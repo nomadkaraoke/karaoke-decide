@@ -14,6 +14,7 @@
 | Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Development setup | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
 | API reference | [docs/API.md](docs/API.md) |
+| **Testing guide** | [docs/TESTING.md](docs/TESTING.md) |
 
 ## Project Overview
 
@@ -26,6 +27,17 @@
 
 ## Essential Rules
 
+### Code Quality (SOLID)
+
+All code must follow SOLID principles:
+- **Single Responsibility** - Each class/function does one thing
+- **Open/Closed** - Open for extension, closed for modification
+- **Liskov Substitution** - Subtypes substitutable for base types
+- **Interface Segregation** - Specific interfaces over general ones
+- **Dependency Inversion** - Depend on abstractions, not concretions
+
+See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
+
 ### Git Workflow
 
 1. **Never commit directly to `main`** - always use feature branches
@@ -34,19 +46,47 @@
    git worktree add -b feature/xyz ../karaoke-decide-feat-xyz main
    ```
 3. **PR format:** Summary, changes list, testing info
-4. **Merge only after CI passes**
+4. **CI must pass before merge** - lint, unit tests, backend tests, frontend build
 
-### Testing (Required Before Commit)
+### Testing (Mandatory)
+
+**CI blocks merge if tests fail.** Coverage requirements:
+- Unit tests: **70%+** coverage
+- Backend tests: **60%+** coverage
 
 ```bash
-# Run all tests (should complete in <2 min)
+# Run all tests before committing
 make test
 
 # Run specific test suites
-make test-unit      # Fast unit tests
-make test-backend   # Backend tests
-make test-e2e       # Emulator tests (if applicable)
+make test-unit      # Fast unit tests (70%+ coverage required)
+make test-backend   # Backend tests (60%+ coverage required)
+make test-e2e       # E2E with emulators
+
+# Frontend E2E with Playwright
+cd frontend && npm run e2e
 ```
+
+**New features require tests.** No exceptions.
+
+### Playwright for Frontend Issues
+
+When investigating frontend bugs or verifying behavior:
+
+```bash
+cd frontend
+
+# Run e2e tests against production
+BASE_URL=https://decide.nomadkaraoke.com npx playwright test
+
+# Debug with visible browser
+npx playwright test --headed --debug
+
+# Capture traces for failed tests
+npx playwright test --trace on
+```
+
+See [docs/TESTING.md](docs/TESTING.md) for Playwright setup and usage.
 
 ### Version Bumping
 

@@ -37,6 +37,7 @@ See [PLAN.md](PLAN.md) for complete implementation phases.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data schemas, BigQuery setup |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup, testing, deployment |
 | [API.md](API.md) | Backend endpoint documentation |
+| [TESTING.md](TESTING.md) | **Testing guide** - SOLID, test types, coverage, Playwright |
 | [LESSONS-LEARNED.md](LESSONS-LEARNED.md) | Accumulated wisdom - check before starting similar work |
 
 ## Quick Reference
