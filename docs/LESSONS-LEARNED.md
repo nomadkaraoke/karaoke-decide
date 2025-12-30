@@ -277,3 +277,59 @@ created_at: datetime = Field(default_factory=datetime.utcnow)
 # GOOD - timezone-aware
 created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 ```
+
+---
+
+### 2025-12-30: CodeRabbit Review - Type Centralization
+
+**Context:** CodeRabbit flagged duplicate TypeScript interfaces defined locally in multiple components instead of using the central types file.
+
+**Lesson:** Keep TypeScript types in a single `src/types/index.ts` file and import them. Duplicate interfaces across components leads to type drift and maintenance burden.
+
+**Recommendation:**
+```typescript
+// BAD - local interface duplicated in each component
+interface Recommendation {
+  song_id: string;
+  // ... fields
+}
+
+// GOOD - import from central types
+import type { Recommendation } from "@/types";
+```
+
+---
+
+### 2025-12-30: CodeRabbit Review - Next.js SPA Navigation
+
+**Context:** CodeRabbit flagged use of `window.location.href` for navigation in Next.js pages.
+
+**Lesson:** Using `window.location.href` causes full page reloads, losing Next.js client-side routing benefits. Always use `useRouter` from `next/navigation` for internal navigation.
+
+**Recommendation:**
+```typescript
+// BAD - full page reload
+onClick: () => (window.location.href = "/services")
+
+// GOOD - SPA navigation
+import { useRouter } from "next/navigation";
+const router = useRouter();
+onClick: () => router.push("/services")
+```
+
+---
+
+### 2025-12-30: CodeRabbit Review - window.open Security
+
+**Context:** CodeRabbit flagged `window.open()` calls missing security parameters when opening external URLs.
+
+**Lesson:** When opening external URLs (like YouTube search), always pass `'noopener,noreferrer'` as the third parameter to prevent the opened page from accessing `window.opener` and to avoid leaking referrer information.
+
+**Recommendation:**
+```typescript
+// BAD - security risk
+window.open(url, "_blank");
+
+// GOOD - secure
+window.open(url, "_blank", "noopener,noreferrer");
+```

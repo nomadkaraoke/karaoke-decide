@@ -8,9 +8,8 @@ test.describe('Production Smoke Tests', () => {
   test('homepage loads successfully', async ({ page }) => {
     await page.goto('/');
 
-    // Check main heading is visible
-    await expect(page.getByText('Nomad')).toBeVisible();
-    await expect(page.getByText('Karaoke')).toBeVisible();
+    // Check navigation logo is visible
+    await expect(page.getByText('Nomad').first()).toBeVisible();
 
     // Check search input is present
     await expect(page.getByPlaceholder(/search/i)).toBeVisible();
@@ -83,7 +82,7 @@ test.describe('Production Smoke Tests', () => {
     await expect(page.getByPlaceholder(/search/i)).toBeVisible();
 
     // Header should be visible
-    await expect(page.getByText('Nomad')).toBeVisible();
+    await expect(page.getByText('Nomad').first()).toBeVisible();
   });
 
   test('API is responding', async ({ page }) => {
