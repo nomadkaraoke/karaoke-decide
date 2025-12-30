@@ -22,24 +22,30 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │                        Backend API                                   │
 │                    (FastAPI on Cloud Run)                           │
 ├─────────────────────────────────────────────────────────────────────┤
-│  /api/auth/*      - Magic link authentication                       │
-│  /api/services/*  - Music service OAuth & sync                      │
-│  /api/catalog/*   - Karaoke song catalog                            │
-│  /api/my/*        - User's matched songs, history                   │
-│  /api/playlists/* - Playlist management                             │
+│  /api/catalog/*   - Karaoke song catalog (BigQuery)        ✅ LIVE  │
+│  /api/auth/*      - Magic link authentication              PLANNED  │
+│  /api/services/*  - Music service OAuth & sync             PLANNED  │
+│  /api/my/*        - User's matched songs, history          PLANNED  │
+│  /api/playlists/* - Playlist management                    PLANNED  │
 └────────┬───────────────────┬────────────────────────────────────────┘
          │                   │
          ▼                   ▼
 ┌─────────────────┐ ┌─────────────────────────────────────────────────┐
-│   Firestore     │ │              External Services                  │
-│   (Database)    │ ├─────────────────────────────────────────────────┤
+│   BigQuery      │ │              External Services                  │
+│   (Analytics)   │ ├─────────────────────────────────────────────────┤
 ├─────────────────┤ │  Spotify API     - User listening history       │
-│  users          │ │  Last.fm API     - Scrobbles and loved tracks   │
-│  music_services │ │  KaraokeNerds    - Karaoke song catalog         │
-│  karaoke_songs  │ │  SendGrid        - Magic link emails            │
-│  user_songs     │ │                                                 │
-│  playlists      │ └─────────────────────────────────────────────────┘
-│  sung_records   │
+│ karaokenerds_   │ │  Last.fm API     - Scrobbles and loved tracks   │
+│   raw (275K)    │ │  KaraokeNerds    - Karaoke song catalog         │
+│ spotify_tracks  │ │  SendGrid        - Magic link emails            │
+│   (256M)        │ │                                                 │
+├─────────────────┤ └─────────────────────────────────────────────────┘
+│   Firestore     │
+│   (User Data)   │
+├─────────────────┤
+│  users          │
+│  music_services │
+│  user_songs     │
+│  playlists      │
 └─────────────────┘
 ```
 
@@ -125,10 +131,36 @@ sung_records:
 4. **API Rate Limiting**: 100 requests/minute per user
 5. **CORS**: Restricted to known domains
 
+## BigQuery Data
+
+### karaokenerds_raw (275,809 rows)
+Karaoke song catalog from KaraokeNerds.com.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| Id | STRING | Unique song ID |
+| Artist | STRING | Artist name |
+| Title | STRING | Song title |
+| Brands | STRING | Comma-separated karaoke brands |
+| brand_count | INT | Number of brands (popularity signal) |
+
+### spotify_tracks (256,039,007 rows)
+Spotify track metadata from Anna's Archive dump.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| spotify_id | STRING | Spotify track ID |
+| title | STRING | Track title |
+| artist_name | STRING | Primary artist |
+| isrc | STRING | International Standard Recording Code |
+| popularity | INT | Spotify popularity (0-100) |
+| duration_ms | INT | Track duration |
+| explicit | BOOL | Explicit content flag |
+
 ## Deployment
 
-- **API**: Cloud Run (auto-scaling, 0-10 instances)
-- **Database**: Firestore (serverless)
+- **API**: Cloud Run (auto-scaling, 0-10 instances) - *pending*
+- **Database**: BigQuery (song catalog), Firestore (user data)
 - **Secrets**: Google Secret Manager
-- **Frontend**: Cloudflare Pages (static)
+- **Frontend**: GitHub Pages at decide.nomadkaraoke.com
 - **IaC**: Pulumi (Python)

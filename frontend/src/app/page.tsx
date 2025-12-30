@@ -1,26 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-// Mock data - will be replaced with API calls
-const POPULAR_SONGS = [
-  { id: 37187, artist: "ABBA", title: "Dancing Queen", brandCount: 58 },
-  { id: 45317, artist: "Queen", title: "Bohemian Rhapsody", brandCount: 45 },
-  { id: 12345, artist: "Frank Sinatra", title: "My Way", brandCount: 62 },
-  { id: 23456, artist: "Gloria Gaynor", title: "I Will Survive", brandCount: 60 },
-  { id: 34567, artist: "Whitney Houston", title: "I Will Always Love You", brandCount: 54 },
-  { id: 45678, artist: "Journey", title: "Don't Stop Believin'", brandCount: 48 },
-  { id: 56789, artist: "Adele", title: "Someone Like You", brandCount: 42 },
-  { id: 67890, artist: "The Killers", title: "Mr. Brightside", brandCount: 38 },
-  { id: 78901, artist: "Bon Jovi", title: "Livin' on a Prayer", brandCount: 52 },
-  { id: 89012, artist: "Madonna", title: "Like a Virgin", brandCount: 61 },
-];
+// API configuration
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://karaoke-decide-718638054799.us-central1.run.app";
 
 interface Song {
   id: number;
   artist: string;
   title: string;
   brandCount: number;
+}
+
+interface ApiSong {
+  id: number;
+  artist: string;
+  title: string;
+  brand_count: number;
+  brands: string[];
+  is_popular: boolean;
+}
+
+interface ApiSearchResponse {
+  songs: ApiSong[];
+  total: number;
+  page: number;
+  per_page: number;
+  has_more: boolean;
+}
+
+// Convert API response to our Song type
+function mapApiSong(apiSong: ApiSong): Song {
+  return {
+    id: apiSong.id,
+    artist: apiSong.artist,
+    title: apiSong.title,
+    brandCount: apiSong.brand_count,
+  };
+}
+
+// API client functions
+async function fetchPopularSongs(limit: number = 20): Promise<Song[]> {
+  const response = await fetch(`${API_BASE_URL}/api/catalog/songs/popular?limit=${limit}`);
+  if (!response.ok) throw new Error("Failed to fetch popular songs");
+  const data: ApiSong[] = await response.json();
+  return data.map(mapApiSong);
+}
+
+async function searchSongs(query: string, limit: number = 20): Promise<Song[]> {
+  const response = await fetch(`${API_BASE_URL}/api/catalog/songs?q=${encodeURIComponent(query)}&per_page=${limit}`);
+  if (!response.ok) throw new Error("Failed to search songs");
+  const data: ApiSearchResponse = await response.json();
+  return data.songs.map(mapApiSong);
 }
 
 function MicrophoneIcon({ className }: { className?: string }) {
@@ -135,42 +166,69 @@ function LoadingPulse() {
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [songs, setSongs] = useState<Song[]>(POPULAR_SONGS);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate search (will be replaced with real API)
-  const handleSearch = async (query: string) => {
+  // Load popular songs on mount
+  useEffect(() => {
+    const loadPopular = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const popularSongs = await fetchPopularSongs(20);
+        setSongs(popularSongs);
+      } catch (err) {
+        setError("Failed to load songs. Please try again.");
+        console.error("Error loading popular songs:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPopular();
+  }, []);
+
+  // Search handler
+  const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
-      setSongs(POPULAR_SONGS);
-      setHasSearched(false);
+      // Reset to popular songs
+      try {
+        setIsSearching(true);
+        const popularSongs = await fetchPopularSongs(20);
+        setSongs(popularSongs);
+        setHasSearched(false);
+      } catch (err) {
+        console.error("Error loading popular songs:", err);
+      } finally {
+        setIsSearching(false);
+      }
       return;
     }
 
     setIsSearching(true);
     setHasSearched(true);
+    setError(null);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 300));
-
-    // Filter mock data (will be replaced with API call)
-    const filtered = POPULAR_SONGS.filter(
-      (song) =>
-        song.title.toLowerCase().includes(query.toLowerCase()) ||
-        song.artist.toLowerCase().includes(query.toLowerCase())
-    );
-
-    setSongs(filtered);
-    setIsSearching(false);
-  };
+    try {
+      const results = await searchSongs(query, 30);
+      setSongs(results);
+    } catch (err) {
+      setError("Search failed. Please try again.");
+      console.error("Error searching songs:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       handleSearch(searchQuery);
-    }, 200);
+    }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, handleSearch]);
 
   return (
     <main className="relative min-h-screen pb-safe">
@@ -233,8 +291,21 @@ export default function Home() {
         </div>
 
         {/* Song list */}
-        {isSearching ? (
+        {isLoading || isSearching ? (
           <LoadingPulse />
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <p className="text-white/60 mb-2">{error}</p>
+            <button
+              onClick={() => handleSearch(searchQuery)}
+              className="mt-2 px-4 py-2 rounded-full bg-white/10 text-white/80 text-sm hover:bg-white/20 transition-colors"
+            >
+              Try again
+            </button>
+          </div>
         ) : songs.length > 0 ? (
           <div className="flex flex-col gap-3">
             {songs.map((song, index) => (

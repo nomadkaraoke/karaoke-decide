@@ -17,10 +17,10 @@
 - **Language:** Python (same package as core)
 - **Entry Point:** `karaoke-decide`
 
-### Frontend (Phase 2)
-- **Framework:** Next.js with TypeScript
-- **UI:** Radix UI + Tailwind CSS
-- **Hosting:** Cloudflare Pages
+### Frontend
+- **Framework:** Next.js 16 with TypeScript (App Router)
+- **UI:** Tailwind CSS with custom neon-noir theme
+- **Hosting:** GitHub Pages (decide.nomadkaraoke.com)
 
 ### Infrastructure
 - **IaC:** Pulumi (Python)
@@ -275,12 +275,12 @@ karaoke-decide playlist show <playlist_id>
 
 ## Development Phases
 
-### Phase 1: Data Foundation
-1. [ ] ETL Spotify metadata dump → extract to usable format
-2. [ ] Download and parse KaraokeNerds catalog
-3. [ ] Design combined song schema
-4. [ ] Load initial dataset (top 100K songs by popularity)
-5. [ ] Basic song search API
+### Phase 1: Data Foundation ✅ COMPLETE
+1. [x] ETL Spotify metadata dump → extract to usable format (256M tracks to BigQuery)
+2. [x] Download and parse KaraokeNerds catalog (275K songs to BigQuery)
+3. [x] Design combined song schema
+4. [x] Load full dataset to BigQuery
+5. [x] Basic song search API with BigQuery backend
 
 ### Phase 2: Auth & User Management
 1. [ ] Magic link email flow (SendGrid)
@@ -318,13 +318,15 @@ karaoke-decide playlist show <playlist_id>
 3. [ ] CI/CD pipeline
 4. [ ] Monitoring & logging
 
-### Phase 8: Web Frontend
-1. [ ] Next.js project setup
+### Phase 8: Web Frontend 🚧 IN PROGRESS
+1. [x] Next.js project setup (App Router, TypeScript, Tailwind)
 2. [ ] Auth flow
-3. [ ] Song discovery UI
+3. [x] Song discovery UI (neon-noir theme, mobile-first)
 4. [ ] Quiz onboarding
 5. [ ] Playlist management
-6. [ ] Mobile-responsive design
+6. [x] Mobile-responsive design
+7. [x] GitHub Pages deployment (decide.nomadkaraoke.com)
+8. [ ] Connect to backend API
 
 ## Future Phases (Post-MLP)
 

@@ -34,3 +34,21 @@ I'd like to reboot this song chooser app but forget about the mobile app for now
 ### Development Approach
 
 Reuse patterns, infrastructure, docs, claude skills/slash commands etc. from the karaoke-gen project to move fast on this new project.
+
+## Current Status (December 2024)
+
+### What's Live
+- **Frontend:** https://decide.nomadkaraoke.com - Mobile-first song search with neon-noir theme
+- **Data:** BigQuery with 275K karaoke songs + 256M Spotify tracks
+
+### What's Working
+- CLI song search commands (`karaoke-decide songs search/popular/artist`)
+- FastAPI backend with BigQuery integration
+- Catalog API endpoints (search, popular, stats)
+- GitHub Actions deployment pipeline
+
+### Next Steps
+1. Connect frontend to backend API
+2. Deploy backend to Cloud Run
+3. Add user authentication
+4. Spotify/Last.fm integration for personalized recommendations
