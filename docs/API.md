@@ -160,27 +160,141 @@ Get catalog statistics.
 
 ---
 
-## Services (Not Yet Implemented)
+## Services ✅ Implemented
 
 ### GET /api/services
 
 List connected music services.
 
+**Requires:** Bearer token
+
+**Response:**
+```json
+[
+  {
+    "service_type": "spotify",
+    "service_username": "SpotifyUser123",
+    "last_sync_at": "2024-12-30T12:00:00Z",
+    "sync_status": "idle",
+    "sync_error": null,
+    "tracks_synced": 150
+  }
+]
+```
+
 ### POST /api/services/spotify/connect
 
-Start Spotify OAuth flow.
+Start Spotify OAuth flow. Returns an authorization URL to redirect the user.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "auth_url": "https://accounts.spotify.com/authorize?..."
+}
+```
 
 ### GET /api/services/spotify/callback
 
-Spotify OAuth callback.
+Spotify OAuth callback. Called by Spotify after user authorization.
+Redirects to frontend success/error page.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| code | string | Authorization code from Spotify |
+| state | string | CSRF protection state token |
+| error | string | Error code if auth failed |
+
+**Response:** Redirect to `{frontend_url}/services/spotify/success` or `{frontend_url}/services/spotify/error?message=...`
 
 ### POST /api/services/lastfm/connect
 
-Connect Last.fm account.
+Connect Last.fm account by username.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "username": "lastfmuser"
+}
+```
+
+**Response:**
+```json
+{
+  "service_type": "lastfm",
+  "service_username": "lastfmuser",
+  "last_sync_at": null,
+  "sync_status": "idle",
+  "sync_error": null,
+  "tracks_synced": 0
+}
+```
+
+### DELETE /api/services/{service_type}
+
+Disconnect a music service.
+
+**Requires:** Bearer token
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| service_type | string | "spotify" or "lastfm" |
+
+**Response:**
+```json
+{
+  "message": "Successfully disconnected spotify"
+}
+```
 
 ### POST /api/services/sync
 
-Trigger listening history sync.
+Trigger listening history sync for all connected services.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "service_type": "spotify",
+      "tracks_fetched": 100,
+      "tracks_matched": 75,
+      "user_songs_created": 50,
+      "user_songs_updated": 25,
+      "error": null
+    }
+  ]
+}
+```
+
+### GET /api/services/sync/status
+
+Get current sync status for all connected services.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "services": [
+    {
+      "service_type": "spotify",
+      "service_username": "SpotifyUser123",
+      "last_sync_at": "2024-12-30T12:00:00Z",
+      "sync_status": "idle",
+      "sync_error": null,
+      "tracks_synced": 150
+    }
+  ]
+}
+```
 
 ---
 
