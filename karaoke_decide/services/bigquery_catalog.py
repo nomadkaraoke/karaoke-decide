@@ -8,6 +8,7 @@ from google.cloud import bigquery
 @dataclass
 class SongResult:
     """Song from the catalog."""
+
     id: int
     artist: str
     title: str

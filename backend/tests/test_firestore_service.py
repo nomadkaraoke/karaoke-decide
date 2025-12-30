@@ -74,9 +74,7 @@ class TestFirestoreServiceGetDocument:
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")
-    async def test_get_document_found(
-        self, mock_async_client: MagicMock, firestore_service: FirestoreService
-    ) -> None:
+    async def test_get_document_found(self, mock_async_client: MagicMock, firestore_service: FirestoreService) -> None:
         """Test getting a document that exists."""
         mock_client = mock_async_client.return_value
         mock_doc_ref = MagicMock()
@@ -116,18 +114,14 @@ class TestFirestoreServiceSetDocument:
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")
-    async def test_set_document(
-        self, mock_async_client: MagicMock, firestore_service: FirestoreService
-    ) -> None:
+    async def test_set_document(self, mock_async_client: MagicMock, firestore_service: FirestoreService) -> None:
         """Test setting a document."""
         mock_client = mock_async_client.return_value
         mock_doc_ref = MagicMock()
         mock_doc_ref.set = AsyncMock()
         mock_client.collection.return_value.document.return_value = mock_doc_ref
 
-        await firestore_service.set_document(
-            "users", "user123", {"name": "Test User"}
-        )
+        await firestore_service.set_document("users", "user123", {"name": "Test User"})
 
         mock_doc_ref.set.assert_called_once_with({"name": "Test User"}, merge=False)
 
@@ -142,9 +136,7 @@ class TestFirestoreServiceSetDocument:
         mock_doc_ref.set = AsyncMock()
         mock_client.collection.return_value.document.return_value = mock_doc_ref
 
-        await firestore_service.set_document(
-            "users", "user123", {"name": "Updated"}, merge=True
-        )
+        await firestore_service.set_document("users", "user123", {"name": "Updated"}, merge=True)
 
         mock_doc_ref.set.assert_called_once_with({"name": "Updated"}, merge=True)
 
@@ -154,18 +146,14 @@ class TestFirestoreServiceUpdateDocument:
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")
-    async def test_update_document(
-        self, mock_async_client: MagicMock, firestore_service: FirestoreService
-    ) -> None:
+    async def test_update_document(self, mock_async_client: MagicMock, firestore_service: FirestoreService) -> None:
         """Test updating a document."""
         mock_client = mock_async_client.return_value
         mock_doc_ref = MagicMock()
         mock_doc_ref.update = AsyncMock()
         mock_client.collection.return_value.document.return_value = mock_doc_ref
 
-        await firestore_service.update_document(
-            "users", "user123", {"last_login": "2024-01-01"}
-        )
+        await firestore_service.update_document("users", "user123", {"last_login": "2024-01-01"})
 
         mock_doc_ref.update.assert_called_once_with({"last_login": "2024-01-01"})
 
@@ -175,9 +163,7 @@ class TestFirestoreServiceDeleteDocument:
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")
-    async def test_delete_document(
-        self, mock_async_client: MagicMock, firestore_service: FirestoreService
-    ) -> None:
+    async def test_delete_document(self, mock_async_client: MagicMock, firestore_service: FirestoreService) -> None:
         """Test deleting a document."""
         mock_client = mock_async_client.return_value
         mock_doc_ref = MagicMock()
@@ -292,9 +278,7 @@ class TestFirestoreServiceCountDocuments:
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")
-    async def test_count_documents(
-        self, mock_async_client: MagicMock, firestore_service: FirestoreService
-    ) -> None:
+    async def test_count_documents(self, mock_async_client: MagicMock, firestore_service: FirestoreService) -> None:
         """Test counting documents."""
         mock_client = mock_async_client.return_value
         mock_query = MagicMock()

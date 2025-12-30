@@ -26,9 +26,7 @@ class LastFmClient:
             {"user": username},
         )
 
-    async def get_loved_tracks(
-        self, username: str, limit: int = 50, page: int = 1
-    ) -> dict[str, Any]:
+    async def get_loved_tracks(self, username: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
         """Get user's loved tracks."""
         return await self._api_request(
             "user.getlovedtracks",
@@ -55,9 +53,7 @@ class LastFmClient:
             {"user": username, "period": period, "limit": limit, "page": page},
         )
 
-    async def get_recent_tracks(
-        self, username: str, limit: int = 50, page: int = 1
-    ) -> dict[str, Any]:
+    async def get_recent_tracks(self, username: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
         """Get user's recent tracks with play timestamps."""
         return await self._api_request(
             "user.getrecenttracks",

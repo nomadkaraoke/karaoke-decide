@@ -81,9 +81,7 @@ class SpotifyClient:
         """Get current user's profile."""
         return await self._api_request("GET", "/me", access_token)
 
-    async def get_saved_tracks(
-        self, access_token: str, limit: int = 50, offset: int = 0
-    ) -> dict[str, Any]:
+    async def get_saved_tracks(self, access_token: str, limit: int = 50, offset: int = 0) -> dict[str, Any]:
         """Get user's saved tracks."""
         return await self._api_request(
             "GET",
@@ -107,9 +105,7 @@ class SpotifyClient:
             params={"time_range": time_range, "limit": limit, "offset": offset},
         )
 
-    async def get_recently_played(
-        self, access_token: str, limit: int = 50
-    ) -> dict[str, Any]:
+    async def get_recently_played(self, access_token: str, limit: int = 50) -> dict[str, Any]:
         """Get user's recently played tracks."""
         return await self._api_request(
             "GET",

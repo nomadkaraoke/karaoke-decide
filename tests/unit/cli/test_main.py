@@ -310,6 +310,7 @@ class TestGetCatalogService:
         """Test service is created lazily and cached."""
         # Reset the global state
         import karaoke_decide.cli.main as cli_module
+
         cli_module._catalog_service = None
 
         # First call creates service

@@ -93,7 +93,7 @@ def extract_tracks_to_ndjson(db_path: str, output_path: str, batch_size: int = 1
         print(f"  {table}: {info['count']:,} rows")
 
     # Determine the actual query based on available tables
-    if 'tracks' in schema:
+    if "tracks" in schema:
         # Anna's Archive format
         query = """
             SELECT
@@ -115,7 +115,7 @@ def extract_tracks_to_ndjson(db_path: str, output_path: str, batch_size: int = 1
         raise ValueError(f"Unknown schema format. Tables: {list(schema.keys())}")
 
     print(f"Extracting to {output_path}...")
-    with gzip.open(output_path, 'wt', encoding='utf-8') as f:
+    with gzip.open(output_path, "wt", encoding="utf-8") as f:
         offset = 0
         total = 0
         while True:
@@ -129,8 +129,8 @@ def extract_tracks_to_ndjson(db_path: str, output_path: str, batch_size: int = 1
                 # Convert any non-JSON-serializable types
                 for k, v in record.items():
                     if isinstance(v, bytes):
-                        record[k] = v.decode('utf-8', errors='replace')
-                f.write(json.dumps(record) + '\n')
+                        record[k] = v.decode("utf-8", errors="replace")
+                f.write(json.dumps(record) + "\n")
 
             total += len(rows)
             offset += batch_size
@@ -157,7 +157,7 @@ def extract_audio_features_to_ndjson(db_path: str, output_path: str, batch_size:
     # Find the audio features table
     audio_table = None
     for table in schema.keys():
-        if 'audio' in table.lower() or 'feature' in table.lower():
+        if "audio" in table.lower() or "feature" in table.lower():
             audio_table = table
             break
 
@@ -165,13 +165,13 @@ def extract_audio_features_to_ndjson(db_path: str, output_path: str, batch_size:
         audio_table = list(schema.keys())[0]  # Use first table
 
     print(f"Using table: {audio_table}")
-    columns = [col[0] for col in schema[audio_table]['columns']]
+    columns = [col[0] for col in schema[audio_table]["columns"]]
     print(f"Columns: {columns}")
 
     query = f"SELECT * FROM {audio_table}"
 
     print(f"Extracting to {output_path}...")
-    with gzip.open(output_path, 'wt', encoding='utf-8') as f:
+    with gzip.open(output_path, "wt", encoding="utf-8") as f:
         offset = 0
         total = 0
         while True:
@@ -184,8 +184,8 @@ def extract_audio_features_to_ndjson(db_path: str, output_path: str, batch_size:
                 record = dict(row)
                 for k, v in record.items():
                     if isinstance(v, bytes):
-                        record[k] = v.decode('utf-8', errors='replace')
-                f.write(json.dumps(record) + '\n')
+                        record[k] = v.decode("utf-8", errors="replace")
+                f.write(json.dumps(record) + "\n")
 
             total += len(rows)
             offset += batch_size
@@ -254,8 +254,7 @@ def main():
     extract_tracks_to_ndjson(tracks_db, tracks_ndjson)
     upload_to_gcs(tracks_ndjson, "spotify/spotify_tracks.ndjson.gz")
     load_to_bigquery(
-        f"gs://{GCS_BUCKET}/spotify/spotify_tracks.ndjson.gz",
-        f"{PROJECT_ID}.{DATASET_ID}.spotify_tracks_raw"
+        f"gs://{GCS_BUCKET}/spotify/spotify_tracks.ndjson.gz", f"{PROJECT_ID}.{DATASET_ID}.spotify_tracks_raw"
     )
 
     # Process audio features
@@ -272,7 +271,7 @@ def main():
     upload_to_gcs(audio_ndjson, "spotify/spotify_audio_features.ndjson.gz")
     load_to_bigquery(
         f"gs://{GCS_BUCKET}/spotify/spotify_audio_features.ndjson.gz",
-        f"{PROJECT_ID}.{DATASET_ID}.spotify_audio_features_raw"
+        f"{PROJECT_ID}.{DATASET_ID}.spotify_audio_features_raw",
     )
 
     print("\n" + "=" * 60)

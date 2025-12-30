@@ -127,28 +127,30 @@ cloud_run_service = gcp.cloudrunv2.Service(
     ingress="INGRESS_TRAFFIC_ALL",
     launch_stage="GA",
     template={
-        "containers": [{
-            "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
-            "ports": {
-                "container_port": 8000,
-                "name": "http1",
-            },
-            "envs": [{"name": "ENVIRONMENT", "value": environment}],
-            "resources": {
-                "limits": {
-                    "cpu": "1",
-                    "memory": "512Mi",
+        "containers": [
+            {
+                "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                "ports": {
+                    "container_port": 8000,
+                    "name": "http1",
                 },
-                "cpu_idle": True,
-                "startup_cpu_boost": True,
-            },
-            "startup_probe": {
-                "tcp_socket": {"port": 8000},
-                "timeout_seconds": 240,
-                "period_seconds": 240,
-                "failure_threshold": 1,
-            },
-        }],
+                "envs": [{"name": "ENVIRONMENT", "value": environment}],
+                "resources": {
+                    "limits": {
+                        "cpu": "1",
+                        "memory": "512Mi",
+                    },
+                    "cpu_idle": True,
+                    "startup_cpu_boost": True,
+                },
+                "startup_probe": {
+                    "tcp_socket": {"port": 8000},
+                    "timeout_seconds": 240,
+                    "period_seconds": 240,
+                    "failure_threshold": 1,
+                },
+            }
+        ],
         "scaling": {
             "max_instance_count": 10,
         },
@@ -156,10 +158,12 @@ cloud_run_service = gcp.cloudrunv2.Service(
         "timeout": "300s",
         "service_account": f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
     },
-    traffics=[{
-        "percent": 100,
-        "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
-    }],
+    traffics=[
+        {
+            "percent": 100,
+            "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+        }
+    ],
     scaling={
         "min_instance_count": 0,
     },
@@ -169,9 +173,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
 # Allow unauthenticated access to Cloud Run service
 cloud_run_invoker = gcp.cloudrunv2.ServiceIamMember(
     "karaoke-decide-invoker",
-    name=cloud_run_service.name.apply(
-        lambda name: f"projects/{project}/locations/{region}/services/{name}"
-    ),
+    name=cloud_run_service.name.apply(lambda name: f"projects/{project}/locations/{region}/services/{name}"),
     project=project,
     location=region,
     role="roles/run.invoker",

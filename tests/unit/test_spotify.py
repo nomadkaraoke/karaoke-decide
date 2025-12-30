@@ -92,9 +92,7 @@ class TestExchangeCode:
         }
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
 
             result = await spotify_client.exchange_code("auth_code")
 
@@ -109,9 +107,7 @@ class TestExchangeCode:
         mock_response.text = "Invalid code"
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
 
             with pytest.raises(ExternalServiceError) as exc_info:
                 await spotify_client.exchange_code("bad_code")
@@ -133,9 +129,7 @@ class TestRefreshToken:
         }
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
 
             result = await spotify_client.refresh_token("refresh_token")
 
@@ -149,9 +143,7 @@ class TestRefreshToken:
         mock_response.text = "Invalid refresh token"
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.post = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
 
             with pytest.raises(ExternalServiceError):
                 await spotify_client.refresh_token("bad_token")
@@ -168,27 +160,21 @@ class TestApiRequest:
         mock_response.json.return_value = {"id": "user123", "display_name": "Test"}
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.request = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.request = AsyncMock(return_value=mock_response)
 
             result = await spotify_client._api_request("GET", "/me", "access_token")
 
             assert result["id"] == "user123"
 
     @pytest.mark.asyncio
-    async def test_api_request_rate_limited(
-        self, spotify_client: SpotifyClient
-    ) -> None:
+    async def test_api_request_rate_limited(self, spotify_client: SpotifyClient) -> None:
         """Test rate limit handling."""
         mock_response = MagicMock()
         mock_response.status_code = 429
         mock_response.headers = {"Retry-After": "30"}
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.request = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.request = AsyncMock(return_value=mock_response)
 
             with pytest.raises(RateLimitError) as exc_info:
                 await spotify_client._api_request("GET", "/me", "token")
@@ -204,9 +190,7 @@ class TestApiRequest:
         mock_response.text = "Internal server error"
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.request = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.request = AsyncMock(return_value=mock_response)
 
             with pytest.raises(ExternalServiceError):
                 await spotify_client._api_request("GET", "/me", "token")
@@ -218,9 +202,7 @@ class TestSpotifyApiMethods:
     @pytest.mark.asyncio
     async def test_get_current_user(self, spotify_client: SpotifyClient) -> None:
         """Test get_current_user calls correct endpoint."""
-        with patch.object(
-            spotify_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(spotify_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"id": "user123"}
 
             result = await spotify_client.get_current_user("token")
@@ -231,28 +213,20 @@ class TestSpotifyApiMethods:
     @pytest.mark.asyncio
     async def test_get_saved_tracks(self, spotify_client: SpotifyClient) -> None:
         """Test get_saved_tracks calls correct endpoint."""
-        with patch.object(
-            spotify_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(spotify_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"items": []}
 
             await spotify_client.get_saved_tracks("token", limit=20, offset=10)
 
-            mock_request.assert_called_once_with(
-                "GET", "/me/tracks", "token", params={"limit": 20, "offset": 10}
-            )
+            mock_request.assert_called_once_with("GET", "/me/tracks", "token", params={"limit": 20, "offset": 10})
 
     @pytest.mark.asyncio
     async def test_get_top_tracks(self, spotify_client: SpotifyClient) -> None:
         """Test get_top_tracks calls correct endpoint."""
-        with patch.object(
-            spotify_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(spotify_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"items": []}
 
-            await spotify_client.get_top_tracks(
-                "token", time_range="short_term", limit=10
-            )
+            await spotify_client.get_top_tracks("token", time_range="short_term", limit=10)
 
             mock_request.assert_called_once()
             call_args = mock_request.call_args
@@ -261,13 +235,9 @@ class TestSpotifyApiMethods:
     @pytest.mark.asyncio
     async def test_get_recently_played(self, spotify_client: SpotifyClient) -> None:
         """Test get_recently_played calls correct endpoint."""
-        with patch.object(
-            spotify_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(spotify_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"items": []}
 
             await spotify_client.get_recently_played("token", limit=25)
 
-            mock_request.assert_called_once_with(
-                "GET", "/me/player/recently-played", "token", params={"limit": 25}
-            )
+            mock_request.assert_called_once_with("GET", "/me/player/recently-played", "token", params={"limit": 25})

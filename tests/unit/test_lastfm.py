@@ -79,18 +79,12 @@ class TestApiRequest:
         """Test successful API request."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "user": {"name": "testuser", "playcount": "1000"}
-        }
+        mock_response.json.return_value = {"user": {"name": "testuser", "playcount": "1000"}}
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
-            result = await lastfm_client._api_request(
-                "user.getinfo", {"user": "testuser"}
-            )
+            result = await lastfm_client._api_request("user.getinfo", {"user": "testuser"})
 
             assert result["user"]["name"] == "testuser"
 
@@ -102,9 +96,7 @@ class TestApiRequest:
         mock_response.text = "Server error"
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
             with pytest.raises(ExternalServiceError) as exc_info:
                 await lastfm_client._api_request("user.getinfo", {"user": "test"})
@@ -122,9 +114,7 @@ class TestApiRequest:
         }
 
         with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__.return_value.get = AsyncMock(
-                return_value=mock_response
-            )
+            mock_client.return_value.__aenter__.return_value.get = AsyncMock(return_value=mock_response)
 
             with pytest.raises(ExternalServiceError) as exc_info:
                 await lastfm_client._api_request("user.getinfo", {"user": "bad_user"})
@@ -132,9 +122,7 @@ class TestApiRequest:
             assert "User not found" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_api_request_includes_api_key(
-        self, lastfm_client: LastFmClient
-    ) -> None:
+    async def test_api_request_includes_api_key(self, lastfm_client: LastFmClient) -> None:
         """Test API requests include api_key parameter."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -158,43 +146,31 @@ class TestLastFmApiMethods:
     @pytest.mark.asyncio
     async def test_get_user_info(self, lastfm_client: LastFmClient) -> None:
         """Test get_user_info calls correct method."""
-        with patch.object(
-            lastfm_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(lastfm_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"user": {"name": "test"}}
 
             result = await lastfm_client.get_user_info("testuser")
 
-            mock_request.assert_called_once_with(
-                "user.getinfo", {"user": "testuser"}
-            )
+            mock_request.assert_called_once_with("user.getinfo", {"user": "testuser"})
             assert result["user"]["name"] == "test"
 
     @pytest.mark.asyncio
     async def test_get_loved_tracks(self, lastfm_client: LastFmClient) -> None:
         """Test get_loved_tracks calls correct method."""
-        with patch.object(
-            lastfm_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(lastfm_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"lovedtracks": {"track": []}}
 
             await lastfm_client.get_loved_tracks("user", limit=25, page=2)
 
-            mock_request.assert_called_once_with(
-                "user.getlovedtracks", {"user": "user", "limit": 25, "page": 2}
-            )
+            mock_request.assert_called_once_with("user.getlovedtracks", {"user": "user", "limit": 25, "page": 2})
 
     @pytest.mark.asyncio
     async def test_get_top_tracks(self, lastfm_client: LastFmClient) -> None:
         """Test get_top_tracks calls correct method."""
-        with patch.object(
-            lastfm_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(lastfm_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"toptracks": {"track": []}}
 
-            await lastfm_client.get_top_tracks(
-                "user", period="7day", limit=10, page=1
-            )
+            await lastfm_client.get_top_tracks("user", period="7day", limit=10, page=1)
 
             mock_request.assert_called_once_with(
                 "user.gettoptracks",
@@ -204,9 +180,7 @@ class TestLastFmApiMethods:
     @pytest.mark.asyncio
     async def test_get_recent_tracks(self, lastfm_client: LastFmClient) -> None:
         """Test get_recent_tracks calls correct method."""
-        with patch.object(
-            lastfm_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(lastfm_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"recenttracks": {"track": []}}
 
             await lastfm_client.get_recent_tracks("user", limit=30, page=1)
@@ -218,13 +192,9 @@ class TestLastFmApiMethods:
     @pytest.mark.asyncio
     async def test_get_track_info(self, lastfm_client: LastFmClient) -> None:
         """Test get_track_info calls correct method."""
-        with patch.object(
-            lastfm_client, "_api_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(lastfm_client, "_api_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"track": {"name": "Song"}}
 
             await lastfm_client.get_track_info("Artist", "Song Title")
 
-            mock_request.assert_called_once_with(
-                "track.getInfo", {"artist": "Artist", "track": "Song Title"}
-            )
+            mock_request.assert_called_once_with("track.getInfo", {"artist": "Artist", "track": "Song Title"})

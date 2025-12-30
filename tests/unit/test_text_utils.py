@@ -1,6 +1,5 @@
 """Tests for text normalization utilities."""
 
-
 from karaoke_decide.utils.text import generate_song_id, normalize_artist, normalize_title
 
 
