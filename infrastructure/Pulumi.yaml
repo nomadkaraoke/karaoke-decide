@@ -1,0 +1,6 @@
+name: karaoke-decide
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+description: Infrastructure for Nomad Karaoke Decide
