@@ -1,5 +1,6 @@
 """Tests for Firestore service."""
 
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -188,7 +189,7 @@ class TestFirestoreServiceQueryDocuments:
         mock_query = MagicMock()
 
         # Create async generator for stream
-        async def async_stream():
+        async def async_stream() -> AsyncGenerator[MagicMock, None]:
             doc = MagicMock()
             doc.id = "user1"
             doc.to_dict.return_value = {"name": "User 1"}
@@ -211,7 +212,7 @@ class TestFirestoreServiceQueryDocuments:
         mock_client = mock_async_client.return_value
         mock_query = MagicMock()
 
-        async def async_stream():
+        async def async_stream() -> AsyncGenerator[MagicMock, None]:
             return
             yield  # Make it an async generator that yields nothing
 
@@ -235,7 +236,7 @@ class TestFirestoreServiceQueryDocuments:
         mock_client = mock_async_client.return_value
         mock_query = MagicMock()
 
-        async def async_stream():
+        async def async_stream() -> AsyncGenerator[MagicMock, None]:
             return
             yield
 
@@ -260,7 +261,7 @@ class TestFirestoreServiceQueryDocuments:
         mock_client = mock_async_client.return_value
         mock_query = MagicMock()
 
-        async def async_stream():
+        async def async_stream() -> AsyncGenerator[MagicMock, None]:
             return
             yield
 

@@ -1,5 +1,7 @@
 """Shared test fixtures for backend tests."""
 
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,23 +20,23 @@ def mock_backend_settings() -> BackendSettings:
 
 
 @pytest.fixture
-def mock_firestore_client():
+def mock_firestore_client() -> Generator[MagicMock, None, None]:
     """Mock Firestore async client."""
     with patch("google.cloud.firestore.AsyncClient") as mock:
         yield mock
 
 
 @pytest.fixture
-def mock_bigquery_client():
+def mock_bigquery_client() -> Generator[MagicMock, None, None]:
     """Mock BigQuery client for catalog tests."""
     with patch("karaoke_decide.services.bigquery_catalog.bigquery.Client") as mock:
         yield mock
 
 
 @pytest.fixture
-def sample_catalog_rows():
+def sample_catalog_rows() -> list[MagicMock]:
     """Sample catalog rows from BigQuery."""
-    rows = []
+    rows: list[MagicMock] = []
     for i, (artist, title, brands) in enumerate(
         [
             (
@@ -61,7 +63,7 @@ def sample_catalog_rows():
 
 
 @pytest.fixture
-def mock_catalog_service(sample_catalog_rows):
+def mock_catalog_service(sample_catalog_rows: list[MagicMock]) -> MagicMock:
     """Mock the catalog service for API tests."""
     mock_service = MagicMock()
 
@@ -75,7 +77,7 @@ def mock_catalog_service(sample_catalog_rows):
     mock_service.get_popular_songs.return_value = sample_catalog_rows
 
     # Mock get_song_by_id
-    def get_song_by_id(song_id):
+    def get_song_by_id(song_id: int) -> MagicMock | None:
         for row in sample_catalog_rows:
             if row.id == song_id:
                 return row
@@ -95,7 +97,7 @@ def mock_catalog_service(sample_catalog_rows):
 
 
 @pytest.fixture
-def client(mock_catalog_service) -> TestClient:
+def client(mock_catalog_service: MagicMock) -> Generator[TestClient, None, None]:
     """Create test client with mocked catalog service."""
     with patch(
         "backend.api.routes.catalog.get_catalog_service",
