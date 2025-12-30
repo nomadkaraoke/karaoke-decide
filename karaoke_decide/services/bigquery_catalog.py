@@ -1,7 +1,7 @@
 """BigQuery-based song catalog service."""
 
-from typing import Optional
 from dataclasses import dataclass
+
 from google.cloud import bigquery
 
 
@@ -21,7 +21,7 @@ class BigQueryCatalogService:
     PROJECT_ID = "nomadkaraoke"
     DATASET_ID = "karaoke_decide"
 
-    def __init__(self, client: Optional[bigquery.Client] = None):
+    def __init__(self, client: bigquery.Client | None = None):
         self.client = client or bigquery.Client(project=self.PROJECT_ID)
 
     def search_songs(
@@ -42,7 +42,7 @@ class BigQueryCatalogService:
         Returns:
             List of matching songs
         """
-        sql = """
+        sql = f"""
             SELECT * FROM (
                 SELECT
                     Id as id,
@@ -50,7 +50,7 @@ class BigQueryCatalogService:
                     Title as title,
                     Brands as brands,
                     ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
-                FROM `{project}.{dataset}.karaokenerds_raw`
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
                 WHERE
                     LOWER(Artist) LIKE LOWER(@query)
                     OR LOWER(Title) LIKE LOWER(@query)
@@ -58,10 +58,7 @@ class BigQueryCatalogService:
             WHERE brand_count >= @min_brands
             ORDER BY brand_count DESC, Artist, Title
             LIMIT @limit OFFSET @offset
-        """.format(
-            project=self.PROJECT_ID,
-            dataset=self.DATASET_ID,
-        )
+        """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
@@ -84,21 +81,18 @@ class BigQueryCatalogService:
             for row in results
         ]
 
-    def get_song_by_id(self, song_id: int) -> Optional[SongResult]:
+    def get_song_by_id(self, song_id: int) -> SongResult | None:
         """Get a single song by ID."""
-        sql = """
+        sql = f"""
             SELECT
                 Id as id,
                 Artist as artist,
                 Title as title,
                 Brands as brands,
                 ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
-            FROM `{project}.{dataset}.karaokenerds_raw`
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
             WHERE Id = @song_id
-        """.format(
-            project=self.PROJECT_ID,
-            dataset=self.DATASET_ID,
-        )
+        """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
@@ -128,7 +122,7 @@ class BigQueryCatalogService:
 
         Songs covered by more karaoke brands are more popular.
         """
-        sql = """
+        sql = f"""
             SELECT * FROM (
                 SELECT
                     Id as id,
@@ -136,15 +130,12 @@ class BigQueryCatalogService:
                     Title as title,
                     Brands as brands,
                     ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
-                FROM `{project}.{dataset}.karaokenerds_raw`
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
             )
             WHERE brand_count >= @min_brands
             ORDER BY brand_count DESC
             LIMIT @limit
-        """.format(
-            project=self.PROJECT_ID,
-            dataset=self.DATASET_ID,
-        )
+        """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
@@ -171,21 +162,18 @@ class BigQueryCatalogService:
         limit: int = 50,
     ) -> list[SongResult]:
         """Get all songs by an artist."""
-        sql = """
+        sql = f"""
             SELECT
                 Id as id,
                 Artist as artist,
                 Title as title,
                 Brands as brands,
                 ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
-            FROM `{project}.{dataset}.karaokenerds_raw`
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
             WHERE LOWER(Artist) = LOWER(@artist)
             ORDER BY brand_count DESC, Title
             LIMIT @limit
-        """.format(
-            project=self.PROJECT_ID,
-            dataset=self.DATASET_ID,
-        )
+        """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[

@@ -1,7 +1,7 @@
 """Core data models for Karaoke Decide."""
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -11,14 +11,14 @@ class User(BaseModel):
 
     id: str
     email: str
-    display_name: Optional[str] = None
+    display_name: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Aggregated stats (denormalized)
     total_songs_known: int = 0
     total_songs_sung: int = 0
-    last_sync_at: Optional[datetime] = None
+    last_sync_at: datetime | None = None
 
 
 class MusicService(BaseModel):
@@ -31,14 +31,14 @@ class MusicService(BaseModel):
     service_username: str
 
     # OAuth tokens (should be encrypted in production)
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_expires_at: Optional[datetime] = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_expires_at: datetime | None = None
 
     # Sync state
-    last_sync_at: Optional[datetime] = None
+    last_sync_at: datetime | None = None
     sync_status: Literal["idle", "syncing", "error"] = "idle"
-    sync_error: Optional[str] = None
+    sync_error: str | None = None
     tracks_synced: int = 0
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -50,7 +50,7 @@ class SongSource(BaseModel):
 
     source: Literal["karaokenerds", "openkj", "karafun"]
     external_id: str
-    url: Optional[str] = None
+    url: str | None = None
 
 
 class KaraokeSong(BaseModel):
@@ -64,9 +64,9 @@ class KaraokeSong(BaseModel):
     sources: list[SongSource] = Field(default_factory=list)
 
     # Optional metadata
-    duration_ms: Optional[int] = None
+    duration_ms: int | None = None
     genres: list[str] = Field(default_factory=list)
-    popularity: Optional[int] = None  # 0-100
+    popularity: int | None = None  # 0-100
 
     # Flags
     is_popular_karaoke: bool = False
@@ -84,14 +84,14 @@ class UserSong(BaseModel):
 
     # From listening history
     play_count: int = 0
-    last_played_at: Optional[datetime] = None
+    last_played_at: datetime | None = None
     is_saved: bool = False
 
     # From user tracking
     times_sung: int = 0
-    last_sung_at: Optional[datetime] = None
-    average_rating: Optional[float] = None  # 1-5
-    notes: Optional[str] = None
+    last_sung_at: datetime | None = None
+    average_rating: float | None = None  # 1-5
+    notes: str | None = None
 
     # Denormalized for queries
     artist: str
@@ -106,7 +106,7 @@ class Playlist(BaseModel):
     id: str
     user_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
     song_ids: list[str] = Field(default_factory=list)
     song_count: int = 0
@@ -123,9 +123,9 @@ class SungRecord(BaseModel):
     song_id: str
 
     sung_at: datetime = Field(default_factory=datetime.utcnow)
-    rating: Optional[int] = None  # 1-5
-    notes: Optional[str] = None
+    rating: int | None = None  # 1-5
+    notes: str | None = None
 
     # Optional context
-    venue: Optional[str] = None
-    playlist_id: Optional[str] = None
+    venue: str | None = None
+    playlist_id: str | None = None

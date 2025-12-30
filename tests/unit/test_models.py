@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from karaoke_decide.core.models import (
     KaraokeSong,
     Playlist,

@@ -1,6 +1,6 @@
 """Catalog routes for browsing karaoke songs."""
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService

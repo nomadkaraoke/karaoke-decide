@@ -4,9 +4,9 @@ Export Spotify tracks from SQLite to BigQuery.
 Exports tracks with primary artist name, ISRC, popularity for karaoke matching.
 """
 
-import sqlite3
-import json
 import gzip
+import json
+import sqlite3
 import subprocess
 from pathlib import Path
 

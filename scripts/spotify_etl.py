@@ -13,12 +13,13 @@ Usage:
     python3 spotify_etl.py
 """
 
-import subprocess
-import sqlite3
-import os
-import json
 import gzip
+import json
+import os
+import sqlite3
+import subprocess
 from datetime import datetime
+
 from google.cloud import bigquery, storage
 
 # Configuration
