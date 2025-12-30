@@ -1,6 +1,6 @@
 """Tests for the AuthService."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -102,7 +102,7 @@ class TestVerifyMagicLink:
         mock_firestore: MagicMock,
     ) -> None:
         """Should return email for valid, unused, non-expired token."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_firestore.get_document.return_value = {
             "email": "test@example.com",
             "created_at": now.isoformat(),
@@ -138,7 +138,7 @@ class TestVerifyMagicLink:
         mock_firestore: MagicMock,
     ) -> None:
         """Should raise AuthenticationError for already-used token."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_firestore.get_document.return_value = {
             "email": "test@example.com",
             "created_at": now.isoformat(),
@@ -156,7 +156,7 @@ class TestVerifyMagicLink:
         mock_firestore: MagicMock,
     ) -> None:
         """Should raise AuthenticationError for expired token."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_firestore.get_document.return_value = {
             "email": "test@example.com",
             "created_at": (now - timedelta(minutes=20)).isoformat(),
@@ -193,7 +193,7 @@ class TestGetOrCreateUser:
         mock_firestore: MagicMock,
     ) -> None:
         """Should return existing user when found."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_firestore.get_document.return_value = {
             "user_id": "user_existing123",
             "email": "existing@example.com",
@@ -223,7 +223,7 @@ class TestGetUserById:
         mock_firestore: MagicMock,
     ) -> None:
         """Should return user when found by ID."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_firestore.query_documents.return_value = [
             {
                 "user_id": "user_test123",
@@ -265,7 +265,7 @@ class TestGenerateJwt:
         auth_service: AuthService,
     ) -> None:
         """Should generate a valid JWT with correct claims."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from karaoke_decide.core.models import User
 
@@ -273,8 +273,8 @@ class TestGenerateJwt:
             id="user_test123",
             email="test@example.com",
             display_name="Test",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         token, expires_in = auth_service.generate_jwt(user)
@@ -289,7 +289,7 @@ class TestGenerateJwt:
         mock_email: MagicMock,
     ) -> None:
         """Should raise ValueError when JWT secret not configured."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from karaoke_decide.core.models import User
 
@@ -303,8 +303,8 @@ class TestGenerateJwt:
         user = User(
             id="user_test123",
             email="test@example.com",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         with pytest.raises(ValueError, match="JWT_SECRET is not configured"):
@@ -319,15 +319,15 @@ class TestValidateJwt:
         auth_service: AuthService,
     ) -> None:
         """Should validate and decode a correct JWT."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from karaoke_decide.core.models import User
 
         user = User(
             id="user_test123",
             email="test@example.com",
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         token, _ = auth_service.generate_jwt(user)
@@ -352,11 +352,10 @@ class TestValidateJwt:
         mock_email: MagicMock,
     ) -> None:
         """Should raise AuthenticationError for expired JWT."""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from jose import jwt
 
-        from karaoke_decide.core.models import User
 
         settings = BackendSettings(
             environment="development",
@@ -367,7 +366,7 @@ class TestValidateJwt:
         service = AuthService(settings, mock_firestore, mock_email)
 
         # Create an already-expired token
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload = {
             "sub": "user_test",
             "email": "test@example.com",

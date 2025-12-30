@@ -1,7 +1,7 @@
 """Shared test fixtures for backend tests."""
 
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,8 +41,8 @@ def sample_user() -> User:
         id="user_abc123def456",
         email="test@example.com",
         display_name="Test User",
-        created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
-        updated_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
         total_songs_known=10,
         total_songs_sung=5,
         last_sync_at=None,
