@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore  # type: ignore[attr-defined]
 
 from backend.config import BackendSettings
 
@@ -116,4 +116,4 @@ class FirestoreService:
         # Use count aggregation
         count_query = query.count()
         result = await count_query.get()
-        return result[0][0].value
+        return int(result[0][0].value)

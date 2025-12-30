@@ -99,7 +99,7 @@ class LastFmClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Last.fm", f"API error: {response.text}")
 
-            data = response.json()
+            data: dict[str, Any] = response.json()
 
             # Last.fm returns errors in the response body
             if "error" in data:

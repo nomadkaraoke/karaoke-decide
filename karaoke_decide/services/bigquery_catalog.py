@@ -202,7 +202,7 @@ class BigQueryCatalogService:
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
         """
         result = list(self.client.query(sql).result())[0]
-        return result.count
+        return int(result.count)
 
     def get_stats(self) -> dict:
         """Get catalog statistics."""

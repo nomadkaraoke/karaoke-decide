@@ -58,7 +58,8 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"Token exchange failed: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     async def refresh_token(self, refresh_token: str) -> dict[str, Any]:
         """Refresh an access token."""
@@ -75,7 +76,8 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"Token refresh failed: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     async def get_current_user(self, access_token: str) -> dict[str, Any]:
         """Get current user's profile."""
@@ -137,4 +139,5 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"API error: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
