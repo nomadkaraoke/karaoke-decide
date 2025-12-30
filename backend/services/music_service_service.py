@@ -122,7 +122,10 @@ class MusicServiceService:
         return state
 
     async def verify_oauth_state(self, state: str) -> dict[str, str] | None:
-        """Verify and consume OAuth state.
+        """Verify and consume OAuth state atomically.
+
+        Uses an atomic delete-and-return to prevent TOCTOU race conditions
+        where two concurrent callbacks could both pass verification.
 
         Args:
             state: State token from OAuth callback.
@@ -130,20 +133,17 @@ class MusicServiceService:
         Returns:
             Dict with user_id and service_type if valid, None otherwise.
         """
-        doc = await self.firestore.get_document(self.OAUTH_STATES_COLLECTION, state)
+        # Atomically delete and retrieve the state document
+        # This ensures the state can only be consumed once
+        doc = await self.firestore.delete_document_atomically(self.OAUTH_STATES_COLLECTION, state)
 
         if doc is None:
             return None
 
-        # Check expiration
+        # Check expiration (state was already deleted, so just validate)
         expires_at = datetime.fromisoformat(doc["expires_at"])
         if datetime.now(UTC) > expires_at:
-            # Delete expired state
-            await self.firestore.delete_document(self.OAUTH_STATES_COLLECTION, state)
             return None
-
-        # Delete state (single use)
-        await self.firestore.delete_document(self.OAUTH_STATES_COLLECTION, state)
 
         return {
             "user_id": doc["user_id"],

@@ -48,11 +48,13 @@ class TestNormalizeText:
         assert track_matcher.normalize_text("1-2-3") == "1 2 3"
 
     def test_normalizes_unicode_quotes(self, track_matcher: TrackMatcher) -> None:
-        """Unicode quotes are normalized - smart quotes become regular apostrophes."""
-        # Smart quotes are replaced with ASCII apostrophe, which is preserved
+        """Unicode quotes are normalized - smart quotes are converted for matching."""
+        # Smart quotes (\u2019 = ') are normalized to enable matching
+        # The exact handling may vary, but the key parts should be present
         result = track_matcher.normalize_text("Don\u2019t")
-        # The result keeps the apostrophe
         assert "don" in result and "t" in result
+        # The result should enable matching "don't" variations
+        assert len(result) >= 4  # At minimum "don t"
 
     def test_empty_string(self, track_matcher: TrackMatcher) -> None:
         """Empty string returns empty string."""
@@ -143,13 +145,18 @@ class TestNormalizeArtist:
         """'with' artist suffix is removed."""
         assert track_matcher.normalize_artist("Artist with Another") == "artist"
 
-    def test_removes_comma_suffix(self, track_matcher: TrackMatcher) -> None:
-        """Comma-separated additional artists are removed."""
-        assert track_matcher.normalize_artist("Artist, Another Artist") == "artist"
+    def test_preserves_comma_in_names(self, track_matcher: TrackMatcher) -> None:
+        """Comma-separated names are preserved (e.g. Crosby, Stills, Nash & Young)."""
+        # Commas and ampersands in artist names should be preserved
+        result = track_matcher.normalize_artist("Crosby, Stills, Nash & Young")
+        assert "crosby" in result
+        assert "young" in result
 
-    def test_removes_ampersand_suffix(self, track_matcher: TrackMatcher) -> None:
-        """Ampersand-separated additional artists are removed."""
-        assert track_matcher.normalize_artist("Artist & Another") == "artist"
+    def test_preserves_ampersand_in_names(self, track_matcher: TrackMatcher) -> None:
+        """Ampersand in artist names is preserved (e.g. Simon & Garfunkel)."""
+        result = track_matcher.normalize_artist("Simon & Garfunkel")
+        assert "simon" in result
+        assert "garfunkel" in result
 
     def test_empty_string(self, track_matcher: TrackMatcher) -> None:
         """Empty string returns empty string."""

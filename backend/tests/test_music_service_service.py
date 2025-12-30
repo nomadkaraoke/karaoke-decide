@@ -140,7 +140,7 @@ class TestOAuthStateManagement:
     async def test_verify_oauth_state_valid(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
         """Valid OAuth state returns user_id and service_type."""
         now = datetime.now(UTC)
-        mock_firestore.get_document = AsyncMock(
+        mock_firestore.delete_document_atomically = AsyncMock(
             return_value={
                 "user_id": "user_123",
                 "service_type": "spotify",
@@ -154,13 +154,13 @@ class TestOAuthStateManagement:
         assert result is not None
         assert result["user_id"] == "user_123"
         assert result["service_type"] == "spotify"
-        # State should be deleted after verification
-        mock_firestore.delete_document.assert_called_once_with("oauth_states", "valid-state")
+        # State should be atomically deleted during verification
+        mock_firestore.delete_document_atomically.assert_called_once_with("oauth_states", "valid-state")
 
     @pytest.mark.asyncio
     async def test_verify_oauth_state_not_found(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
         """Non-existent OAuth state returns None."""
-        mock_firestore.get_document = AsyncMock(return_value=None)
+        mock_firestore.delete_document_atomically = AsyncMock(return_value=None)
 
         result = await service.verify_oauth_state("invalid-state")
 
@@ -168,9 +168,9 @@ class TestOAuthStateManagement:
 
     @pytest.mark.asyncio
     async def test_verify_oauth_state_expired(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
-        """Expired OAuth state returns None and is deleted."""
+        """Expired OAuth state returns None (already deleted atomically)."""
         past = datetime.now(UTC) - timedelta(minutes=15)
-        mock_firestore.get_document = AsyncMock(
+        mock_firestore.delete_document_atomically = AsyncMock(
             return_value={
                 "user_id": "user_123",
                 "service_type": "spotify",
@@ -182,7 +182,8 @@ class TestOAuthStateManagement:
         result = await service.verify_oauth_state("expired-state")
 
         assert result is None
-        mock_firestore.delete_document.assert_called_once()
+        # Document was already deleted atomically, even though expired
+        mock_firestore.delete_document_atomically.assert_called_once()
 
 
 class TestServiceCRUD:

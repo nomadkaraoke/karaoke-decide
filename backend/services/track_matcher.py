@@ -47,13 +47,14 @@ class TrackMatcher:
     ]
 
     # Patterns to remove from artist names
+    # Note: Intentionally NOT including "&" or "," patterns as they would
+    # incorrectly truncate legitimate names like "Simon & Garfunkel" or
+    # "Crosby, Stills, Nash & Young"
     ARTIST_REMOVE_PATTERNS = [
         r"\s*feat\.?\s+.*$",  # feat. Another Artist
         r"\s*ft\.?\s+.*$",  # ft. Another Artist
         r"\s*featuring\s+.*$",  # featuring Another Artist
-        r"\s*&\s+.*$",  # & Another Artist (be careful with this)
-        r"\s*,\s+.*$",  # , Another Artist
-        r"\s*with\s+.*$",  # with Another Artist
+        r"\s*\bwith\b\s+.*$",  # with Another Artist (word boundary to avoid "Saoirse")
     ]
 
     def __init__(self, catalog_service: BigQueryCatalogService):

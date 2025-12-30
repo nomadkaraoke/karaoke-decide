@@ -498,7 +498,10 @@ class SyncService:
             existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
 
             if existing:
-                # Update existing - increment play count
+                # Update existing - increment sync count
+                # NOTE: play_count here represents "times seen during sync", not actual plays.
+                # This is a known limitation - consider renaming to sync_count in future.
+                # See: https://github.com/nomadkaraoke/karaoke-decide/pull/5
                 current_play_count = existing.get("play_count", 0)
                 await self.firestore.update_document(
                     self.USER_SONGS_COLLECTION,

@@ -279,8 +279,8 @@ class TestSyncSpotify:
         """Creates UserSong records for matched tracks."""
         result = await sync_service.sync_spotify("user_123", sample_spotify_service)
 
-        # Should create user songs for matched tracks
-        assert result.user_songs_created > 0 or result.user_songs_updated >= 0
+        # Should create or update user songs for matched tracks
+        assert (result.user_songs_created + result.user_songs_updated) > 0
         mock_firestore.set_document.assert_called()
 
     @pytest.mark.asyncio

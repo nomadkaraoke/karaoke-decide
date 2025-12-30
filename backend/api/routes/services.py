@@ -3,6 +3,8 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -153,7 +155,7 @@ async def spotify_callback(
     # Handle OAuth errors
     if error:
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/error?message={error}",
+            url=f"{frontend_url}/services/spotify/error?message={quote(error, safe='')}",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -190,7 +192,7 @@ async def spotify_callback(
         )
 
     except Exception as e:
-        error_msg = str(e).replace(" ", "_")[:50]  # Truncate for URL safety
+        error_msg = quote(str(e)[:100], safe="")  # URL-encode for safety
         return RedirectResponse(
             url=f"{frontend_url}/services/spotify/error?message={error_msg}",
             status_code=status.HTTP_302_FOUND,

@@ -117,3 +117,35 @@ class FirestoreService:
         count_query = query.count()
         result = await count_query.get()
         return int(result[0][0].value)
+
+    async def delete_document_atomically(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        """Atomically delete a document and return its contents.
+
+        Uses a Firestore transaction to ensure the document is only
+        consumed once, even with concurrent requests.
+
+        Args:
+            collection: Collection name
+            doc_id: Document ID to delete
+
+        Returns:
+            Document data if it existed and was deleted, None otherwise.
+        """
+
+        @firestore.async_transactional
+        async def delete_in_transaction(
+            transaction: firestore.AsyncTransaction,
+        ) -> dict[str, Any] | None:
+            doc_ref = self.collection(collection).document(doc_id)
+            doc = await doc_ref.get(transaction=transaction)
+
+            if not doc.exists:
+                return None
+
+            # Delete within transaction
+            transaction.delete(doc_ref)
+            return {"id": doc.id, **doc.to_dict()}
+
+        transaction = self.client.transaction()
+        result: dict[str, Any] | None = await delete_in_transaction(transaction)
+        return result
