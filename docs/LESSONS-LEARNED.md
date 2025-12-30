@@ -233,3 +233,47 @@ async def test_respects_limit(self, recommendation_service, mock_bigquery):
     recs = await recommendation_service.get_recommendations(limit=3)
     assert len(recs) <= 3  # Now correctly tests the limit
 ```
+
+---
+
+### 2024-12-30: FirestoreService order_direction Must Be Uppercase
+
+**Context:** Implementing user songs query with descending play count ordering.
+
+**Lesson:** `FirestoreService.query_documents` only recognizes `"DESCENDING"` (uppercase). Using `"desc"` or `"descending"` silently defaults to ascending order.
+
+**Recommendation:**
+```python
+# BAD - silently uses ascending order
+docs = await firestore.query_documents(
+    collection,
+    order_by="play_count",
+    order_direction="desc",  # Ignored! Defaults to ascending
+)
+
+# GOOD - explicitly uppercase
+docs = await firestore.query_documents(
+    collection,
+    order_by="play_count",
+    order_direction="DESCENDING",  # Works correctly
+)
+```
+
+---
+
+### 2024-12-30: Python 3.12 Deprecates datetime.utcnow()
+
+**Context:** Using `datetime.utcnow()` as default factory for Pydantic model fields.
+
+**Lesson:** Python 3.12 deprecates `datetime.utcnow()` in favor of timezone-aware `datetime.now(UTC)`. While it still works, it will show deprecation warnings and should be migrated.
+
+**Recommendation:**
+```python
+from datetime import UTC, datetime
+
+# BAD - deprecated in Python 3.12
+created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# GOOD - timezone-aware
+created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+```
