@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Navigation } from "@/components/Navigation";
 
 export const metadata: Metadata = {
   title: "Nomad Karaoke Decide - Find Your Next Karaoke Song",
@@ -40,7 +42,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
-        {children}
+        <AuthProvider>
+          <Navigation />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

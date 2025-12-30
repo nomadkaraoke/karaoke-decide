@@ -12,7 +12,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2024-12-30)
 
-**Phase:** ~65% to MLP (Minimum Lovable Product)
+**Phase:** ~80% to MLP (Minimum Lovable Product)
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
@@ -20,14 +20,16 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
+- **Frontend Auth & Discovery:** Full auth flow, My Songs, Recommendations, Quiz UI, Services page (Phase 5 complete)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests, 228 backend tests, all checks passing
+- **CI/Testing:** 135 unit tests, 228 backend tests, 67 E2E tests, all checks passing
 
-### 🚧 Next Up (Phase 5: Frontend Auth & Discovery)
-1. Frontend authentication flow (magic link + JWT)
-2. My Songs page (user library view)
-3. Recommendations page (personalized discovery)
-4. Quiz onboarding flow
+### 🚧 Next Up (Phase 6: Polish & Launch)
+1. Production email delivery (SendGrid integration for magic links)
+2. User profile page and settings
+3. Mobile responsive polish
+4. Performance optimization
+5. Production deployment and launch
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -118,6 +120,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2024-12-30 | Phase 5: Frontend Auth & Discovery (auth flow, My Songs, Recommendations, Quiz, Services pages) | [archive/2024-12-30-phase5-frontend-auth-discovery.md](archive/2024-12-30-phase5-frontend-auth-discovery.md) |
 | 2024-12-30 | Phase 4: Quiz & Recommendations (quiz onboarding, recommendation algorithm v1) | [archive/2024-12-30-phase4-quiz-recommendations.md](archive/2024-12-30-phase4-quiz-recommendations.md) |
 | 2024-12-30 | Phase 3: Music Service Integration (Spotify OAuth, Last.fm, sync) | [archive/2024-12-30-phase3-music-service-integration.md](archive/2024-12-30-phase3-music-service-integration.md) |
 | 2024-12-30 | Phase 2: Auth & User Management (magic link, JWT, Firestore) | [archive/2024-12-30-auth-implementation.md](archive/2024-12-30-auth-implementation.md) |
