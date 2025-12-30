@@ -181,7 +181,7 @@ class RecommendationService:
             self.USER_SONGS_COLLECTION,
             filters=[("user_id", "==", user_id)],
             order_by="play_count",
-            order_direction="desc",
+            order_direction="DESCENDING",
             limit=limit,
             offset=offset,
         )
@@ -202,7 +202,7 @@ class RecommendationService:
                 artist=doc["artist"],
                 title=doc["title"],
                 created_at=(datetime.fromisoformat(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
-                updated_at=datetime.fromisoformat(doc["updated_at"]),
+                updated_at=(datetime.fromisoformat(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
             )
             for doc in docs
         ]

@@ -1,6 +1,6 @@
 """Core data models for Karaoke Decide."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -12,8 +12,8 @@ class User(BaseModel):
     id: str
     email: str
     display_name: str | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Aggregated stats (denormalized)
     total_songs_known: int = 0
@@ -47,8 +47,8 @@ class MusicService(BaseModel):
     sync_error: str | None = None
     tracks_synced: int = 0
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class SongSource(BaseModel):
@@ -77,8 +77,8 @@ class KaraokeSong(BaseModel):
     # Flags
     is_popular_karaoke: bool = False
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class UserSong(BaseModel):
@@ -106,8 +106,8 @@ class UserSong(BaseModel):
     artist: str
     title: str
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Playlist(BaseModel):
@@ -121,8 +121,8 @@ class Playlist(BaseModel):
     song_ids: list[str] = Field(default_factory=list)
     song_count: int = 0
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class SungRecord(BaseModel):
@@ -132,7 +132,7 @@ class SungRecord(BaseModel):
     user_id: str
     song_id: str
 
-    sung_at: datetime = Field(default_factory=datetime.utcnow)
+    sung_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     rating: int | None = None  # 1-5
     notes: str | None = None
 
@@ -159,7 +159,7 @@ class QuizResponse(BaseModel):
     known_song_ids: list[str]  # Songs the user recognized
     decade_preference: str | None = None  # Preferred decade
     energy_preference: Literal["chill", "medium", "high"] | None = None
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Recommendation(BaseModel):
@@ -181,11 +181,3 @@ class Recommendation(BaseModel):
     # Optional metadata
     brand_count: int = 0
     popularity: int = 0
-
-
-class UserSongSource(BaseModel):
-    """Source information for a UserSong record."""
-
-    source: Literal["spotify", "lastfm", "quiz"]
-    play_count: int = 0
-    last_played_at: datetime | None = None
