@@ -146,3 +146,43 @@ return response.json()
 result: dict[str, Any] = response.json()
 return result
 ```
+
+---
+
+### 2024-12-30: Mock Sync vs Async Methods Correctly
+
+**Context:** Tests were failing with "coroutine object is not iterable" when mocking a sync method with AsyncMock.
+
+**Lesson:** When mocking a synchronous method that returns a list, use `MagicMock.return_value`, not `AsyncMock(return_value=...)`. AsyncMock wraps the return value in a coroutine, which breaks when the code doesn't await it.
+
+**Recommendation:**
+```python
+# BAD - if search_songs is synchronous
+mock.search_songs = AsyncMock(return_value=[result])
+
+# GOOD - use regular mock for sync methods
+mock.search_songs.return_value = [result]
+```
+
+---
+
+### 2024-12-30: FastAPI Dependency Defaults
+
+**Context:** Mypy errors on FastAPI route with `music_service: MusicServiceServiceDep = ...` as default.
+
+**Lesson:** Using `...` (Ellipsis) as a default for FastAPI `Depends` parameters causes mypy errors. Instead, put parameters with Depends annotations before Query parameters (order them by required-ness).
+
+**Recommendation:**
+```python
+# BAD - ellipsis as default
+async def callback(
+    code: str | None = Query(None),
+    music_service: MusicServiceServiceDep = ...,  # mypy error
+):
+
+# GOOD - reorder parameters
+async def callback(
+    music_service: MusicServiceServiceDep,  # Depends params first
+    code: str | None = Query(None),
+):
+```
