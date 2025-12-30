@@ -2,10 +2,23 @@
 
 import click
 from rich.console import Console
+from rich.table import Table
 
 from karaoke_decide import __version__
+from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 console = Console()
+
+# Lazy-loaded catalog service
+_catalog_service = None
+
+
+def get_catalog_service() -> BigQueryCatalogService:
+    """Get or create the catalog service."""
+    global _catalog_service
+    if _catalog_service is None:
+        _catalog_service = BigQueryCatalogService()
+    return _catalog_service
 
 
 @click.group()
@@ -81,30 +94,127 @@ def songs() -> None:
 
 @songs.command()
 @click.argument("query")
-def search(query: str) -> None:
-    """Search the karaoke catalog."""
-    console.print(f"[yellow]Search for '{query}' not yet implemented[/yellow]")
-    # TODO: Search catalog
+@click.option("--limit", "-l", default=20, help="Number of results")
+@click.option("--min-brands", "-b", default=0, help="Minimum brand count (popularity)")
+def search(query: str, limit: int, min_brands: int) -> None:
+    """Search the karaoke catalog by artist or title."""
+    with console.status(f"Searching for '{query}'..."):
+        svc = get_catalog_service()
+        results = svc.search_songs(query, limit=limit, min_brands=min_brands)
+
+    if not results:
+        console.print(f"[yellow]No results found for '{query}'[/yellow]")
+        return
+
+    table = Table(title=f"Search Results: {query}")
+    table.add_column("ID", style="dim")
+    table.add_column("Artist", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Brands", justify="right", style="magenta")
+
+    for song in results:
+        table.add_row(
+            str(song.id),
+            song.artist,
+            song.title,
+            str(song.brand_count),
+        )
+
+    console.print(table)
+    console.print(f"[dim]Found {len(results)} songs[/dim]")
+
+
+@songs.command()
+@click.argument("artist")
+@click.option("--limit", "-l", default=20, help="Number of results")
+def artist(artist: str, limit: int) -> None:
+    """Show all songs by an artist."""
+    with console.status(f"Searching for songs by '{artist}'..."):
+        svc = get_catalog_service()
+        results = svc.get_songs_by_artist(artist, limit=limit)
+
+    if not results:
+        console.print(f"[yellow]No songs found for artist '{artist}'[/yellow]")
+        return
+
+    table = Table(title=f"Songs by {artist}")
+    table.add_column("ID", style="dim")
+    table.add_column("Title", style="green")
+    table.add_column("Brands", justify="right", style="magenta")
+
+    for song in results:
+        table.add_row(
+            str(song.id),
+            song.title,
+            str(song.brand_count),
+        )
+
+    console.print(table)
+    console.print(f"[dim]Found {len(results)} songs[/dim]")
+
+
+@songs.command()
+@click.option("--limit", "-l", default=50, help="Number of results")
+@click.option("--min-brands", "-b", default=5, help="Minimum brand count")
+def popular(limit: int, min_brands: int) -> None:
+    """Show most popular karaoke songs."""
+    with console.status("Fetching popular songs..."):
+        svc = get_catalog_service()
+        results = svc.get_popular_songs(limit=limit, min_brands=min_brands)
+
+    if not results:
+        console.print("[yellow]No popular songs found[/yellow]")
+        return
+
+    table = Table(title=f"Most Popular Karaoke Songs ({min_brands}+ brands)")
+    table.add_column("#", style="dim", justify="right")
+    table.add_column("Artist", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Brands", justify="right", style="magenta")
+
+    for i, song in enumerate(results, 1):
+        table.add_row(
+            str(i),
+            song.artist,
+            song.title,
+            str(song.brand_count),
+        )
+
+    console.print(table)
+
+
+@songs.command()
+def stats() -> None:
+    """Show catalog statistics."""
+    with console.status("Fetching stats..."):
+        svc = get_catalog_service()
+        stats = svc.get_stats()
+
+    console.print("\n[bold]Karaoke Catalog Stats[/bold]")
+    console.print(f"  Total songs:     [cyan]{stats['total_songs']:,}[/cyan]")
+    console.print(f"  Unique artists:  [cyan]{stats['unique_artists']:,}[/cyan]")
+    console.print(f"  Max brand count: [cyan]{stats['max_brand_count']}[/cyan]")
+    console.print(f"  Avg brand count: [cyan]{stats['avg_brand_count']:.2f}[/cyan]")
 
 
 @songs.command()
 def browse() -> None:
     """Interactive browse with filters."""
-    console.print("[yellow]Browse not yet implemented[/yellow]")
+    console.print("[yellow]Interactive browse not yet implemented[/yellow]")
     # TODO: Interactive browser
 
 
 @songs.command()
 def mine() -> None:
     """Show songs from my listening history."""
-    console.print("[yellow]My songs not yet implemented[/yellow]")
+    console.print("[yellow]My songs not yet implemented - connect Spotify first[/yellow]")
     # TODO: Show matched songs
 
 
 @songs.command()
 def top() -> None:
     """Show my top karaoke recommendations."""
-    console.print("[yellow]Top songs not yet implemented[/yellow]")
+    console.print("[yellow]Top songs not yet implemented - connect Spotify first[/yellow]")
     # TODO: Show recommendations
 
 
@@ -142,7 +252,7 @@ def show(playlist_id: str) -> None:
 @click.argument("song_id")
 def add(playlist_id: str, song_id: str) -> None:
     """Add a song to a playlist."""
-    console.print(f"[yellow]Add song to playlist not yet implemented[/yellow]")
+    console.print("[yellow]Add song to playlist not yet implemented[/yellow]")
     # TODO: Add song
 
 
@@ -151,7 +261,7 @@ def add(playlist_id: str, song_id: str) -> None:
 @click.argument("song_id")
 def remove(playlist_id: str, song_id: str) -> None:
     """Remove a song from a playlist."""
-    console.print(f"[yellow]Remove song from playlist not yet implemented[/yellow]")
+    console.print("[yellow]Remove song from playlist not yet implemented[/yellow]")
     # TODO: Remove song
 
 
