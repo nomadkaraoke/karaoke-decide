@@ -86,6 +86,10 @@ tmp/
 temp/
 *.tmp
 
+# Large data files
+*.json.gz
+data/
+
 # Frontend (when added)
 frontend/node_modules/
 frontend/.next/

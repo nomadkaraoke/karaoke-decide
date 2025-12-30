@@ -1,32 +1,21 @@
-# Nomad Karaoke Decide - Project Plan
+# Nomad Karaoke Decide - Implementation Plan
 
-## Vision
+> See [VISION.md](VISION.md) for product goals and [docs/REQUIREMENTS-QA.md](docs/REQUIREMENTS-QA.md) for the full requirements discussion.
 
-**Nomad Karaoke Decide** helps people discover and choose the perfect karaoke songs to sing. Unlike the original KaraokeHunt app which only listed songs, this product will actually deliver on the core value proposition: **helping you decide what to sing**.
-
-**Domain:** decide.nomadkaraoke.com
-
-## Core Value Proposition
-
-1. **Know what you know** - Connect your music listening history (Spotify, Last.fm, Apple Music) to see songs you actually recognize
-2. **Know what's available** - Comprehensive karaoke catalog from multiple sources
-3. **Know what you can sing** - Vocal range detection and filtering
-4. **Track what works** - Record which songs you've sung and how they went
-
-## Tech Stack (Following karaoke-gen Patterns)
+## Tech Stack
 
 ### Backend
 - **Language:** Python 3.12
 - **Framework:** FastAPI
-- **Database:** Firestore (NoSQL document store)
-- **Storage:** Google Cloud Storage (for any file uploads)
+- **Database:** Firestore (NoSQL)
+- **Storage:** Google Cloud Storage
 - **Secrets:** Google Secret Manager
 - **Runtime:** Google Cloud Run
 - **Package Manager:** Poetry
 
 ### CLI
-- **Language:** Python (same package as backend core)
-- **Entry Points:** `karaoke-decide` (main CLI)
+- **Language:** Python (same package as core)
+- **Entry Point:** `karaoke-decide`
 
 ### Frontend (Phase 2)
 - **Framework:** Next.js with TypeScript
@@ -38,212 +27,138 @@
 - **CI/CD:** GitHub Actions
 - **Containers:** Docker
 
-## Minimum Lovable Product (MLP) - Phase 1
+## Data Sources
 
-### Core Features
+### 1. Spotify Metadata Archive (Offline, ETL Required)
 
-#### 1. User Management
-- Magic link authentication (email-based, no passwords)
-- User profile with optional display name
-- Store connected service credentials securely
+**Location:** `/Volumes/AndrewMacSD/spotify-metadata-dump/annas_archive_spotify_2025_07_metadata/`
 
-#### 2. Music Service Integration
-- **Spotify Integration** (primary)
-  - OAuth2 flow for user authorization
-  - Fetch user's saved tracks, top tracks, recently played
-  - Fetch playlists and their tracks
-- **Last.fm Integration** (secondary)
-  - API key auth + user token
-  - Fetch listening history with play counts
-  - Fetch loved tracks
-- Store normalized listening data per user
+**Files:**
+- `spotify_clean.sqlite3.zst` (36GB compressed) - Core track/artist/album metadata
+- `spotify_clean_audio_features.sqlite3.zst` (17GB compressed) - BPM, key, energy, etc.
 
-#### 3. Karaoke Catalog
-- Fetch and store karaoke song catalog from KaraokeNerds API
-- Periodic refresh (daily/weekly cron)
-- Normalized track model: artist, title, source, external_id
+**Data Available:**
+- Track: name, duration_ms, popularity (0-100), explicit, ISRC, preview_url
+- Artist: name, follower_count, popularity, genres
+- Album: name, type, release_date, label
+- Audio Features: BPM, key, danceability, energy, valence, acousticness
 
-#### 4. Personal Song Matching
-- Match user's listening history against karaoke catalog
-- Rank songs by:
-  - Play count (most listened = most familiar)
-  - Recency (recently played = fresh in memory)
-  - Saved/loved status
-- Expose matched songs via API
+**ETL Task:** Extract relevant data, load into Firestore or BigQuery for querying.
 
-#### 5. Song Search & Browse
-- Full-text search across karaoke catalog
-- Filter by: artist, title, in_my_library, play_count_min
-- Sort by: relevance, play_count, artist, title
+### 2. KaraokeNerds Catalog (Daily Sync)
 
-#### 6. Personal Playlists
-- Create, update, delete playlists
-- Add/remove songs from playlists
-- Mark songs as "sung" with optional rating (1-5) and notes
+**Location:** `gs://projectbread-karaokay.appspot.com/karaokenerds-data/full/full-data-latest.json.gz`
 
-### CLI Commands
+**Data Available:**
+- Artist, title, brands that have covered it
+- Brand count as primitive popularity signal
 
-```bash
-# Authentication
-karaoke-decide auth login              # Start magic link flow
-karaoke-decide auth status             # Show current user
-karaoke-decide auth logout             # Clear credentials
+**Access:** Requires projectbread-karaokay GCP credentials.
 
-# Music Services
-karaoke-decide services list           # Show connected services
-karaoke-decide services connect spotify # OAuth flow for Spotify
-karaoke-decide services connect lastfm  # Connect Last.fm
-karaoke-decide services sync           # Manually trigger history sync
+### 3. User Listening History (Real-Time)
 
-# Song Discovery
-karaoke-decide songs search "bohemian" # Search karaoke catalog
-karaoke-decide songs browse            # Interactive browse with filters
-karaoke-decide songs mine              # Show my matched songs (songs I know)
-karaoke-decide songs top               # Show my top karaoke picks
+**Spotify API:**
+- OAuth2 for user authorization
+- Saved tracks, top tracks, recently played
+- Playlists and their tracks
 
-# Playlists
-karaoke-decide playlist list           # List my playlists
-karaoke-decide playlist create "Friday Night"
-karaoke-decide playlist show <id>
-karaoke-decide playlist add <playlist_id> <song_id>
-karaoke-decide playlist remove <playlist_id> <song_id>
-
-# Song Tracking
-karaoke-decide sung <song_id> --rating 4 --notes "Crowd loved it"
-karaoke-decide history                 # Show songs I've sung
-```
-
-### API Endpoints
-
-```
-# Auth
-POST   /api/auth/magic-link           # Request magic link
-POST   /api/auth/verify               # Verify magic link token
-GET    /api/auth/me                   # Get current user
-POST   /api/auth/logout               # Invalidate session
-
-# Music Services
-GET    /api/services                  # List connected services
-POST   /api/services/spotify/connect  # Start Spotify OAuth
-GET    /api/services/spotify/callback # Spotify OAuth callback
-POST   /api/services/lastfm/connect   # Connect Last.fm
-POST   /api/services/sync             # Trigger history sync
-GET    /api/services/sync/status      # Get sync status
-
-# Catalog
-GET    /api/catalog/songs             # Search/browse catalog
-GET    /api/catalog/songs/:id         # Get song details
-GET    /api/catalog/stats             # Catalog statistics
-
-# My Songs (personalized)
-GET    /api/my/songs                  # My matched songs with listen data
-GET    /api/my/songs/top              # Top recommendations
-GET    /api/my/history                # Songs I've sung
-
-# Playlists
-GET    /api/playlists                 # List my playlists
-POST   /api/playlists                 # Create playlist
-GET    /api/playlists/:id             # Get playlist
-PUT    /api/playlists/:id             # Update playlist
-DELETE /api/playlists/:id             # Delete playlist
-POST   /api/playlists/:id/songs       # Add song to playlist
-DELETE /api/playlists/:id/songs/:songId # Remove song
-
-# Song Tracking
-POST   /api/my/songs/:id/sung         # Mark song as sung with rating
-```
+**Last.fm API:**
+- API key + user token
+- Scrobbles with play counts
+- Loved tracks
 
 ## Data Models
+
+### Song (Combined Catalog)
+```python
+class Song:
+    id: str                      # Normalized: slugify(artist-title)
+    artist: str
+    title: str
+
+    # Popularity signals
+    spotify_popularity: int | None  # 0-100
+    karaoke_brand_count: int        # How many brands have this
+
+    # Audio features (from Spotify dump)
+    duration_ms: int | None
+    bpm: float | None
+    key: int | None               # Pitch class (0-11)
+    mode: int | None              # 0=minor, 1=major
+    energy: float | None          # 0-1
+    danceability: float | None    # 0-1
+    valence: float | None         # 0-1 (positivity)
+
+    # Metadata
+    genres: list[str]
+    decade: str | None            # "1980s", "1990s", etc.
+    explicit: bool
+
+    # Karaoke availability
+    has_karaoke: bool
+    karaoke_youtube_url: str | None
+
+    # Future: vocal analysis
+    vocal_range_low: str | None   # e.g., "C3"
+    vocal_range_high: str | None  # e.g., "G5"
+```
 
 ### User
 ```python
 class User:
-    id: str                    # Firestore doc ID
-    email: str                 # Unique, primary identifier
-    display_name: Optional[str]
+    id: str
+    email: str
+    display_name: str | None
     created_at: datetime
-    updated_at: datetime
 
-    # Aggregated stats (denormalized for fast reads)
-    total_songs_known: int     # Songs matched from listening history
-    total_songs_sung: int      # Songs marked as sung
-    last_sync_at: Optional[datetime]
+    # Quiz responses (for data-light users)
+    quiz_songs_known: list[str]   # Song IDs they recognized
+    quiz_decade_pref: str | None
+    quiz_energy_pref: str | None  # "chill", "medium", "high"
+
+    # Vocal range (optional)
+    vocal_range_low: str | None
+    vocal_range_high: str | None
+    voice_type: str | None        # "baritone", "soprano", etc.
+
+    # Stats
+    last_sync_at: datetime | None
 ```
 
-### MusicService (connected accounts)
+### MusicService (Connected Accounts)
 ```python
 class MusicService:
     id: str
     user_id: str
-    service_type: Literal["spotify", "lastfm", "apple_music"]
-    service_user_id: str       # User's ID on that service
-    service_username: str      # Display name on that service
+    service_type: Literal["spotify", "lastfm"]
+    service_user_id: str
 
-    # OAuth tokens (encrypted)
-    access_token: Optional[str]
-    refresh_token: Optional[str]
-    token_expires_at: Optional[datetime]
+    # OAuth tokens
+    access_token: str | None
+    refresh_token: str | None
+    token_expires_at: datetime | None
 
     # Sync state
-    last_sync_at: Optional[datetime]
-    sync_status: Literal["idle", "syncing", "error"]
-    sync_error: Optional[str]
     tracks_synced: int
-
-    created_at: datetime
-    updated_at: datetime
+    last_sync_at: datetime | None
 ```
 
-### KaraokeSong (catalog)
-```python
-class KaraokeSong:
-    id: str                    # Normalized ID: slugify(artist-title)
-    artist: str
-    title: str
-
-    # Source tracking
-    sources: List[SongSource]  # Which karaoke services have this
-
-    # Optional metadata (enriched later)
-    duration_ms: Optional[int]
-    genres: List[str]
-    popularity: Optional[int]  # 0-100 from Spotify
-
-    # Flags
-    is_popular_karaoke: bool   # On "top karaoke songs" lists
-
-    created_at: datetime
-    updated_at: datetime
-
-class SongSource:
-    source: Literal["karaokenerds", "openkj", "karafun"]
-    external_id: str
-    url: Optional[str]
-```
-
-### UserSong (user's relationship to a song)
+### UserSong (User's Relationship to Songs)
 ```python
 class UserSong:
-    id: str                    # user_id:song_id
+    id: str                       # user_id:song_id
     user_id: str
-    song_id: str               # References KaraokeSong.id
+    song_id: str
 
     # From listening history
-    play_count: int            # Total plays across services
-    last_played_at: Optional[datetime]
-    is_saved: bool             # In user's library/favorites
+    play_count: int
+    last_played_at: datetime | None
+    is_saved: bool
+    source: Literal["spotify", "lastfm", "quiz"]
 
-    # From user tracking
-    times_sung: int
-    last_sung_at: Optional[datetime]
-    average_rating: Optional[float]  # 1-5
-    notes: Optional[str]
-
-    # Denormalized for queries
+    # Denormalized
     artist: str
     title: str
-
-    updated_at: datetime
 ```
 
 ### Playlist
@@ -252,239 +167,226 @@ class Playlist:
     id: str
     user_id: str
     name: str
-    description: Optional[str]
-
-    song_ids: List[str]        # Ordered list of KaraokeSong IDs
-    song_count: int            # Denormalized
-
+    song_ids: list[str]
     created_at: datetime
     updated_at: datetime
 ```
 
-### SungRecord (individual singing event)
-```python
-class SungRecord:
-    id: str
-    user_id: str
-    song_id: str
+## API Endpoints
 
-    sung_at: datetime
-    rating: Optional[int]      # 1-5
-    notes: Optional[str]
-
-    # Optional context
-    venue: Optional[str]
-    playlist_id: Optional[str]
+### Auth
+```
+POST /api/auth/magic-link     - Request magic link email
+POST /api/auth/verify         - Verify token, get JWT
+GET  /api/auth/me             - Get current user
+POST /api/auth/logout         - Invalidate session
 ```
 
-## Infrastructure (Pulumi)
-
-### GCP Resources
-
-```python
-# Firestore
-- Database: karaoke-decide-db (FIRESTORE_NATIVE, us-central1)
-- Collections: users, music_services, karaoke_songs, user_songs, playlists, sung_records
-- Composite indexes for common queries
-
-# Cloud Storage
-- Bucket: karaoke-decide-storage-{project}
-- Used for: catalog snapshots, export data
-
-# Cloud Run
-- Service: karaoke-decide-api
-- Memory: 512MB (lightweight API)
-- CPU: 1
-- Min instances: 0, Max: 10
-- Concurrency: 80
-
-# Secret Manager
-- spotify-client-id
-- spotify-client-secret
-- lastfm-api-key
-- sendgrid-api-key (for magic links)
-
-# Cloud Scheduler (cron)
-- catalog-sync: Daily at 3am UTC
-- token-refresh: Hourly (refresh expiring OAuth tokens)
-
-# Service Account
-- karaoke-decide-backend: Firestore, Storage, Secrets, Scheduler
+### Music Services
+```
+GET  /api/services            - List connected services
+POST /api/services/spotify/connect    - Start OAuth
+GET  /api/services/spotify/callback   - OAuth callback
+POST /api/services/lastfm/connect     - Connect Last.fm
+POST /api/services/sync       - Trigger history sync
+GET  /api/services/sync/status
 ```
 
-## Project Structure
-
+### Onboarding Quiz
 ```
-karaoke-decide/
-├── karaoke_decide/              # Core Python package
-│   ├── __init__.py
-│   ├── cli/                     # CLI implementation
-│   │   ├── __init__.py
-│   │   ├── main.py              # Entry point
-│   │   ├── auth.py              # Auth commands
-│   │   ├── services.py          # Service connection commands
-│   │   ├── songs.py             # Song discovery commands
-│   │   └── playlists.py         # Playlist commands
-│   ├── core/                    # Shared business logic
-│   │   ├── __init__.py
-│   │   ├── models.py            # Pydantic models
-│   │   ├── config.py            # Settings management
-│   │   └── exceptions.py        # Custom exceptions
-│   ├── services/                # External service integrations
-│   │   ├── __init__.py
-│   │   ├── spotify.py           # Spotify API client
-│   │   ├── lastfm.py            # Last.fm API client
-│   │   └── karaokenerds.py      # KaraokeNerds catalog fetcher
-│   └── utils/                   # Utilities
-│       ├── __init__.py
-│       └── text.py              # String normalization, etc.
-│
-├── backend/                     # FastAPI backend
-│   ├── __init__.py
-│   ├── main.py                  # FastAPI app
-│   ├── config.py                # Backend-specific settings
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── routes/
-│   │   │   ├── __init__.py
-│   │   │   ├── auth.py
-│   │   │   ├── services.py
-│   │   │   ├── catalog.py
-│   │   │   ├── my_songs.py
-│   │   │   └── playlists.py
-│   │   └── deps.py              # Dependency injection
-│   ├── models/                  # Request/response models
-│   │   └── ...
-│   ├── services/                # Backend services
-│   │   ├── __init__.py
-│   │   ├── firestore_service.py
-│   │   ├── auth_service.py
-│   │   ├── user_service.py
-│   │   ├── catalog_service.py
-│   │   ├── sync_service.py
-│   │   └── email_service.py
-│   ├── middleware/
-│   │   └── audit_logging.py
-│   └── tests/
-│       └── ...
-│
-├── frontend/                    # Next.js frontend (Phase 2)
-│   └── ...
-│
-├── infrastructure/              # Pulumi IaC
-│   ├── __main__.py
-│   ├── Pulumi.yaml
-│   ├── Pulumi.dev.yaml
-│   └── Pulumi.prod.yaml
-│
-├── tests/                       # Package tests
-│   ├── unit/
-│   └── integration/
-│
-├── scripts/                     # Dev scripts
-│   ├── start-emulators.sh
-│   ├── stop-emulators.sh
-│   └── seed-catalog.py
-│
-├── docs/                        # Documentation
-│   ├── README.md
-│   ├── ARCHITECTURE.md
-│   ├── DEVELOPMENT.md
-│   ├── API.md
-│   └── archive/
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-├── .claude/
-│   └── commands/
-│       └── ...
-│
-├── CLAUDE.md                    # AI agent guidelines
-├── CONTEXT.md                   # Project background
-├── PLAN.md                      # This file
-├── Dockerfile
-├── Makefile
-├── pyproject.toml
-├── poetry.lock
-├── .gitignore
-├── .env.example
-└── README.md
+GET  /api/quiz/songs          - Get quiz song options (popular karaoke)
+POST /api/quiz/submit         - Submit quiz responses
+```
+
+### Song Discovery
+```
+GET  /api/songs               - Search/browse catalog
+GET  /api/songs/:id           - Get song details
+GET  /api/songs/recommend     - Get recommendations for user
+```
+
+Query params for /api/songs:
+- `q` - Text search
+- `decade` - Filter by decade
+- `genre` - Filter by genre
+- `energy` - min/max energy
+- `bpm` - min/max BPM
+- `popularity` - min popularity
+- `in_my_library` - Only songs user knows
+- `has_karaoke` - Only existing karaoke versions
+- `sort` - play_count, popularity, artist, title
+
+### My Songs
+```
+GET  /api/my/songs            - Songs from my listening history
+GET  /api/my/songs/top        - Top recommendations
+```
+
+### Playlists
+```
+GET    /api/playlists
+POST   /api/playlists
+GET    /api/playlists/:id
+PUT    /api/playlists/:id
+DELETE /api/playlists/:id
+POST   /api/playlists/:id/songs
+DELETE /api/playlists/:id/songs/:songId
+```
+
+### Karaoke Links
+```
+GET /api/songs/:id/karaoke    - Get karaoke video URL or generator link
+```
+
+Returns either:
+- `{ "type": "youtube", "url": "https://youtube.com/..." }`
+- `{ "type": "generate", "url": "https://gen.nomadkaraoke.com/?artist=...&title=..." }`
+
+## CLI Commands
+
+```bash
+# Auth
+karaoke-decide auth login
+karaoke-decide auth status
+karaoke-decide auth logout
+
+# Services
+karaoke-decide services list
+karaoke-decide services connect spotify
+karaoke-decide services connect lastfm
+karaoke-decide services sync
+
+# Quiz (for data-light testing)
+karaoke-decide quiz start
+karaoke-decide quiz status
+
+# Songs
+karaoke-decide songs search "bohemian"
+karaoke-decide songs recommend
+karaoke-decide songs recommend --decade 90s --energy high
+karaoke-decide songs mine
+
+# Playlists
+karaoke-decide playlist list
+karaoke-decide playlist create "Friday Night"
+karaoke-decide playlist add <playlist_id> <song_id>
+karaoke-decide playlist show <playlist_id>
 ```
 
 ## Development Phases
 
-### Phase 1: Foundation (Current)
-1. Project setup (repo, structure, deps)
-2. Core models and configuration
-3. Firestore service layer
-4. Auth system (magic links)
-5. Basic CLI structure
+### Phase 1: Data Foundation
+1. [ ] ETL Spotify metadata dump → extract to usable format
+2. [ ] Download and parse KaraokeNerds catalog
+3. [ ] Design combined song schema
+4. [ ] Load initial dataset (top 100K songs by popularity)
+5. [ ] Basic song search API
 
-### Phase 2: Catalog & Matching
-1. KaraokeNerds catalog fetcher
-2. Spotify OAuth integration
-3. Last.fm integration
-4. Listening history sync
-5. Song matching algorithm
+### Phase 2: Auth & User Management
+1. [ ] Magic link email flow (SendGrid)
+2. [ ] JWT token management
+3. [ ] User profile storage
+4. [ ] Session management
 
-### Phase 3: API & CLI Complete
-1. All API endpoints implemented
-2. Full CLI functionality
-3. Playlist management
-4. Song tracking (sung records)
-5. Comprehensive tests
+### Phase 3: Music Service Integration
+1. [ ] Spotify OAuth flow
+2. [ ] Spotify listening history fetch
+3. [ ] Last.fm API integration
+4. [ ] Background sync job
+5. [ ] UserSong matching to catalog
 
-### Phase 4: Infrastructure & Deploy
-1. Pulumi infrastructure
-2. Cloud Run deployment
-3. CI/CD pipeline
-4. Monitoring & logging
+### Phase 4: Quiz & Recommendations
+1. [ ] Quiz song selection (popular karaoke)
+2. [ ] Quiz submission and storage
+3. [ ] Recommendation algorithm v1
+4. [ ] Filter/sort implementation
 
-### Phase 5: Web Frontend
-1. Next.js project setup
-2. Auth flow
-3. Song discovery UI
-4. Playlist management UI
-5. Mobile-responsive design
+### Phase 5: Playlists & Karaoke Links
+1. [ ] Playlist CRUD
+2. [ ] Karaoke availability check
+3. [ ] YouTube link lookup
+4. [ ] Generator handoff URL
+
+### Phase 6: CLI Polish
+1. [ ] All commands implemented
+2. [ ] Rich terminal output
+3. [ ] Interactive browse mode
+
+### Phase 7: Infrastructure
+1. [ ] Pulumi GCP setup
+2. [ ] Cloud Run deployment
+3. [ ] CI/CD pipeline
+4. [ ] Monitoring & logging
+
+### Phase 8: Web Frontend
+1. [ ] Next.js project setup
+2. [ ] Auth flow
+3. [ ] Song discovery UI
+4. [ ] Quiz onboarding
+5. [ ] Playlist management
+6. [ ] Mobile-responsive design
+
+## Future Phases (Post-MLP)
+
+### Vocal Range Detection
+1. [ ] Research existing APIs (Cyanite, etc.)
+2. [ ] Web Audio API pitch detection prototype
+3. [ ] Song vocal range analysis pipeline
+4. [ ] Pre-compute top 1000 songs
+5. [ ] User vocal range → song matching
+
+### Performance Tracking
+1. [ ] Post-song survey
+2. [ ] Rating and notes storage
+3. [ ] "Songs I've sung" history
+
+### Social Features
+1. [ ] Friend connections
+2. [ ] Group playlists
+3. [ ] Karaoke crews
+
+### Venue Integration
+1. [ ] Venue database
+2. [ ] Filter by venue availability
 
 ## Testing Strategy
 
-Following karaoke-gen patterns:
-
 ```bash
-# Unit tests (fast, mocked)
-make test-unit
-
-# Backend tests with emulators
-make test-e2e
-
-# All tests
-make test
+make test         # All tests
+make test-unit    # Unit tests only
+make test-backend # Backend tests
+make test-e2e     # With emulators
 ```
 
 ### Coverage Targets
-- Backend: 70%+
 - Core package: 80%+
-- CLI: 60%+ (harder to test interactive)
+- Backend: 70%+
+- CLI: 60%+
 
-## Success Metrics
+## Notes on Data Access
 
-### MLP Launch Criteria
+### KaraokeNerds Catalog
+Currently requires `projectbread-karaokay` GCP credentials. Options:
+1. Copy data to `nomadkaraoke` project
+2. Set up cross-project access
+3. Download manually and upload to new location
+
+### Spotify Dump
+Large files require:
+1. Decompress with zstd (requires disk space)
+2. Extract relevant columns to smaller format
+3. Consider BigQuery for full-scale queries
+4. Local SQLite subset for development
+
+## Success Criteria
+
+MLP is complete when:
 - [ ] User can sign up via magic link
-- [ ] User can connect Spotify account
-- [ ] User can see their listening history matched to karaoke songs
-- [ ] User can search the full karaoke catalog
-- [ ] User can create and manage playlists
-- [ ] User can mark songs as sung with ratings
-- [ ] CLI provides full functionality
-- [ ] API is deployed and accessible
+- [ ] User can connect Spotify OR complete quiz
+- [ ] User sees relevant song recommendations
+- [ ] User can search and filter songs
+- [ ] User can create playlists
+- [ ] Songs link to YouTube karaoke or Generator
+- [ ] API is deployed and stable
+- [ ] Web frontend is responsive and usable
 - [ ] 70%+ test coverage
-
-### Future Metrics (Post-MLP)
-- Monthly active users
-- Songs matched per user
-- Playlists created
-- Songs marked as sung
-- User retention (7-day, 30-day)
