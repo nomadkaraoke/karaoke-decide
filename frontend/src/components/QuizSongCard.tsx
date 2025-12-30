@@ -1,15 +1,7 @@
 "use client";
 
+import type { QuizSong } from "@/types";
 import { CheckIcon, StarIcon } from "./icons";
-
-interface QuizSong {
-  id: string;
-  artist: string;
-  title: string;
-  decade: string;
-  popularity: number;
-  brand_count: number;
-}
 
 interface QuizSongCardProps {
   song: QuizSong;

@@ -6,6 +6,14 @@ import Link from "next/link";
 import { XIcon, SpotifyIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 
+function safeDecodeURIComponent(str: string): string {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
 function ErrorContent() {
   const searchParams = useSearchParams();
   const message = searchParams.get("message") || "An unknown error occurred";
@@ -26,7 +34,7 @@ function ErrorContent() {
         <h1 className="text-2xl font-bold text-white mb-2">
           Connection Failed
         </h1>
-        <p className="text-white/60 mb-6">{decodeURIComponent(message)}</p>
+        <p className="text-white/60 mb-6">{safeDecodeURIComponent(message)}</p>
 
         <div className="space-y-3">
           <Link href="/services">

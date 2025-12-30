@@ -71,7 +71,8 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
                 `https://www.youtube.com/results?search_query=${encodeURIComponent(
                   `${song.artist} ${song.title} karaoke`
                 )}`,
-                "_blank"
+                "_blank",
+                "noopener,noreferrer"
               );
             }}
           >

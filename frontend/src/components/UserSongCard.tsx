@@ -96,7 +96,8 @@ export function UserSongCard({
                 `https://www.youtube.com/results?search_query=${encodeURIComponent(
                   `${song.artist} ${song.title} karaoke`
                 )}`,
-                "_blank"
+                "_blank",
+                "noopener,noreferrer"
               );
             }}
           >

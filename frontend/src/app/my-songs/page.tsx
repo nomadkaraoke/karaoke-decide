@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { UserSongCard } from "@/components/UserSongCard";
@@ -20,6 +21,7 @@ interface UserSong {
 }
 
 export default function MySongsPage() {
+  const router = useRouter();
   const [songs, setSongs] = useState<UserSong[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -112,11 +114,11 @@ export default function MySongsPage() {
               description="Connect your music services or take the quiz to build your song library."
               action={{
                 label: "Connect Services",
-                onClick: () => (window.location.href = "/services"),
+                onClick: () => router.push("/services"),
               }}
               secondaryAction={{
                 label: "Take the Quiz",
-                onClick: () => (window.location.href = "/quiz"),
+                onClick: () => router.push("/quiz"),
               }}
             />
           ) : (

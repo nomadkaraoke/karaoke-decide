@@ -2,26 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import type { Recommendation } from "@/types";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { SparklesIcon, MusicIcon, LinkIcon } from "@/components/icons";
 import { Button, LoadingPulse, EmptyState } from "@/components/ui";
 
-interface Recommendation {
-  song_id: string;
-  artist: string;
-  title: string;
-  score: number;
-  reason: string;
-  reason_type: string;
-  brand_count: number;
-  popularity: number;
-}
-
 const DECADES = ["1970s", "1980s", "1990s", "2000s", "2010s", "2020s"];
 
 export default function RecommendationsPage() {
+  const router = useRouter();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,11 +127,11 @@ export default function RecommendationsPage() {
               description="Connect your music services or take the quiz to get personalized recommendations."
               action={{
                 label: "Connect Services",
-                onClick: () => (window.location.href = "/services"),
+                onClick: () => router.push("/services"),
               }}
               secondaryAction={{
                 label: "Take the Quiz",
-                onClick: () => (window.location.href = "/quiz"),
+                onClick: () => router.push("/quiz"),
               }}
             />
           ) : (

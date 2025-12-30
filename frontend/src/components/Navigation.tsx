@@ -87,7 +87,7 @@ export function Navigation() {
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5">
                   <UserIcon className="w-4 h-4 text-white/60" />
                   <span className="text-sm text-white/80 max-w-[120px] truncate">
-                    {user?.display_name || user?.email?.split("@")[0]}
+                    {user?.display_name || user?.email?.split("@")[0] || "User"}
                   </span>
                 </div>
                 <button
@@ -111,6 +111,8 @@ export function Navigation() {
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="md:hidden p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? (
               <XIcon className="w-6 h-6" />
@@ -157,7 +159,7 @@ export function Navigation() {
                     <UserIcon className="w-5 h-5 text-white/60" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
-                        {user?.display_name || user?.email?.split("@")[0]}
+                        {user?.display_name || user?.email?.split("@")[0] || "User"}
                       </p>
                       <p className="text-xs text-white/40 truncate">{user?.email}</p>
                     </div>

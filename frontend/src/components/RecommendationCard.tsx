@@ -1,19 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { Recommendation } from "@/types";
 import { MicrophoneIcon, StarIcon, SparklesIcon } from "./icons";
 import { Badge } from "./ui";
-
-interface Recommendation {
-  song_id: string;
-  artist: string;
-  title: string;
-  score: number;
-  reason: string;
-  reason_type: string;
-  brand_count: number;
-  popularity: number;
-}
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -138,7 +128,8 @@ export function RecommendationCard({
                 `https://www.youtube.com/results?search_query=${encodeURIComponent(
                   `${recommendation.artist} ${recommendation.title} karaoke`
                 )}`,
-                "_blank"
+                "_blank",
+                "noopener,noreferrer"
               );
             }}
           >

@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback((token: string) => {
     setAuthToken(token);
-    // Will trigger useEffect to check auth
+    // Token is stored; caller should call checkAuth() to fetch user data
   }, []);
 
   const logout = useCallback(async () => {
