@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -219,3 +224,152 @@ jobs:
             exit 1
           fi
           echo "All required jobs passed!"
+
+  # ============================================
+  # DEPLOYMENTS (main branch only)
+  # ============================================
+
+  deploy-frontend:
+    name: Deploy Frontend (GitHub Pages)
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: https://karaoke-decide-718638054799.us-central1.run.app
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-backend:
+    name: Deploy Backend (Cloud Run)
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit, test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      REGISTRY: us-central1-docker.pkg.dev
+      PROJECT_ID: nomadkaraoke
+      REPOSITORY: karaoke-repo
+      IMAGE_NAME: karaoke-decide
+      REGION: us-central1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: "1.8.2"
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(poetry version --short)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📋 Version: $VERSION"
+
+      - name: Authenticate to Google Cloud (Workload Identity)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          version: "latest"
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:v${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.IMAGE_NAME }} \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --cpu 1 \
+            --timeout 300 \
+            --concurrency 80 \
+            --max-instances 10 \
+            --min-instances 0 \
+            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke-decide"
+
+      - name: Verify deployment
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+
+          echo "Service URL: $SERVICE_URL"
+          echo "Waiting for deployment to stabilize..."
+          sleep 10
+
+          # Health check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/api/health")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Deployment successful! Health check passed."
+          else
+            echo "❌ Health check failed with status: $HTTP_STATUS"
+            exit 1
+          fi
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "🎉 Backend deployment successful!"
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
