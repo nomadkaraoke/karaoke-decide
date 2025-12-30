@@ -18,6 +18,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery integration
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
+- **CI/Testing:** 135 unit tests (99% coverage), 33 backend tests (83% coverage), all checks passing
 
 ### 🚧 Next Up (Phase 2: Auth & User Management)
 1. Magic link email authentication (SendGrid)
@@ -98,4 +99,5 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2024-12-30 | Comprehensive test coverage (135 unit, 33 backend tests) | [archive/2024-12-30-comprehensive-test-coverage.md](archive/2024-12-30-comprehensive-test-coverage.md) |
 | 2024-12-30 | Data foundation (BigQuery ETL) + frontend launch | [archive/2024-12-30-data-foundation-and-frontend.md](archive/2024-12-30-data-foundation-and-frontend.md) |

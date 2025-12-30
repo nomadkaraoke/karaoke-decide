@@ -105,3 +105,44 @@ Artifact Reg:     projects/{project}/locations/{region}/repositories/{repo}
 Cloud Run:        projects/{project}/locations/{region}/services/{service}
 IAM Member:       {project} {role} {member}
 ```
+
+---
+
+### 2024-12-30: Lazy Service Initialization for CI
+
+**Context:** Backend tests were failing in CI because `BigQueryCatalogService` was instantiated at module import, requiring GCP credentials.
+
+**Lesson:** Services that require external credentials should use lazy initialization, not module-level instantiation. This allows tests to mock the service before first use.
+
+**Recommendation:**
+```python
+# BAD - instantiated at import
+catalog_service = BigQueryCatalogService()
+
+# GOOD - lazy initialization
+_catalog_service: BigQueryCatalogService | None = None
+
+def get_catalog_service() -> BigQueryCatalogService:
+    global _catalog_service
+    if _catalog_service is None:
+        _catalog_service = BigQueryCatalogService()
+    return _catalog_service
+```
+
+---
+
+### 2024-12-30: Type Annotations for httpx response.json()
+
+**Context:** Mypy was failing with "Returning Any from function declared to return dict[str, Any]" on all `response.json()` calls.
+
+**Lesson:** `response.json()` returns `Any` type. Mypy requires explicit type annotation to satisfy declared return types.
+
+**Recommendation:**
+```python
+# BAD - mypy error
+return response.json()
+
+# GOOD - explicit annotation
+result: dict[str, Any] = response.json()
+return result
+```
