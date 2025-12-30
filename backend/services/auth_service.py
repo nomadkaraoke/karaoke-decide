@@ -139,11 +139,7 @@ class AuthService:
                 updated_at=datetime.fromisoformat(doc["updated_at"]),
                 total_songs_known=doc.get("total_songs_known", 0),
                 total_songs_sung=doc.get("total_songs_sung", 0),
-                last_sync_at=(
-                    datetime.fromisoformat(doc["last_sync_at"])
-                    if doc.get("last_sync_at")
-                    else None
-                ),
+                last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
             )
 
         # Create new user
@@ -202,11 +198,7 @@ class AuthService:
             updated_at=datetime.fromisoformat(doc["updated_at"]),
             total_songs_known=doc.get("total_songs_known", 0),
             total_songs_sung=doc.get("total_songs_sung", 0),
-            last_sync_at=(
-                datetime.fromisoformat(doc["last_sync_at"])
-                if doc.get("last_sync_at")
-                else None
-            ),
+            last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
         )
 
     def generate_jwt(self, user: User) -> tuple[str, int]:

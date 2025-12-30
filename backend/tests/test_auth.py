@@ -15,12 +15,15 @@ def auth_client_with_mocks(
     mock_auth_service: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """Create test client with mocked auth service."""
-    with patch(
-        "backend.api.routes.catalog.get_catalog_service",
-        return_value=mock_catalog_service,
-    ), patch(
-        "backend.api.deps.get_auth_service",
-        return_value=mock_auth_service,
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
     ):
         from backend.main import app
 
@@ -76,12 +79,15 @@ class TestRequestMagicLink:
         """Should return 500 when email fails to send."""
         mock_auth_service.send_magic_link = AsyncMock(return_value=False)
 
-        with patch(
-            "backend.api.routes.catalog.get_catalog_service",
-            return_value=mock_catalog_service,
-        ), patch(
-            "backend.api.deps.get_auth_service",
-            return_value=mock_auth_service,
+        with (
+            patch(
+                "backend.api.routes.catalog.get_catalog_service",
+                return_value=mock_catalog_service,
+            ),
+            patch(
+                "backend.api.deps.get_auth_service",
+                return_value=mock_auth_service,
+            ),
         ):
             from backend.main import app
 
@@ -119,16 +125,17 @@ class TestVerifyMagicLink:
         mock_auth_service: MagicMock,
     ) -> None:
         """Should return 401 for invalid token."""
-        mock_auth_service.verify_magic_link = AsyncMock(
-            side_effect=AuthenticationError("Invalid or expired token")
-        )
+        mock_auth_service.verify_magic_link = AsyncMock(side_effect=AuthenticationError("Invalid or expired token"))
 
-        with patch(
-            "backend.api.routes.catalog.get_catalog_service",
-            return_value=mock_catalog_service,
-        ), patch(
-            "backend.api.deps.get_auth_service",
-            return_value=mock_auth_service,
+        with (
+            patch(
+                "backend.api.routes.catalog.get_catalog_service",
+                return_value=mock_catalog_service,
+            ),
+            patch(
+                "backend.api.deps.get_auth_service",
+                return_value=mock_auth_service,
+            ),
         ):
             from backend.main import app
 
@@ -188,16 +195,17 @@ class TestGetCurrentUser:
         mock_auth_service: MagicMock,
     ) -> None:
         """Should return 401 for invalid token."""
-        mock_auth_service.validate_jwt.side_effect = AuthenticationError(
-            "Invalid token"
-        )
+        mock_auth_service.validate_jwt.side_effect = AuthenticationError("Invalid token")
 
-        with patch(
-            "backend.api.routes.catalog.get_catalog_service",
-            return_value=mock_catalog_service,
-        ), patch(
-            "backend.api.deps.get_auth_service",
-            return_value=mock_auth_service,
+        with (
+            patch(
+                "backend.api.routes.catalog.get_catalog_service",
+                return_value=mock_catalog_service,
+            ),
+            patch(
+                "backend.api.deps.get_auth_service",
+                return_value=mock_auth_service,
+            ),
         ):
             from backend.main import app
 

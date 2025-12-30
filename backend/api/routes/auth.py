@@ -64,9 +64,7 @@ async def request_magic_link(
             detail="Failed to send magic link email",
         )
 
-    return MagicLinkResponse(
-        message="If an account exists for this email, you will receive a magic link shortly."
-    )
+    return MagicLinkResponse(message="If an account exists for this email, you will receive a magic link shortly.")
 
 
 @router.post("/verify", response_model=AuthResponse)

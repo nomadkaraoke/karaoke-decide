@@ -201,12 +201,15 @@ def auth_client(
     mock_auth_service: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """Create test client with mocked auth and catalog services."""
-    with patch(
-        "backend.api.routes.catalog.get_catalog_service",
-        return_value=mock_catalog_service,
-    ), patch(
-        "backend.api.deps.get_auth_service",
-        return_value=mock_auth_service,
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
     ):
         # Import app inside the patch context
         from backend.main import app

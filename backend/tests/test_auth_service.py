@@ -356,7 +356,6 @@ class TestValidateJwt:
 
         from jose import jwt
 
-
         settings = BackendSettings(
             environment="development",
             google_cloud_project="test-project",
