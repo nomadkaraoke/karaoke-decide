@@ -1,0 +1,189 @@
+"""
+Pulumi infrastructure for Nomad Karaoke Decide.
+
+Resources managed:
+- BigQuery dataset and tables (karaoke catalog data)
+- GCS bucket (data staging)
+- Artifact Registry repository (container images)
+- Cloud Run service (backend API)
+- IAM bindings (service account permissions)
+"""
+
+import pulumi
+import pulumi_gcp as gcp
+
+# Configuration
+config = pulumi.Config()
+gcp_config = pulumi.Config("gcp")
+project = gcp_config.require("project")
+region = gcp_config.require("region")
+environment = config.get("environment") or "production"
+
+# Project number (needed for service account references)
+PROJECT_NUMBER = "718638054799"
+
+# =============================================================================
+# BigQuery
+# =============================================================================
+
+# Dataset for karaoke catalog data
+bigquery_dataset = gcp.bigquery.Dataset(
+    "karaoke-decide-dataset",
+    dataset_id="karaoke_decide",
+    project=project,
+    description="Karaoke song catalog and metadata",
+    max_time_travel_hours="168",
+    accesses=[
+        {"role": "OWNER", "user_by_email": "admin@nomadkaraoke.com"},
+        {"role": "OWNER", "special_group": "projectOwners"},
+        {"role": "READER", "special_group": "projectReaders"},
+        {"role": "WRITER", "special_group": "projectWriters"},
+    ],
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# KaraokeNerds catalog table
+karaokenerds_table = gcp.bigquery.Table(
+    "karaokenerds-raw-table",
+    dataset_id=bigquery_dataset.dataset_id,
+    table_id="karaokenerds_raw",
+    project=project,
+    schema='[{"mode":"NULLABLE","name":"Title","type":"STRING"},{"mode":"NULLABLE","name":"Artist","type":"STRING"},{"mode":"NULLABLE","name":"Brands","type":"STRING"},{"mode":"NULLABLE","name":"Id","type":"INTEGER"}]',
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# Spotify tracks table
+spotify_tracks_table = gcp.bigquery.Table(
+    "spotify-tracks-table",
+    dataset_id=bigquery_dataset.dataset_id,
+    table_id="spotify_tracks",
+    project=project,
+    schema='[{"mode":"NULLABLE","name":"spotify_id","type":"STRING"},{"mode":"NULLABLE","name":"title","type":"STRING"},{"mode":"NULLABLE","name":"isrc","type":"STRING"},{"mode":"NULLABLE","name":"popularity","type":"INTEGER"},{"mode":"NULLABLE","name":"duration_ms","type":"INTEGER"},{"mode":"NULLABLE","name":"explicit","type":"BOOLEAN"},{"mode":"NULLABLE","name":"artist_name","type":"STRING"},{"mode":"NULLABLE","name":"artist_spotify_id","type":"STRING"},{"mode":"NULLABLE","name":"artist_popularity","type":"INTEGER"},{"mode":"NULLABLE","name":"artist_followers","type":"INTEGER"}]',
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# =============================================================================
+# Cloud Storage
+# =============================================================================
+
+# Data staging bucket
+data_bucket = gcp.storage.Bucket(
+    "data-bucket",
+    name="nomadkaraoke-data",
+    project=project,
+    location="US-CENTRAL1",
+    uniform_bucket_level_access=True,
+    public_access_prevention="inherited",
+    hierarchical_namespace={"enabled": False},
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# =============================================================================
+# Artifact Registry
+# =============================================================================
+
+# Container image repository
+artifact_repo = gcp.artifactregistry.Repository(
+    "karaoke-repo",
+    repository_id="karaoke-repo",
+    project=project,
+    location=region,
+    format="DOCKER",
+    description="Docker repository for karaoke backend images",
+)
+
+# =============================================================================
+# IAM
+# =============================================================================
+
+# BigQuery User role for default compute service account
+bigquery_user_binding = gcp.projects.IAMMember(
+    "compute-sa-bigquery-user",
+    project=project,
+    role="roles/bigquery.user",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# BigQuery Data Viewer role for default compute service account
+bigquery_viewer_binding = gcp.projects.IAMMember(
+    "compute-sa-bigquery-viewer",
+    project=project,
+    role="roles/bigquery.dataViewer",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# =============================================================================
+# Cloud Run
+# =============================================================================
+
+# Backend API service
+cloud_run_service = gcp.cloudrunv2.Service(
+    "karaoke-decide-api",
+    name="karaoke-decide",
+    project=project,
+    location=region,
+    ingress="INGRESS_TRAFFIC_ALL",
+    launch_stage="GA",
+    template={
+        "containers": [{
+            "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+            "ports": {
+                "container_port": 8000,
+                "name": "http1",
+            },
+            "envs": [{"name": "ENVIRONMENT", "value": environment}],
+            "resources": {
+                "limits": {
+                    "cpu": "1",
+                    "memory": "512Mi",
+                },
+                "cpu_idle": True,
+                "startup_cpu_boost": True,
+            },
+            "startup_probe": {
+                "tcp_socket": {"port": 8000},
+                "timeout_seconds": 240,
+                "period_seconds": 240,
+                "failure_threshold": 1,
+            },
+        }],
+        "scaling": {
+            "max_instance_count": 10,
+        },
+        "max_instance_request_concurrency": 80,
+        "timeout": "300s",
+        "service_account": f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    },
+    traffics=[{
+        "percent": 100,
+        "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+    }],
+    scaling={
+        "min_instance_count": 0,
+    },
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# Allow unauthenticated access to Cloud Run service
+cloud_run_invoker = gcp.cloudrunv2.ServiceIamMember(
+    "karaoke-decide-invoker",
+    name=cloud_run_service.name.apply(
+        lambda name: f"projects/{project}/locations/{region}/services/{name}"
+    ),
+    project=project,
+    location=region,
+    role="roles/run.invoker",
+    member="allUsers",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+# =============================================================================
+# Outputs
+# =============================================================================
+
+pulumi.export("cloud_run_url", cloud_run_service.uri)
+pulumi.export("bigquery_dataset", bigquery_dataset.dataset_id)
+pulumi.export("data_bucket", data_bucket.name)
+pulumi.export("artifact_repo", artifact_repo.name)

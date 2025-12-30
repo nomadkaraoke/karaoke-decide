@@ -1,21 +1,27 @@
 # Claude Code Guidelines for Nomad Karaoke Decide
 
+> **New session?** Read [docs/README.md](docs/README.md) first for current status and entry points.
+
 ## Quick Reference
 
 | Topic | Location |
 |-------|----------|
-| Project background | CONTEXT.md |
-| Implementation plan | PLAN.md |
-| Architecture | docs/ARCHITECTURE.md |
-| Development setup | docs/DEVELOPMENT.md |
-| API reference | docs/API.md |
+| **Current status** | **[docs/README.md](docs/README.md)** ← Start here |
+| Project background | [docs/CONTEXT.md](docs/CONTEXT.md) |
+| Implementation plan | [docs/PLAN.md](docs/PLAN.md) |
+| Product vision | [docs/VISION.md](docs/VISION.md) |
+| Lessons learned | [docs/LESSONS-LEARNED.md](docs/LESSONS-LEARNED.md) |
+| Architecture | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Development setup | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) |
+| API reference | [docs/API.md](docs/API.md) |
 
 ## Project Overview
 
 **Nomad Karaoke Decide** helps people discover and choose karaoke songs based on their music listening history.
 
-- **Domain:** decide.nomadkaraoke.com
-- **Tech Stack:** Python 3.11+, FastAPI, Firestore, Cloud Run
+- **Live:** https://decide.nomadkaraoke.com
+- **API:** https://karaoke-decide-718638054799.us-central1.run.app
+- **Tech Stack:** Python 3.12, FastAPI, BigQuery, Cloud Run, Next.js
 - **Sister Project:** [karaoke-gen](https://github.com/nomadkaraoke/karaoke-gen) - shares patterns
 
 ## Essential Rules
@@ -105,9 +111,22 @@ scripts/           # Dev utilities
 
 ## Documentation Maintenance
 
-- **Before PRs:** Check if docs need updating
+- **Before PRs:** Run `/docs-review` to check if docs need updating
 - **Significant work:** Create `docs/archive/YYYY-MM-DD-topic.md`
 - **Status changes:** Update `docs/README.md`
+- **Lessons learned:** Add entries to `docs/LESSONS-LEARNED.md`
+- **Periodic check:** Run `/docs-maintain` to verify doc organization
+
+## Slash Commands
+
+| Command | Purpose |
+|---------|---------|
+| `/plan` | Create implementation plan for a feature |
+| `/implement` | Implement from an existing plan |
+| `/test` | Run tests and report results |
+| `/docs-review` | Check docs before merging PR |
+| `/docs-maintain` | Periodic documentation maintenance |
+| `/coderabbit-review` | Address CodeRabbit PR comments |
 
 ## Common Tasks
 

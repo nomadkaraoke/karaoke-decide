@@ -1,6 +1,6 @@
 # Nomad Karaoke Decide - Implementation Plan
 
-> See [VISION.md](VISION.md) for product goals and [docs/REQUIREMENTS-QA.md](docs/REQUIREMENTS-QA.md) for the full requirements discussion.
+> See [VISION.md](VISION.md) for product goals and [REQUIREMENTS-QA.md](REQUIREMENTS-QA.md) for the full requirements discussion.
 
 ## Tech Stack
 

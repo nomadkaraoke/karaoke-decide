@@ -16,7 +16,7 @@ First, determine the current branch and find the associated PR:
 git branch --show-current
 ```
 
-Then use GitHub tools to find the PR for this branch in the `nomadkaraoke/karaoke-gen` repository.
+Then use GitHub tools to find the PR for this branch in the `nomadkaraoke/karaoke-decide` repository.
 
 ### 2. Fetch CodeRabbit Comments
 
