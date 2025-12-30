@@ -62,10 +62,9 @@ dmypy.json
 .AppleDouble
 .LSOverride
 
-# GCP
-*.json
-!.claude/**/*.json
+# GCP service accounts
 service-account*.json
+*-credentials.json
 
 # Pulumi
 infrastructure/.pulumi/
