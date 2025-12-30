@@ -10,7 +10,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://karaoke-decide-718638054799.us-central1.run.app
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2024-12-30)
+## Current Status (2025-12-30)
 
 **Phase:** ~80% to MLP (Minimum Lovable Product)
 
