@@ -29,11 +29,11 @@ Health check endpoint.
 
 ---
 
-## Auth
+## Auth ✅ Implemented
 
 ### POST /api/auth/magic-link
 
-Request a magic link to be sent via email.
+Request a magic link to be sent via email. In dev mode (no SendGrid configured), the link is logged to console.
 
 **Request:**
 ```json
@@ -45,7 +45,7 @@ Request a magic link to be sent via email.
 **Response:**
 ```json
 {
-  "message": "Magic link sent to user@example.com"
+  "message": "If an account exists for this email, you will receive a magic link shortly."
 }
 ```
 
@@ -84,12 +84,14 @@ Get the current authenticated user.
 
 ### POST /api/auth/logout
 
-Invalidate the current session.
+Log out the current user (stateless - client should discard token).
+
+**Requires:** Bearer token
 
 **Response:**
 ```json
 {
-  "message": "Logged out"
+  "message": "Successfully logged out"
 }
 ```
 

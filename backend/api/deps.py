@@ -6,6 +6,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import BackendSettings, get_backend_settings
+from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
+from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.models import User
 
 # Security scheme
@@ -17,9 +19,25 @@ async def get_settings() -> BackendSettings:
     return get_backend_settings()
 
 
+async def get_firestore(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+) -> FirestoreService:
+    """Get Firestore service instance."""
+    return FirestoreService(settings)
+
+
+async def get_auth_service_dep(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> AuthService:
+    """Get auth service instance."""
+    return get_auth_service(settings, firestore)
+
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     settings: Annotated[BackendSettings, Depends(get_settings)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service_dep)],
 ) -> User:
     """Get the current authenticated user from the JWT token.
 
@@ -33,26 +51,48 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # TODO: Validate JWT token and fetch user
-    # token = credentials.credentials
-    # user = await validate_token_and_get_user(token, settings)
+    try:
+        # Validate JWT token
+        claims = auth_service.validate_jwt(credentials.credentials)
+        user_id = claims.get("sub")
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Authentication not yet implemented",
-    )
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token claims",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Fetch user from Firestore
+        user = await auth_service.get_user_by_id(user_id)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        return user
+
+    except AuthenticationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 async def get_optional_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     settings: Annotated[BackendSettings, Depends(get_settings)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service_dep)],
 ) -> User | None:
     """Get the current user if authenticated, None otherwise."""
     if credentials is None:
         return None
 
     try:
-        return await get_current_user(credentials, settings)
+        return await get_current_user(credentials, settings, auth_service)
     except HTTPException:
         return None
 
@@ -61,3 +101,5 @@ async def get_optional_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
+FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service_dep)]
