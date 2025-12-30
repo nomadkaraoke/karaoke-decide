@@ -26,9 +26,7 @@ class LastFmClient:
             {"user": username},
         )
 
-    async def get_loved_tracks(
-        self, username: str, limit: int = 50, page: int = 1
-    ) -> dict[str, Any]:
+    async def get_loved_tracks(self, username: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
         """Get user's loved tracks."""
         return await self._api_request(
             "user.getlovedtracks",
@@ -55,9 +53,7 @@ class LastFmClient:
             {"user": username, "period": period, "limit": limit, "page": page},
         )
 
-    async def get_recent_tracks(
-        self, username: str, limit: int = 50, page: int = 1
-    ) -> dict[str, Any]:
+    async def get_recent_tracks(self, username: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
         """Get user's recent tracks with play timestamps."""
         return await self._api_request(
             "user.getrecenttracks",
@@ -103,7 +99,7 @@ class LastFmClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Last.fm", f"API error: {response.text}")
 
-            data = response.json()
+            data: dict[str, Any] = response.json()
 
             # Last.fm returns errors in the response body
             if "error" in data:

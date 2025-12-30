@@ -60,9 +60,6 @@ asyncio_mode = "auto"
 addopts = [
     "-v",
     "--tb=short",
-    "--cov=karaoke_decide",
-    "--cov=backend",
-    "--cov-report=term-missing",
 ]
 markers = [
     "slow: marks tests as slow",
@@ -72,6 +69,16 @@ markers = [
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::RuntimeWarning",
+]
+
+[tool.coverage.run]
+source = ["karaoke_decide", "backend"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
 ]
 
 [tool.ruff]

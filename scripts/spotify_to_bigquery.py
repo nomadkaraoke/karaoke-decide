@@ -4,9 +4,9 @@ Export Spotify tracks from SQLite to BigQuery.
 Exports tracks with primary artist name, ISRC, popularity for karaoke matching.
 """
 
-import sqlite3
-import json
 import gzip
+import json
+import sqlite3
 import subprocess
 from pathlib import Path
 
@@ -17,6 +17,7 @@ PROJECT = "nomadkaraoke"
 DATASET = "karaoke_decide"
 TABLE = "spotify_tracks"
 BATCH_SIZE = 500000  # 500K rows per file
+
 
 def export_tracks():
     """Export tracks with artist info to NDJSON files."""
@@ -57,7 +58,7 @@ def export_tracks():
     for row in cursor:
         if row_count == 0:
             file_path = OUTPUT_DIR / f"tracks_{file_num:04d}.ndjson.gz"
-            current_file = gzip.open(file_path, 'wt', encoding='utf-8')
+            current_file = gzip.open(file_path, "wt", encoding="utf-8")
             print(f"Writing {file_path}...")
 
         record = {
@@ -90,15 +91,13 @@ def export_tracks():
     print(f"Export complete: {total_count:,} tracks in {file_num + 1} files")
     return file_num + 1
 
+
 def upload_to_gcs(num_files):
     """Upload NDJSON files to GCS."""
     print(f"Uploading {num_files} files to {GCS_BUCKET}...")
-    subprocess.run([
-        "gsutil", "-m", "cp",
-        str(OUTPUT_DIR / "tracks_*.ndjson.gz"),
-        GCS_BUCKET + "/"
-    ], check=True)
+    subprocess.run(["gsutil", "-m", "cp", str(OUTPUT_DIR / "tracks_*.ndjson.gz"), GCS_BUCKET + "/"], check=True)
     print("Upload complete")
+
 
 def load_to_bigquery():
     """Load data from GCS to BigQuery."""
@@ -118,15 +117,20 @@ def load_to_bigquery():
     artist_followers:INTEGER
     """
 
-    subprocess.run([
-        "bq", "load",
-        "--replace",
-        "--source_format=NEWLINE_DELIMITED_JSON",
-        f"{PROJECT}:{DATASET}.{TABLE}",
-        f"{GCS_BUCKET}/tracks_*.ndjson.gz",
-        schema.replace("\n", ",").replace(" ", "")
-    ], check=True)
+    subprocess.run(
+        [
+            "bq",
+            "load",
+            "--replace",
+            "--source_format=NEWLINE_DELIMITED_JSON",
+            f"{PROJECT}:{DATASET}.{TABLE}",
+            f"{GCS_BUCKET}/tracks_*.ndjson.gz",
+            schema.replace("\n", ",").replace(" ", ""),
+        ],
+        check=True,
+    )
     print("BigQuery load complete")
+
 
 if __name__ == "__main__":
     print("=== Spotify to BigQuery ETL ===")

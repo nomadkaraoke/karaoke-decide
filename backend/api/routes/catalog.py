@@ -1,14 +1,22 @@
 """Catalog routes for browsing karaoke songs."""
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 router = APIRouter()
 
-# Initialize service (could use dependency injection in production)
-catalog_service = BigQueryCatalogService()
+# Lazy initialization for testability
+_catalog_service: BigQueryCatalogService | None = None
+
+
+def get_catalog_service() -> BigQueryCatalogService:
+    """Get or create catalog service (lazy initialization)."""
+    global _catalog_service
+    if _catalog_service is None:
+        _catalog_service = BigQueryCatalogService()
+    return _catalog_service
 
 
 class SongResponse(BaseModel):
@@ -58,10 +66,11 @@ async def search_catalog(
     """
     offset = (page - 1) * per_page
 
+    service = get_catalog_service()
     if artist:
-        results = catalog_service.get_songs_by_artist(artist, limit=per_page)
+        results = service.get_songs_by_artist(artist, limit=per_page)
     elif q:
-        results = catalog_service.search_songs(
+        results = service.search_songs(
             query=q,
             limit=per_page + 1,  # Get one extra to check has_more
             offset=offset,
@@ -69,7 +78,7 @@ async def search_catalog(
         )
     else:
         # Default: popular songs
-        results = catalog_service.get_popular_songs(
+        results = service.get_popular_songs(
             limit=per_page + 1,
             min_brands=max(min_brands, 3),  # At least 3 brands for popular
         )
@@ -102,7 +111,7 @@ async def get_popular_songs(
     min_brands: int = Query(5, ge=1, description="Minimum brand count"),
 ) -> list[SongResponse]:
     """Get the most popular karaoke songs by brand coverage."""
-    results = catalog_service.get_popular_songs(limit=limit, min_brands=min_brands)
+    results = get_catalog_service().get_popular_songs(limit=limit, min_brands=min_brands)
     return [
         SongResponse(
             id=s.id,
@@ -119,7 +128,7 @@ async def get_popular_songs(
 @router.get("/songs/{song_id}", response_model=SongResponse)
 async def get_song(song_id: int) -> SongResponse:
     """Get details for a specific song."""
-    result = catalog_service.get_song_by_id(song_id)
+    result = get_catalog_service().get_song_by_id(song_id)
     if not result:
         raise HTTPException(status_code=404, detail="Song not found")
 
@@ -136,5 +145,5 @@ async def get_song(song_id: int) -> SongResponse:
 @router.get("/stats", response_model=CatalogStatsResponse)
 async def get_catalog_stats() -> CatalogStatsResponse:
     """Get catalog statistics."""
-    stats = catalog_service.get_stats()
+    stats = get_catalog_service().get_stats()
     return CatalogStatsResponse(**stats)

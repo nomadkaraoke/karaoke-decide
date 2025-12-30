@@ -58,7 +58,8 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"Token exchange failed: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     async def refresh_token(self, refresh_token: str) -> dict[str, Any]:
         """Refresh an access token."""
@@ -75,15 +76,14 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"Token refresh failed: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
     async def get_current_user(self, access_token: str) -> dict[str, Any]:
         """Get current user's profile."""
         return await self._api_request("GET", "/me", access_token)
 
-    async def get_saved_tracks(
-        self, access_token: str, limit: int = 50, offset: int = 0
-    ) -> dict[str, Any]:
+    async def get_saved_tracks(self, access_token: str, limit: int = 50, offset: int = 0) -> dict[str, Any]:
         """Get user's saved tracks."""
         return await self._api_request(
             "GET",
@@ -107,9 +107,7 @@ class SpotifyClient:
             params={"time_range": time_range, "limit": limit, "offset": offset},
         )
 
-    async def get_recently_played(
-        self, access_token: str, limit: int = 50
-    ) -> dict[str, Any]:
+    async def get_recently_played(self, access_token: str, limit: int = 50) -> dict[str, Any]:
         """Get user's recently played tracks."""
         return await self._api_request(
             "GET",
@@ -141,4 +139,5 @@ class SpotifyClient:
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"API error: {response.text}")
 
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result

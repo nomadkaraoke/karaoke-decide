@@ -2,9 +2,9 @@
 
 from fastapi import APIRouter
 
-from backend.api.routes.health import router as health_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.catalog import router as catalog_router
+from backend.api.routes.health import router as health_router
 
 router = APIRouter()
 

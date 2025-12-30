@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-import pytest
-
 from karaoke_decide.core.models import (
     KaraokeSong,
     Playlist,
@@ -42,9 +40,7 @@ class TestKaraokeSong:
             id="queen-bohemian-rhapsody",
             artist="Queen",
             title="Bohemian Rhapsody",
-            sources=[
-                SongSource(source="karaokenerds", external_id="12345")
-            ],
+            sources=[SongSource(source="karaokenerds", external_id="12345")],
         )
         assert song.id == "queen-bohemian-rhapsody"
         assert song.artist == "Queen"

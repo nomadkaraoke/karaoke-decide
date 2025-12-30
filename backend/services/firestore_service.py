@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from google.cloud import firestore
+from google.cloud import firestore  # type: ignore[attr-defined]
 
 from backend.config import BackendSettings
 
@@ -28,9 +28,7 @@ class FirestoreService:
         """Get a collection reference."""
         return self.client.collection(name)
 
-    async def get_document(
-        self, collection: str, doc_id: str
-    ) -> dict[str, Any] | None:
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
         """Get a document by ID."""
         doc_ref = self.collection(collection).document(doc_id)
         doc = await doc_ref.get()
@@ -49,9 +47,7 @@ class FirestoreService:
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.set(data, merge=merge)
 
-    async def update_document(
-        self, collection: str, doc_id: str, data: dict[str, Any]
-    ) -> None:
+    async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         """Update specific fields in a document."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.update(data)
@@ -90,11 +86,7 @@ class FirestoreService:
                 query = query.where(field, op, value)
 
         if order_by:
-            direction = (
-                firestore.Query.DESCENDING
-                if order_direction == "DESCENDING"
-                else firestore.Query.ASCENDING
-            )
+            direction = firestore.Query.DESCENDING if order_direction == "DESCENDING" else firestore.Query.ASCENDING
             query = query.order_by(order_by, direction=direction)
 
         if offset:
@@ -124,4 +116,4 @@ class FirestoreService:
         # Use count aggregation
         count_query = query.count()
         result = await count_query.get()
-        return result[0][0].value
+        return int(result[0][0].value)

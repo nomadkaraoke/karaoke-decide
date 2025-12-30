@@ -29,7 +29,8 @@ class KaraokeNerdsClient:
                     f"Failed to fetch catalog: {response.status_code}",
                 )
 
-            return response.json()
+            result: list[dict[str, Any]] = response.json()
+            return result
 
     def parse_song(self, data: dict[str, Any]) -> KaraokeSong:
         """Parse a song from the KaraokeNerds catalog format.

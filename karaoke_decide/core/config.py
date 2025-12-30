@@ -1,7 +1,7 @@
 """Configuration management for Karaoke Decide."""
 
 from functools import lru_cache
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:3000"
 
     # Emulators (auto-detected)
-    firestore_emulator_host: Optional[str] = None
-    storage_emulator_host: Optional[str] = None
+    firestore_emulator_host: str | None = None
+    storage_emulator_host: str | None = None
 
     @property
     def is_production(self) -> bool:
