@@ -298,15 +298,157 @@ Get current sync status for all connected services.
 
 ---
 
-## My Songs (Not Yet Implemented)
+## Quiz ✅ Implemented
+
+### GET /api/quiz/songs
+
+Get quiz songs for onboarding. Returns popular karaoke songs for users to identify which they know.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| count | int | Number of songs (default: 20, min: 5, max: 30) |
+
+**Response:**
+```json
+{
+  "songs": [
+    {
+      "id": "1",
+      "artist": "Queen",
+      "title": "Bohemian Rhapsody",
+      "decade": "1970s",
+      "popularity": 85,
+      "brand_count": 8
+    }
+  ]
+}
+```
+
+### POST /api/quiz/submit
+
+Submit quiz responses with known songs and preferences.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "known_song_ids": ["1", "2", "3"],
+  "decade_preference": "1980s",
+  "energy_preference": "high"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Quiz completed successfully",
+  "songs_added": 3,
+  "recommendations_ready": true
+}
+```
+
+### GET /api/quiz/status
+
+Get user's quiz completion status.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "completed": true,
+  "completed_at": "2024-01-15T12:00:00Z",
+  "songs_known_count": 5
+}
+```
+
+---
+
+## My Songs ✅ Implemented
 
 ### GET /api/my/songs
 
 Get songs from user's listening history matched to karaoke catalog.
 
-### GET /api/my/songs/top
+**Requires:** Bearer token
 
-Get top karaoke recommendations for user.
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| page | int | Page number (default: 1, min: 1) |
+| per_page | int | Results per page (default: 20, max: 100) |
+
+**Response:**
+```json
+{
+  "songs": [
+    {
+      "id": "user123:1",
+      "song_id": "1",
+      "artist": "Queen",
+      "title": "Bohemian Rhapsody",
+      "source": "spotify",
+      "play_count": 10,
+      "is_saved": true,
+      "times_sung": 2,
+      "last_played_at": "2024-01-15T12:00:00Z",
+      "last_sung_at": "2024-01-10T20:00:00Z",
+      "average_rating": 4.5,
+      "notes": "Great for warming up"
+    }
+  ],
+  "total": 150,
+  "page": 1,
+  "per_page": 20,
+  "has_more": true
+}
+```
+
+### GET /api/my/recommendations
+
+Get personalized karaoke song recommendations.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | int | Number of recommendations (default: 20, min: 1, max: 50) |
+| decade | string | Filter by decade (e.g., "1980s") |
+| min_popularity | int | Minimum popularity (0-100) |
+
+**Response:**
+```json
+{
+  "recommendations": [
+    {
+      "song_id": "100",
+      "artist": "Queen",
+      "title": "We Will Rock You",
+      "score": 0.85,
+      "reason": "You listen to Queen",
+      "reason_type": "known_artist",
+      "brand_count": 8,
+      "popularity": 80
+    }
+  ]
+}
+```
+
+**Reason Types:**
+- `known_artist` - Song by an artist you already listen to
+- `similar_genre` - Similar genre to your preferences
+- `decade_match` - Matches your decade preference from quiz
+- `crowd_pleaser` - Popular karaoke song for all audiences
+- `popular` - High popularity score on streaming services
+
+---
+
+## My Songs (Not Yet Implemented)
 
 ### GET /api/my/history
 

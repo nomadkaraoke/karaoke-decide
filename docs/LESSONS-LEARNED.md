@@ -186,3 +186,50 @@ async def callback(
     code: str | None = Query(None),
 ):
 ```
+
+---
+
+### 2024-12-30: Mypy "Returning Any" with min/max Functions
+
+**Context:** Implementing recommendation scoring function that returns `float`, using `min(score, 1.0)` to cap the score.
+
+**Lesson:** `min()` and `max()` return `Any` when their arguments could be multiple types. Mypy complains "Returning Any from function declared to return float".
+
+**Recommendation:**
+```python
+# BAD - mypy error
+def calculate_score(...) -> float:
+    score = ...
+    return min(score, 1.0)  # Returns Any
+
+# GOOD - explicit type annotation
+def calculate_score(...) -> float:
+    score = ...
+    capped_score: float = min(score, 1.0)
+    return capped_score
+```
+
+---
+
+### 2024-12-30: Test Mocks Must Match Service Behavior
+
+**Context:** Testing recommendation service limit parameter. Test was failing because mock returned all 5 songs regardless of requested limit.
+
+**Lesson:** When testing service methods that accept parameters like `limit`, the mock must be configured to return appropriate data for the test case. Don't rely on fixture defaults that may exceed your test's expected output.
+
+**Recommendation:**
+```python
+# BAD - using default mock that returns 5 songs
+async def test_respects_limit(self, recommendation_service, mock_bigquery):
+    # mock_bigquery fixture returns 5 songs
+    recs = await recommendation_service.get_recommendations(limit=3)
+    assert len(recs) <= 3  # May fail if service returns all 5
+
+# GOOD - configure mock specifically for test
+async def test_respects_limit(self, recommendation_service, mock_bigquery):
+    # Override mock to return only 3 songs
+    mock_rows = [create_row(i) for i in range(3)]
+    mock_bigquery.query.return_value.result.return_value = mock_rows
+    recs = await recommendation_service.get_recommendations(limit=3)
+    assert len(recs) <= 3  # Now correctly tests the limit
+```
