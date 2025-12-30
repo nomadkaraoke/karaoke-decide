@@ -276,7 +276,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     env:
       REGISTRY: us-central1-docker.pkg.dev
-      PROJECT_ID: nomadkaraoke-decide
+      PROJECT_ID: nomadkaraoke
       REPOSITORY: karaoke-repo
       IMAGE_NAME: karaoke-decide
       REGION: us-central1
@@ -300,11 +300,12 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📋 Version: $VERSION"
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (Workload Identity)
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -344,7 +345,7 @@ jobs:
             --concurrency 80 \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=${{ env.PROJECT_ID }}"
+            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke-decide"
 
       - name: Verify deployment
         run: |
