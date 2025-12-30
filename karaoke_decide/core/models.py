@@ -20,6 +20,12 @@ class User(BaseModel):
     total_songs_sung: int = 0
     last_sync_at: datetime | None = None
 
+    # Quiz data (for data-light users)
+    quiz_completed_at: datetime | None = None
+    quiz_songs_known: list[str] = Field(default_factory=list)
+    quiz_decade_pref: str | None = None
+    quiz_energy_pref: Literal["chill", "medium", "high"] | None = None
+
 
 class MusicService(BaseModel):
     """Connected music service account."""
@@ -82,6 +88,9 @@ class UserSong(BaseModel):
     user_id: str
     song_id: str
 
+    # Source tracking
+    source: Literal["spotify", "lastfm", "quiz"] = "spotify"
+
     # From listening history
     play_count: int = 0
     last_played_at: datetime | None = None
@@ -97,6 +106,7 @@ class UserSong(BaseModel):
     artist: str
     title: str
 
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -129,3 +139,53 @@ class SungRecord(BaseModel):
     # Optional context
     venue: str | None = None
     playlist_id: str | None = None
+
+
+class QuizSong(BaseModel):
+    """Song presented in the onboarding quiz."""
+
+    id: str  # Same as KaraokeSong id
+    artist: str
+    title: str
+    decade: str  # "1970s", "1980s", etc.
+    popularity: int  # 0-100 from Spotify
+    brand_count: int  # Number of karaoke brands
+
+
+class QuizResponse(BaseModel):
+    """User's response to the onboarding quiz."""
+
+    user_id: str
+    known_song_ids: list[str]  # Songs the user recognized
+    decade_preference: str | None = None  # Preferred decade
+    energy_preference: Literal["chill", "medium", "high"] | None = None
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Recommendation(BaseModel):
+    """A song recommendation for a user."""
+
+    song_id: str
+    artist: str
+    title: str
+    score: float  # 0-1 relevance score
+    reason: str  # Human-readable explanation
+    reason_type: Literal[
+        "known_artist",
+        "similar_genre",
+        "decade_match",
+        "crowd_pleaser",
+        "popular",
+    ]
+
+    # Optional metadata
+    brand_count: int = 0
+    popularity: int = 0
+
+
+class UserSongSource(BaseModel):
+    """Source information for a UserSong record."""
+
+    source: Literal["spotify", "lastfm", "quiz"]
+    play_count: int = 0
+    last_played_at: datetime | None = None

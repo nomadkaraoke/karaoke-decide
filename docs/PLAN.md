@@ -196,6 +196,7 @@ GET  /api/services/sync/status
 ```
 GET  /api/quiz/songs          - Get quiz song options (popular karaoke)
 POST /api/quiz/submit         - Submit quiz responses
+GET  /api/quiz/status         - Get quiz completion status
 ```
 
 ### Song Discovery
@@ -219,7 +220,7 @@ Query params for /api/songs:
 ### My Songs
 ```
 GET  /api/my/songs            - Songs from my listening history
-GET  /api/my/songs/top        - Top recommendations
+GET  /api/my/recommendations  - Personalized song recommendations
 ```
 
 ### Playlists
@@ -295,11 +296,11 @@ karaoke-decide playlist show <playlist_id>
 4. [x] Background sync job
 5. [x] UserSong matching to catalog
 
-### Phase 4: Quiz & Recommendations
-1. [ ] Quiz song selection (popular karaoke)
-2. [ ] Quiz submission and storage
-3. [ ] Recommendation algorithm v1
-4. [ ] Filter/sort implementation
+### Phase 4: Quiz & Recommendations ✅ COMPLETE
+1. [x] Quiz song selection (popular karaoke)
+2. [x] Quiz submission and storage
+3. [x] Recommendation algorithm v1
+4. [x] Filter/sort implementation
 
 ### Phase 5: Playlists & Karaoke Links
 1. [ ] Playlist CRUD

@@ -8,7 +8,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.config import BackendSettings
-from karaoke_decide.core.models import User
+from backend.services.quiz_service import QuizStatus, QuizSubmitResult
+from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong
 
 
 @pytest.fixture
@@ -212,6 +213,173 @@ def auth_client(
         ),
     ):
         # Import app inside the patch context
+        from backend.main import app
+
+        yield TestClient(app)
+
+
+@pytest.fixture
+def sample_quiz_songs() -> list[QuizSong]:
+    """Sample quiz songs for testing."""
+    return [
+        QuizSong(
+            id="1",
+            artist="Queen",
+            title="Bohemian Rhapsody",
+            decade="1970s",
+            popularity=85,
+            brand_count=8,
+        ),
+        QuizSong(
+            id="2",
+            artist="Journey",
+            title="Don't Stop Believin'",
+            decade="1980s",
+            popularity=80,
+            brand_count=7,
+        ),
+        QuizSong(
+            id="3",
+            artist="Adele",
+            title="Rolling in the Deep",
+            decade="2010s",
+            popularity=90,
+            brand_count=6,
+        ),
+    ]
+
+
+@pytest.fixture
+def mock_quiz_service(sample_quiz_songs: list[QuizSong]) -> MagicMock:
+    """Mock quiz service for API tests."""
+    mock = MagicMock()
+    mock.get_quiz_songs = AsyncMock(return_value=sample_quiz_songs)
+    mock.submit_quiz = AsyncMock(return_value=QuizSubmitResult(songs_added=2, recommendations_ready=True))
+    mock.get_quiz_status = AsyncMock(
+        return_value=QuizStatus(
+            completed=False,
+            completed_at=None,
+            songs_known_count=0,
+        )
+    )
+    return mock
+
+
+@pytest.fixture
+def sample_user_songs(sample_user: User) -> list[UserSong]:
+    """Sample user songs for testing."""
+    return [
+        UserSong(
+            id=f"{sample_user.id}:1",
+            user_id=sample_user.id,
+            song_id="1",
+            source="spotify",
+            play_count=10,
+            is_saved=True,
+            times_sung=2,
+            artist="Queen",
+            title="Bohemian Rhapsody",
+        ),
+        UserSong(
+            id=f"{sample_user.id}:2",
+            user_id=sample_user.id,
+            song_id="2",
+            source="lastfm",
+            play_count=5,
+            is_saved=False,
+            times_sung=1,
+            artist="Journey",
+            title="Don't Stop Believin'",
+        ),
+    ]
+
+
+@pytest.fixture
+def sample_recommendations() -> list[Recommendation]:
+    """Sample recommendations for testing."""
+    return [
+        Recommendation(
+            song_id="100",
+            artist="Queen",
+            title="We Will Rock You",
+            score=0.85,
+            reason="You listen to Queen",
+            reason_type="known_artist",
+            brand_count=8,
+            popularity=80,
+        ),
+        Recommendation(
+            song_id="101",
+            artist="ABBA",
+            title="Dancing Queen",
+            score=0.70,
+            reason="Popular karaoke song",
+            reason_type="crowd_pleaser",
+            brand_count=9,
+            popularity=75,
+        ),
+    ]
+
+
+@pytest.fixture
+def mock_recommendation_service(
+    sample_user_songs: list[UserSong],
+    sample_recommendations: list[Recommendation],
+) -> MagicMock:
+    """Mock recommendation service for API tests."""
+    mock = MagicMock()
+    mock.get_user_songs = AsyncMock(return_value=(sample_user_songs, len(sample_user_songs)))
+    mock.get_recommendations = AsyncMock(return_value=sample_recommendations)
+    return mock
+
+
+@pytest.fixture
+def quiz_client(
+    mock_catalog_service: MagicMock,
+    mock_auth_service: MagicMock,
+    mock_quiz_service: MagicMock,
+) -> Generator[TestClient, None, None]:
+    """Create test client with mocked quiz service."""
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
+        patch(
+            "backend.api.deps.get_quiz_service",
+            return_value=mock_quiz_service,
+        ),
+    ):
+        from backend.main import app
+
+        yield TestClient(app)
+
+
+@pytest.fixture
+def recommendations_client(
+    mock_catalog_service: MagicMock,
+    mock_auth_service: MagicMock,
+    mock_recommendation_service: MagicMock,
+) -> Generator[TestClient, None, None]:
+    """Create test client with mocked recommendation service."""
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
+        patch(
+            "backend.api.deps.get_recommendation_service",
+            return_value=mock_recommendation_service,
+        ),
+    ):
         from backend.main import app
 
         yield TestClient(app)

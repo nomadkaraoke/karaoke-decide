@@ -12,21 +12,22 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2024-12-30)
 
-**Phase:** ~50% to MLP (Minimum Lovable Product)
+**Phase:** ~65% to MLP (Minimum Lovable Product)
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery integration
 - **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
+- **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests (99% coverage), 167 backend tests (87% coverage), all checks passing
+- **CI/Testing:** 135 unit tests, 228 backend tests, all checks passing
 
-### 🚧 Next Up (Phase 4: Quiz & Recommendations)
-1. Quiz song selection (popular karaoke)
-2. Quiz submission and storage
-3. Recommendation algorithm v1
-4. Filter/sort implementation
+### 🚧 Next Up (Phase 5: Frontend Auth & Discovery)
+1. Frontend authentication flow (magic link + JWT)
+2. My Songs page (user library view)
+3. Recommendations page (personalized discovery)
+4. Quiz onboarding flow
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -86,6 +87,11 @@ cd frontend && npm run dev
 - `DELETE /api/services/{type}` - Disconnect service
 - `POST /api/services/sync` - Trigger listening history sync
 - `GET /api/services/sync/status` - Get sync status
+- `GET /api/quiz/songs` - Get quiz songs for onboarding
+- `POST /api/quiz/submit` - Submit quiz responses
+- `GET /api/quiz/status` - Get quiz completion status
+- `GET /api/my/songs` - Get user's song library
+- `GET /api/my/recommendations` - Get personalized recommendations
 
 ## For AI Agents
 
@@ -112,6 +118,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2024-12-30 | Phase 4: Quiz & Recommendations (quiz onboarding, recommendation algorithm v1) | [archive/2024-12-30-phase4-quiz-recommendations.md](archive/2024-12-30-phase4-quiz-recommendations.md) |
 | 2024-12-30 | Phase 3: Music Service Integration (Spotify OAuth, Last.fm, sync) | [archive/2024-12-30-phase3-music-service-integration.md](archive/2024-12-30-phase3-music-service-integration.md) |
 | 2024-12-30 | Phase 2: Auth & User Management (magic link, JWT, Firestore) | [archive/2024-12-30-auth-implementation.md](archive/2024-12-30-auth-implementation.md) |
 | 2024-12-30 | Comprehensive test coverage (135 unit, 33 backend tests) | [archive/2024-12-30-comprehensive-test-coverage.md](archive/2024-12-30-comprehensive-test-coverage.md) |
