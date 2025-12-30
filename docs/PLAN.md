@@ -282,18 +282,18 @@ karaoke-decide playlist show <playlist_id>
 4. [x] Load full dataset to BigQuery
 5. [x] Basic song search API with BigQuery backend
 
-### Phase 2: Auth & User Management
-1. [ ] Magic link email flow (SendGrid)
-2. [ ] JWT token management
-3. [ ] User profile storage
-4. [ ] Session management
+### Phase 2: Auth & User Management ✅ COMPLETE
+1. [x] Magic link email flow (SendGrid)
+2. [x] JWT token management
+3. [x] User profile storage
+4. [x] Session management
 
-### Phase 3: Music Service Integration
-1. [ ] Spotify OAuth flow
-2. [ ] Spotify listening history fetch
-3. [ ] Last.fm API integration
-4. [ ] Background sync job
-5. [ ] UserSong matching to catalog
+### Phase 3: Music Service Integration ✅ COMPLETE
+1. [x] Spotify OAuth flow
+2. [x] Spotify listening history fetch
+3. [x] Last.fm API integration
+4. [x] Background sync job
+5. [x] UserSong matching to catalog
 
 ### Phase 4: Quiz & Recommendations
 1. [ ] Quiz song selection (popular karaoke)

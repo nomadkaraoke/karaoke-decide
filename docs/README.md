@@ -12,20 +12,21 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2024-12-30)
 
-**Phase:** ~35% to MLP (Minimum Lovable Product)
+**Phase:** ~50% to MLP (Minimum Lovable Product)
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery integration
 - **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
+- **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests (99% coverage), 63 backend tests (83% coverage), all checks passing
+- **CI/Testing:** 135 unit tests (99% coverage), 167 backend tests (87% coverage), all checks passing
 
-### 🚧 Next Up (Phase 3: Music Service Integration)
-1. Spotify OAuth flow
-2. Spotify listening history fetch
-3. Last.fm API integration
-4. Background sync job
+### 🚧 Next Up (Phase 4: Quiz & Recommendations)
+1. Quiz song selection (popular karaoke)
+2. Quiz submission and storage
+3. Recommendation algorithm v1
+4. Filter/sort implementation
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -78,6 +79,13 @@ cd frontend && npm run dev
 - `GET /api/catalog/songs?q=<query>` - Search songs
 - `GET /api/catalog/songs/popular?limit=20` - Popular songs
 - `GET /api/catalog/stats` - Catalog statistics
+- `GET /api/services` - List connected music services
+- `POST /api/services/spotify/connect` - Start Spotify OAuth
+- `GET /api/services/spotify/callback` - Spotify OAuth callback
+- `POST /api/services/lastfm/connect` - Connect Last.fm
+- `DELETE /api/services/{type}` - Disconnect service
+- `POST /api/services/sync` - Trigger listening history sync
+- `GET /api/services/sync/status` - Get sync status
 
 ## For AI Agents
 
@@ -104,6 +112,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2024-12-30 | Phase 3: Music Service Integration (Spotify OAuth, Last.fm, sync) | [archive/2024-12-30-phase3-music-service-integration.md](archive/2024-12-30-phase3-music-service-integration.md) |
 | 2024-12-30 | Phase 2: Auth & User Management (magic link, JWT, Firestore) | [archive/2024-12-30-auth-implementation.md](archive/2024-12-30-auth-implementation.md) |
 | 2024-12-30 | Comprehensive test coverage (135 unit, 33 backend tests) | [archive/2024-12-30-comprehensive-test-coverage.md](archive/2024-12-30-comprehensive-test-coverage.md) |
 | 2024-12-30 | Data foundation (BigQuery ETL) + frontend launch | [archive/2024-12-30-data-foundation-and-frontend.md](archive/2024-12-30-data-foundation-and-frontend.md) |

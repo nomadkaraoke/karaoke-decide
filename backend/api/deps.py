@@ -8,6 +8,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.music_service_service import MusicServiceService, get_music_service_service
+from backend.services.sync_service import SyncService, get_sync_service
 from karaoke_decide.core.models import User
 
 # Security scheme
@@ -97,9 +99,28 @@ async def get_optional_user(
         return None
 
 
+async def get_music_service_service_dep(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> MusicServiceService:
+    """Get music service service instance."""
+    return get_music_service_service(settings, firestore)
+
+
+async def get_sync_service_dep(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    music_service: Annotated[MusicServiceService, Depends(get_music_service_service_dep)],
+) -> SyncService:
+    """Get sync service instance."""
+    return get_sync_service(settings, firestore, music_service)
+
+
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service_dep)]
+MusicServiceServiceDep = Annotated[MusicServiceService, Depends(get_music_service_service_dep)]
+SyncServiceDep = Annotated[SyncService, Depends(get_sync_service_dep)]

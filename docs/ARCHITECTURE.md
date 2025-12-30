@@ -23,8 +23,8 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │                    (FastAPI on Cloud Run)                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │  /api/catalog/*   - Karaoke song catalog (BigQuery)        ✅ LIVE  │
-│  /api/auth/*      - Magic link authentication              PLANNED  │
-│  /api/services/*  - Music service OAuth & sync             PLANNED  │
+│  /api/auth/*      - Magic link authentication              ✅ LIVE  │
+│  /api/services/*  - Music service OAuth & sync             ✅ LIVE  │
 │  /api/my/*        - User's matched songs, history          PLANNED  │
 │  /api/playlists/* - Playlist management                    PLANNED  │
 └────────┬───────────────────┬────────────────────────────────────────┘
