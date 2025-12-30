@@ -12,18 +12,20 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2024-12-30)
 
-**Phase:** ~25% to MLP (Minimum Lovable Product)
+**Phase:** ~35% to MLP (Minimum Lovable Product)
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery integration
+- **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests (99% coverage), 33 backend tests (83% coverage), all checks passing
+- **CI/Testing:** 135 unit tests (99% coverage), 63 backend tests (83% coverage), all checks passing
 
-### 🚧 Next Up (Phase 2: Auth & User Management)
-1. Magic link email authentication (SendGrid)
-2. JWT token management
-3. User profile storage in Firestore
+### 🚧 Next Up (Phase 3: Music Service Integration)
+1. Spotify OAuth flow
+2. Spotify listening history fetch
+3. Last.fm API integration
+4. Background sync job
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -70,6 +72,9 @@ cd frontend && npm run dev
 | `karaoke_decide.spotify_tracks` | 256,039,007 | Spotify track metadata |
 
 ### Live Endpoints
+- `POST /api/auth/magic-link` - Request magic link email
+- `POST /api/auth/verify` - Verify token, get JWT
+- `GET /api/auth/me` - Get current user (requires auth)
 - `GET /api/catalog/songs?q=<query>` - Search songs
 - `GET /api/catalog/songs/popular?limit=20` - Popular songs
 - `GET /api/catalog/stats` - Catalog statistics
@@ -99,5 +104,6 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2024-12-30 | Phase 2: Auth & User Management (magic link, JWT, Firestore) | [archive/2024-12-30-auth-implementation.md](archive/2024-12-30-auth-implementation.md) |
 | 2024-12-30 | Comprehensive test coverage (135 unit, 33 backend tests) | [archive/2024-12-30-comprehensive-test-coverage.md](archive/2024-12-30-comprehensive-test-coverage.md) |
 | 2024-12-30 | Data foundation (BigQuery ETL) + frontend launch | [archive/2024-12-30-data-foundation-and-frontend.md](archive/2024-12-30-data-foundation-and-frontend.md) |
