@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  MicrophoneIcon,
   UserIcon,
   LogOutIcon,
   MenuIcon,
@@ -47,15 +47,15 @@ export function Navigation() {
       <div className="max-w-4xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className="relative">
-              <MicrophoneIcon className="w-7 h-7 text-[#ff2d92]" />
-              <div className="absolute inset-0 blur-md bg-[#ff2d92]/50" />
-            </div>
-            <span className="text-lg font-bold">
-              <span className="text-white">Nomad</span>
-              <span className="text-[#ff2d92] neon-text-pink ml-1">Karaoke</span>
-            </span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/nomad-karaoke-logo.svg"
+              alt="Nomad Karaoke"
+              width={140}
+              height={50}
+              priority
+              className="h-10 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}
