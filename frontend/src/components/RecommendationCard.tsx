@@ -110,7 +110,7 @@ export function RecommendationCard({
 
   return (
     <div
-      className={`group relative ${showAnimation ? "animate-fade-in-up" : ""}`}
+      className={`group relative ${showAnimation ? "animate-fade-in-up" : ""} ${isDropdownOpen ? "z-10" : ""}`}
       style={showAnimation ? { animationDelay: `${index * 50}ms` } : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
