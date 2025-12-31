@@ -294,14 +294,9 @@ export const api = {
 
     sync: () =>
       api.post<{
-        results: Array<{
-          service_type: string;
-          tracks_fetched: number;
-          tracks_matched: number;
-          user_songs_created: number;
-          user_songs_updated: number;
-          error: string | null;
-        }>;
+        job_id: string;
+        status: string;
+        message: string;
       }>("/api/services/sync"),
 
     getSyncStatus: () =>
@@ -314,6 +309,30 @@ export const api = {
           sync_error: string | null;
           tracks_synced: number;
         }>;
+        active_job: {
+          job_id: string;
+          status: string;
+          progress: {
+            current_service: string | null;
+            current_phase: string | null;
+            total_tracks: number;
+            processed_tracks: number;
+            matched_tracks: number;
+            percentage: number;
+          } | null;
+          results: Array<{
+            service_type: string;
+            tracks_fetched: number;
+            tracks_matched: number;
+            user_songs_created: number;
+            user_songs_updated: number;
+            artists_stored: number;
+            error: string | null;
+          }> | null;
+          error: string | null;
+          created_at: string;
+          completed_at: string | null;
+        } | null;
       }>("/api/services/sync/status"),
   },
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, FormEvent, useRef } from "react";
 import { api } from "@/lib/api";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import {
@@ -22,6 +22,33 @@ interface ConnectedService {
   tracks_synced: number;
 }
 
+interface SyncProgress {
+  current_service: string | null;
+  current_phase: string | null;
+  total_tracks: number;
+  processed_tracks: number;
+  matched_tracks: number;
+  percentage: number;
+}
+
+interface ActiveJob {
+  job_id: string;
+  status: string;
+  progress: SyncProgress | null;
+  results: Array<{
+    service_type: string;
+    tracks_fetched: number;
+    tracks_matched: number;
+    user_songs_created: number;
+    user_songs_updated: number;
+    artists_stored: number;
+    error: string | null;
+  }> | null;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export default function ServicesPage() {
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +62,8 @@ export default function ServicesPage() {
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Disconnect state
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
@@ -43,8 +72,17 @@ export default function ServicesPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.services.list();
-      setServices(response);
+      const response = await api.services.getSyncStatus();
+      setServices(response.services);
+      setActiveJob(response.active_job);
+
+      // If there's an active job, start polling
+      if (response.active_job &&
+          (response.active_job.status === "pending" || response.active_job.status === "in_progress")) {
+        setIsSyncing(true);
+      } else {
+        setIsSyncing(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load services");
     } finally {
@@ -52,8 +90,57 @@ export default function ServicesPage() {
     }
   }, []);
 
+  // Polling for sync status
+  const pollSyncStatus = useCallback(async () => {
+    try {
+      const response = await api.services.getSyncStatus();
+      setServices(response.services);
+      setActiveJob(response.active_job);
+
+      if (response.active_job) {
+        if (response.active_job.status === "completed") {
+          // Sync completed
+          setIsSyncing(false);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+
+          // Show success message
+          const totalMatched = response.active_job.results?.reduce(
+            (sum, r) => sum + r.tracks_matched, 0
+          ) || 0;
+          const totalCreated = response.active_job.results?.reduce(
+            (sum, r) => sum + r.user_songs_created, 0
+          ) || 0;
+          setSyncMessage(
+            `Sync complete! Found ${totalMatched} karaoke songs, added ${totalCreated} new songs to your library.`
+          );
+        } else if (response.active_job.status === "failed") {
+          // Sync failed
+          setIsSyncing(false);
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          setError(response.active_job.error || "Sync failed");
+        }
+      }
+    } catch (err) {
+      // Don't show error for polling failures
+      console.error("Polling error:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadServices();
+
+    // Cleanup polling on unmount
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, [loadServices]);
 
   const isConnected = (serviceType: string) =>
@@ -111,25 +198,21 @@ export default function ServicesPage() {
     try {
       setIsSyncing(true);
       setSyncMessage(null);
-      const response = await api.services.sync();
+      setError(null);
 
-      // Summarize results
-      const totalMatched = response.results.reduce(
-        (sum, r) => sum + r.tracks_matched,
-        0
-      );
-      const totalCreated = response.results.reduce(
-        (sum, r) => sum + r.user_songs_created,
-        0
-      );
-      setSyncMessage(
-        `Synced! Found ${totalMatched} matching songs, added ${totalCreated} new songs.`
-      );
+      // Start async sync
+      await api.services.sync();
 
-      await loadServices();
+      // Start polling for status
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      pollIntervalRef.current = setInterval(pollSyncStatus, 3000);
+
+      // Do an immediate poll
+      await pollSyncStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sync failed");
-    } finally {
+      setError(err instanceof Error ? err.message : "Failed to start sync");
       setIsSyncing(false);
     }
   };
@@ -315,27 +398,82 @@ export default function ServicesPage() {
                 )}
               </div>
 
-              {/* Sync button */}
+              {/* Sync button and progress */}
               {services.length > 0 && (
                 <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="font-semibold text-white">
                         Sync listening history
                       </h3>
                       <p className="text-sm text-white/60">
-                        Fetch your latest tracks from connected services
+                        {isSyncing
+                          ? "Syncing in background - you can navigate away safely"
+                          : "Fetch your latest tracks from connected services"}
                       </p>
                     </div>
                     <Button
                       variant="secondary"
                       onClick={handleSync}
                       isLoading={isSyncing}
+                      disabled={isSyncing}
                       leftIcon={<RefreshIcon className="w-5 h-5" />}
                     >
-                      Sync Now
+                      {isSyncing ? "Syncing..." : "Sync Now"}
                     </Button>
                   </div>
+
+                  {/* Progress display */}
+                  {isSyncing && activeJob?.progress && (
+                    <div className="mt-4 space-y-3">
+                      {/* Progress bar */}
+                      <div className="relative h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="absolute inset-y-0 left-0 bg-[#00f5ff] transition-all duration-500"
+                          style={{ width: `${activeJob.progress.percentage}%` }}
+                        />
+                      </div>
+
+                      {/* Progress details */}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-white/60">
+                          {activeJob.progress.current_service && (
+                            <>
+                              <span className="capitalize">{activeJob.progress.current_service}</span>
+                              {activeJob.progress.current_phase && (
+                                <span className="text-white/40">
+                                  {" "}
+                                  - {activeJob.progress.current_phase}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </span>
+                        <span className="text-white font-medium">
+                          {activeJob.progress.percentage}%
+                        </span>
+                      </div>
+
+                      {/* Track counts */}
+                      {activeJob.progress.total_tracks > 0 && (
+                        <div className="flex gap-4 text-xs text-white/50">
+                          <span>
+                            {activeJob.progress.processed_tracks} / {activeJob.progress.total_tracks} tracks processed
+                          </span>
+                          <span>
+                            {activeJob.progress.matched_tracks} matched to karaoke
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Pending state */}
+                  {isSyncing && activeJob?.status === "pending" && (
+                    <div className="mt-4 text-sm text-white/60 animate-pulse">
+                      Starting sync...
+                    </div>
+                  )}
                 </div>
               )}
             </div>

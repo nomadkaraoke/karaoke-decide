@@ -115,6 +115,47 @@ bigquery_viewer_binding = gcp.projects.IAMMember(
 )
 
 # =============================================================================
+# Cloud Tasks
+# =============================================================================
+
+# Queue for background music sync jobs
+sync_tasks_queue = gcp.cloudtasks.Queue(
+    "music-sync-queue",
+    name="music-sync-queue",
+    project=project,
+    location=region,
+    rate_limits={
+        "max_dispatches_per_second": 10,
+        "max_concurrent_dispatches": 5,
+    },
+    retry_config={
+        "max_attempts": 3,
+        "min_backoff": "10s",
+        "max_backoff": "300s",
+        "max_doublings": 3,
+    },
+    stackdriver_logging_config={
+        "sampling_ratio": 1.0,
+    },
+)
+
+# Allow Cloud Run service account to enqueue tasks
+cloud_tasks_enqueuer = gcp.projects.IAMMember(
+    "compute-sa-tasks-enqueuer",
+    project=project,
+    role="roles/cloudtasks.enqueuer",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+)
+
+# Allow Cloud Tasks to invoke Cloud Run (for OIDC authentication)
+cloud_tasks_invoker = gcp.projects.IAMMember(
+    "compute-sa-run-invoker",
+    project=project,
+    role="roles/run.invoker",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+)
+
+# =============================================================================
 # Cloud Run
 # =============================================================================
 
@@ -134,7 +175,10 @@ cloud_run_service = gcp.cloudrunv2.Service(
                     "container_port": 8000,
                     "name": "http1",
                 },
-                "envs": [{"name": "ENVIRONMENT", "value": environment}],
+                "envs": [
+                    {"name": "ENVIRONMENT", "value": environment},
+                    {"name": "CLOUD_RUN_URL", "value": f"https://karaoke-decide-718638054799.{region}.run.app"},
+                ],
                 "resources": {
                     "limits": {
                         "cpu": "1",
