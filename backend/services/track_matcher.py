@@ -1,9 +1,12 @@
 """Track matching service for normalizing and matching listening history to catalog."""
 
+import logging
 import re
 from dataclasses import dataclass
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -219,6 +222,8 @@ class TrackMatcher:
         if not tracks:
             return []
 
+        logger.info(f"Track matcher: received {len(tracks)} tracks to match")
+
         # First, normalize all tracks and build lookup structures
         normalized_tracks: list[tuple[str, str, str, str]] = []  # (orig_artist, orig_title, norm_artist, norm_title)
         for track in tracks:
@@ -228,9 +233,17 @@ class TrackMatcher:
 
         # Build list of unique (normalized_artist, normalized_title) tuples for batch query
         unique_normalized = list({(nt[2], nt[3]) for nt in normalized_tracks if nt[2] and nt[3]})
+        logger.info(f"Track matcher: {len(unique_normalized)} unique normalized tracks to query")
+
+        # Log a sample of normalized tracks for debugging
+        if unique_normalized:
+            sample = unique_normalized[:5]
+            for artist, title in sample:
+                logger.info(f"Track matcher sample: '{artist}' - '{title}'")
 
         # Execute batch query to get all matches at once
         matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
+        logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
 
         # Build results maintaining original order
         results: list[MatchedTrack] = []
