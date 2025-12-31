@@ -156,7 +156,7 @@ class SyncService:
         services = await self.music_service_service.get_user_services(user_id)
         logger.info(f"Found {len(services)} connected services for user {user_id}")
         for svc in services:
-            logger.info(f"  - {svc.service_type}: username={svc.service_username}, display={svc.display_name}")
+            logger.info(f"  - {svc.service_type}: username={svc.service_username}")
         results: list[SyncResult] = []
 
         for service in services:
