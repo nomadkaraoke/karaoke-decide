@@ -504,3 +504,43 @@ async def async_empty_generator() -> AsyncGenerator[Any, None]:
     return
     yield
 ```
+
+---
+
+### 2025-12-31: Cloud Run Secrets Configuration
+
+**Context:** Magic link auth failing in production with "JWT_SECRET is not configured" error.
+
+**Lesson:** Cloud Run env vars set via CI don't persist across deployments when using `--set-env-vars` alone. Secrets need both:
+1. IAM binding for Cloud Run SA to access Secret Manager secrets
+2. `--set-secrets` flag in deploy command to mount secrets as env vars
+
+**Recommendation:**
+```yaml
+# In CI workflow deploy step:
+gcloud run deploy SERVICE_NAME \
+  --set-env-vars "KEY=value" \
+  --set-secrets "JWT_SECRET=secret-name:latest"
+
+# IAM binding (via gcloud or Pulumi):
+gcloud secrets add-iam-policy-binding SECRET_NAME \
+  --member="serviceAccount:SA@developer.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+```
+
+---
+
+### 2025-12-31: Never Hardcode API Keys in Test Files
+
+**Context:** E2E test file committed with hardcoded Mailslurp API key.
+
+**Lesson:** API keys in source code are a security risk and can be scraped by bots. Always use environment variables for secrets, even in test files.
+
+**Recommendation:**
+```typescript
+// BAD - hardcoded API key
+const API_KEY = "sk_actual_key_value";
+
+// GOOD - read from environment
+const API_KEY = process.env.MAILSLURP_API_KEY || "";
+```

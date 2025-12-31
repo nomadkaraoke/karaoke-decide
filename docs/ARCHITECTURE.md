@@ -159,8 +159,29 @@ Spotify track metadata from Anna's Archive dump.
 
 ## Deployment
 
-- **API**: Cloud Run (auto-scaling, 0-10 instances) - *pending*
+- **API**: Cloud Run (auto-scaling, 0-10 instances)
 - **Database**: BigQuery (song catalog), Firestore (user data)
 - **Secrets**: Google Secret Manager
 - **Frontend**: GitHub Pages at decide.nomadkaraoke.com
 - **IaC**: Pulumi (Python)
+
+### Cloud Run Secrets Configuration
+
+Cloud Run requires secrets from Secret Manager to be explicitly mounted:
+
+```bash
+gcloud run deploy SERVICE_NAME \
+  --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke" \
+  --set-secrets "JWT_SECRET=karaoke-decide-jwt-secret:latest,..."
+```
+
+**Required secrets:**
+| Secret Name | Environment Variable | Purpose |
+|-------------|---------------------|---------|
+| `karaoke-decide-jwt-secret` | `JWT_SECRET` | JWT token signing |
+| `spotipy-client-id` | `SPOTIFY_CLIENT_ID` | Spotify OAuth |
+| `spotipy-client-secret` | `SPOTIFY_CLIENT_SECRET` | Spotify OAuth |
+| `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
+| `sendgrid-api-key` | `SENDGRID_API_KEY` | Email delivery |
+
+**IAM requirement:** Cloud Run service account needs `roles/secretmanager.secretAccessor` on each secret. Managed via Pulumi in `infrastructure/__main__.py`.
