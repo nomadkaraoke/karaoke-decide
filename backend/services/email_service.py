@@ -40,17 +40,26 @@ class EmailService:
 
         Returns:
             True if email was sent (or logged in dev mode), False on error
+
+        Raises:
+            RuntimeError: If email service is not configured in production
         """
         magic_link_url = f"{self.settings.frontend_url}/auth/verify?token={token}"
 
-        # Dev mode: log to console instead of sending
+        # Check if SendGrid is configured
         if not self.is_configured:
-            logger.info("=" * 60)
-            logger.info("MAGIC LINK (SendGrid not configured - dev mode)")
-            logger.info(f"To: {email}")
-            logger.info(f"Link: {magic_link_url}")
-            logger.info("=" * 60)
-            return True
+            if self.settings.is_production:
+                # In production, this is a critical error - don't silently fail
+                logger.error("SENDGRID_API_KEY is not configured in production!")
+                raise RuntimeError("Email service is not configured. Please contact support.")
+            else:
+                # Dev mode: log to console instead of sending
+                logger.info("=" * 60)
+                logger.info("MAGIC LINK (SendGrid not configured - dev mode)")
+                logger.info(f"To: {email}")
+                logger.info(f"Link: {magic_link_url}")
+                logger.info("=" * 60)
+                return True
 
         # Production mode: send via SendGrid
         message = Mail(
@@ -129,6 +138,10 @@ class EmailService:
 
         Returns:
             True if email was sent successfully.
+
+        Note:
+            Unlike send_magic_link, this doesn't raise in production if email
+            is not configured - sync completion emails are optional notifications.
         """
         frontend_url = self.settings.frontend_url
         # Format services list with proper grammar (Oxford comma for 3+ items)
@@ -141,15 +154,18 @@ class EmailService:
         else:
             services_str = ", ".join(services[:-1]) + f", and {services[-1]}"
 
-        # Dev mode: log to console
+        # Skip if not configured (sync emails are optional)
         if not self.is_configured:
-            logger.info("=" * 60)
-            logger.info("SYNC COMPLETE EMAIL (SendGrid not configured - dev mode)")
-            logger.info(f"To: {to_email}")
-            logger.info(f"Songs matched: {songs_matched}")
-            logger.info(f"Artists stored: {artists_stored}")
-            logger.info(f"Services: {services_str}")
-            logger.info("=" * 60)
+            if self.settings.is_production:
+                logger.warning("SENDGRID_API_KEY not configured - skipping sync complete email")
+            else:
+                logger.info("=" * 60)
+                logger.info("SYNC COMPLETE EMAIL (SendGrid not configured - dev mode)")
+                logger.info(f"To: {to_email}")
+                logger.info(f"Songs matched: {songs_matched}")
+                logger.info(f"Artists stored: {artists_stored}")
+                logger.info(f"Services: {services_str}")
+                logger.info("=" * 60)
             return True
 
         # Production mode: send via SendGrid
