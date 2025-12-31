@@ -104,6 +104,9 @@ def mock_auth_service(
         "exp": 1704196800,
     }
 
+    # Mock update_user_profile
+    mock.update_user_profile = AsyncMock(return_value=sample_user)
+
     return mock
 
 

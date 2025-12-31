@@ -82,6 +82,38 @@ Get the current authenticated user.
 }
 ```
 
+### PUT /api/auth/profile
+
+Update the current user's profile settings.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "display_name": "John Doe"
+}
+```
+
+Use `null` to clear the display name:
+```json
+{
+  "display_name": null
+}
+```
+
+**Response:**
+```json
+{
+  "id": "user123",
+  "email": "user@example.com",
+  "display_name": "John Doe"
+}
+```
+
+**Error Responses:**
+- `404` - User not found
+
 ### POST /api/auth/logout
 
 Log out the current user (stateless - client should discard token).

@@ -273,6 +273,60 @@ class AuthService:
         await self.store_magic_link(email, token)
         return await self.email_service.send_magic_link(email, token)
 
+    async def update_user_profile(
+        self,
+        user_id: str,
+        display_name: str | None = None,
+    ) -> User | None:
+        """Update a user's profile.
+
+        Args:
+            user_id: User's ID (user_xxx format)
+            display_name: New display name (or None to keep unchanged)
+
+        Returns:
+            Updated User model or None if not found
+        """
+        # Query to find the user document
+        docs = await self.firestore.query_documents(
+            self.USERS_COLLECTION,
+            filters=[("user_id", "==", user_id)],
+            limit=1,
+        )
+
+        if not docs:
+            return None
+
+        doc = docs[0]
+        email_hash = self._hash_email(doc["email"])
+
+        # Build update data
+        now = datetime.now(UTC)
+        update_data: dict[str, Any] = {
+            "updated_at": now.isoformat(),
+        }
+
+        if display_name is not None:
+            update_data["display_name"] = display_name
+
+        await self.firestore.update_document(
+            self.USERS_COLLECTION,
+            email_hash,
+            update_data,
+        )
+
+        # Return updated user
+        return User(
+            id=doc["user_id"],
+            email=doc["email"],
+            display_name=display_name if display_name is not None else doc.get("display_name"),
+            created_at=datetime.fromisoformat(doc["created_at"]),
+            updated_at=now,
+            total_songs_known=doc.get("total_songs_known", 0),
+            total_songs_sung=doc.get("total_songs_sung", 0),
+            last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
+        )
+
 
 # Singleton instance (lazy initialization)
 _auth_service: AuthService | None = None

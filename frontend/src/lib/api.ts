@@ -117,6 +117,15 @@ export const api = {
 
     getMe: () => api.get<{ id: string; email: string; display_name: string | null }>("/api/auth/me"),
 
+    updateProfile: (data: { display_name?: string | null }) =>
+      apiRequest<{ id: string; email: string; display_name: string | null }>(
+        "/api/auth/profile",
+        {
+          method: "PUT",
+          body: JSON.stringify(data),
+        }
+      ),
+
     logout: () => api.post<{ message: string }>("/api/auth/logout"),
   },
 
