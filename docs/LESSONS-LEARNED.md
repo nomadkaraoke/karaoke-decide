@@ -544,3 +544,30 @@ const API_KEY = "sk_actual_key_value";
 // GOOD - read from environment
 const API_KEY = process.env.MAILSLURP_API_KEY || "";
 ```
+
+---
+
+### 2025-12-31: Verify New Settings Are Passed to Cloud Run
+
+**Context:** Cloud Tasks sync failing with "GOOGLE_CLOUD_PROJECT_NUMBER must be set in production" even though the setting was defined in the `Settings` class.
+
+**Lesson:** When adding a new setting to the `Settings` class that's required at runtime, you must also add it to the Cloud Run environment variables in Pulumi. Defining the setting doesn't automatically make it available - it needs to be explicitly passed.
+
+**Recommendation:**
+```python
+# In karaoke_decide/core/config.py - defining the setting
+class Settings(BaseSettings):
+    google_cloud_project_number: str = ""  # Step 1: Define setting
+
+# In infrastructure/__main__.py - MUST ALSO add to Cloud Run envs
+cloud_run_service = gcp.cloudrunv2.Service(
+    template={
+        "containers": [{
+            "envs": [
+                # Step 2: Pass to Cloud Run (easy to forget!)
+                {"name": "GOOGLE_CLOUD_PROJECT_NUMBER", "value": PROJECT_NUMBER},
+            ],
+        }],
+    },
+)
+```

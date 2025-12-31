@@ -178,6 +178,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
                 "envs": [
                     {"name": "ENVIRONMENT", "value": environment},
                     {"name": "GOOGLE_CLOUD_PROJECT", "value": project},
+                    {"name": "GOOGLE_CLOUD_PROJECT_NUMBER", "value": PROJECT_NUMBER},
                     {"name": "CLOUD_RUN_URL", "value": f"https://karaoke-decide-718638054799.{region}.run.app"},
                 ],
                 "resources": {
