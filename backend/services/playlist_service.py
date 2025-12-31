@@ -7,6 +7,7 @@ stored in Firestore.
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
@@ -94,7 +95,7 @@ class PlaylistService:
         now = datetime.now(UTC)
         playlist_id = str(uuid.uuid4())
 
-        playlist_data = {
+        playlist_data: dict[str, Any] = {
             "id": playlist_id,
             "user_id": user_id,
             "name": name,
