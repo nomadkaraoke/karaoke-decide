@@ -3,6 +3,8 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import uuid
+from datetime import UTC, datetime
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -11,10 +13,12 @@ from pydantic import BaseModel
 
 from backend.api.deps import (
     CurrentUser,
+    FirestoreServiceDep,
     MusicServiceServiceDep,
     Settings,
-    SyncServiceDep,
 )
+from backend.models.sync_job import SyncJob, SyncJobStatus
+from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 
 router = APIRouter()
@@ -56,19 +60,52 @@ class SyncResultItem(BaseModel):
     tracks_matched: int
     user_songs_created: int
     user_songs_updated: int
+    artists_stored: int = 0
     error: str | None
 
 
 class SyncResultResponse(BaseModel):
-    """Response from sync operation."""
+    """Response from sync operation (legacy synchronous)."""
 
     results: list[SyncResultItem]
+
+
+class SyncJobStartResponse(BaseModel):
+    """Response when async sync job is started."""
+
+    job_id: str
+    status: str
+    message: str
+
+
+class SyncJobProgressResponse(BaseModel):
+    """Progress information for a sync job."""
+
+    current_service: str | None
+    current_phase: str | None
+    total_tracks: int
+    processed_tracks: int
+    matched_tracks: int
+    percentage: int
+
+
+class SyncJobStatusResponse(BaseModel):
+    """Status of a sync job."""
+
+    job_id: str
+    status: str
+    progress: SyncJobProgressResponse | None
+    results: list[SyncResultItem] | None
+    error: str | None
+    created_at: str
+    completed_at: str | None
 
 
 class SyncStatusResponse(BaseModel):
     """Current sync status across all services."""
 
     services: list[ConnectedServiceResponse]
+    active_job: SyncJobStatusResponse | None = None
 
 
 class DisconnectResponse(BaseModel):
@@ -273,34 +310,52 @@ async def disconnect_service(
 # -----------------------------------------------------------------------------
 
 
-@router.post("/sync", response_model=SyncResultResponse)
+@router.post("/sync", response_model=SyncJobStartResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync(
     user: CurrentUser,
-    sync_service: SyncServiceDep,
-) -> SyncResultResponse:
-    """Trigger sync for all connected services.
+    settings: Settings,
+    firestore: FirestoreServiceDep,
+) -> SyncJobStartResponse:
+    """Trigger async sync for all connected services.
 
-    Fetches listening history from all connected services,
-    matches tracks against the karaoke catalog, and creates
-    UserSong records.
+    Creates a background job that fetches listening history from all
+    connected services, matches tracks against the karaoke catalog,
+    and creates UserSong records.
 
-    This operation may take several seconds depending on the
-    size of the user's listening history.
+    Returns immediately with a job_id. Use GET /sync/status to poll
+    for progress. An email will be sent when sync completes.
     """
-    results = await sync_service.sync_all_services(user.id)
+    # Create sync job
+    job_id = str(uuid.uuid4())
+    job = SyncJob(
+        id=job_id,
+        user_id=user.id,
+        status=SyncJobStatus.PENDING,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
 
-    return SyncResultResponse(
-        results=[
-            SyncResultItem(
-                service_type=r.service_type,
-                tracks_fetched=r.tracks_fetched,
-                tracks_matched=r.tracks_matched,
-                user_songs_created=r.user_songs_created,
-                user_songs_updated=r.user_songs_updated,
-                error=r.error,
-            )
-            for r in results
-        ]
+    # Store job in Firestore
+    await firestore.set_document("sync_jobs", job_id, job.to_dict())
+
+    # Enqueue Cloud Task
+    try:
+        cloud_tasks = get_cloud_tasks_service(settings)
+        cloud_tasks.create_sync_task(job_id=job_id, user_id=user.id)
+    except Exception as e:
+        # If task creation fails, mark job as failed
+        job.status = SyncJobStatus.FAILED
+        job.error = f"Failed to enqueue task: {e}"
+        await firestore.set_document("sync_jobs", job_id, job.to_dict())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to start sync: {e}",
+        )
+
+    return SyncJobStartResponse(
+        job_id=job_id,
+        status="pending",
+        message="Sync job started. Poll /sync/status for progress.",
     )
 
 
@@ -308,13 +363,73 @@ async def trigger_sync(
 async def get_sync_status(
     user: CurrentUser,
     music_service: MusicServiceServiceDep,
+    firestore: FirestoreServiceDep,
 ) -> SyncStatusResponse:
     """Get current sync status for all services.
 
     Returns the sync status, last sync time, and track count
-    for each connected service.
+    for each connected service. Also includes active job progress
+    if a sync is currently running.
     """
     services = await music_service.get_user_services(user.id)
+
+    # Find most recent active or recent job for this user
+    active_job: SyncJobStatusResponse | None = None
+    try:
+        jobs_ref = firestore.client.collection("sync_jobs")
+        query = jobs_ref.where("user_id", "==", user.id).order_by("created_at", direction="DESCENDING").limit(1)
+        docs = query.stream()
+
+        for doc in docs:
+            job_data = doc.to_dict()
+            if job_data:
+                job = SyncJob.from_dict(job_data)
+
+                # Include if pending, in_progress, or completed within last minute
+                include_job = job.status in (SyncJobStatus.PENDING, SyncJobStatus.IN_PROGRESS)
+                if job.status == SyncJobStatus.COMPLETED and job.completed_at:
+                    seconds_since = (datetime.now(UTC) - job.completed_at).total_seconds()
+                    include_job = seconds_since < 60
+
+                if include_job:
+                    progress = None
+                    if job.progress:
+                        progress = SyncJobProgressResponse(
+                            current_service=job.progress.current_service,
+                            current_phase=job.progress.current_phase,
+                            total_tracks=job.progress.total_tracks,
+                            processed_tracks=job.progress.processed_tracks,
+                            matched_tracks=job.progress.matched_tracks,
+                            percentage=job.progress.percentage,
+                        )
+
+                    results = None
+                    if job.results:
+                        results = [
+                            SyncResultItem(
+                                service_type=r.service_type,
+                                tracks_fetched=r.tracks_fetched,
+                                tracks_matched=r.tracks_matched,
+                                user_songs_created=r.user_songs_created,
+                                user_songs_updated=r.user_songs_updated,
+                                artists_stored=r.artists_stored,
+                                error=r.error,
+                            )
+                            for r in job.results
+                        ]
+
+                    active_job = SyncJobStatusResponse(
+                        job_id=job.id,
+                        status=job.status.value,
+                        progress=progress,
+                        results=results,
+                        error=job.error,
+                        created_at=job.created_at.isoformat(),
+                        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+                    )
+    except Exception:
+        # If query fails (e.g., missing index), just continue without active job
+        pass
 
     return SyncStatusResponse(
         services=[
@@ -327,5 +442,6 @@ async def get_sync_status(
                 tracks_synced=svc.tracks_synced,
             )
             for svc in services
-        ]
+        ],
+        active_job=active_job,
     )

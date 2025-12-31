@@ -317,29 +317,22 @@ Disconnect a music service.
 
 ### POST /api/services/sync
 
-Trigger listening history sync for all connected services.
+Trigger async listening history sync for all connected services. Sync runs in background via Cloud Tasks.
 
 **Requires:** Bearer token
 
-**Response:**
+**Response (202 Accepted):**
 ```json
 {
-  "results": [
-    {
-      "service_type": "spotify",
-      "tracks_fetched": 100,
-      "tracks_matched": 75,
-      "user_songs_created": 50,
-      "user_songs_updated": 25,
-      "error": null
-    }
-  ]
+  "job_id": "sync_user123_1735621234",
+  "status": "pending",
+  "message": "Sync job created. Poll /api/services/sync/status for progress."
 }
 ```
 
 ### GET /api/services/sync/status
 
-Get current sync status for all connected services.
+Get current sync status for all connected services and any active sync job.
 
 **Requires:** Bearer token
 
@@ -355,9 +348,27 @@ Get current sync status for all connected services.
       "sync_error": null,
       "tracks_synced": 150
     }
-  ]
+  ],
+  "active_job": {
+    "job_id": "sync_user123_1735621234",
+    "status": "in_progress",
+    "progress": {
+      "current_service": "spotify",
+      "current_phase": "matching",
+      "total_tracks": 500,
+      "processed_tracks": 250,
+      "matched_tracks": 180,
+      "percentage": 50
+    },
+    "results": null,
+    "error": null,
+    "created_at": "2024-12-30T12:00:00Z",
+    "completed_at": null
+  }
 }
 ```
+
+**Job statuses:** `pending`, `in_progress`, `completed`, `failed`
 
 ---
 

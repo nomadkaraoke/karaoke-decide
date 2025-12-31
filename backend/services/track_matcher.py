@@ -203,30 +203,52 @@ class TrackMatcher:
     async def batch_match_tracks(
         self,
         tracks: list[dict[str, str]],
-        batch_size: int = 50,
     ) -> list[MatchedTrack]:
         """Match a batch of tracks to the karaoke catalog.
 
-        Processes tracks in batches for efficiency.
+        Uses a single BigQuery query per batch for efficiency, instead of
+        one query per track. This dramatically improves performance for
+        large listening histories (900+ tracks).
 
         Args:
             tracks: List of dicts with 'artist' and 'title' keys.
-            batch_size: Number of tracks to process per batch.
 
         Returns:
             List of MatchedTrack results in same order as input.
         """
+        if not tracks:
+            return []
+
+        # First, normalize all tracks and build lookup structures
+        normalized_tracks: list[tuple[str, str, str, str]] = []  # (orig_artist, orig_title, norm_artist, norm_title)
+        for track in tracks:
+            artist = track.get("artist", "")
+            title = track.get("title", "")
+            normalized_tracks.append((artist, title, self.normalize_artist(artist), self.normalize_title(title)))
+
+        # Build list of unique (normalized_artist, normalized_title) tuples for batch query
+        unique_normalized = list({(nt[2], nt[3]) for nt in normalized_tracks if nt[2] and nt[3]})
+
+        # Execute batch query to get all matches at once
+        matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
+
+        # Build results maintaining original order
         results: list[MatchedTrack] = []
+        for orig_artist, orig_title, norm_artist, norm_title in normalized_tracks:
+            # Look up match using normalized values
+            key = (norm_artist, norm_title)
+            catalog_song = matched_songs.get(key)
 
-        for i in range(0, len(tracks), batch_size):
-            batch = tracks[i : i + batch_size]
-
-            for track in batch:
-                artist = track.get("artist", "")
-                title = track.get("title", "")
-
-                matched = await self.match_single_track(artist, title)
-                results.append(matched)
+            results.append(
+                MatchedTrack(
+                    original_artist=orig_artist,
+                    original_title=orig_title,
+                    normalized_artist=norm_artist,
+                    normalized_title=norm_title,
+                    catalog_song=catalog_song,
+                    match_confidence=1.0 if catalog_song else 0.0,
+                )
+            )
 
         return results
 

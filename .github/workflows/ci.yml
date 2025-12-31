@@ -324,7 +324,7 @@ jobs:
             --concurrency 80 \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke-decide"
+            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke"
 
       - name: Verify deployment
         run: |

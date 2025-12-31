@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import router
+from backend.api.routes import internal_api_router, router
 from backend.config import get_backend_settings
 
 
@@ -50,6 +50,9 @@ def create_app() -> FastAPI:
 
     # Include API routes
     app.include_router(router, prefix="/api")
+
+    # Include internal routes (for Cloud Tasks callbacks)
+    app.include_router(internal_api_router, prefix="/internal", tags=["internal"])
 
     return app
 

@@ -221,3 +221,68 @@ class BigQueryCatalogService:
             "max_brand_count": result.max_brand_count,
             "avg_brand_count": round(result.avg_brand_count, 2),
         }
+
+    def batch_match_tracks(
+        self,
+        tracks: list[tuple[str, str]],
+    ) -> dict[tuple[str, str], SongResult]:
+        """Match multiple tracks in a single BigQuery query.
+
+        Uses OR conditions to find exact matches for all tracks at once,
+        which is much more efficient than one query per track.
+
+        Args:
+            tracks: List of (normalized_artist, normalized_title) tuples
+
+        Returns:
+            Dict mapping (artist, title) tuples to SongResult for found matches
+        """
+        if not tracks:
+            return {}
+
+        # Build OR conditions for each track
+        # Using parameterized queries would require dynamic parameter count,
+        # so we sanitize and use LOWER() for case-insensitive matching
+        conditions = []
+        for artist, title in tracks:
+            # Escape single quotes by doubling them (BigQuery SQL escaping)
+            # Also lowercase to match LOWER() in SQL
+            safe_artist = artist.replace("'", "''").lower()
+            safe_title = title.replace("'", "''").lower()
+            conditions.append(f"(LOWER(Artist) = '{safe_artist}' AND LOWER(Title) = '{safe_title}')")
+
+        # Process in chunks to avoid query size limits (max ~100 tracks per query)
+        chunk_size = 100
+        all_results: dict[tuple[str, str], SongResult] = {}
+
+        for i in range(0, len(conditions), chunk_size):
+            chunk_conditions = conditions[i : i + chunk_size]
+            where_clause = " OR ".join(chunk_conditions)
+
+            sql = f"""
+                SELECT
+                    Id as id,
+                    Artist as artist,
+                    Title as title,
+                    Brands as brands,
+                    ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
+                WHERE {where_clause}
+            """
+
+            results = self.client.query(sql).result()
+
+            for row in results:
+                # Create key using lowercased values to match input
+                key = (row.artist.lower(), row.title.lower())
+                # If multiple matches (same song different brands), keep highest brand_count
+                if key not in all_results or row.brand_count > all_results[key].brand_count:
+                    all_results[key] = SongResult(
+                        id=row.id,
+                        artist=row.artist,
+                        title=row.title,
+                        brands=row.brands,
+                        brand_count=row.brand_count,
+                    )
+
+        return all_results

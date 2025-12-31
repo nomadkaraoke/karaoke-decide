@@ -401,3 +401,106 @@ function ProfilePage() {
   <div className="absolute z-50">Dropdown</div>
 </div>
 ```
+
+---
+
+### 2025-12-31: Case-Sensitivity in SQL Batch Matching
+
+**Context:** BigQuery batch track matching was failing to find matches even when songs existed in the catalog.
+
+**Lesson:** When building SQL `WHERE` clauses with `LOWER(column) = 'value'`, the value must also be lowercased in the application code before interpolation. The catalog uses `LOWER(Artist)` but input values weren't being lowercased.
+
+**Recommendation:**
+```python
+# BAD - case mismatch
+safe_artist = artist.replace("'", "''")  # "Queen" won't match LOWER(Artist)='queen'
+
+# GOOD - lowercase to match SQL LOWER()
+safe_artist = artist.replace("'", "''").lower()  # "queen" matches LOWER(Artist)='queen'
+```
+
+---
+
+### 2025-12-31: Thread-Safe Singleton with Double-Checked Locking
+
+**Context:** Service singletons were being initialized without thread safety, which could cause race conditions in multi-threaded environments.
+
+**Lesson:** Use double-checked locking pattern for thread-safe lazy initialization of singletons. Check twice - once without lock (fast path) and once with lock (safe path).
+
+**Recommendation:**
+```python
+import threading
+
+_service: MyService | None = None
+_service_lock = threading.Lock()
+
+def get_service() -> MyService:
+    global _service
+    if _service is None:
+        with _service_lock:
+            if _service is None:  # Double-check after acquiring lock
+                _service = MyService()
+    return _service
+```
+
+---
+
+### 2025-12-31: React useCallback Declaration Order
+
+**Context:** TypeScript build failing with "Block-scoped variable used before its declaration" when one useCallback referenced another.
+
+**Lesson:** In React/TypeScript, `useCallback` hooks must be declared in dependency order. If `loadServices` depends on `pollSyncStatus` in its dependency array, `pollSyncStatus` must be defined first.
+
+**Recommendation:**
+```typescript
+// BAD - pollSyncStatus used before declaration
+const loadServices = useCallback(() => {
+  pollSyncStatus(); // Error: used before declaration
+}, [pollSyncStatus]);
+
+const pollSyncStatus = useCallback(() => {...}, []);
+
+// GOOD - define dependencies first
+const pollSyncStatus = useCallback(() => {...}, []);
+
+const loadServices = useCallback(() => {
+  pollSyncStatus(); // OK - already declared
+}, [pollSyncStatus]);
+```
+
+---
+
+### 2025-12-31: CI Environment Variables Must Match Infrastructure
+
+**Context:** Magic link auth broke in production after deployment because CI workflow had wrong GOOGLE_CLOUD_PROJECT value.
+
+**Lesson:** When infrastructure (Pulumi) sets environment variables, CI deploy scripts must use identical values. A typo (`nomadkaraoke-decide` vs `nomadkaraoke`) caused Firestore to fail finding users.
+
+**Recommendation:**
+- Document required env vars in infrastructure code comments
+- Use variables/secrets rather than hardcoding values in multiple places
+- After fixing infra, check ALL places that set the same env var (Pulumi, CI, local .env)
+
+---
+
+### 2025-12-31: Python Async Generator Type Annotations
+
+**Context:** Mypy failing with "Function is missing a return type annotation" on an async generator function in tests.
+
+**Lesson:** Async generator functions need explicit `AsyncGenerator[YieldType, SendType]` return type annotation. The `yield` statement alone doesn't satisfy mypy.
+
+**Recommendation:**
+```python
+from collections.abc import AsyncGenerator
+from typing import Any
+
+# BAD - missing type annotation
+async def async_empty_generator():
+    return
+    yield
+
+# GOOD - explicit return type
+async def async_empty_generator() -> AsyncGenerator[Any, None]:
+    return
+    yield
+```

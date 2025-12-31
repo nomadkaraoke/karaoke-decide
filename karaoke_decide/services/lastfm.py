@@ -53,6 +53,29 @@ class LastFmClient:
             {"user": username, "period": period, "limit": limit, "page": page},
         )
 
+    async def get_top_artists(
+        self,
+        username: str,
+        period: str = "overall",
+        limit: int = 50,
+        page: int = 1,
+    ) -> dict[str, Any]:
+        """Get user's top artists with play counts.
+
+        Args:
+            username: Last.fm username
+            period: overall | 7day | 1month | 3month | 6month | 12month
+            limit: Number of results per page (max 1000)
+            page: Page number
+
+        Returns:
+            dict with 'topartists' containing artist list with name, playcount, url
+        """
+        return await self._api_request(
+            "user.gettopartists",
+            {"user": username, "period": period, "limit": limit, "page": page},
+        )
+
     async def get_recent_tracks(self, username: str, limit: int = 50, page: int = 1) -> dict[str, Any]:
         """Get user's recent tracks with play timestamps."""
         return await self._api_request(

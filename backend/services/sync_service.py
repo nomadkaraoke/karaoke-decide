@@ -27,7 +27,12 @@ class SyncResult:
     tracks_matched: int
     user_songs_created: int
     user_songs_updated: int
+    artists_stored: int = 0
     error: str | None = None
+
+
+# Type for progress callback
+ProgressCallback = Any  # Callable that accepts progress params
 
 
 class SyncService:
@@ -127,6 +132,332 @@ class SyncService:
             results.append(result)
 
         return results
+
+    async def sync_all_services_with_progress(
+        self,
+        user_id: str,
+        progress_callback: ProgressCallback | None = None,
+    ) -> list[SyncResult]:
+        """Sync all connected services with progress updates.
+
+        This is the async version called by Cloud Tasks that reports
+        progress and fetches top artists for recommendations.
+
+        Args:
+            user_id: User ID to sync.
+            progress_callback: Async callback for progress updates.
+
+        Returns:
+            List of SyncResult for each service.
+        """
+        services = await self.music_service_service.get_user_services(user_id)
+        results: list[SyncResult] = []
+
+        for service in services:
+            if service.service_type == "spotify":
+                result = await self._sync_spotify_with_progress(user_id, service, progress_callback)
+            elif service.service_type == "lastfm":
+                result = await self._sync_lastfm_with_progress(user_id, service, progress_callback)
+            else:
+                result = SyncResult(
+                    service_type=service.service_type,
+                    tracks_fetched=0,
+                    tracks_matched=0,
+                    user_songs_created=0,
+                    user_songs_updated=0,
+                    error=f"Unknown service type: {service.service_type}",
+                )
+            results.append(result)
+
+        return results
+
+    async def _sync_spotify_with_progress(
+        self,
+        user_id: str,
+        service: MusicService,
+        progress_callback: ProgressCallback | None,
+    ) -> SyncResult:
+        """Sync Spotify with progress updates and artist fetching."""
+        try:
+            await self.music_service_service.update_sync_status(user_id, "spotify", "syncing")
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="spotify",
+                    current_phase="fetching",
+                    total_tracks=0,
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            try:
+                access_token = await self.music_service_service.get_valid_spotify_token(service)
+            except MusicServiceError as e:
+                await self.music_service_service.update_sync_status(user_id, "spotify", "error", error=str(e))
+                return SyncResult(
+                    service_type="spotify",
+                    tracks_fetched=0,
+                    tracks_matched=0,
+                    user_songs_created=0,
+                    user_songs_updated=0,
+                    error=str(e),
+                )
+
+            # Fetch tracks
+            tracks = await self._fetch_spotify_tracks(access_token)
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="spotify",
+                    current_phase="matching",
+                    total_tracks=len(tracks),
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            # Match to catalog (batch)
+            matched = await self.track_matcher.batch_match_tracks(tracks)
+            tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="spotify",
+                    current_phase="storing",
+                    total_tracks=len(tracks),
+                    processed_tracks=len(tracks),
+                    matched_tracks=tracks_matched,
+                )
+
+            # Create/update UserSongs
+            created, updated = await self._upsert_user_songs(user_id, matched, "spotify")
+
+            # Fetch and store top artists
+            artists_stored = await self._fetch_and_store_spotify_artists(user_id, access_token)
+
+            await self.music_service_service.update_sync_status(
+                user_id, "spotify", "idle", tracks_synced=tracks_matched
+            )
+
+            return SyncResult(
+                service_type="spotify",
+                tracks_fetched=len(tracks),
+                tracks_matched=tracks_matched,
+                user_songs_created=created,
+                user_songs_updated=updated,
+                artists_stored=artists_stored,
+            )
+
+        except ExternalServiceError as e:
+            error_msg = f"Spotify API error: {e}"
+            await self.music_service_service.update_sync_status(user_id, "spotify", "error", error=error_msg)
+            return SyncResult(
+                service_type="spotify",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
+        except Exception as e:
+            error_msg = f"Unexpected error: {e}"
+            await self.music_service_service.update_sync_status(user_id, "spotify", "error", error=error_msg)
+            return SyncResult(
+                service_type="spotify",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
+
+    async def _sync_lastfm_with_progress(
+        self,
+        user_id: str,
+        service: MusicService,
+        progress_callback: ProgressCallback | None,
+    ) -> SyncResult:
+        """Sync Last.fm with progress updates and artist fetching."""
+        try:
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "syncing")
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="lastfm",
+                    current_phase="fetching",
+                    total_tracks=0,
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            username = service.service_username
+            if not username:
+                raise MusicServiceError("No Last.fm username configured")
+
+            # Fetch tracks
+            tracks = await self._fetch_lastfm_tracks(username)
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="lastfm",
+                    current_phase="matching",
+                    total_tracks=len(tracks),
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            # Match to catalog (batch)
+            matched = await self.track_matcher.batch_match_tracks(tracks)
+            tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="lastfm",
+                    current_phase="storing",
+                    total_tracks=len(tracks),
+                    processed_tracks=len(tracks),
+                    matched_tracks=tracks_matched,
+                )
+
+            # Create/update UserSongs
+            created, updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+
+            # Fetch and store top artists
+            artists_stored = await self._fetch_and_store_lastfm_artists(user_id, username)
+
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "idle", tracks_synced=tracks_matched)
+
+            return SyncResult(
+                service_type="lastfm",
+                tracks_fetched=len(tracks),
+                tracks_matched=tracks_matched,
+                user_songs_created=created,
+                user_songs_updated=updated,
+                artists_stored=artists_stored,
+            )
+
+        except MusicServiceError as e:
+            error_msg = str(e)
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
+            return SyncResult(
+                service_type="lastfm",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
+        except ExternalServiceError as e:
+            error_msg = f"Last.fm API error: {e}"
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
+            return SyncResult(
+                service_type="lastfm",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
+        except Exception as e:
+            error_msg = f"Unexpected error: {e}"
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
+            return SyncResult(
+                service_type="lastfm",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
+
+    async def _fetch_and_store_spotify_artists(self, user_id: str, access_token: str) -> int:
+        """Fetch and store user's top artists from Spotify.
+
+        Args:
+            user_id: User ID.
+            access_token: Spotify access token.
+
+        Returns:
+            Number of artists stored.
+        """
+        stored = 0
+        now = datetime.now(UTC)
+
+        # Fetch top artists for different time ranges
+        for time_range in ["short_term", "medium_term", "long_term"]:
+            try:
+                response = await self.spotify.get_top_artists(access_token, time_range=time_range, limit=50)
+                artists = response.get("items", [])
+
+                for rank, artist in enumerate(artists, 1):
+                    artist_id = f"{user_id}:spotify:{artist.get('id', '')}"
+                    genres = artist.get("genres", [])
+
+                    artist_data = {
+                        "id": artist_id,
+                        "user_id": user_id,
+                        "source": "spotify",
+                        "artist_name": artist.get("name", ""),
+                        "artist_id": artist.get("id", ""),
+                        "rank": rank,
+                        "time_range": time_range,
+                        "popularity": artist.get("popularity", 0),
+                        "genres": genres[:5] if genres else [],  # Store up to 5 genres
+                        "updated_at": now.isoformat(),
+                    }
+
+                    await self.firestore.set_document("user_artists", artist_id, artist_data)
+                    stored += 1
+
+            except Exception:
+                # Continue with other time ranges if one fails
+                continue
+
+        return stored
+
+    async def _fetch_and_store_lastfm_artists(self, user_id: str, username: str) -> int:
+        """Fetch and store user's top artists from Last.fm.
+
+        Args:
+            user_id: User ID.
+            username: Last.fm username.
+
+        Returns:
+            Number of artists stored.
+        """
+        stored = 0
+        now = datetime.now(UTC)
+
+        # Fetch top artists for different time periods
+        for period in ["overall", "12month", "6month"]:
+            try:
+                response = await self.lastfm.get_top_artists(username, period=period, limit=50)
+                artists = response.get("topartists", {}).get("artist", [])
+
+                for rank, artist in enumerate(artists, 1):
+                    artist_name = artist.get("name", "")
+                    # Create unique ID using normalized name
+                    safe_name = artist_name.lower().replace(" ", "_")[:50]
+                    artist_id = f"{user_id}:lastfm:{safe_name}:{period}"
+
+                    artist_data = {
+                        "id": artist_id,
+                        "user_id": user_id,
+                        "source": "lastfm",
+                        "artist_name": artist_name,
+                        "rank": rank,
+                        "period": period,
+                        "playcount": int(artist.get("playcount", 0)),
+                        "updated_at": now.isoformat(),
+                    }
+
+                    await self.firestore.set_document("user_artists", artist_id, artist_data)
+                    stored += 1
+
+            except Exception:
+                # Continue with other periods if one fails
+                continue
+
+        return stored
 
     async def sync_spotify(self, user_id: str, service: MusicService) -> SyncResult:
         """Sync Spotify listening history.

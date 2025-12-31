@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Google Cloud
     google_cloud_project: str = ""
+    google_cloud_project_number: str = ""  # Required for service account references
     gcs_bucket_name: str = "karaoke-decide-storage"
     firestore_database: str = "(default)"
 
@@ -48,6 +49,11 @@ class Settings(BaseSettings):
 
     # Frontend
     frontend_url: str = "http://localhost:3000"
+
+    # Cloud Tasks
+    cloud_tasks_location: str = "us-central1"
+    cloud_tasks_queue: str = "music-sync-queue"
+    cloud_run_url: str = ""  # Set in production
 
     # Emulators (auto-detected)
     firestore_emulator_host: str | None = None

@@ -10,7 +10,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://karaoke-decide-718638054799.us-central1.run.app
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2025-12-30)
+## Current Status (2025-12-31)
 
 **Phase:** MLP COMPLETE (Minimum Lovable Product) - All success criteria met
 
@@ -19,6 +19,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Backend API:** Deployed on Cloud Run with BigQuery integration
 - **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
+- **Async Music Sync:** Background sync via Cloud Tasks with progress tracking (NEW)
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
 - **Frontend Auth & Discovery:** Full auth flow, My Songs, Recommendations, Quiz UI, Services page (Phase 5 complete)
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
@@ -131,6 +132,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2025-12-31 | **Async Music Sync & CodeRabbit Fixes** (Cloud Tasks, progress UI, 11 bug fixes) | [archive/2025-12-31-async-sync-coderabbit-fixes.md](archive/2025-12-31-async-sync-coderabbit-fixes.md) |
 | 2025-12-30 | **Phase 6: MLP Complete** (Playlists, Karaoke Links, Profile) | [archive/2025-12-30-phase6-mlp-completion.md](archive/2025-12-30-phase6-mlp-completion.md) |
 | 2025-12-30 | Phase 5: Frontend Auth & Discovery (auth flow, My Songs, Recommendations, Quiz, Services pages) | [archive/2025-12-30-phase5-frontend-auth-discovery.md](archive/2025-12-30-phase5-frontend-auth-discovery.md) |
 | 2024-12-30 | Phase 4: Quiz & Recommendations (quiz onboarding, recommendation algorithm v1) | [archive/2024-12-30-phase4-quiz-recommendations.md](archive/2024-12-30-phase4-quiz-recommendations.md) |

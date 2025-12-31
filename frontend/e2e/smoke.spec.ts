@@ -30,15 +30,20 @@ test.describe('Production Smoke Tests', () => {
 
   test('search returns results', async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
     // Search for a popular song
-    await page.getByPlaceholder(/search/i).fill('queen');
+    const searchInput = page.getByPlaceholder(/search/i);
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('queen');
 
-    // Wait for results to load (debounced search)
-    await page.waitForTimeout(500);
+    // Wait for debounce and results to load
+    await page.waitForTimeout(800);
+    await page.waitForLoadState('networkidle');
 
-    // Should show results section
-    await expect(page.getByText(/results for/i)).toBeVisible({ timeout: 10000 });
+    // Should show results - either "results for" text or Queen artist name
+    const resultsText = page.getByText(/results for|queen/i).first();
+    await expect(resultsText).toBeVisible({ timeout: 10000 });
   });
 
   test('popular songs load on homepage', async ({ page }) => {

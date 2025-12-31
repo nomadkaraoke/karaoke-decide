@@ -107,6 +107,31 @@ class SpotifyClient:
             params={"time_range": time_range, "limit": limit, "offset": offset},
         )
 
+    async def get_top_artists(
+        self,
+        access_token: str,
+        time_range: str = "medium_term",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Get user's top artists with genres.
+
+        Args:
+            access_token: Spotify access token
+            time_range: short_term (4 weeks), medium_term (6 months), long_term (years)
+            limit: Number of results (max 50)
+            offset: Pagination offset
+
+        Returns:
+            dict with 'items' containing artist objects with id, name, genres, popularity
+        """
+        return await self._api_request(
+            "GET",
+            "/me/top/artists",
+            access_token,
+            params={"time_range": time_range, "limit": limit, "offset": offset},
+        )
+
     async def get_recently_played(self, access_token: str, limit: int = 50) -> dict[str, Any]:
         """Get user's recently played tracks."""
         return await self._api_request(
