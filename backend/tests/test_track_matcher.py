@@ -36,13 +36,13 @@ class TestNormalizeText:
         """Multiple spaces are collapsed to single space."""
         assert track_matcher.normalize_text("hello   world") == "hello world"
 
-    def test_preserves_apostrophes(self, track_matcher: TrackMatcher) -> None:
-        """Apostrophes in contractions are preserved."""
-        assert track_matcher.normalize_text("Don't Stop") == "don't stop"
-        assert track_matcher.normalize_text("It's") == "it's"
+    def test_removes_apostrophes(self, track_matcher: TrackMatcher) -> None:
+        """Apostrophes are removed (required for BigQuery REGEXP_REPLACE matching)."""
+        assert track_matcher.normalize_text("Don't Stop") == "don t stop"
+        assert track_matcher.normalize_text("It's") == "it s"
 
     def test_removes_punctuation(self, track_matcher: TrackMatcher) -> None:
-        """Punctuation (except apostrophes) is removed."""
+        """All punctuation is removed."""
         assert track_matcher.normalize_text("Hello, World!") == "hello world"
         assert track_matcher.normalize_text("Rock & Roll") == "rock roll"
         assert track_matcher.normalize_text("1-2-3") == "1 2 3"
