@@ -76,7 +76,7 @@ async def deep_health_check(
 
         catalog = get_catalog_service()
         # Quick query to verify BigQuery connectivity
-        stats = catalog.get_catalog_stats()
+        stats = catalog.get_stats()
         checks["bigquery"] = {
             "status": "healthy",
             "message": f"Connected, {stats.get('total_songs', 0):,} songs in catalog",

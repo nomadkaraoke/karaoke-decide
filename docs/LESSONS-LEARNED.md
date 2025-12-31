@@ -663,3 +663,29 @@ gcp.serviceaccount.IAMMember(
    ```
 
 4. **Document required IAM bindings** in infrastructure code with comments explaining why each is needed
+
+---
+
+### 2025-12-31: FirestoreService Uses AsyncClient - Don't Mix Sync/Async
+
+**Context:** Sync status wasn't persisting on page reload. `get_sync_status` was using `list(query.stream())` to get results.
+
+**Lesson:** `FirestoreService` uses `google.cloud.firestore.AsyncClient`, which means `stream()` returns an async iterator. Calling sync `list()` on an async iterator doesn't work correctly - it returns empty results without error.
+
+**Recommendation:**
+```python
+# BAD - sync list() on async iterator returns empty
+query = firestore.client.collection("sync_jobs").where(...)
+job_docs = list(query.stream())  # Returns [] even when docs exist!
+
+# GOOD - use the async helper method
+job_docs = await firestore.query_documents(
+    collection="sync_jobs",
+    filters=[("user_id", "==", user.id)],
+    order_by="created_at",
+    order_direction="DESCENDING",
+    limit=1,
+)
+```
+
+**Why tests didn't catch this:** Tests mocked `FirestoreService`, not the underlying Firestore client. The mock returned expected data regardless of sync/async usage.

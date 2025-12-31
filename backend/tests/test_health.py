@@ -57,7 +57,7 @@ def deep_health_client(
 
     # Mock catalog service and cloud tasks
     mock_catalog = MagicMock()
-    mock_catalog.get_catalog_stats.return_value = {"total_songs": 275000}
+    mock_catalog.get_stats.return_value = {"total_songs": 275000}
 
     mock_queue = MagicMock()
     mock_queue.name = "projects/test/locations/us-central1/queues/sync-queue"
@@ -113,7 +113,7 @@ def test_deep_health_check_degraded_on_failure(
     app.dependency_overrides[deps.get_firestore] = get_firestore_override
 
     mock_catalog = MagicMock()
-    mock_catalog.get_catalog_stats.return_value = {"total_songs": 275000}
+    mock_catalog.get_stats.return_value = {"total_songs": 275000}
 
     mock_queue = MagicMock()
     mock_queue.name = "projects/test/locations/us-central1/queues/sync-queue"

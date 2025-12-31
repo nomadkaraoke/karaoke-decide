@@ -80,6 +80,8 @@ cd frontend && npm run dev
 | `karaoke_decide.spotify_tracks` | 256,039,007 | Spotify track metadata |
 
 ### Live Endpoints
+- `GET /api/health` - Basic health check
+- `GET /api/health/deep` - Deep health check (validates Firestore, BigQuery, Cloud Tasks)
 - `POST /api/auth/magic-link` - Request magic link email
 - `POST /api/auth/verify` - Verify token, get JWT
 - `GET /api/auth/me` - Get current user (requires auth)
@@ -133,6 +135,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2025-12-31 | Sync IAM Fix & Health Monitoring (403 fix, deep health endpoint, scheduled monitoring, comprehensive E2E) | [archive/2025-12-31-sync-iam-fix-and-health-monitoring.md](archive/2025-12-31-sync-iam-fix-and-health-monitoring.md) |
 | 2025-12-31 | **Production Hotfix** (Cloud Run secrets, magic link auth fix) | [archive/2025-12-31-cloud-run-secrets-hotfix.md](archive/2025-12-31-cloud-run-secrets-hotfix.md) |
 | 2025-12-31 | Async Music Sync & CodeRabbit Fixes (Cloud Tasks, progress UI, 11 bug fixes) | [archive/2025-12-31-async-sync-coderabbit-fixes.md](archive/2025-12-31-async-sync-coderabbit-fixes.md) |
 | 2025-12-30 | **Phase 6: MLP Complete** (Playlists, Karaoke Links, Profile) | [archive/2025-12-30-phase6-mlp-completion.md](archive/2025-12-30-phase6-mlp-completion.md) |
