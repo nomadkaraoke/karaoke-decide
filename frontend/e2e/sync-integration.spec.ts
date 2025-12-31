@@ -60,10 +60,11 @@ test.describe("Sync Integration Tests", () => {
 
     test.beforeEach(async ({ page }) => {
       // Set auth token in localStorage before navigating
+      // Note: PROD_TEST_TOKEN is guaranteed to be defined here due to test.skip above
       await page.goto(process.env.BASE_URL || "https://decide.nomadkaraoke.com");
       await page.evaluate((token) => {
         localStorage.setItem("karaoke_decide_token", token);
-      }, PROD_TEST_TOKEN);
+      }, PROD_TEST_TOKEN!);
     });
 
     test("sync button triggers actual sync", async ({ page }) => {

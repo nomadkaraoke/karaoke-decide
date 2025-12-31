@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import MailSlurp from "mailslurp-client";
+import MailSlurp, {
+  MatchOptionFieldEnum,
+  MatchOptionShouldEnum,
+} from "mailslurp-client";
 
 /**
  * Comprehensive Production E2E Tests
@@ -77,8 +80,8 @@ test.describe("Production Comprehensive E2E Tests", () => {
         matchOptions: {
           matches: [
             {
-              field: "SUBJECT",
-              should: "CONTAIN",
+              field: MatchOptionFieldEnum.SUBJECT,
+              should: MatchOptionShouldEnum.CONTAIN,
               value: "sign in",
             },
           ],
@@ -176,10 +179,11 @@ test.describe("Production Comprehensive E2E Tests", () => {
 
     test.beforeEach(async ({ page }) => {
       // Set auth token before navigating
+      // Note: PROD_TEST_TOKEN is guaranteed to be defined here due to test.skip above
       await page.goto(PROD_URL);
       await page.evaluate((token) => {
         localStorage.setItem("karaoke_decide_token", token);
-      }, PROD_TEST_TOKEN);
+      }, PROD_TEST_TOKEN!);
     });
 
     test("services page shows connected services", async ({ page }) => {
