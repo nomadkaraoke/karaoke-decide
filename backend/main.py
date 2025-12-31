@@ -1,5 +1,7 @@
 """FastAPI application for Karaoke Decide."""
 
+import logging
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -8,6 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import internal_api_router, router
 from backend.config import get_backend_settings
+
+# Configure logging to output to stdout for Cloud Run
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s:%(name)s:%(message)s",
+    stream=sys.stdout,
+)
 
 
 @asynccontextmanager
