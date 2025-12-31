@@ -176,10 +176,62 @@ cloud_run_service = gcp.cloudrunv2.Service(
                     "name": "http1",
                 },
                 "envs": [
+                    # Plain environment variables
                     {"name": "ENVIRONMENT", "value": environment},
                     {"name": "GOOGLE_CLOUD_PROJECT", "value": project},
                     {"name": "GOOGLE_CLOUD_PROJECT_NUMBER", "value": PROJECT_NUMBER},
-                    {"name": "CLOUD_RUN_URL", "value": f"https://karaoke-decide-718638054799.{region}.run.app"},
+                    {"name": "CLOUD_RUN_URL", "value": f"https://karaoke-decide-{PROJECT_NUMBER}.{region}.run.app"},
+                    {"name": "FRONTEND_URL", "value": "https://decide.nomadkaraoke.com"},
+                    {
+                        "name": "SPOTIFY_REDIRECT_URI",
+                        "value": f"https://karaoke-decide-{PROJECT_NUMBER}.{region}.run.app/api/services/spotify/callback",
+                    },
+                    # Secrets from Secret Manager
+                    {
+                        "name": "JWT_SECRET",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "karaoke-decide-jwt-secret",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "SPOTIFY_CLIENT_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "spotipy-client-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "SPOTIFY_CLIENT_SECRET",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "spotipy-client-secret",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "LASTFM_API_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "lastfm-api-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "SENDGRID_API_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "sendgrid-api-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {

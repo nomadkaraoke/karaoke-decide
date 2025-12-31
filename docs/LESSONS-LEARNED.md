@@ -571,3 +571,40 @@ cloud_run_service = gcp.cloudrunv2.Service(
     },
 )
 ```
+
+---
+
+### 2025-12-31: Pulumi and CI Deployments Must Stay in Sync
+
+**Context:** Magic link emails weren't being sent. Investigation revealed `SENDGRID_API_KEY` was empty, causing "dev mode" fallback.
+
+**Lesson:** When both Pulumi and CI deploy to Cloud Run, they can overwrite each other's configuration. CI was setting secrets via `--set-secrets`, but running `pulumi up` created a new revision that didn't include those secrets. The two deployment systems must define the same configuration.
+
+**Recommendation:**
+```python
+# In infrastructure/__main__.py - define ALL env vars and secrets
+# Don't rely on CI to set secrets separately
+cloud_run_service = gcp.cloudrunv2.Service(
+    template={
+        "containers": [{
+            "envs": [
+                # Plain env vars
+                {"name": "ENVIRONMENT", "value": environment},
+                {"name": "FRONTEND_URL", "value": "https://decide.nomadkaraoke.com"},
+                # Secrets - mount from Secret Manager
+                {
+                    "name": "SENDGRID_API_KEY",
+                    "value_source": {
+                        "secret_key_ref": {
+                            "secret": "sendgrid-api-key",
+                            "version": "latest",
+                        }
+                    },
+                },
+            ],
+        }],
+    },
+)
+```
+
+**Key insight:** If you use Pulumi for infrastructure, put ALL Cloud Run configuration in Pulumi - don't split between Pulumi (env vars) and CI (secrets).

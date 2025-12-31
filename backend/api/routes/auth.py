@@ -62,15 +62,22 @@ async def request_magic_link(
     In development mode (when SendGrid is not configured), the magic link
     is logged to the console instead of being sent via email.
     """
-    success = await auth_service.send_magic_link(request.email)
+    try:
+        success = await auth_service.send_magic_link(request.email)
 
-    if not success:
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send magic link email. Please try again later.",
+            )
+
+        return MagicLinkResponse(message="If an account exists for this email, you will receive a magic link shortly.")
+    except RuntimeError as e:
+        # Email service configuration error (e.g., SendGrid not configured in production)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send magic link email",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
         )
-
-    return MagicLinkResponse(message="If an account exists for this email, you will receive a magic link shortly.")
 
 
 @router.post("/verify", response_model=AuthResponse)
