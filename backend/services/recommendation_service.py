@@ -420,7 +420,8 @@ class RecommendationService:
         if not artists:
             return []
 
-        # Build parameterized query
+        # Build parameterized query with GROUP BY to avoid duplicates from Spotify join
+        # (one karaoke song can match many Spotify tracks for different releases)
         placeholders = ", ".join([f"@artist_{i}" for i in range(len(artists))])
         sql = f"""
             SELECT
@@ -428,13 +429,14 @@ class RecommendationService:
                 k.Artist as artist,
                 k.Title as title,
                 ARRAY_LENGTH(SPLIT(k.Brands, ',')) as brand_count,
-                COALESCE(s.popularity, 0) as spotify_popularity
+                COALESCE(MAX(s.popularity), 0) as spotify_popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
             LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` s
                 ON LOWER(k.Artist) = LOWER(s.artist_name)
                 AND LOWER(k.Title) = LOWER(s.title)
             WHERE LOWER(k.Artist) IN ({placeholders})
                 AND ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
+            GROUP BY k.Id, k.Artist, k.Title, k.Brands
             ORDER BY ARRAY_LENGTH(SPLIT(k.Brands, ',')) DESC
             LIMIT @limit
         """
@@ -466,21 +468,24 @@ class RecommendationService:
         Returns:
             List of song dicts.
         """
+        # GROUP BY to avoid duplicates from Spotify join
+        # (one karaoke song can match many Spotify tracks for different releases)
         sql = f"""
             SELECT
                 CAST(k.Id AS STRING) as id,
                 k.Artist as artist,
                 k.Title as title,
                 ARRAY_LENGTH(SPLIT(k.Brands, ',')) as brand_count,
-                COALESCE(s.popularity, 0) as spotify_popularity
+                COALESCE(MAX(s.popularity), 0) as spotify_popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
             LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` s
                 ON LOWER(k.Artist) = LOWER(s.artist_name)
                 AND LOWER(k.Title) = LOWER(s.title)
             WHERE ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
+            GROUP BY k.Id, k.Artist, k.Title, k.Brands
             ORDER BY
                 ARRAY_LENGTH(SPLIT(k.Brands, ',')) DESC,
-                COALESCE(s.popularity, 0) DESC
+                spotify_popularity DESC
             LIMIT @limit
         """
 
