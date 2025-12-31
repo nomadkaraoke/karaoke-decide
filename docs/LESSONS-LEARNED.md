@@ -380,3 +380,24 @@ function ProfilePage() {
 - Delete unused classes, functions, constants, and imports
 - Don't scaffold code "for future use" - add it when needed
 - Run linters that detect unused code (`ruff` flags unused imports)
+
+---
+
+### 2025-12-30: Dropdown Z-Index in Card Lists
+
+**Context:** "Sing it!" dropdown on song cards was appearing beneath subsequent cards in the list, making it impossible to interact with.
+
+**Lesson:** In a list of cards where each card has `position: relative`, subsequent sibling cards create new stacking contexts that can cover earlier cards' dropdowns - even if the dropdown has `z-index: 50`. The parent card itself needs elevated z-index when its dropdown is open.
+
+**Recommendation:**
+```tsx
+// BAD - dropdown has z-50 but parent card has no z-index
+<div className="relative">
+  <div className="absolute z-50">Dropdown</div>
+</div>
+
+// GOOD - elevate parent card when dropdown is open
+<div className={`relative ${isDropdownOpen ? "z-10" : ""}`}>
+  <div className="absolute z-50">Dropdown</div>
+</div>
+```
