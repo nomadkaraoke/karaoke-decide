@@ -16,10 +16,10 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
-- **Backend API:** Deployed on Cloud Run with BigQuery integration
-- **Authentication:** Magic link auth with JWT tokens (Phase 2 complete)
+- **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
+- **Authentication:** Magic link auth with JWT tokens (Phase 2 complete, secrets configured)
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
-- **Async Music Sync:** Background sync via Cloud Tasks with progress tracking (NEW)
+- **Async Music Sync:** Background sync via Cloud Tasks with progress tracking
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
 - **Frontend Auth & Discovery:** Full auth flow, My Songs, Recommendations, Quiz UI, Services page (Phase 5 complete)
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
@@ -27,12 +27,13 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **User Profile:** Profile settings page with display name management (Phase 6 Part 3)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
 - **CI/Testing:** 135 unit tests, 280+ backend tests, 67 E2E tests, all checks passing
+- **Email Delivery:** SendGrid configured for production magic link emails
 
 ### 🚧 Next Up (Post-MLP)
-1. Production email delivery (SendGrid integration for magic links - ready, needs API key)
-2. Analytics and usage tracking
-3. Social features (share playlists, follow users)
-4. Advanced recommendation tuning
+1. Analytics and usage tracking
+2. Social features (share playlists, follow users)
+3. Advanced recommendation tuning
+4. Mobile app (React Native)
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -132,7 +133,8 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
-| 2025-12-31 | **Async Music Sync & CodeRabbit Fixes** (Cloud Tasks, progress UI, 11 bug fixes) | [archive/2025-12-31-async-sync-coderabbit-fixes.md](archive/2025-12-31-async-sync-coderabbit-fixes.md) |
+| 2025-12-31 | **Production Hotfix** (Cloud Run secrets, magic link auth fix) | [archive/2025-12-31-cloud-run-secrets-hotfix.md](archive/2025-12-31-cloud-run-secrets-hotfix.md) |
+| 2025-12-31 | Async Music Sync & CodeRabbit Fixes (Cloud Tasks, progress UI, 11 bug fixes) | [archive/2025-12-31-async-sync-coderabbit-fixes.md](archive/2025-12-31-async-sync-coderabbit-fixes.md) |
 | 2025-12-30 | **Phase 6: MLP Complete** (Playlists, Karaoke Links, Profile) | [archive/2025-12-30-phase6-mlp-completion.md](archive/2025-12-30-phase6-mlp-completion.md) |
 | 2025-12-30 | Phase 5: Frontend Auth & Discovery (auth flow, My Songs, Recommendations, Quiz, Services pages) | [archive/2025-12-30-phase5-frontend-auth-discovery.md](archive/2025-12-30-phase5-frontend-auth-discovery.md) |
 | 2024-12-30 | Phase 4: Quiz & Recommendations (quiz onboarding, recommendation algorithm v1) | [archive/2024-12-30-phase4-quiz-recommendations.md](archive/2024-12-30-phase4-quiz-recommendations.md) |

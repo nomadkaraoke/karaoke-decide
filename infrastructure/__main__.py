@@ -227,6 +227,29 @@ cloud_run_invoker = gcp.cloudrunv2.ServiceIamMember(
 )
 
 # =============================================================================
+# Secret Manager Access
+# =============================================================================
+
+# Secrets that Cloud Run needs access to
+REQUIRED_SECRETS = [
+    "karaoke-decide-jwt-secret",
+    "spotipy-client-id",
+    "spotipy-client-secret",
+    "lastfm-api-key",
+    "sendgrid-api-key",
+]
+
+# Grant Cloud Run service account access to secrets
+for secret_name in REQUIRED_SECRETS:
+    gcp.secretmanager.SecretIamMember(
+        f"cloud-run-secret-access-{secret_name}",
+        project=project,
+        secret_id=secret_name,
+        role="roles/secretmanager.secretAccessor",
+        member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    )
+
+# =============================================================================
 # Outputs
 # =============================================================================
 
