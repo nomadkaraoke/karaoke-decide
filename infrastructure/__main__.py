@@ -147,6 +147,14 @@ cloud_tasks_enqueuer = gcp.projects.IAMMember(
     member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
 )
 
+# Allow Cloud Run service account to view queue metadata (for deep health checks)
+cloud_tasks_viewer = gcp.projects.IAMMember(
+    "compute-sa-tasks-viewer",
+    project=project,
+    role="roles/cloudtasks.viewer",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+)
+
 # Allow Cloud Tasks to invoke Cloud Run (for OIDC authentication)
 cloud_tasks_invoker = gcp.projects.IAMMember(
     "compute-sa-run-invoker",
