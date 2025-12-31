@@ -59,6 +59,26 @@ class RecommendationsResponse(BaseModel):
     recommendations: list[RecommendationResponse]
 
 
+class UserArtistResponse(BaseModel):
+    """Artist from user's listening history."""
+
+    id: str
+    artist_name: str
+    source: str
+    rank: int
+    time_range: str
+    popularity: int | None = None
+    genres: list[str] = []
+
+
+class UserArtistsResponse(BaseModel):
+    """Response containing user's artists."""
+
+    artists: list[UserArtistResponse]
+    total: int
+    sources: dict[str, int]  # Count by source (spotify, lastfm)
+
+
 # -----------------------------------------------------------------------------
 # User's Songs (Library)
 # -----------------------------------------------------------------------------
@@ -148,4 +168,48 @@ async def get_recommendations(
             )
             for rec in recommendations
         ]
+    )
+
+
+# -----------------------------------------------------------------------------
+# User's Artists
+# -----------------------------------------------------------------------------
+
+
+@router.get("/artists", response_model=UserArtistsResponse)
+async def get_my_artists(
+    user: CurrentUser,
+    recommendation_service: RecommendationServiceDep,
+    source: str | None = Query(None, description="Filter by source (spotify, lastfm)"),
+    time_range: str | None = Query(None, description="Filter by time range"),
+    limit: int = Query(100, ge=1, le=500, description="Max artists to return"),
+) -> UserArtistsResponse:
+    """Get user's top artists from listening history.
+
+    Returns artists synced from Spotify and/or Last.fm, grouped by
+    time range (short_term, medium_term, long_term for Spotify;
+    7day, 1month, 3month, 6month, 12month, overall for Last.fm).
+    """
+    artists, sources = await recommendation_service.get_user_artists(
+        user_id=user.id,
+        source=source,
+        time_range=time_range,
+        limit=limit,
+    )
+
+    return UserArtistsResponse(
+        artists=[
+            UserArtistResponse(
+                id=artist["id"],
+                artist_name=artist["artist_name"],
+                source=artist["source"],
+                rank=artist.get("rank", 0),
+                time_range=artist.get("time_range", ""),
+                popularity=artist.get("popularity"),
+                genres=artist.get("genres", []),
+            )
+            for artist in artists
+        ],
+        total=len(artists),
+        sources=sources,
     )

@@ -49,6 +49,16 @@ interface ActiveJob {
   completed_at: string | null;
 }
 
+interface UserArtist {
+  id: string;
+  artist_name: string;
+  source: string;
+  rank: number;
+  time_range: string;
+  popularity: number | null;
+  genres: string[];
+}
+
 export default function ServicesPage() {
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,6 +77,26 @@ export default function ServicesPage() {
 
   // Disconnect state
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+
+  // Artists state
+  const [artists, setArtists] = useState<UserArtist[]>([]);
+  const [artistSources, setArtistSources] = useState<Record<string, number>>({});
+  const [showArtists, setShowArtists] = useState(false);
+  const [artistsLoading, setArtistsLoading] = useState(false);
+
+  // Load artists from API
+  const loadArtists = useCallback(async () => {
+    try {
+      setArtistsLoading(true);
+      const response = await api.my.getArtists(undefined, undefined, 200);
+      setArtists(response.artists);
+      setArtistSources(response.sources);
+    } catch (err) {
+      console.error("Failed to load artists:", err);
+    } finally {
+      setArtistsLoading(false);
+    }
+  }, []);
 
   // Polling for sync status (defined before loadServices since it's used there)
   const pollSyncStatus = useCallback(async () => {
@@ -91,9 +121,15 @@ export default function ServicesPage() {
           const totalCreated = response.active_job.results?.reduce(
             (sum, r) => sum + r.user_songs_created, 0
           ) || 0;
+          const totalArtists = response.active_job.results?.reduce(
+            (sum, r) => sum + r.artists_stored, 0
+          ) || 0;
           setSyncMessage(
-            `Sync complete! Found ${totalMatched} karaoke songs, added ${totalCreated} new songs to your library.`
+            `Sync complete! Found ${totalMatched} karaoke songs, added ${totalCreated} new songs to your library.${totalArtists > 0 ? ` Synced ${totalArtists} artists.` : ""}`
           );
+
+          // Refresh artists list
+          loadArtists();
         } else if (response.active_job.status === "failed") {
           // Sync failed
           setIsSyncing(false);
@@ -108,7 +144,7 @@ export default function ServicesPage() {
       // Don't show error for polling failures
       console.error("Polling error:", err);
     }
-  }, []);
+  }, [loadArtists]);
 
   const loadServices = useCallback(async () => {
     try {
@@ -138,6 +174,7 @@ export default function ServicesPage() {
 
   useEffect(() => {
     loadServices();
+    loadArtists();
 
     // Cleanup polling on unmount
     return () => {
@@ -145,7 +182,7 @@ export default function ServicesPage() {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [loadServices]);
+  }, [loadServices, loadArtists]);
 
   const isConnected = (serviceType: string) =>
     services.some((s) => s.service_type === serviceType);
@@ -476,6 +513,99 @@ export default function ServicesPage() {
                   {isSyncing && activeJob?.status === "pending" && (
                     <div className="mt-4 text-sm text-white/60 animate-pulse">
                       Starting sync...
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Fetched Artists */}
+              {artists.length > 0 && (
+                <div className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10">
+                  <button
+                    onClick={() => setShowArtists(!showArtists)}
+                    className="w-full flex items-center justify-between text-left"
+                  >
+                    <div>
+                      <h3 className="font-semibold text-white">
+                        Your Top Artists
+                      </h3>
+                      <p className="text-sm text-white/60">
+                        {artists.length} artists from{" "}
+                        {Object.entries(artistSources)
+                          .map(([src, count]) => `${src} (${count})`)
+                          .join(", ")}
+                      </p>
+                    </div>
+                    <svg
+                      className={`w-5 h-5 text-white/60 transition-transform ${showArtists ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showArtists && (
+                    <div className="mt-4">
+                      {artistsLoading ? (
+                        <LoadingPulse count={3} />
+                      ) : (
+                        <div className="space-y-4">
+                          {/* Group by source */}
+                          {["spotify", "lastfm"].map((source) => {
+                            const sourceArtists = artists.filter((a) => a.source === source);
+                            if (sourceArtists.length === 0) return null;
+
+                            // Group by time_range
+                            const byTimeRange = sourceArtists.reduce((acc, artist) => {
+                              const tr = artist.time_range || "unknown";
+                              if (!acc[tr]) acc[tr] = [];
+                              acc[tr].push(artist);
+                              return acc;
+                            }, {} as Record<string, UserArtist[]>);
+
+                            return (
+                              <div key={source}>
+                                <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
+                                  {source === "spotify" ? (
+                                    <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
+                                  ) : (
+                                    <LastfmIcon className="w-4 h-4 text-[#ff4444]" />
+                                  )}
+                                  <span className="capitalize">{source}</span>
+                                </h4>
+                                {Object.entries(byTimeRange).map(([timeRange, rangeArtists]) => (
+                                  <div key={timeRange} className="mb-3">
+                                    <p className="text-xs text-white/50 mb-1">
+                                      {timeRange.replace("_", " ")}
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {rangeArtists.slice(0, 20).map((artist) => (
+                                        <span
+                                          key={artist.id}
+                                          className="px-2 py-1 text-xs rounded-full bg-white/10 text-white/80 hover:bg-white/20 transition-colors"
+                                          title={artist.genres.length > 0 ? artist.genres.join(", ") : undefined}
+                                        >
+                                          {artist.artist_name}
+                                          {artist.rank && artist.rank <= 10 && (
+                                            <span className="ml-1 text-[#00f5ff]">#{artist.rank}</span>
+                                          )}
+                                        </span>
+                                      ))}
+                                      {rangeArtists.length > 20 && (
+                                        <span className="px-2 py-1 text-xs text-white/50">
+                                          +{rangeArtists.length - 20} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -209,6 +209,48 @@ class RecommendationService:
 
         return songs, total
 
+    async def get_user_artists(
+        self,
+        user_id: str,
+        source: str | None = None,
+        time_range: str | None = None,
+        limit: int = 100,
+    ) -> tuple[list[dict[str, Any]], dict[str, int]]:
+        """Get user's top artists from listening history.
+
+        Args:
+            user_id: User's ID.
+            source: Optional filter by source (spotify, lastfm).
+            time_range: Optional filter by time range.
+            limit: Maximum number of artists.
+
+        Returns:
+            Tuple of (list of artist dicts, source counts dict).
+        """
+        # Build filters
+        filters: list[tuple[str, str, Any]] = [("user_id", "==", user_id)]
+        if source:
+            filters.append(("source", "==", source))
+        if time_range:
+            filters.append(("time_range", "==", time_range))
+
+        # Get artists sorted by rank
+        docs = await self.firestore.query_documents(
+            "user_artists",
+            filters=filters,
+            order_by="rank",
+            order_direction="ASCENDING",
+            limit=limit,
+        )
+
+        # Count by source
+        source_counts: dict[str, int] = {}
+        for doc in docs:
+            src = doc.get("source", "unknown")
+            source_counts[src] = source_counts.get(src, 0) + 1
+
+        return docs, source_counts
+
     async def _build_user_context(self, user_id: str) -> UserContext:
         """Build context about user for scoring.
 

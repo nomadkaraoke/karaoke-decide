@@ -221,6 +221,29 @@ export const api = {
         }>;
       }>(`/api/my/recommendations?${params.toString()}`);
     },
+
+    getArtists: (
+      source?: string,
+      timeRange?: string,
+      limit: number = 100
+    ) => {
+      const params = new URLSearchParams({ limit: limit.toString() });
+      if (source) params.append("source", source);
+      if (timeRange) params.append("time_range", timeRange);
+      return api.get<{
+        artists: Array<{
+          id: string;
+          artist_name: string;
+          source: string;
+          rank: number;
+          time_range: string;
+          popularity: number | null;
+          genres: string[];
+        }>;
+        total: number;
+        sources: Record<string, number>;
+      }>(`/api/my/artists?${params.toString()}`);
+    },
   },
 
   // ============================================================================
