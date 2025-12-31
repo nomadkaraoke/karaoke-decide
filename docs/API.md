@@ -82,6 +82,38 @@ Get the current authenticated user.
 }
 ```
 
+### PUT /api/auth/profile
+
+Update the current user's profile settings.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "display_name": "John Doe"
+}
+```
+
+Use `null` to clear the display name:
+```json
+{
+  "display_name": null
+}
+```
+
+**Response:**
+```json
+{
+  "id": "user123",
+  "email": "user@example.com",
+  "display_name": "John Doe"
+}
+```
+
+**Error Responses:**
+- `404` - User not found
+
 ### POST /api/auth/logout
 
 Log out the current user (stateless - client should discard token).
@@ -144,6 +176,37 @@ Get details for a specific song.
   "is_popular": true
 }
 ```
+
+### GET /api/catalog/songs/{song_id}/links
+
+Get karaoke links for a specific song. Returns URLs to find or create karaoke videos.
+
+**Response:**
+```json
+{
+  "song_id": 1,
+  "artist": "Queen",
+  "title": "Bohemian Rhapsody",
+  "links": [
+    {
+      "type": "youtube_search",
+      "url": "https://www.youtube.com/results?search_query=Queen+Bohemian+Rhapsody+karaoke",
+      "label": "Search YouTube",
+      "description": "Find existing karaoke videos on YouTube"
+    },
+    {
+      "type": "karaoke_generator",
+      "url": "https://gen.nomadkaraoke.com?artist=Queen&title=Bohemian+Rhapsody",
+      "label": "Create with Generator",
+      "description": "Generate a custom karaoke video with Nomad Karaoke"
+    }
+  ]
+}
+```
+
+**Link Types:**
+- `youtube_search` - YouTube search results for karaoke videos
+- `karaoke_generator` - Link to Nomad Karaoke Generator to create custom videos
 
 ### GET /api/catalog/stats
 
@@ -460,35 +523,161 @@ Mark a song as sung with optional rating.
 
 ---
 
-## Playlists (Not Yet Implemented)
+## Playlists ✅ Implemented
 
 ### GET /api/playlists
 
 List user's playlists.
 
+**Requires:** Bearer token
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | int | Max playlists to return (default: 50, max: 100) |
+| offset | int | Number of playlists to skip (default: 0) |
+
+**Response:**
+```json
+{
+  "playlists": [
+    {
+      "id": "playlist-uuid",
+      "name": "Friday Night Karaoke",
+      "description": "Songs for Friday night sessions",
+      "song_ids": ["1", "2", "3"],
+      "song_count": 3,
+      "created_at": "2024-12-30T12:00:00Z",
+      "updated_at": "2024-12-30T12:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
 ### POST /api/playlists
 
 Create a new playlist.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "name": "Friday Night Karaoke",
+  "description": "Songs for Friday night sessions"
+}
+```
+
+**Response:** `201 Created`
+```json
+{
+  "id": "playlist-uuid",
+  "name": "Friday Night Karaoke",
+  "description": "Songs for Friday night sessions",
+  "song_ids": [],
+  "song_count": 0,
+  "created_at": "2024-12-30T12:00:00Z",
+  "updated_at": "2024-12-30T12:00:00Z"
+}
+```
 
 ### GET /api/playlists/{playlist_id}
 
 Get playlist details.
 
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "id": "playlist-uuid",
+  "name": "Friday Night Karaoke",
+  "description": "Songs for Friday night sessions",
+  "song_ids": ["1", "2", "3"],
+  "song_count": 3,
+  "created_at": "2024-12-30T12:00:00Z",
+  "updated_at": "2024-12-30T12:00:00Z"
+}
+```
+
+**Error Responses:**
+- `404` - Playlist not found
+- `403` - Access denied (not your playlist)
+
 ### PUT /api/playlists/{playlist_id}
 
-Update a playlist.
+Update a playlist's name or description.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "name": "Updated Name",
+  "description": "Updated description"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "playlist-uuid",
+  "name": "Updated Name",
+  "description": "Updated description",
+  "song_ids": ["1", "2", "3"],
+  "song_count": 3,
+  "created_at": "2024-12-30T12:00:00Z",
+  "updated_at": "2024-12-30T14:00:00Z"
+}
+```
 
 ### DELETE /api/playlists/{playlist_id}
 
 Delete a playlist.
 
+**Requires:** Bearer token
+
+**Response:** `204 No Content`
+
 ### POST /api/playlists/{playlist_id}/songs
 
 Add a song to a playlist.
 
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "song_id": "queen-bohemian-rhapsody"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "playlist-uuid",
+  "name": "Friday Night Karaoke",
+  "description": "Songs for Friday night sessions",
+  "song_ids": ["1", "2", "3", "queen-bohemian-rhapsody"],
+  "song_count": 4,
+  "created_at": "2024-12-30T12:00:00Z",
+  "updated_at": "2024-12-30T14:00:00Z"
+}
+```
+
+Note: Duplicate songs are silently ignored (no error, but not added again).
+
 ### DELETE /api/playlists/{playlist_id}/songs/{song_id}
 
 Remove a song from a playlist.
+
+**Requires:** Bearer token
+
+**Response:** `204 No Content`
+
+Note: If the song is not in the playlist, this is a no-op (no error).
 
 ---
 

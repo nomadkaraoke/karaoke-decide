@@ -218,6 +218,81 @@ class TestGetCurrentUser:
         assert response.status_code == 401
 
 
+class TestUpdateProfile:
+    """Tests for PUT /api/auth/profile."""
+
+    def test_success_updates_display_name(
+        self,
+        auth_client_with_mocks: TestClient,
+    ) -> None:
+        """Should update display name and return user info."""
+        response = auth_client_with_mocks.put(
+            "/api/auth/profile",
+            headers={"Authorization": "Bearer valid-token"},
+            json={"display_name": "New Display Name"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "id" in data
+        assert "email" in data
+        assert "display_name" in data
+
+    def test_can_set_null_display_name(
+        self,
+        auth_client_with_mocks: TestClient,
+    ) -> None:
+        """Should accept null display name to clear it."""
+        response = auth_client_with_mocks.put(
+            "/api/auth/profile",
+            headers={"Authorization": "Bearer valid-token"},
+            json={"display_name": None},
+        )
+
+        assert response.status_code == 200
+
+    def test_unauthenticated_returns_401(
+        self,
+        auth_client_with_mocks: TestClient,
+    ) -> None:
+        """Should return 401 when not authenticated."""
+        response = auth_client_with_mocks.put(
+            "/api/auth/profile",
+            json={"display_name": "Test"},
+        )
+
+        assert response.status_code == 401
+
+    def test_user_not_found_returns_404(
+        self,
+        mock_catalog_service: MagicMock,
+        mock_auth_service: MagicMock,
+    ) -> None:
+        """Should return 404 if user not found during update."""
+        mock_auth_service.update_user_profile = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "backend.api.routes.catalog.get_catalog_service",
+                return_value=mock_catalog_service,
+            ),
+            patch(
+                "backend.api.deps.get_auth_service",
+                return_value=mock_auth_service,
+            ),
+        ):
+            from backend.main import app
+
+            client = TestClient(app)
+            response = client.put(
+                "/api/auth/profile",
+                headers={"Authorization": "Bearer valid-token"},
+                json={"display_name": "Test"},
+            )
+
+        assert response.status_code == 404
+
+
 class TestLogout:
     """Tests for POST /api/auth/logout."""
 

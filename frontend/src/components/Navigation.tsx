@@ -13,12 +13,15 @@ import {
   MusicIcon,
   SparklesIcon,
   LinkIcon,
+  PlaylistIcon,
+  SettingsIcon,
 } from "./icons";
 import { Button } from "./ui";
 
 const navLinks = [
   { href: "/", label: "Search", icon: null },
   { href: "/my-songs", label: "My Songs", icon: MusicIcon, authRequired: true },
+  { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
   { href: "/services", label: "Services", icon: LinkIcon, authRequired: true },
 ];
@@ -83,13 +86,24 @@ export function Navigation() {
             {isLoading ? (
               <div className="w-20 h-8 rounded-lg bg-white/5 animate-pulse" />
             ) : isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5">
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                  title="Profile settings"
+                >
                   <UserIcon className="w-4 h-4 text-white/60" />
                   <span className="text-sm text-white/80 max-w-[120px] truncate">
                     {user?.display_name || user?.email?.split("@")[0] || "User"}
                   </span>
-                </div>
+                </Link>
+                <Link
+                  href="/profile"
+                  className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Settings"
+                >
+                  <SettingsIcon className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
@@ -155,7 +169,11 @@ export function Navigation() {
                 <div className="w-full h-12 rounded-xl bg-white/5 animate-pulse" />
               ) : isAuthenticated ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5">
+                  <Link
+                    href="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                  >
                     <UserIcon className="w-5 h-5 text-white/60" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">
@@ -163,7 +181,8 @@ export function Navigation() {
                       </p>
                       <p className="text-xs text-white/40 truncate">{user?.email}</p>
                     </div>
-                  </div>
+                    <SettingsIcon className="w-4 h-4 text-white/40" />
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"

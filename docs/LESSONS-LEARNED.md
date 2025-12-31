@@ -333,3 +333,50 @@ window.open(url, "_blank");
 // GOOD - secure
 window.open(url, "_blank", "noopener,noreferrer");
 ```
+
+---
+
+### 2025-12-30: React setState During Render Causes Infinite Loops
+
+**Context:** Profile page was syncing user display name to local state directly in the render function body.
+
+**Lesson:** Calling `setState` during render (outside useEffect) causes React to re-render, which triggers setState again, creating an infinite loop. CodeRabbit flagged this as a critical issue.
+
+**Recommendation:**
+```typescript
+// BAD - setState during render causes infinite loop
+function ProfilePage() {
+  const [displayName, setDisplayName] = useState("");
+  const { user } = useAuth();
+
+  // This runs on EVERY render and triggers another render!
+  if (user?.display_name && displayName === "") {
+    setDisplayName(user.display_name);
+  }
+}
+
+// GOOD - use useEffect for side effects
+function ProfilePage() {
+  const [displayName, setDisplayName] = useState("");
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.display_name) {
+      setDisplayName(user.display_name);
+    }
+  }, [user?.display_name]);
+}
+```
+
+---
+
+### 2025-12-30: Remove Unused Code During Development
+
+**Context:** CodeRabbit flagged unused dataclass and constant in playlist_service.py that were likely scaffolded but never used.
+
+**Lesson:** Unused code (dead code) creates confusion for future developers and AI agents trying to understand the codebase. Remove it immediately rather than leaving it "for later."
+
+**Recommendation:**
+- Delete unused classes, functions, constants, and imports
+- Don't scaffold code "for future use" - add it when needed
+- Run linters that detect unused code (`ruff` flags unused imports)

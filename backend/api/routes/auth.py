@@ -43,6 +43,12 @@ class UserResponse(BaseModel):
     display_name: str | None = None
 
 
+class UpdateProfileRequest(BaseModel):
+    """Request to update user profile."""
+
+    display_name: str | None = None
+
+
 @router.post("/magic-link", response_model=MagicLinkResponse)
 async def request_magic_link(
     request: MagicLinkRequest,
@@ -118,6 +124,35 @@ async def get_current_user_endpoint(user: CurrentUser) -> UserResponse:
         id=user.id,
         email=user.email,
         display_name=user.display_name,
+    )
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_profile(
+    request: UpdateProfileRequest,
+    user: CurrentUser,
+    auth_service: AuthServiceDep,
+) -> UserResponse:
+    """Update the current user's profile.
+
+    Allows updating display name and other profile settings.
+    Requires a valid Bearer token in the Authorization header.
+    """
+    updated_user = await auth_service.update_user_profile(
+        user_id=user.id,
+        display_name=request.display_name,
+    )
+
+    if updated_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return UserResponse(
+        id=updated_user.id,
+        email=updated_user.email,
+        display_name=updated_user.display_name,
     )
 
 
