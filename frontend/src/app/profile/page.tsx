@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -15,9 +15,11 @@ export default function ProfilePage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Sync display name when user data loads
-  if (user?.display_name !== undefined && displayName === "" && user.display_name) {
-    setDisplayName(user.display_name);
-  }
+  useEffect(() => {
+    if (user?.display_name) {
+      setDisplayName(user.display_name);
+    }
+  }, [user?.display_name]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

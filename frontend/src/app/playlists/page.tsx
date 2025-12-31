@@ -15,16 +15,7 @@ import {
   LoaderIcon,
 } from "@/components/icons";
 import { Button, LoadingPulse, EmptyState, Input } from "@/components/ui";
-
-interface Playlist {
-  id: string;
-  name: string;
-  description: string | null;
-  song_ids: string[];
-  song_count: number;
-  created_at: string;
-  updated_at: string;
-}
+import type { Playlist } from "@/types";
 
 function PlaylistsContent() {
   const router = useRouter();

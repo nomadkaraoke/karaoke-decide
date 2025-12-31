@@ -39,8 +39,8 @@ class TestKaraokeLinkService:
         url = service.get_youtube_search_url("AC/DC", "Back in Black")
 
         assert "youtube.com/results" in url
-        # URL should be encoded (/ becomes %2F)
-        assert "AC%2FDC" in url or "AC/DC" not in url
+        # URL should be encoded (/ becomes %2F with quote_plus)
+        assert "AC%2FDC" in url
 
     def test_get_generator_url(self, service: KaraokeLinkService) -> None:
         """Test Karaoke Generator URL generation."""
@@ -57,8 +57,9 @@ class TestKaraokeLinkService:
         url = service.get_generator_url("Guns N' Roses", "Sweet Child O' Mine")
 
         assert "gen.nomadkaraoke.com" in url
-        # Apostrophe should be encoded
-        assert "'" not in url or "%27" in url
+        # Apostrophe should be encoded to %27
+        assert "%27" in url
+        assert "'" not in url
 
     def test_get_links_returns_all_link_types(self, service: KaraokeLinkService) -> None:
         """Test get_links returns all available link types."""

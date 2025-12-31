@@ -27,17 +27,6 @@ class PlaylistInfo:
     updated_at: datetime
 
 
-@dataclass
-class PlaylistSong:
-    """Song in a playlist with denormalized info."""
-
-    song_id: str
-    artist: str
-    title: str
-    brand_count: int
-    popularity: int
-
-
 class PlaylistNotFoundError(Exception):
     """Raised when a playlist is not found."""
 
@@ -60,7 +49,6 @@ class PlaylistService:
     """
 
     PLAYLISTS_COLLECTION = "playlists"
-    USER_SONGS_COLLECTION = "user_songs"
 
     def __init__(
         self,

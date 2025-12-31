@@ -532,6 +532,7 @@ List user's playlists.
 **Requires:** Bearer token
 
 **Query Parameters:**
+
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | limit | int | Max playlists to return (default: 50, max: 100) |
