@@ -1,8 +1,11 @@
 """BigQuery-based song catalog service."""
 
+import logging
 from dataclasses import dataclass
 
 from google.cloud import bigquery
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -240,6 +243,8 @@ class BigQueryCatalogService:
         if not tracks:
             return {}
 
+        logger.info(f"BigQuery batch_match_tracks: received {len(tracks)} tracks")
+
         # Build OR conditions for each track
         # Using parameterized queries would require dynamic parameter count,
         # so we sanitize and use LOWER() for case-insensitive matching
@@ -270,9 +275,12 @@ class BigQueryCatalogService:
                 WHERE {where_clause}
             """
 
+            logger.info(f"BigQuery: executing chunk query for {len(chunk_conditions)} tracks")
             results = self.client.query(sql).result()
 
+            chunk_matches = 0
             for row in results:
+                chunk_matches += 1
                 # Create key using lowercased values to match input
                 key = (row.artist.lower(), row.title.lower())
                 # If multiple matches (same song different brands), keep highest brand_count
@@ -284,5 +292,7 @@ class BigQueryCatalogService:
                         brands=row.brands,
                         brand_count=row.brand_count,
                     )
+            logger.info(f"BigQuery: chunk returned {chunk_matches} matches")
 
+        logger.info(f"BigQuery batch_match_tracks: total {len(all_results)} unique matches")
         return all_results
