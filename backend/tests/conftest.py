@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.config import BackendSettings
+from backend.services.playlist_service import PlaylistInfo
 from backend.services.quiz_service import QuizStatus, QuizSubmitResult
 from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong
 
@@ -378,6 +379,73 @@ def recommendations_client(
         patch(
             "backend.api.deps.get_recommendation_service",
             return_value=mock_recommendation_service,
+        ),
+    ):
+        from backend.main import app
+
+        yield TestClient(app)
+
+
+@pytest.fixture
+def sample_playlists(sample_user: User) -> list[PlaylistInfo]:
+    """Sample playlists for testing."""
+    return [
+        PlaylistInfo(
+            id="playlist-1",
+            user_id=sample_user.id,
+            name="Friday Night Karaoke",
+            description="Songs for Friday night sessions",
+            song_ids=["1", "2", "3"],
+            song_count=3,
+            created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
+        ),
+        PlaylistInfo(
+            id="playlist-2",
+            user_id=sample_user.id,
+            name="Crowd Pleasers",
+            description="Always gets the crowd going",
+            song_ids=["4", "5"],
+            song_count=2,
+            created_at=datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 2, 12, 0, 0, tzinfo=UTC),
+        ),
+    ]
+
+
+@pytest.fixture
+def mock_playlist_service(sample_playlists: list[PlaylistInfo]) -> MagicMock:
+    """Mock playlist service for API tests."""
+    mock = MagicMock()
+    mock.list_playlists = AsyncMock(return_value=sample_playlists)
+    mock.create_playlist = AsyncMock(return_value=sample_playlists[0])
+    mock.get_playlist = AsyncMock(return_value=sample_playlists[0])
+    mock.update_playlist = AsyncMock(return_value=sample_playlists[0])
+    mock.delete_playlist = AsyncMock(return_value=None)
+    mock.add_song_to_playlist = AsyncMock(return_value=sample_playlists[0])
+    mock.remove_song_from_playlist = AsyncMock(return_value=sample_playlists[0])
+    return mock
+
+
+@pytest.fixture
+def playlist_client(
+    mock_catalog_service: MagicMock,
+    mock_auth_service: MagicMock,
+    mock_playlist_service: MagicMock,
+) -> Generator[TestClient, None, None]:
+    """Create test client with mocked playlist service."""
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
+        patch(
+            "backend.api.deps.get_playlist_service",
+            return_value=mock_playlist_service,
         ),
     ):
         from backend.main import app

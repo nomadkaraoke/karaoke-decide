@@ -294,4 +294,77 @@ export const api = {
         }>;
       }>("/api/services/sync/status"),
   },
+
+  // ============================================================================
+  // Playlist endpoints
+  // ============================================================================
+
+  playlists: {
+    list: (limit: number = 50, offset: number = 0) =>
+      api.get<{
+        playlists: Array<{
+          id: string;
+          name: string;
+          description: string | null;
+          song_ids: string[];
+          song_count: number;
+          created_at: string;
+          updated_at: string;
+        }>;
+        total: number;
+      }>(`/api/playlists?limit=${limit}&offset=${offset}`),
+
+    create: (name: string, description?: string | null) =>
+      api.post<{
+        id: string;
+        name: string;
+        description: string | null;
+        song_ids: string[];
+        song_count: number;
+        created_at: string;
+        updated_at: string;
+      }>("/api/playlists", { name, description }),
+
+    get: (playlistId: string) =>
+      api.get<{
+        id: string;
+        name: string;
+        description: string | null;
+        song_ids: string[];
+        song_count: number;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/playlists/${playlistId}`),
+
+    update: (playlistId: string, data: { name?: string; description?: string | null }) =>
+      apiRequest<{
+        id: string;
+        name: string;
+        description: string | null;
+        song_ids: string[];
+        song_count: number;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/playlists/${playlistId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    delete: (playlistId: string) =>
+      api.delete<Record<string, never>>(`/api/playlists/${playlistId}`),
+
+    addSong: (playlistId: string, songId: string) =>
+      api.post<{
+        id: string;
+        name: string;
+        description: string | null;
+        song_ids: string[];
+        song_count: number;
+        created_at: string;
+        updated_at: string;
+      }>(`/api/playlists/${playlistId}/songs`, { song_id: songId }),
+
+    removeSong: (playlistId: string, songId: string) =>
+      api.delete<Record<string, never>>(`/api/playlists/${playlistId}/songs/${songId}`),
+  },
 };

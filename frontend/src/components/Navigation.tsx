@@ -13,12 +13,14 @@ import {
   MusicIcon,
   SparklesIcon,
   LinkIcon,
+  PlaylistIcon,
 } from "./icons";
 import { Button } from "./ui";
 
 const navLinks = [
   { href: "/", label: "Search", icon: null },
   { href: "/my-songs", label: "My Songs", icon: MusicIcon, authRequired: true },
+  { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
   { href: "/services", label: "Services", icon: LinkIcon, authRequired: true },
 ];

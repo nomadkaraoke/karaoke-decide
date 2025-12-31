@@ -133,3 +133,36 @@ export interface QuizSubmitRequest {
   decade_preference?: string | null;
   energy_preference?: "chill" | "medium" | "high" | null;
 }
+
+// ============================================================================
+// Playlist Types
+// ============================================================================
+
+export interface Playlist {
+  id: string;
+  name: string;
+  description: string | null;
+  song_ids: string[];
+  song_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlaylistsResponse {
+  playlists: Playlist[];
+  total: number;
+}
+
+export interface CreatePlaylistRequest {
+  name: string;
+  description?: string | null;
+}
+
+export interface UpdatePlaylistRequest {
+  name?: string | null;
+  description?: string | null;
+}
+
+export interface AddSongRequest {
+  song_id: string;
+}
