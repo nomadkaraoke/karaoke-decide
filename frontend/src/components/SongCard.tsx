@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { MicrophoneIcon, StarIcon } from "./icons";
+import { useEffect, useRef, useState } from "react";
+import {
+  ChevronDownIcon,
+  MicrophoneIcon,
+  StarIcon,
+  VideoIcon,
+  YouTubeIcon,
+} from "./icons";
 
 interface Song {
   id: number | string;
@@ -33,8 +39,43 @@ export function PopularityStars({ count }: { count: number }) {
   );
 }
 
+/**
+ * Generate karaoke link URLs for a song
+ */
+function getKaraokeLinks(artist: string, title: string) {
+  const searchQuery = encodeURIComponent(`${artist} ${title} karaoke`);
+  const artistParam = encodeURIComponent(artist);
+  const titleParam = encodeURIComponent(title);
+
+  return {
+    youtube: `https://www.youtube.com/results?search_query=${searchQuery}`,
+    generator: `https://gen.nomadkaraoke.com?artist=${artistParam}&title=${titleParam}`,
+  };
+}
+
 export function SongCard({ song, index = 0, showAnimation = true }: SongCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const links = getKaraokeLinks(song.artist, song.title);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   return (
     <div
@@ -63,22 +104,58 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
         <div className="flex items-center justify-between gap-3">
           <PopularityStars count={song.brandCount} />
 
-          <button
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
-            onClick={() => {
-              // Will link to karaoke video or generator
-              window.open(
-                `https://www.youtube.com/results?search_query=${encodeURIComponent(
-                  `${song.artist} ${song.title} karaoke`
-                )}`,
-                "_blank",
-                "noopener,noreferrer"
-              );
-            }}
-          >
-            <MicrophoneIcon className="w-4 h-4" />
-            <span>Sing it!</span>
-          </button>
+          {/* Karaoke button with dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <MicrophoneIcon className="w-4 h-4" />
+              <span>Sing it!</span>
+              <ChevronDownIcon
+                className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {/* Dropdown menu */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[rgba(30,30,40,0.98)] border border-white/20 shadow-xl overflow-hidden z-50 animate-fade-in">
+                <div className="p-1">
+                  <a
+                    href={links.youtube}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <YouTubeIcon className="w-5 h-5 text-red-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white">Search YouTube</div>
+                      <div className="text-xs text-white/50 truncate">
+                        Find existing karaoke videos
+                      </div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={links.generator}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <VideoIcon className="w-5 h-5 text-[#00f5ff]" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-white">Create with Generator</div>
+                      <div className="text-xs text-white/50 truncate">
+                        Generate custom karaoke video
+                      </div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

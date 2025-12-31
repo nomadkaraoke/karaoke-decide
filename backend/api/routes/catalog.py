@@ -3,12 +3,17 @@
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.services.karaoke_link_service import (
+    KaraokeLinkService,
+    get_karaoke_link_service,
+)
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 router = APIRouter()
 
 # Lazy initialization for testability
 _catalog_service: BigQueryCatalogService | None = None
+_karaoke_link_service: KaraokeLinkService | None = None
 
 
 def get_catalog_service() -> BigQueryCatalogService:
@@ -17,6 +22,14 @@ def get_catalog_service() -> BigQueryCatalogService:
     if _catalog_service is None:
         _catalog_service = BigQueryCatalogService()
     return _catalog_service
+
+
+def _get_karaoke_link_service() -> KaraokeLinkService:
+    """Get or create karaoke link service (lazy initialization)."""
+    global _karaoke_link_service
+    if _karaoke_link_service is None:
+        _karaoke_link_service = get_karaoke_link_service()
+    return _karaoke_link_service
 
 
 class SongResponse(BaseModel):
@@ -47,6 +60,24 @@ class CatalogStatsResponse(BaseModel):
     unique_artists: int
     max_brand_count: int
     avg_brand_count: float
+
+
+class KaraokeLinkResponse(BaseModel):
+    """A karaoke link for a song."""
+
+    type: str
+    url: str
+    label: str
+    description: str
+
+
+class SongLinksResponse(BaseModel):
+    """Response containing karaoke links for a song."""
+
+    song_id: int
+    artist: str
+    title: str
+    links: list[KaraokeLinkResponse]
 
 
 @router.get("/songs", response_model=CatalogSearchResponse)
@@ -139,6 +170,39 @@ async def get_song(song_id: int) -> SongResponse:
         brands=result.brands.split(",") if result.brands else [],
         brand_count=result.brand_count,
         is_popular=result.brand_count >= 5,
+    )
+
+
+@router.get("/songs/{song_id}/links", response_model=SongLinksResponse)
+async def get_song_links(song_id: int) -> SongLinksResponse:
+    """Get karaoke links for a specific song.
+
+    Returns available links to watch or create karaoke videos:
+    - YouTube search for existing karaoke videos
+    - Nomad Karaoke Generator for creating custom videos
+    """
+    # First get the song to verify it exists and get artist/title
+    song = get_catalog_service().get_song_by_id(song_id)
+    if not song:
+        raise HTTPException(status_code=404, detail="Song not found")
+
+    # Get karaoke links
+    link_service = _get_karaoke_link_service()
+    links = link_service.get_links(song.artist, song.title)
+
+    return SongLinksResponse(
+        song_id=song.id,
+        artist=song.artist,
+        title=song.title,
+        links=[
+            KaraokeLinkResponse(
+                type=link.type.value,
+                url=link.url,
+                label=link.label,
+                description=link.description,
+            )
+            for link in links
+        ],
     )
 
 

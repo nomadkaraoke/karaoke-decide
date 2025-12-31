@@ -145,6 +145,37 @@ Get details for a specific song.
 }
 ```
 
+### GET /api/catalog/songs/{song_id}/links
+
+Get karaoke links for a specific song. Returns URLs to find or create karaoke videos.
+
+**Response:**
+```json
+{
+  "song_id": 1,
+  "artist": "Queen",
+  "title": "Bohemian Rhapsody",
+  "links": [
+    {
+      "type": "youtube_search",
+      "url": "https://www.youtube.com/results?search_query=Queen+Bohemian+Rhapsody+karaoke",
+      "label": "Search YouTube",
+      "description": "Find existing karaoke videos on YouTube"
+    },
+    {
+      "type": "karaoke_generator",
+      "url": "https://gen.nomadkaraoke.com?artist=Queen&title=Bohemian+Rhapsody",
+      "label": "Create with Generator",
+      "description": "Generate a custom karaoke video with Nomad Karaoke"
+    }
+  ]
+}
+```
+
+**Link Types:**
+- `youtube_search` - YouTube search results for karaoke videos
+- `karaoke_generator` - Link to Nomad Karaoke Generator to create custom videos
+
 ### GET /api/catalog/stats
 
 Get catalog statistics.

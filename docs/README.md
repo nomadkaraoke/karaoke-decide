@@ -21,16 +21,16 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
 - **Frontend Auth & Discovery:** Full auth flow, My Songs, Recommendations, Quiz UI, Services page (Phase 5 complete)
-- **Playlists:** Full CRUD for user karaoke playlists (Phase 6 started)
+- **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
+- **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests, 254 backend tests, 67 E2E tests, all checks passing
+- **CI/Testing:** 135 unit tests, 280+ backend tests, 67 E2E tests, all checks passing
 
 ### 🚧 Next Up (Phase 6: Polish & Launch)
 1. Production email delivery (SendGrid integration for magic links)
-2. Karaoke link lookup (YouTube, Generator handoff)
-3. User profile page and settings
-4. Mobile responsive polish
-5. Performance optimization
+2. User profile page and settings
+3. Mobile responsive polish
+4. Performance optimization
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
@@ -82,6 +82,7 @@ cd frontend && npm run dev
 - `GET /api/auth/me` - Get current user (requires auth)
 - `GET /api/catalog/songs?q=<query>` - Search songs
 - `GET /api/catalog/songs/popular?limit=20` - Popular songs
+- `GET /api/catalog/songs/{id}/links` - Get karaoke links for a song
 - `GET /api/catalog/stats` - Catalog statistics
 - `GET /api/services` - List connected music services
 - `POST /api/services/spotify/connect` - Start Spotify OAuth

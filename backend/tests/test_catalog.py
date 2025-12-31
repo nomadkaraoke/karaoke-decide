@@ -127,3 +127,63 @@ class TestGetCatalogStats:
         # Verify mock values
         assert data["total_songs"] == 275809
         assert data["unique_artists"] == 50000
+
+
+class TestGetSongLinks:
+    """Tests for the song links endpoint."""
+
+    def test_get_song_links_found(self, client: TestClient) -> None:
+        """Test getting karaoke links for a song."""
+        # Use ID 1 which exists in mock data (Queen - Bohemian Rhapsody)
+        response = client.get("/api/catalog/songs/1/links")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["song_id"] == 1
+        assert data["artist"] == "Queen"
+        assert data["title"] == "Bohemian Rhapsody"
+        assert "links" in data
+        assert len(data["links"]) >= 2
+
+    def test_get_song_links_has_youtube(self, client: TestClient) -> None:
+        """Test song links include YouTube search."""
+        response = client.get("/api/catalog/songs/1/links")
+
+        assert response.status_code == 200
+        data = response.json()
+        youtube_link = next((link for link in data["links"] if link["type"] == "youtube_search"), None)
+        assert youtube_link is not None
+        assert "youtube.com" in youtube_link["url"]
+        assert "Queen" in youtube_link["url"] or "queen" in youtube_link["url"].lower()
+        assert "karaoke" in youtube_link["url"].lower()
+
+    def test_get_song_links_has_generator(self, client: TestClient) -> None:
+        """Test song links include Karaoke Generator."""
+        response = client.get("/api/catalog/songs/1/links")
+
+        assert response.status_code == 200
+        data = response.json()
+        gen_link = next((link for link in data["links"] if link["type"] == "karaoke_generator"), None)
+        assert gen_link is not None
+        assert "gen.nomadkaraoke.com" in gen_link["url"]
+        assert "Queen" in gen_link["url"] or "queen" in gen_link["url"].lower()
+
+    def test_get_song_links_not_found(self, client: TestClient) -> None:
+        """Test getting links for non-existent song returns 404."""
+        response = client.get("/api/catalog/songs/999999999/links")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert "not found" in data["detail"].lower()
+
+    def test_get_song_links_response_structure(self, client: TestClient) -> None:
+        """Test link response structure is complete."""
+        response = client.get("/api/catalog/songs/1/links")
+
+        assert response.status_code == 200
+        data = response.json()
+        for link in data["links"]:
+            assert "type" in link
+            assert "url" in link
+            assert "label" in link
+            assert "description" in link

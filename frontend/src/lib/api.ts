@@ -152,6 +152,19 @@ export const api = {
           is_popular: boolean;
         }>
       >(`/api/catalog/songs/popular?limit=${limit}`),
+
+    getSongLinks: (songId: number) =>
+      api.get<{
+        song_id: number;
+        artist: string;
+        title: string;
+        links: Array<{
+          type: "youtube_search" | "karaoke_generator";
+          url: string;
+          label: string;
+          description: string;
+        }>;
+      }>(`/api/catalog/songs/${songId}/links`),
   },
 
   // ============================================================================

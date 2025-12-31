@@ -166,3 +166,23 @@ export interface UpdatePlaylistRequest {
 export interface AddSongRequest {
   song_id: string;
 }
+
+// ============================================================================
+// Karaoke Link Types
+// ============================================================================
+
+export type KaraokeLinkType = "youtube_search" | "karaoke_generator";
+
+export interface KaraokeLink {
+  type: KaraokeLinkType;
+  url: string;
+  label: string;
+  description: string;
+}
+
+export interface SongLinksResponse {
+  song_id: number;
+  artist: string;
+  title: string;
+  links: KaraokeLink[];
+}
