@@ -302,32 +302,28 @@ karaoke-decide playlist show <playlist_id>
 3. [x] Recommendation algorithm v1
 4. [x] Filter/sort implementation
 
-### Phase 5: Playlists & Karaoke Links
-1. [ ] Playlist CRUD
-2. [ ] Karaoke availability check
-3. [ ] YouTube link lookup
-4. [ ] Generator handoff URL
+### Phase 5: Frontend Auth & Discovery ✅ COMPLETE
+1. [x] Auth flow (magic link, JWT storage, protected routes)
+2. [x] My Songs page with listening history
+3. [x] Recommendations page with personalized suggestions
+4. [x] Quiz onboarding UI
+5. [x] Services connection page (Spotify OAuth, Last.fm)
 
-### Phase 6: CLI Polish
+### Phase 6: Playlists, Karaoke Links & Profile ✅ COMPLETE
+1. [x] Playlist CRUD (create, read, update, delete, add/remove songs)
+2. [x] Karaoke link lookup (YouTube search, Generator handoff)
+3. [x] User profile page with display name management
+
+### Phase 7: CLI Polish (Post-MLP)
 1. [ ] All commands implemented
 2. [ ] Rich terminal output
 3. [ ] Interactive browse mode
 
-### Phase 7: Infrastructure
-1. [ ] Pulumi GCP setup
-2. [ ] Cloud Run deployment
-3. [ ] CI/CD pipeline
+### Phase 8: Infrastructure (Post-MLP)
+1. [x] Pulumi GCP setup
+2. [x] Cloud Run deployment
+3. [x] CI/CD pipeline
 4. [ ] Monitoring & logging
-
-### Phase 8: Web Frontend 🚧 IN PROGRESS
-1. [x] Next.js project setup (App Router, TypeScript, Tailwind)
-2. [ ] Auth flow
-3. [x] Song discovery UI (neon-noir theme, mobile-first)
-4. [ ] Quiz onboarding
-5. [ ] Playlist management
-6. [x] Mobile-responsive design
-7. [x] GitHub Pages deployment (decide.nomadkaraoke.com)
-8. [ ] Connect to backend API
 
 ## Future Phases (Post-MLP)
 
@@ -384,12 +380,14 @@ Large files require:
 ## Success Criteria
 
 MLP is complete when:
-- [ ] User can sign up via magic link
-- [ ] User can connect Spotify OR complete quiz
-- [ ] User sees relevant song recommendations
-- [ ] User can search and filter songs
-- [ ] User can create playlists
-- [ ] Songs link to YouTube karaoke or Generator
-- [ ] API is deployed and stable
-- [ ] Web frontend is responsive and usable
-- [ ] 70%+ test coverage
+- [x] User can sign up via magic link
+- [x] User can connect Spotify OR complete quiz
+- [x] User sees relevant song recommendations
+- [x] User can search and filter songs
+- [x] User can create playlists
+- [x] Songs link to YouTube karaoke or Generator
+- [x] API is deployed and stable
+- [x] Web frontend is responsive and usable
+- [x] 70%+ test coverage
+
+**MLP COMPLETE as of 2025-12-30** - See [archive/2025-12-30-phase6-mlp-completion.md](archive/2025-12-30-phase6-mlp-completion.md)
