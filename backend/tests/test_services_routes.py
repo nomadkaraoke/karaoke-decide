@@ -162,24 +162,78 @@ def mock_catalog_service() -> MagicMock:
 
 
 @pytest.fixture
+def mock_firestore_service() -> MagicMock:
+    """Create mock firestore service."""
+    mock = MagicMock()
+    mock.set_document = AsyncMock(return_value=None)
+    mock.get_document = AsyncMock(return_value=None)
+    mock.update_document = AsyncMock(return_value=None)
+
+    # Mock the client.collection().where().order_by().limit().stream() chain
+    # used in get_sync_status
+    mock_stream = MagicMock()
+    mock_stream.__iter__ = MagicMock(return_value=iter([]))  # Empty iterator for sync
+    mock_stream.__aiter__ = MagicMock(return_value=iter([]))  # Empty async iterator
+
+    mock_query = MagicMock()
+    mock_query.stream.return_value = mock_stream
+    mock_query.limit.return_value = mock_query
+    mock_query.order_by.return_value = mock_query
+    mock_query.where.return_value = mock_query
+
+    mock_collection = MagicMock()
+    mock_collection.where.return_value = mock_query
+
+    mock.client = MagicMock()
+    mock.client.collection.return_value = mock_collection
+
+    return mock
+
+
+@pytest.fixture
+def mock_cloud_tasks_service() -> MagicMock:
+    """Create mock cloud tasks service."""
+    mock = MagicMock()
+    mock.create_sync_task = MagicMock(return_value="task-123")
+    return mock
+
+
+@pytest.fixture
 def auth_client(
     mock_settings: BackendSettings,
     mock_music_service_service: MagicMock,
     mock_sync_service: MagicMock,
     mock_auth_service: MagicMock,
     mock_catalog_service: MagicMock,
+    mock_firestore_service: MagicMock,
+    mock_cloud_tasks_service: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """Create test client with mocked services."""
+    from backend.api import deps
+    from backend.main import app
+
+    # Use FastAPI's dependency override mechanism
+    async def get_settings_override() -> BackendSettings:
+        return mock_settings
+
+    async def get_firestore_override() -> MagicMock:
+        return mock_firestore_service
+
+    app.dependency_overrides[deps.get_settings] = get_settings_override
+    app.dependency_overrides[deps.get_firestore] = get_firestore_override
+
     with (
         patch("backend.api.deps.get_backend_settings", return_value=mock_settings),
         patch("backend.api.deps.get_music_service_service", return_value=mock_music_service_service),
         patch("backend.api.deps.get_sync_service", return_value=mock_sync_service),
         patch("backend.api.deps.get_auth_service", return_value=mock_auth_service),
         patch("backend.api.routes.catalog.get_catalog_service", return_value=mock_catalog_service),
+        patch("backend.api.routes.services.get_cloud_tasks_service", return_value=mock_cloud_tasks_service),
     ):
-        from backend.main import app
-
         yield TestClient(app)
+
+    # Clean up overrides
+    app.dependency_overrides.clear()
 
 
 class TestListServices:
@@ -401,32 +455,33 @@ class TestDisconnectService:
 
 
 class TestSync:
-    """Tests for POST /api/services/sync."""
+    """Tests for POST /api/services/sync (async)."""
 
-    def test_sync_all_services(
+    def test_sync_starts_async_job(
         self,
         auth_client: TestClient,
-        mock_sync_service: MagicMock,
+        mock_firestore_service: MagicMock,
+        mock_cloud_tasks_service: MagicMock,
     ) -> None:
-        """Syncs all connected services."""
+        """Starts async sync job and returns job_id."""
         response = auth_client.post(
             "/api/services/sync",
             headers={"Authorization": "Bearer test-token"},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
-        assert "results" in data
-        assert len(data["results"]) == 2
+        assert "job_id" in data
+        assert data["status"] == "pending"
+        assert "message" in data
 
-        # Check Spotify result
-        spotify_result = next(r for r in data["results"] if r["service_type"] == "spotify")
-        assert spotify_result["tracks_fetched"] == 100
-        assert spotify_result["tracks_matched"] == 75
+        # Verify job was stored in Firestore
+        mock_firestore_service.set_document.assert_called_once()
+        call_args = mock_firestore_service.set_document.call_args
+        assert call_args[0][0] == "sync_jobs"  # collection name
 
-        # Check Last.fm result
-        lastfm_result = next(r for r in data["results"] if r["service_type"] == "lastfm")
-        assert lastfm_result["tracks_fetched"] == 150
+        # Verify Cloud Task was created
+        mock_cloud_tasks_service.create_sync_task.assert_called_once()
 
     def test_sync_requires_auth(self, auth_client: TestClient) -> None:
         """Returns 401 without authentication."""

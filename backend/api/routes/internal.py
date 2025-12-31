@@ -5,13 +5,17 @@ They are protected by OIDC authentication in production.
 """
 
 import logging
+from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
 from backend.api.deps import FirestoreServiceDep, Settings, SyncServiceDep
+from backend.config import BackendSettings
 from backend.models.sync_job import SyncJob, SyncJobProgress, SyncJobResult, SyncJobStatus
+from backend.services.firestore_service import FirestoreService
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +182,7 @@ async def process_sync_task(
         )
 
 
-def _create_progress_callback(firestore, job_id: str):
+def _create_progress_callback(firestore: FirestoreService, job_id: str) -> Callable[..., Coroutine[Any, Any, None]]:
     """Create a progress callback function for sync service.
 
     Args:
@@ -195,7 +199,7 @@ def _create_progress_callback(firestore, job_id: str):
         total_tracks: int = 0,
         processed_tracks: int = 0,
         matched_tracks: int = 0,
-    ):
+    ) -> None:
         """Update job progress in Firestore."""
         progress = SyncJobProgress(
             current_service=current_service,
@@ -227,8 +231,8 @@ def _create_progress_callback(firestore, job_id: str):
 async def _send_sync_completion_email(
     user_id: str,
     job: SyncJob,
-    firestore,
-    settings,
+    firestore: FirestoreService,
+    settings: BackendSettings,
 ) -> None:
     """Send email notification when sync completes.
 

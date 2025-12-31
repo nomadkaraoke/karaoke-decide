@@ -376,7 +376,7 @@ async def get_sync_status(
     # Find most recent active or recent job for this user
     active_job: SyncJobStatusResponse | None = None
     try:
-        jobs_ref = firestore.db.collection("sync_jobs")
+        jobs_ref = firestore.client.collection("sync_jobs")
         query = jobs_ref.where("user_id", "==", user.id).order_by("created_at", direction="DESCENDING").limit(1)
         docs = query.stream()
 
