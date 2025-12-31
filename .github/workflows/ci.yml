@@ -324,7 +324,7 @@ jobs:
             --concurrency 80 \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke,FRONTEND_URL=https://decide.nomadkaraoke.com,SPOTIFY_REDIRECT_URI=https://karaoke-decide-718638054799.us-central1.run.app/api/services/spotify/callback" \
+            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke,GOOGLE_CLOUD_PROJECT_NUMBER=718638054799,CLOUD_RUN_URL=https://karaoke-decide-718638054799.us-central1.run.app,FRONTEND_URL=https://decide.nomadkaraoke.com,SPOTIFY_REDIRECT_URI=https://karaoke-decide-718638054799.us-central1.run.app/api/services/spotify/callback" \
             --set-secrets "JWT_SECRET=karaoke-decide-jwt-secret:latest,SPOTIFY_CLIENT_ID=spotipy-client-id:latest,SPOTIFY_CLIENT_SECRET=spotipy-client-secret:latest,LASTFM_API_KEY=lastfm-api-key:latest,SENDGRID_API_KEY=sendgrid-api-key:latest"
 
       - name: Verify deployment
