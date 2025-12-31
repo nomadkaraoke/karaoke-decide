@@ -200,6 +200,46 @@ After merging to main:
 | `e2e-smoke` | Production smoke tests |
 | `deploy-frontend` | Deploy to GitHub Pages |
 
+### Known Testing Gaps
+
+**Infrastructure dependencies** (Cloud Tasks, BigQuery, Firestore) are mocked in tests. This means IAM permission errors won't be caught until production. Mitigations:
+
+1. **Authenticated smoke tests** - Use `e2e/sync-integration.spec.ts` with a test account token
+2. **Manual verification** after infrastructure changes (Pulumi updates)
+3. **Deep health endpoint** - `/api/health/deep` validates connectivity to all infrastructure
+
+### Production E2E Testing
+
+For comprehensive production testing with automated email login:
+
+```bash
+cd frontend
+
+# Run with Mailslurp (creates temporary test accounts)
+MAILSLURP_API_KEY=<key> npx playwright test e2e/production-comprehensive.spec.ts
+
+# Run with pre-authenticated token for service-related tests
+# (Use andrew@beveridge.uk account which has Spotify/Last.fm connected)
+MAILSLURP_API_KEY=<key> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts
+
+# Run only authenticated tests (faster, no Mailslurp needed)
+PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts --grep "Authenticated"
+```
+
+To get a PROD_TEST_TOKEN:
+1. Login to https://decide.nomadkaraoke.com
+2. Open browser DevTools → Application → Local Storage
+3. Copy the `karaoke_decide_token` value
+
+The comprehensive tests cover:
+- Magic link authentication flow (via Mailslurp)
+- Search and catalog browsing
+- Services page and sync functionality
+- My Songs, Recommendations, Playlists pages
+- Quiz functionality
+- API health endpoints
+- Error handling
+
 ## Running Tests Locally
 
 ```bash

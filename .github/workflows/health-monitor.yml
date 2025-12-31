@@ -1,0 +1,67 @@
+name: Health Monitor
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  health-check:
+    name: Infrastructure Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Deep Health Endpoint
+        id: health
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            "https://karaoke-decide-718638054799.us-central1.run.app/api/health/deep")
+
+          # Split response and status code
+          body=$(echo "$response" | head -n -1)
+          status_code=$(echo "$response" | tail -n 1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "response=$body" >> $GITHUB_OUTPUT
+
+          echo "HTTP Status: $status_code"
+          echo "Response:"
+          echo "$body" | jq . || echo "$body"
+
+          # Check if healthy
+          if [ "$status_code" != "200" ]; then
+            echo "Health check failed with status $status_code"
+            exit 1
+          fi
+
+          # Check if status is healthy
+          status=$(echo "$body" | jq -r '.status')
+          if [ "$status" != "healthy" ]; then
+            echo "Service is degraded: $status"
+            exit 1
+          fi
+
+          echo "All health checks passed!"
+
+      - name: Send Failure Notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.sendgrid.net
+          server_port: 587
+          username: apikey
+          password: ${{ secrets.SENDGRID_API_KEY }}
+          subject: "⚠️ Karaoke Decide Health Check Failed"
+          to: andrew@beveridge.uk
+          from: noreply@nomadkaraoke.com
+          body: |
+            The scheduled health check for Karaoke Decide has failed.
+
+            Time: ${{ github.event.repository.updated_at }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Status Code: ${{ steps.health.outputs.status_code }}
+            Response: ${{ steps.health.outputs.response }}
+
+            Please investigate at:
+            https://console.cloud.google.com/run/detail/us-central1/karaoke-decide/logs?project=nomadkaraoke

@@ -17,7 +17,7 @@ Authorization: Bearer <token>
 
 ### GET /api/health
 
-Health check endpoint.
+Health check endpoint for load balancers and monitoring.
 
 **Response:**
 ```json
@@ -26,6 +26,38 @@ Health check endpoint.
   "service": "karaoke-decide"
 }
 ```
+
+### GET /api/health/deep
+
+Deep health check that validates connectivity to all infrastructure components.
+Useful for post-deploy verification and scheduled monitoring.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "karaoke-decide",
+  "timestamp": "2025-12-31T12:00:00Z",
+  "checks": {
+    "firestore": {
+      "status": "healthy",
+      "message": "Connected, 42 users in database"
+    },
+    "bigquery": {
+      "status": "healthy",
+      "message": "Connected, 275,809 songs in catalog"
+    },
+    "cloud_tasks": {
+      "status": "healthy",
+      "message": "Queue 'projects/.../queues/sync-queue' accessible"
+    }
+  }
+}
+```
+
+**Status values:**
+- `healthy` - All checks passed
+- `degraded` - One or more checks failed (see individual check status)
 
 ---
 

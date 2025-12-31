@@ -168,31 +168,8 @@ def mock_firestore_service() -> MagicMock:
     mock.set_document = AsyncMock(return_value=None)
     mock.get_document = AsyncMock(return_value=None)
     mock.update_document = AsyncMock(return_value=None)
-
-    # Mock the client.collection().where().order_by().limit().stream() chain
-    # used in get_sync_status
-    from collections.abc import AsyncGenerator
-    from typing import Any
-
-    async def async_empty_generator() -> AsyncGenerator[Any, None]:
-        return
-        yield  # Makes this an async generator
-
-    mock_stream = MagicMock()
-    mock_stream.__iter__ = MagicMock(return_value=iter([]))  # Empty iterator for sync
-    mock_stream.__aiter__ = MagicMock(return_value=async_empty_generator())  # Async iterator
-
-    mock_query = MagicMock()
-    mock_query.stream.return_value = mock_stream
-    mock_query.limit.return_value = mock_query
-    mock_query.order_by.return_value = mock_query
-    mock_query.where.return_value = mock_query
-
-    mock_collection = MagicMock()
-    mock_collection.where.return_value = mock_query
-
-    mock.client = MagicMock()
-    mock.client.collection.return_value = mock_collection
+    # Mock query_documents for get_sync_status - returns empty list (no active jobs)
+    mock.query_documents = AsyncMock(return_value=[])
 
     return mock
 
