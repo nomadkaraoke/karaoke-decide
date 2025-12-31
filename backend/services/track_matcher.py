@@ -75,9 +75,12 @@ class TrackMatcher:
 
         Performs:
         - Lowercase conversion
-        - Punctuation removal (except apostrophes in contractions)
+        - ALL punctuation removal (including apostrophes)
         - Whitespace normalization
         - Strip leading/trailing whitespace
+
+        NOTE: Removes apostrophes to match BigQuery REGEXP_REPLACE which can't
+        easily include apostrophes in the character class.
 
         Args:
             text: Text to normalize.
@@ -91,13 +94,9 @@ class TrackMatcher:
         # Lowercase
         result = text.lower()
 
-        # Replace common unicode characters
-        result = result.replace("'", "'").replace("'", "'")
-        result = result.replace(""", '"').replace(""", '"')
-
-        # Remove punctuation except apostrophes (for contractions like "don't")
-        # Keep alphanumeric, spaces, and apostrophes
-        result = re.sub(r"[^\w\s']", " ", result)
+        # Remove ALL punctuation (including apostrophes)
+        # Must match BigQuery: r'[^a-z0-9 ]'
+        result = re.sub(r"[^a-z0-9 ]", " ", result)
 
         # Collapse multiple whitespace to single space
         result = re.sub(r"\s+", " ", result)
