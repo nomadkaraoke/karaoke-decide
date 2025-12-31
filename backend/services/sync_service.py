@@ -4,6 +4,7 @@ Fetches tracks from Spotify and Last.fm, matches them against the
 karaoke catalog, and creates UserSong records.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -16,6 +17,8 @@ from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.spotify import SpotifyClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -151,6 +154,9 @@ class SyncService:
             List of SyncResult for each service.
         """
         services = await self.music_service_service.get_user_services(user_id)
+        logger.info(f"Found {len(services)} connected services for user {user_id}")
+        for svc in services:
+            logger.info(f"  - {svc.service_type}: username={svc.service_username}, display={svc.display_name}")
         results: list[SyncResult] = []
 
         for service in services:
@@ -617,11 +623,15 @@ class SyncService:
         tracks: list[dict[str, str]] = []
         seen: set[str] = set()
 
+        logger.info("Starting Spotify track fetch")
+
         # Fetch saved tracks (library)
         offset = 0
+        saved_count = 0
         while offset < self.SPOTIFY_SAVED_TRACKS_LIMIT:
             response = await self.spotify.get_saved_tracks(access_token, limit=50, offset=offset)
             items = response.get("items", [])
+            logger.info(f"Spotify saved tracks: offset={offset}, items returned={len(items)}")
             if not items:
                 break
 
@@ -633,13 +643,18 @@ class SyncService:
                     if key not in seen:
                         seen.add(key)
                         tracks.append(track_info)
+                        saved_count += 1
 
             offset += len(items)
             if len(items) < 50:
                 break
 
+        logger.info(f"Spotify saved tracks total: {saved_count} unique tracks")
+
         # Fetch top tracks (medium term - ~6 months)
+        top_medium_count = 0
         response = await self.spotify.get_top_tracks(access_token, time_range="medium_term", limit=50)
+        logger.info(f"Spotify top tracks (medium_term): {len(response.get('items', []))} items")
         for track in response.get("items", []):
             track_info = self._extract_spotify_track_info(track)
             if track_info:
@@ -647,9 +662,13 @@ class SyncService:
                 if key not in seen:
                     seen.add(key)
                     tracks.append(track_info)
+                    top_medium_count += 1
+        logger.info(f"Spotify top tracks (medium_term): {top_medium_count} new unique tracks")
 
         # Fetch top tracks (long term - all time)
+        top_long_count = 0
         response = await self.spotify.get_top_tracks(access_token, time_range="long_term", limit=50)
+        logger.info(f"Spotify top tracks (long_term): {len(response.get('items', []))} items")
         for track in response.get("items", []):
             track_info = self._extract_spotify_track_info(track)
             if track_info:
@@ -657,9 +676,13 @@ class SyncService:
                 if key not in seen:
                     seen.add(key)
                     tracks.append(track_info)
+                    top_long_count += 1
+        logger.info(f"Spotify top tracks (long_term): {top_long_count} new unique tracks")
 
         # Fetch recently played
+        recent_count = 0
         response = await self.spotify.get_recently_played(access_token, limit=50)
+        logger.info(f"Spotify recently played: {len(response.get('items', []))} items")
         for item in response.get("items", []):
             track = item.get("track", {})
             track_info = self._extract_spotify_track_info(track)
@@ -668,7 +691,10 @@ class SyncService:
                 if key not in seen:
                     seen.add(key)
                     tracks.append(track_info)
+                    recent_count += 1
+        logger.info(f"Spotify recently played: {recent_count} new unique tracks")
 
+        logger.info(f"Spotify fetch complete: {len(tracks)} total unique tracks")
         return tracks
 
     def _extract_spotify_track_info(self, track: dict[str, Any]) -> dict[str, str] | None:
@@ -710,12 +736,16 @@ class SyncService:
         tracks: list[dict[str, str]] = []
         seen: set[str] = set()
 
+        logger.info(f"Starting Last.fm track fetch for username: {username}")
+
         # Fetch top tracks (overall)
         page = 1
         fetched = 0
+        top_count = 0
         while fetched < self.LASTFM_TOP_TRACKS_LIMIT:
             response = await self.lastfm.get_top_tracks(username, period="overall", limit=100, page=page)
             items = response.get("toptracks", {}).get("track", [])
+            logger.info(f"Last.fm top tracks: page={page}, items returned={len(items)}")
             if not items:
                 break
 
@@ -727,17 +757,22 @@ class SyncService:
                         seen.add(key)
                         tracks.append(track_info)
                         fetched += 1
+                        top_count += 1
 
             if len(items) < 100:
                 break
             page += 1
+
+        logger.info(f"Last.fm top tracks total: {top_count} unique tracks")
 
         # Fetch loved tracks
         page = 1
         fetched = 0
+        loved_count = 0
         while fetched < self.LASTFM_LOVED_TRACKS_LIMIT:
             response = await self.lastfm.get_loved_tracks(username, limit=100, page=page)
             items = response.get("lovedtracks", {}).get("track", [])
+            logger.info(f"Last.fm loved tracks: page={page}, items returned={len(items)}")
             if not items:
                 break
 
@@ -749,14 +784,19 @@ class SyncService:
                         seen.add(key)
                         tracks.append(track_info)
                         fetched += 1
+                        loved_count += 1
 
             if len(items) < 100:
                 break
             page += 1
 
+        logger.info(f"Last.fm loved tracks total: {loved_count} new unique tracks")
+
         # Fetch recent tracks
+        recent_count = 0
         response = await self.lastfm.get_recent_tracks(username, limit=200, page=1)
         items = response.get("recenttracks", {}).get("track", [])
+        logger.info(f"Last.fm recent tracks: {len(items)} items returned")
         for item in items:
             # Skip currently playing track (has @attr with nowplaying)
             if item.get("@attr", {}).get("nowplaying"):
@@ -768,6 +808,10 @@ class SyncService:
                 if key not in seen:
                     seen.add(key)
                     tracks.append(track_info)
+                    recent_count += 1
+
+        logger.info(f"Last.fm recent tracks: {recent_count} new unique tracks")
+        logger.info(f"Last.fm fetch complete: {len(tracks)} total unique tracks")
 
         return tracks
 
