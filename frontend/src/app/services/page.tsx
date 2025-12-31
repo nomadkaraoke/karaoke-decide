@@ -80,6 +80,10 @@ export default function ServicesPage() {
       if (response.active_job &&
           (response.active_job.status === "pending" || response.active_job.status === "in_progress")) {
         setIsSyncing(true);
+        // Start polling if not already polling
+        if (!pollIntervalRef.current) {
+          pollIntervalRef.current = setInterval(pollSyncStatus, 3000);
+        }
       } else {
         setIsSyncing(false);
       }
@@ -88,7 +92,7 @@ export default function ServicesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [pollSyncStatus]);
 
   // Polling for sync status
   const pollSyncStatus = useCallback(async () => {

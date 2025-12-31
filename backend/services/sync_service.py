@@ -136,7 +136,6 @@ class SyncService:
     async def sync_all_services_with_progress(
         self,
         user_id: str,
-        job_id: str,
         progress_callback: ProgressCallback | None = None,
     ) -> list[SyncResult]:
         """Sync all connected services with progress updates.
@@ -146,7 +145,6 @@ class SyncService:
 
         Args:
             user_id: User ID to sync.
-            job_id: Sync job ID for tracking.
             progress_callback: Async callback for progress updates.
 
         Returns:
@@ -337,6 +335,17 @@ class SyncService:
                 artists_stored=artists_stored,
             )
 
+        except MusicServiceError as e:
+            error_msg = str(e)
+            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
+            return SyncResult(
+                service_type="lastfm",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=error_msg,
+            )
         except ExternalServiceError as e:
             error_msg = f"Last.fm API error: {e}"
             await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)

@@ -246,8 +246,9 @@ class BigQueryCatalogService:
         conditions = []
         for artist, title in tracks:
             # Escape single quotes by doubling them (BigQuery SQL escaping)
-            safe_artist = artist.replace("'", "''")
-            safe_title = title.replace("'", "''")
+            # Also lowercase to match LOWER() in SQL
+            safe_artist = artist.replace("'", "''").lower()
+            safe_title = title.replace("'", "''").lower()
             conditions.append(f"(LOWER(Artist) = '{safe_artist}' AND LOWER(Title) = '{safe_title}')")
 
         # Process in chunks to avoid query size limits (max ~100 tracks per query)

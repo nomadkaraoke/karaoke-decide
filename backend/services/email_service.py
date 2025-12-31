@@ -131,7 +131,15 @@ class EmailService:
             True if email was sent successfully.
         """
         frontend_url = self.settings.frontend_url
-        services_str = " and ".join(services) if services else "your music services"
+        # Format services list with proper grammar (Oxford comma for 3+ items)
+        if not services:
+            services_str = "your music services"
+        elif len(services) == 1:
+            services_str = services[0]
+        elif len(services) == 2:
+            services_str = f"{services[0]} and {services[1]}"
+        else:
+            services_str = ", ".join(services[:-1]) + f", and {services[-1]}"
 
         # Dev mode: log to console
         if not self.is_configured:

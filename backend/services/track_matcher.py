@@ -203,7 +203,6 @@ class TrackMatcher:
     async def batch_match_tracks(
         self,
         tracks: list[dict[str, str]],
-        batch_size: int = 100,
     ) -> list[MatchedTrack]:
         """Match a batch of tracks to the karaoke catalog.
 
@@ -213,7 +212,6 @@ class TrackMatcher:
 
         Args:
             tracks: List of dicts with 'artist' and 'title' keys.
-            batch_size: Number of tracks to process per BigQuery batch.
 
         Returns:
             List of MatchedTrack results in same order as input.

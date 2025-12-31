@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 from typing import Any
 
 from google.cloud import tasks_v2
@@ -26,12 +27,15 @@ class CloudTasksService:
         self.location = settings.cloud_tasks_location
         self.queue = settings.cloud_tasks_queue
         self._client: tasks_v2.CloudTasksClient | None = None
+        self._client_lock = threading.Lock()
 
     @property
     def client(self) -> tasks_v2.CloudTasksClient:
-        """Get or create Cloud Tasks client."""
+        """Get or create Cloud Tasks client (thread-safe)."""
         if self._client is None:
-            self._client = tasks_v2.CloudTasksClient()
+            with self._client_lock:
+                if self._client is None:
+                    self._client = tasks_v2.CloudTasksClient()
         return self._client
 
     @property
@@ -111,30 +115,36 @@ class CloudTasksService:
 
         In production, this is needed for service account references.
         """
-        # Hardcoded for now - could be looked up via Resource Manager API
-        return "718638054799"
+        if self.settings.google_cloud_project_number:
+            return self.settings.google_cloud_project_number
+        # Fallback for development - should be set via GOOGLE_CLOUD_PROJECT_NUMBER env var
+        raise ValueError("GOOGLE_CLOUD_PROJECT_NUMBER must be set in production for Cloud Tasks OIDC auth")
 
 
 # Lazy initialization
 _cloud_tasks_service: CloudTasksService | None = None
+_cloud_tasks_lock = threading.Lock()
 
 
 def get_cloud_tasks_service(settings: BackendSettings | None = None) -> CloudTasksService:
-    """Get the Cloud Tasks service instance.
+    """Get the Cloud Tasks service instance (thread-safe singleton).
 
     Args:
-        settings: Optional settings override.
+        settings: Optional settings override. Only used on first call.
 
     Returns:
         CloudTasksService instance.
     """
     global _cloud_tasks_service
 
-    if _cloud_tasks_service is None or settings is not None:
-        if settings is None:
-            from backend.config import get_backend_settings
+    if _cloud_tasks_service is None:
+        with _cloud_tasks_lock:
+            # Double-check after acquiring lock
+            if _cloud_tasks_service is None:
+                if settings is None:
+                    from backend.config import get_backend_settings
 
-            settings = get_backend_settings()
-        _cloud_tasks_service = CloudTasksService(settings)
+                    settings = get_backend_settings()
+                _cloud_tasks_service = CloudTasksService(settings)
 
     return _cloud_tasks_service

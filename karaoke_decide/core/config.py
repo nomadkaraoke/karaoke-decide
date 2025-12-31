@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # Google Cloud
     google_cloud_project: str = ""
+    google_cloud_project_number: str = ""  # Required for service account references
     gcs_bucket_name: str = "karaoke-decide-storage"
     firestore_database: str = "(default)"
 

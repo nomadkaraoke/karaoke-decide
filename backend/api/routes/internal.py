@@ -120,7 +120,6 @@ async def process_sync_task(
         # Execute sync with progress updates
         results = await sync_service.sync_all_services_with_progress(
             user_id=user_id,
-            job_id=job_id,
             progress_callback=_create_progress_callback(firestore, job_id),
         )
 
