@@ -44,7 +44,23 @@ class ScoredSong:
         "decade_match",
         "crowd_pleaser",
         "popular",
+        "generate_karaoke",
     ]
+    has_karaoke_version: bool = True
+    duration_ms: int | None = None
+    explicit: bool = False
+    is_classic: bool = False  # brand_count >= 20
+
+
+@dataclass
+class CategorizedRecommendations:
+    """Recommendations organized into categories."""
+
+    from_artists_you_know: list["Recommendation"]
+    create_your_own: list["Recommendation"]
+    crowd_pleasers: list["Recommendation"]
+    total_count: int
+    filters_applied: dict[str, Any]
 
 
 class RecommendationService:
@@ -74,6 +90,13 @@ class RecommendationService:
     # Thresholds
     MIN_BRAND_COUNT = 3  # Minimum brands for recommendation
     DEFAULT_LIMIT = 20
+    MAX_SONGS_PER_ARTIST = 3  # Artist diversity limit
+    CLASSIC_THRESHOLD = 20  # Brand count for "all-time classics"
+
+    # Section limits for categorized recommendations
+    KNOWN_ARTIST_LIMIT = 15
+    GENERATE_SECTION_LIMIT = 10
+    CROWD_PLEASER_LIMIT = 10
 
     def __init__(
         self,
@@ -135,9 +158,10 @@ class RecommendationService:
         if min_popularity:
             scored_songs = [s for s in scored_songs if s.spotify_popularity >= min_popularity]
 
-        # Sort by score and take top N
+        # Sort by score and apply artist diversity
         scored_songs.sort(key=lambda x: x.score, reverse=True)
-        top_songs = scored_songs[:limit]
+        diverse_songs = self._apply_artist_diversity(scored_songs)
+        top_songs = diverse_songs[:limit]
 
         # Convert to Recommendation models
         return [
@@ -153,6 +177,238 @@ class RecommendationService:
             )
             for song in top_songs
         ]
+
+    async def get_categorized_recommendations(
+        self,
+        user_id: str,
+        has_karaoke: bool | None = None,
+        min_popularity: int | None = None,
+        max_popularity: int | None = None,
+        exclude_explicit: bool = False,
+        min_duration_ms: int | None = None,
+        max_duration_ms: int | None = None,
+        classics_only: bool = False,
+    ) -> CategorizedRecommendations:
+        """Get recommendations organized into categories.
+
+        Args:
+            user_id: User's ID.
+            has_karaoke: Filter by karaoke availability (None=all).
+            min_popularity: Minimum Spotify popularity (0-100).
+            max_popularity: Maximum Spotify popularity (for "hidden gems").
+            exclude_explicit: Hide explicit content.
+            min_duration_ms: Minimum song duration.
+            max_duration_ms: Maximum song duration.
+            classics_only: Only show songs with brand_count >= CLASSIC_THRESHOLD.
+
+        Returns:
+            CategorizedRecommendations with three sections.
+        """
+        # Build user context
+        context = await self._build_user_context(user_id)
+
+        filters_applied = {
+            "has_karaoke": has_karaoke,
+            "min_popularity": min_popularity,
+            "max_popularity": max_popularity,
+            "exclude_explicit": exclude_explicit,
+            "min_duration_ms": min_duration_ms,
+            "max_duration_ms": max_duration_ms,
+            "classics_only": classics_only,
+        }
+
+        # Section 1: From Artists You Know (karaoke songs by known artists)
+        from_artists: list[Recommendation] = []
+        if context.known_artists and has_karaoke is not False:
+            artist_songs = await self._score_candidates(context, self.KNOWN_ARTIST_LIMIT * 5)
+            # Filter to only known artist songs
+            artist_songs = [s for s in artist_songs if s.reason_type == "known_artist"]
+            artist_songs = self._apply_filters(
+                artist_songs,
+                min_popularity=min_popularity,
+                max_popularity=max_popularity,
+                classics_only=classics_only,
+            )
+            artist_songs.sort(key=lambda x: x.score, reverse=True)
+            artist_songs = self._apply_artist_diversity(artist_songs)
+            from_artists = self._convert_to_recommendations(artist_songs[: self.KNOWN_ARTIST_LIMIT])
+
+        # Section 2: Create Your Own Karaoke (songs without karaoke version)
+        create_your_own: list[Recommendation] = []
+        if has_karaoke is not True:
+            # Get user's songs that don't have karaoke versions
+            user_songs_without_karaoke = await self._get_user_songs_without_karaoke(
+                user_id, context, limit=self.GENERATE_SECTION_LIMIT * 3
+            )
+            # Apply filters
+            user_songs_without_karaoke = self._apply_filters(
+                user_songs_without_karaoke,
+                min_popularity=min_popularity,
+                max_popularity=max_popularity,
+                classics_only=False,  # Can't be classics without karaoke
+            )
+            user_songs_without_karaoke = self._apply_artist_diversity(user_songs_without_karaoke)
+            create_your_own = self._convert_to_recommendations(
+                user_songs_without_karaoke[: self.GENERATE_SECTION_LIMIT]
+            )
+
+        # Section 3: Crowd Pleasers (popular karaoke songs for discovery)
+        crowd_pleasers: list[Recommendation] = []
+        if has_karaoke is not False:
+            popular_songs = self._get_popular_songs(limit=self.CROWD_PLEASER_LIMIT * 5)
+            scored_popular = []
+            for song in popular_songs:
+                if song["id"] not in context.known_song_ids:
+                    score = self._calculate_score(song, context, is_known_artist=False)
+                    scored_popular.append(
+                        ScoredSong(
+                            song_id=song["id"],
+                            artist=song["artist"],
+                            title=song["title"],
+                            brand_count=song["brand_count"],
+                            spotify_popularity=song.get("spotify_popularity", 0),
+                            score=score,
+                            reason="Popular karaoke song",
+                            reason_type="crowd_pleaser",
+                            is_classic=song["brand_count"] >= self.CLASSIC_THRESHOLD,
+                        )
+                    )
+            scored_popular = self._apply_filters(
+                scored_popular,
+                min_popularity=min_popularity,
+                max_popularity=max_popularity,
+                classics_only=classics_only,
+            )
+            scored_popular.sort(key=lambda x: x.score, reverse=True)
+            scored_popular = self._apply_artist_diversity(scored_popular)
+            crowd_pleasers = self._convert_to_recommendations(scored_popular[: self.CROWD_PLEASER_LIMIT])
+
+        total_count = len(from_artists) + len(create_your_own) + len(crowd_pleasers)
+
+        return CategorizedRecommendations(
+            from_artists_you_know=from_artists,
+            create_your_own=create_your_own,
+            crowd_pleasers=crowd_pleasers,
+            total_count=total_count,
+            filters_applied=filters_applied,
+        )
+
+    def _apply_filters(
+        self,
+        songs: list[ScoredSong],
+        min_popularity: int | None = None,
+        max_popularity: int | None = None,
+        classics_only: bool = False,
+    ) -> list[ScoredSong]:
+        """Apply common filters to a list of scored songs.
+
+        Args:
+            songs: List of scored songs.
+            min_popularity: Minimum Spotify popularity.
+            max_popularity: Maximum Spotify popularity.
+            classics_only: Only include classics (brand_count >= CLASSIC_THRESHOLD).
+
+        Returns:
+            Filtered list.
+        """
+        result = songs
+
+        if min_popularity is not None:
+            result = [s for s in result if s.spotify_popularity >= min_popularity]
+
+        if max_popularity is not None:
+            result = [s for s in result if s.spotify_popularity <= max_popularity]
+
+        if classics_only:
+            result = [s for s in result if s.brand_count >= self.CLASSIC_THRESHOLD]
+
+        return result
+
+    def _convert_to_recommendations(self, songs: list[ScoredSong]) -> list[Recommendation]:
+        """Convert scored songs to Recommendation models.
+
+        Args:
+            songs: List of scored songs.
+
+        Returns:
+            List of Recommendation objects.
+        """
+        return [
+            Recommendation(
+                song_id=song.song_id,
+                artist=song.artist,
+                title=song.title,
+                score=round(song.score, 3),
+                reason=song.reason,
+                reason_type=song.reason_type,
+                brand_count=song.brand_count,
+                popularity=song.spotify_popularity,
+                has_karaoke_version=song.has_karaoke_version,
+                duration_ms=song.duration_ms,
+                explicit=song.explicit,
+                is_classic=song.is_classic,
+            )
+            for song in songs
+        ]
+
+    async def _get_user_songs_without_karaoke(
+        self,
+        user_id: str,
+        context: UserContext,
+        limit: int,
+    ) -> list[ScoredSong]:
+        """Get user's songs that don't have karaoke versions.
+
+        Args:
+            user_id: User's ID.
+            context: User context.
+            limit: Maximum songs to return.
+
+        Returns:
+            List of scored songs (with has_karaoke_version=False).
+        """
+        # Query user_songs for tracks without karaoke
+        docs = await self.firestore.query_documents(
+            self.USER_SONGS_COLLECTION,
+            filters=[
+                ("user_id", "==", user_id),
+                ("has_karaoke_version", "==", False),
+            ],
+            order_by="play_count",
+            order_direction="DESCENDING",
+            limit=limit,
+        )
+
+        scored: list[ScoredSong] = []
+        for doc in docs:
+            artist = doc.get("artist", "")
+            is_known = artist.lower() in context.known_artists
+
+            # Build a song dict for scoring
+            song_data = {
+                "spotify_popularity": doc.get("spotify_popularity", 50),
+                "brand_count": 0,  # No karaoke = 0 brands
+            }
+            score = self._calculate_score(song_data, context, is_known_artist=is_known, has_karaoke=False)
+
+            scored.append(
+                ScoredSong(
+                    song_id=doc.get("song_id", ""),
+                    artist=artist,
+                    title=doc.get("title", ""),
+                    brand_count=0,
+                    spotify_popularity=doc.get("spotify_popularity", 50),
+                    score=score,
+                    reason=f"Generate karaoke for {artist}",
+                    reason_type="generate_karaoke",
+                    has_karaoke_version=False,
+                    duration_ms=doc.get("duration_ms"),
+                    explicit=doc.get("explicit", False),
+                    is_classic=False,
+                )
+            )
+
+        return scored
 
     async def get_user_songs(
         self,
@@ -369,39 +625,86 @@ class RecommendationService:
         song: dict[str, Any],
         context: UserContext,
         is_known_artist: bool,
+        has_karaoke: bool = True,
     ) -> float:
         """Calculate recommendation score for a song.
+
+        Uses diminishing returns for popularity and brand count to
+        prevent songs with extremely high values from dominating.
 
         Args:
             song: Song data dict.
             context: User context.
             is_known_artist: Whether user knows this artist.
+            has_karaoke: Whether song has karaoke version.
 
         Returns:
             Score between 0 and 1.
         """
         score = 0.0
 
-        # Artist match component
+        # Artist match component (0.35)
         if is_known_artist:
             score += self.ARTIST_MATCH_WEIGHT
 
-        # Popularity component (normalize Spotify popularity 0-100 to 0-1)
-        spotify_pop = song.get("spotify_popularity", 0) / 100.0
-        score += self.POPULARITY_WEIGHT * spotify_pop
+        # Popularity component with diminishing returns (0.25)
+        # Use sqrt for curve: 100 pop = 0.25, 25 pop = 0.125, 4 pop = 0.05
+        spotify_pop = song.get("spotify_popularity", 0)
+        pop_score = (spotify_pop / 100.0) ** 0.5  # sqrt curve
+        score += self.POPULARITY_WEIGHT * pop_score
 
-        # Karaoke availability component (normalize brand count)
-        # Most songs have 1-15 brands, normalize with cap at 10
-        brand_score = min(song["brand_count"], 10) / 10.0
-        score += self.KARAOKE_AVAILABILITY_WEIGHT * brand_score
+        # Karaoke availability with diminishing returns (0.20)
+        if has_karaoke:
+            brand_count = song.get("brand_count", 0)
+            # First 5 brands worth more, then diminishing
+            if brand_count <= 5:
+                brand_score = brand_count / 5.0
+            else:
+                # 5 brands = 1.0, 10 brands = 1.3, 20+ brands = 1.5 (capped)
+                base = 1.0
+                extra = min(brand_count - 5, 15) / 15.0 * 0.5
+                brand_score = base + extra
+            # Normalize to 0-1
+            brand_score = min(brand_score / 1.5, 1.0)
+            score += self.KARAOKE_AVAILABILITY_WEIGHT * brand_score
 
-        # Decade preference bonus
-        # Note: We don't have decade data yet, but structure is ready
-        # if context.quiz_decade_pref and song.get("decade") == context.quiz_decade_pref:
-        #     score += self.DECADE_WEIGHT
+        # Decade preference bonus (if we have data)
+        if context.quiz_decade_pref and song.get("decade") == context.quiz_decade_pref:
+            score += self.DECADE_WEIGHT
 
         capped_score: float = min(score, 1.0)  # Cap at 1.0
         return capped_score
+
+    def _apply_artist_diversity(
+        self,
+        songs: list[ScoredSong],
+        max_per_artist: int | None = None,
+    ) -> list[ScoredSong]:
+        """Limit songs per artist to ensure variety.
+
+        Args:
+            songs: Sorted list of scored songs (by score, descending).
+            max_per_artist: Maximum songs to include per artist.
+                           Defaults to MAX_SONGS_PER_ARTIST.
+
+        Returns:
+            Filtered list with artist diversity applied.
+        """
+        if max_per_artist is None:
+            max_per_artist = self.MAX_SONGS_PER_ARTIST
+
+        result: list[ScoredSong] = []
+        artist_counts: dict[str, int] = {}
+
+        for song in songs:
+            artist_key = song.artist.lower()
+            count = artist_counts.get(artist_key, 0)
+
+            if count < max_per_artist:
+                result.append(song)
+                artist_counts[artist_key] = count + 1
+
+        return result
 
     def _get_songs_by_artists(
         self,

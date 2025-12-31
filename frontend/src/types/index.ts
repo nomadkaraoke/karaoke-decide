@@ -51,6 +51,10 @@ export interface Recommendation {
   reason_type: string;
   brand_count: number;
   popularity: number;
+  has_karaoke_version: boolean;
+  is_classic: boolean;
+  duration_ms: number | null;
+  explicit: boolean;
 }
 
 export interface QuizSong {
@@ -102,6 +106,24 @@ export interface UserSongsResponse extends PaginatedResponse<UserSong> {}
 
 export interface RecommendationsResponse {
   recommendations: Recommendation[];
+}
+
+export interface CategorizedRecommendationsResponse {
+  from_artists_you_know: Recommendation[];
+  create_your_own: Recommendation[];
+  crowd_pleasers: Recommendation[];
+  total_count: number;
+  filters_applied: Record<string, string | number | boolean | null>;
+}
+
+export interface RecommendationFilters {
+  has_karaoke?: boolean | null;
+  min_popularity?: number;
+  max_popularity?: number;
+  exclude_explicit?: boolean;
+  min_duration_ms?: number;
+  max_duration_ms?: number;
+  classics_only?: boolean;
 }
 
 export interface QuizSongsResponse {

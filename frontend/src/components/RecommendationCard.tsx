@@ -61,9 +61,21 @@ function getReasonBadgeVariant(
       return "warning";
     case "crowd_pleaser":
       return "success";
+    case "generate_karaoke":
+      return "quiz";
     default:
       return "default";
   }
+}
+
+/**
+ * Format duration from milliseconds to mm:ss
+ */
+function formatDuration(ms: number | null): string | null {
+  if (!ms) return null;
+  const minutes = Math.floor(ms / 60000);
+  const seconds = Math.floor((ms % 60000) / 1000);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 /**
@@ -90,6 +102,8 @@ export function RecommendationCard({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const links = getKaraokeLinks(recommendation.artist, recommendation.title);
+  const isGenerateOnly = !recommendation.has_karaoke_version;
+  const duration = formatDuration(recommendation.duration_ms);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -115,20 +129,49 @@ export function RecommendationCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Glow effect on hover */}
+      {/* Glow effect on hover - different color for generate-only */}
       <div
-        className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] opacity-0 blur-sm transition-opacity duration-300 ${
+        className={`absolute -inset-0.5 rounded-2xl opacity-0 blur-sm transition-opacity duration-300 ${
           isHovered ? "opacity-60" : ""
+        } ${
+          isGenerateOnly
+            ? "bg-gradient-to-r from-[#00f5ff] via-[#00c8ff] to-[#00f5ff]"
+            : "bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff]"
         }`}
       />
 
-      <div className="relative flex flex-col gap-3 p-4 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 backdrop-blur-sm transition-all duration-300 hover:border-white/20">
+      <div
+        className={`relative flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-sm transition-all duration-300 ${
+          isGenerateOnly
+            ? "bg-[rgba(0,40,50,0.9)] border border-[#00f5ff]/30 hover:border-[#00f5ff]/50"
+            : "bg-[rgba(20,20,30,0.9)] border border-white/10 hover:border-white/20"
+        }`}
+      >
         {/* Top row: Title and score */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-semibold text-white truncate group-hover:text-[#00f5ff] transition-colors">
-              {recommendation.title}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3
+                className={`text-lg font-semibold truncate transition-colors ${
+                  isGenerateOnly
+                    ? "text-white group-hover:text-[#00f5ff]"
+                    : "text-white group-hover:text-[#00f5ff]"
+                }`}
+              >
+                {recommendation.title}
+              </h3>
+              {/* Badges next to title */}
+              {recommendation.explicit && (
+                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-white/20 text-white/70 rounded">
+                  E
+                </span>
+              )}
+              {recommendation.is_classic && (
+                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[#ffeb3b]/20 text-[#ffeb3b] rounded">
+                  CLASSIC
+                </span>
+              )}
+            </div>
             <p className="text-sm text-white/60 truncate mt-0.5">{recommendation.artist}</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -142,16 +185,28 @@ export function RecommendationCard({
           <Badge variant={getReasonBadgeVariant(recommendation.reason_type)}>
             {recommendation.reason}
           </Badge>
+          {isGenerateOnly && (
+            <Badge variant="default">
+              Generate Only
+            </Badge>
+          )}
         </div>
 
         {/* Bottom row: Stats and action */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-4">
-            {/* Brand count */}
-            <div className="flex items-center gap-2">
-              <PopularityStars count={recommendation.brand_count} />
-              <span className="text-xs text-white/40">{recommendation.brand_count} brands</span>
-            </div>
+            {/* Brand count - only show for karaoke-ready songs */}
+            {recommendation.has_karaoke_version && recommendation.brand_count > 0 && (
+              <div className="flex items-center gap-2">
+                <PopularityStars count={recommendation.brand_count} />
+                <span className="text-xs text-white/40">{recommendation.brand_count} brands</span>
+              </div>
+            )}
+
+            {/* Duration */}
+            {duration && (
+              <span className="text-xs text-white/30">{duration}</span>
+            )}
 
             {/* Spotify popularity */}
             {recommendation.popularity > 0 && (
@@ -159,56 +214,72 @@ export function RecommendationCard({
             )}
           </div>
 
-          {/* Karaoke button with dropdown */}
+          {/* Action button */}
           <div className="relative" ref={dropdownRef}>
-            <button
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            >
-              <MicrophoneIcon className="w-4 h-4" />
-              <span>Sing it!</span>
-              <ChevronDownIcon
-                className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
-              />
-            </button>
+            {isGenerateOnly ? (
+              /* Direct generate button for non-karaoke songs */
+              <a
+                href={links.generator}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#00c8ff] to-[#00f5ff] text-[#001820] text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(0,245,255,0.5)] active:scale-95"
+              >
+                <VideoIcon className="w-4 h-4" />
+                <span>Generate</span>
+              </a>
+            ) : (
+              /* Dropdown for karaoke-ready songs */
+              <>
+                <button
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  <MicrophoneIcon className="w-4 h-4" />
+                  <span>Sing it!</span>
+                  <ChevronDownIcon
+                    className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
 
-            {/* Dropdown menu */}
-            {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[rgba(30,30,40,0.98)] border border-white/20 shadow-xl overflow-hidden z-50 animate-fade-in">
-                <div className="p-1">
-                  <a
-                    href={links.youtube}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    <YouTubeIcon className="w-5 h-5 text-red-500" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white">Search YouTube</div>
-                      <div className="text-xs text-white/50 truncate">
-                        Find existing karaoke videos
-                      </div>
-                    </div>
-                  </a>
+                {/* Dropdown menu */}
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[rgba(30,30,40,0.98)] border border-white/20 shadow-xl overflow-hidden z-50 animate-fade-in">
+                    <div className="p-1">
+                      <a
+                        href={links.youtube}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
+                        <YouTubeIcon className="w-5 h-5 text-red-500" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white">Search YouTube</div>
+                          <div className="text-xs text-white/50 truncate">
+                            Find existing karaoke videos
+                          </div>
+                        </div>
+                      </a>
 
-                  <a
-                    href={links.generator}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    <VideoIcon className="w-5 h-5 text-[#00f5ff]" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white">Create with Generator</div>
-                      <div className="text-xs text-white/50 truncate">
-                        Generate custom karaoke video
-                      </div>
+                      <a
+                        href={links.generator}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
+                      >
+                        <VideoIcon className="w-5 h-5 text-[#00f5ff]" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white">Create with Generator</div>
+                          <div className="text-xs text-white/50 truncate">
+                            Generate custom karaoke video
+                          </div>
+                        </div>
+                      </a>
                     </div>
-                  </a>
-                </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
