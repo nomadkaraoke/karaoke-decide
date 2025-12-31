@@ -10,18 +10,18 @@ logger = logging.getLogger(__name__)
 
 
 def _normalize_for_matching(text: str) -> str:
-    """Normalize text for matching (same logic as TrackMatcher).
+    """Normalize text for matching.
 
-    Must match the Python normalization used on input tracks.
+    Must match the BigQuery REGEXP_REPLACE normalization exactly.
+    Removes ALL punctuation (including apostrophes) for simpler matching.
     """
     if not text:
         return ""
     # Lowercase
     result = text.lower()
-    # Replace curly quotes with straight
-    result = result.replace("'", "'").replace("'", "'")
-    # Remove punctuation except apostrophes (same as TrackMatcher)
-    result = re.sub(r"[^\w\s']", " ", result)
+    # Remove ALL punctuation (including apostrophes) - must match BigQuery regex
+    # BigQuery uses: r'[^a-z0-9 ]' which removes everything except letters, numbers, space
+    result = re.sub(r"[^a-z0-9 ]", " ", result)
     # Collapse multiple whitespace
     result = re.sub(r"\s+", " ", result)
     return result.strip()
@@ -280,7 +280,8 @@ class BigQueryCatalogService:
             # 2. Replace non-alphanumeric (except space and apostrophe) with space
             # 3. Collapse multiple spaces to single space
             # 4. Trim whitespace
-            normalize_sql = "TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER({field}), r\"[^a-z0-9 ']\", ' '), r' +', ' '))"
+            # NOTE: BigQuery uses single quotes for strings, and r'...' for raw regex
+            normalize_sql = "TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER({field}), r'[^a-z0-9 ]', ' '), r' +', ' '))"
             normalized_artist = normalize_sql.format(field="Artist")
             normalized_title = normalize_sql.format(field="Title")
             conditions.append(f"({normalized_artist} = '{safe_artist}' AND {normalized_title} = '{safe_title}')")
