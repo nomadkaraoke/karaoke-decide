@@ -68,33 +68,7 @@ export default function ServicesPage() {
   // Disconnect state
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
-  const loadServices = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const response = await api.services.getSyncStatus();
-      setServices(response.services);
-      setActiveJob(response.active_job);
-
-      // If there's an active job, start polling
-      if (response.active_job &&
-          (response.active_job.status === "pending" || response.active_job.status === "in_progress")) {
-        setIsSyncing(true);
-        // Start polling if not already polling
-        if (!pollIntervalRef.current) {
-          pollIntervalRef.current = setInterval(pollSyncStatus, 3000);
-        }
-      } else {
-        setIsSyncing(false);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load services");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [pollSyncStatus]);
-
-  // Polling for sync status
+  // Polling for sync status (defined before loadServices since it's used there)
   const pollSyncStatus = useCallback(async () => {
     try {
       const response = await api.services.getSyncStatus();
@@ -135,6 +109,32 @@ export default function ServicesPage() {
       console.error("Polling error:", err);
     }
   }, []);
+
+  const loadServices = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await api.services.getSyncStatus();
+      setServices(response.services);
+      setActiveJob(response.active_job);
+
+      // If there's an active job, start polling
+      if (response.active_job &&
+          (response.active_job.status === "pending" || response.active_job.status === "in_progress")) {
+        setIsSyncing(true);
+        // Start polling if not already polling
+        if (!pollIntervalRef.current) {
+          pollIntervalRef.current = setInterval(pollSyncStatus, 3000);
+        }
+      } else {
+        setIsSyncing(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load services");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pollSyncStatus]);
 
   useEffect(() => {
     loadServices();

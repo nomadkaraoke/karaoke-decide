@@ -171,7 +171,10 @@ def mock_firestore_service() -> MagicMock:
 
     # Mock the client.collection().where().order_by().limit().stream() chain
     # used in get_sync_status
-    async def async_empty_generator():
+    from collections.abc import AsyncGenerator
+    from typing import Any
+
+    async def async_empty_generator() -> AsyncGenerator[Any, None]:
         return
         yield  # Makes this an async generator
 
