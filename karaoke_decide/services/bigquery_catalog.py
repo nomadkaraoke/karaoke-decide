@@ -1,11 +1,30 @@
 """BigQuery-based song catalog service."""
 
 import logging
+import re
 from dataclasses import dataclass
 
 from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_for_matching(text: str) -> str:
+    """Normalize text for matching (same logic as TrackMatcher).
+
+    Must match the Python normalization used on input tracks.
+    """
+    if not text:
+        return ""
+    # Lowercase
+    result = text.lower()
+    # Replace curly quotes with straight
+    result = result.replace("'", "'").replace("'", "'")
+    # Remove punctuation except apostrophes (same as TrackMatcher)
+    result = re.sub(r"[^\w\s']", " ", result)
+    # Collapse multiple whitespace
+    result = re.sub(r"\s+", " ", result)
+    return result.strip()
 
 
 @dataclass
@@ -247,14 +266,24 @@ class BigQueryCatalogService:
 
         # Build OR conditions for each track
         # Using parameterized queries would require dynamic parameter count,
-        # so we sanitize and use LOWER() for case-insensitive matching
+        # so we sanitize and normalize for matching
+        # IMPORTANT: Must normalize BOTH the input AND the catalog data identically
+        # The catalog has punctuation (commas, etc.) that input normalization removes
         conditions = []
         for artist, title in tracks:
             # Escape single quotes by doubling them (BigQuery SQL escaping)
-            # Also lowercase to match LOWER() in SQL
+            # Input is already normalized (lowercase, punctuation removed except apostrophes)
             safe_artist = artist.replace("'", "''").lower()
             safe_title = title.replace("'", "''").lower()
-            conditions.append(f"(LOWER(Artist) = '{safe_artist}' AND LOWER(Title) = '{safe_title}')")
+            # Use REGEXP_REPLACE to normalize catalog data the same way:
+            # 1. Lowercase
+            # 2. Replace non-alphanumeric (except space and apostrophe) with space
+            # 3. Collapse multiple spaces to single space
+            # 4. Trim whitespace
+            normalize_sql = "TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER({field}), r\"[^a-z0-9 ']\", ' '), r' +', ' '))"
+            normalized_artist = normalize_sql.format(field="Artist")
+            normalized_title = normalize_sql.format(field="Title")
+            conditions.append(f"({normalized_artist} = '{safe_artist}' AND {normalized_title} = '{safe_title}')")
 
         # Process in chunks to avoid query size limits (max ~100 tracks per query)
         chunk_size = 100
@@ -281,8 +310,9 @@ class BigQueryCatalogService:
             chunk_matches = 0
             for row in results:
                 chunk_matches += 1
-                # Create key using lowercased values to match input
-                key = (row.artist.lower(), row.title.lower())
+                # Create key using NORMALIZED values to match input
+                # Must use same normalization as TrackMatcher applies to input
+                key = (_normalize_for_matching(row.artist), _normalize_for_matching(row.title))
                 # If multiple matches (same song different brands), keep highest brand_count
                 if key not in all_results or row.brand_count > all_results[key].brand_count:
                     all_results[key] = SongResult(
