@@ -200,6 +200,14 @@ After merging to main:
 | `e2e-smoke` | Production smoke tests |
 | `deploy-frontend` | Deploy to GitHub Pages |
 
+### Known Testing Gaps
+
+**Infrastructure dependencies** (Cloud Tasks, BigQuery, Firestore) are mocked in tests. This means IAM permission errors won't be caught until production. Mitigations:
+
+1. **Authenticated smoke tests** - Use `e2e/sync-integration.spec.ts` with a test account token
+2. **Manual verification** after infrastructure changes (Pulumi updates)
+3. **Deep health endpoint** (planned) - `/api/health/deep` to validate connectivity
+
 ## Running Tests Locally
 
 ```bash

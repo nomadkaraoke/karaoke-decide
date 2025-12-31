@@ -155,6 +155,23 @@ cloud_tasks_invoker = gcp.projects.IAMMember(
     member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
 )
 
+# Allow service account to act as itself (required for Cloud Tasks OIDC)
+# This grants iam.serviceAccounts.actAs permission
+service_account_user = gcp.serviceaccount.IAMMember(
+    "compute-sa-act-as-self",
+    service_account_id=f"projects/{project}/serviceAccounts/{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    role="roles/iam.serviceAccountUser",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+)
+
+# =============================================================================
+# Firestore Indexes
+# =============================================================================
+
+# NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
+# It was created manually/automatically and is required by GET /api/services/sync/status
+# Not managed by Pulumi to avoid conflicts with existing index
+
 # =============================================================================
 # Cloud Run
 # =============================================================================

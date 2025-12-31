@@ -608,3 +608,58 @@ cloud_run_service = gcp.cloudrunv2.Service(
 ```
 
 **Key insight:** If you use Pulumi for infrastructure, put ALL Cloud Run configuration in Pulumi - don't split between Pulumi (env vars) and CI (secrets).
+
+---
+
+### 2025-12-31: Cloud Tasks OIDC Requires iam.serviceAccounts.actAs
+
+**Context:** Sync button returned 403 error in production: "The principal lacks IAM permission iam.serviceAccounts.actAs for the resource".
+
+**Lesson:** When Cloud Tasks creates tasks with OIDC authentication (to call Cloud Run), the service account creating the task needs `roles/iam.serviceAccountUser` on the target service account. This grants the `iam.serviceAccounts.actAs` permission required for OIDC token impersonation.
+
+**Recommendation:**
+```python
+# In Pulumi infrastructure code
+gcp.serviceaccount.IAMMember(
+    "compute-sa-act-as-self",
+    service_account_id=f"projects/{project}/serviceAccounts/{SA_EMAIL}",
+    role="roles/iam.serviceAccountUser",
+    member=f"serviceAccount:{SA_EMAIL}",  # Allow SA to act as itself
+)
+```
+
+**Why tests didn't catch this:** All tests mocked the Cloud Tasks service. No test actually called `CloudTasksClient.create_task()` with real credentials. See "Testing Strategy for Infrastructure" entry below.
+
+---
+
+### 2025-12-31: Testing Strategy for Infrastructure Dependencies
+
+**Context:** IAM permission error wasn't caught because Cloud Tasks was completely mocked in tests.
+
+**Lesson:** Tests that mock external services don't validate IAM permissions or infrastructure configuration. Production-like integration tests are needed for infrastructure-dependent code paths.
+
+**Gap identified:**
+- Backend tests mock `CloudTasksService` entirely
+- E2E tests mock API responses, never trigger real sync
+- Production API tests only test unauthenticated endpoints
+
+**Recommendations:**
+
+1. **Add authenticated production smoke tests** - Run after deploy with a test account:
+   ```bash
+   PROD_TEST_TOKEN=<jwt> npx playwright test e2e/sync-integration.spec.ts
+   ```
+
+2. **Use Cloud Tasks emulator in CI** for integration tests (when available)
+
+3. **Add infrastructure health endpoint** that validates connectivity:
+   ```python
+   @router.get("/health/deep")
+   async def deep_health_check():
+       # Test Cloud Tasks queue exists and is accessible
+       # Test BigQuery connectivity
+       # Test Firestore connectivity
+       return {"status": "healthy", "checks": {...}}
+   ```
+
+4. **Document required IAM bindings** in infrastructure code with comments explaining why each is needed

@@ -3,6 +3,7 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import logging
 import uuid
 from datetime import UTC, datetime
 from urllib.parse import quote
@@ -20,6 +21,8 @@ from backend.api.deps import (
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -376,12 +379,16 @@ async def get_sync_status(
     # Find most recent active or recent job for this user
     active_job: SyncJobStatusResponse | None = None
     try:
-        jobs_ref = firestore.client.collection("sync_jobs")
-        query = jobs_ref.where("user_id", "==", user.id).order_by("created_at", direction="DESCENDING").limit(1)
-        docs = query.stream()
+        # Use the proper async query method
+        job_docs = await firestore.query_documents(
+            collection="sync_jobs",
+            filters=[("user_id", "==", user.id)],
+            order_by="created_at",
+            order_direction="DESCENDING",
+            limit=1,
+        )
 
-        for doc in docs:
-            job_data = doc.to_dict()
+        for job_data in job_docs:
             if job_data:
                 job = SyncJob.from_dict(job_data)
 
@@ -390,7 +397,6 @@ async def get_sync_status(
                 if job.status == SyncJobStatus.COMPLETED and job.completed_at:
                     seconds_since = (datetime.now(UTC) - job.completed_at).total_seconds()
                     include_job = seconds_since < 60
-
                 if include_job:
                     progress = None
                     if job.progress:
@@ -427,9 +433,10 @@ async def get_sync_status(
                         created_at=job.created_at.isoformat(),
                         completed_at=job.completed_at.isoformat() if job.completed_at else None,
                     )
-    except Exception:
-        # If query fails (e.g., missing index), just continue without active job
-        pass
+    except Exception as e:
+        # Log the actual error - likely missing Firestore composite index
+        logger.error(f"Failed to query sync_jobs for user {user.id}: {e}")
+        # Continue without active job - frontend will show sync button
 
     return SyncStatusResponse(
         services=[
