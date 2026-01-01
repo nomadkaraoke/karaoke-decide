@@ -218,8 +218,97 @@ export const api = {
           reason_type: string;
           brand_count: number;
           popularity: number;
+          has_karaoke_version: boolean;
+          is_classic: boolean;
+          duration_ms: number | null;
+          explicit: boolean;
         }>;
       }>(`/api/my/recommendations?${params.toString()}`);
+    },
+
+    getCategorizedRecommendations: (filters?: {
+      has_karaoke?: boolean | null;
+      min_popularity?: number;
+      max_popularity?: number;
+      exclude_explicit?: boolean;
+      min_duration_ms?: number;
+      max_duration_ms?: number;
+      classics_only?: boolean;
+    }) => {
+      const params = new URLSearchParams();
+      if (filters) {
+        if (filters.has_karaoke !== undefined && filters.has_karaoke !== null) {
+          params.append("has_karaoke", filters.has_karaoke.toString());
+        }
+        if (filters.min_popularity !== undefined) {
+          params.append("min_popularity", filters.min_popularity.toString());
+        }
+        if (filters.max_popularity !== undefined) {
+          params.append("max_popularity", filters.max_popularity.toString());
+        }
+        if (filters.exclude_explicit !== undefined) {
+          params.append("exclude_explicit", filters.exclude_explicit.toString());
+        }
+        if (filters.min_duration_ms !== undefined) {
+          params.append("min_duration_ms", filters.min_duration_ms.toString());
+        }
+        if (filters.max_duration_ms !== undefined) {
+          params.append("max_duration_ms", filters.max_duration_ms.toString());
+        }
+        if (filters.classics_only !== undefined) {
+          params.append("classics_only", filters.classics_only.toString());
+        }
+      }
+      const queryString = params.toString();
+      const url = queryString
+        ? `/api/my/recommendations/categorized?${queryString}`
+        : "/api/my/recommendations/categorized";
+      return api.get<{
+        from_artists_you_know: Array<{
+          song_id: string;
+          artist: string;
+          title: string;
+          score: number;
+          reason: string;
+          reason_type: string;
+          brand_count: number;
+          popularity: number;
+          has_karaoke_version: boolean;
+          is_classic: boolean;
+          duration_ms: number | null;
+          explicit: boolean;
+        }>;
+        create_your_own: Array<{
+          song_id: string;
+          artist: string;
+          title: string;
+          score: number;
+          reason: string;
+          reason_type: string;
+          brand_count: number;
+          popularity: number;
+          has_karaoke_version: boolean;
+          is_classic: boolean;
+          duration_ms: number | null;
+          explicit: boolean;
+        }>;
+        crowd_pleasers: Array<{
+          song_id: string;
+          artist: string;
+          title: string;
+          score: number;
+          reason: string;
+          reason_type: string;
+          brand_count: number;
+          popularity: number;
+          has_karaoke_version: boolean;
+          is_classic: boolean;
+          duration_ms: number | null;
+          explicit: boolean;
+        }>;
+        total_count: number;
+        filters_applied: Record<string, string | number | boolean | null>;
+      }>(url);
     },
 
     getArtists: (

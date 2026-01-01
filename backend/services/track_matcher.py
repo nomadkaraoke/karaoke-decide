@@ -3,6 +3,7 @@
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
 
@@ -19,6 +20,11 @@ class MatchedTrack:
     normalized_title: str
     catalog_song: SongResult | None  # None if no match found
     match_confidence: float  # 0.0 to 1.0
+
+    # Source track metadata (optional, for storing unmatched tracks)
+    spotify_popularity: int | None = None
+    duration_ms: int | None = None
+    explicit: bool = False
 
 
 class TrackMatcher:
@@ -204,7 +210,7 @@ class TrackMatcher:
 
     async def batch_match_tracks(
         self,
-        tracks: list[dict[str, str]],
+        tracks: list[dict[str, Any]],
     ) -> list[MatchedTrack]:
         """Match a batch of tracks to the karaoke catalog.
 
@@ -213,7 +219,8 @@ class TrackMatcher:
         large listening histories (900+ tracks).
 
         Args:
-            tracks: List of dicts with 'artist' and 'title' keys.
+            tracks: List of dicts with 'artist', 'title', and optionally
+                   'popularity', 'duration_ms', 'explicit' keys.
 
         Returns:
             List of MatchedTrack results in same order as input.
@@ -224,11 +231,25 @@ class TrackMatcher:
         logger.info(f"Track matcher: received {len(tracks)} tracks to match")
 
         # First, normalize all tracks and build lookup structures
-        normalized_tracks: list[tuple[str, str, str, str]] = []  # (orig_artist, orig_title, norm_artist, norm_title)
+        # (orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit)
+        normalized_tracks: list[tuple[str, str, str, str, int | None, int | None, bool]] = []
         for track in tracks:
             artist = track.get("artist", "")
             title = track.get("title", "")
-            normalized_tracks.append((artist, title, self.normalize_artist(artist), self.normalize_title(title)))
+            popularity = track.get("popularity")
+            duration_ms = track.get("duration_ms")
+            explicit = track.get("explicit", False)
+            normalized_tracks.append(
+                (
+                    artist,
+                    title,
+                    self.normalize_artist(artist),
+                    self.normalize_title(title),
+                    popularity,
+                    duration_ms,
+                    explicit,
+                )
+            )
 
         # Build list of unique (normalized_artist, normalized_title) tuples for batch query
         unique_normalized = list({(nt[2], nt[3]) for nt in normalized_tracks if nt[2] and nt[3]})
@@ -246,7 +267,7 @@ class TrackMatcher:
 
         # Build results maintaining original order
         results: list[MatchedTrack] = []
-        for orig_artist, orig_title, norm_artist, norm_title in normalized_tracks:
+        for orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit in normalized_tracks:
             # Look up match using normalized values
             key = (norm_artist, norm_title)
             catalog_song = matched_songs.get(key)
@@ -259,6 +280,9 @@ class TrackMatcher:
                     normalized_title=norm_title,
                     catalog_song=catalog_song,
                     match_confidence=1.0 if catalog_song else 0.0,
+                    spotify_popularity=popularity,
+                    duration_ms=duration_ms,
+                    explicit=explicit,
                 )
             )
 

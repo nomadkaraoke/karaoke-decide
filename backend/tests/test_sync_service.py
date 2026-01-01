@@ -476,7 +476,7 @@ class TestExtractTrackInfo:
     """Tests for track info extraction methods."""
 
     def test_extract_spotify_track_basic(self, sync_service: SyncService) -> None:
-        """Extracts basic Spotify track info."""
+        """Extracts basic Spotify track info including metadata."""
         track = {
             "name": "Test Song",
             "artists": [{"name": "Test Artist"}],
@@ -484,7 +484,13 @@ class TestExtractTrackInfo:
 
         result = sync_service._extract_spotify_track_info(track)
 
-        assert result == {"artist": "Test Artist", "title": "Test Song"}
+        assert result is not None
+        assert result["artist"] == "Test Artist"
+        assert result["title"] == "Test Song"
+        # New fields with defaults
+        assert result["popularity"] == 0
+        assert result["duration_ms"] is None
+        assert result["explicit"] is False
 
     def test_extract_spotify_track_multiple_artists(self, sync_service: SyncService) -> None:
         """Uses primary artist for multiple artists."""
@@ -600,13 +606,15 @@ class TestUpsertUserSongs:
         assert call_args[0][2]["play_count"] == 6
 
     @pytest.mark.asyncio
-    async def test_skips_unmatched_tracks(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
-        """Skips tracks without catalog match."""
+    async def test_stores_unmatched_tracks_for_generate_feature(
+        self, sync_service: SyncService, mock_firestore: MagicMock
+    ) -> None:
+        """Stores unmatched tracks with synthetic song_id for Generate Your Own feature."""
         matched = [
             MatchedTrack(
-                original_artist="Unknown",
+                original_artist="Unknown Artist",
                 original_title="Unknown Song",
-                normalized_artist="unknown",
+                normalized_artist="unknown artist",
                 normalized_title="unknown song",
                 catalog_song=None,
                 match_confidence=0.0,
@@ -615,6 +623,14 @@ class TestUpsertUserSongs:
 
         created, updated = await sync_service._upsert_user_songs("user_123", matched, "spotify")
 
-        assert created == 0
+        # Unmatched tracks are now stored with has_karaoke_version=False
+        assert created == 1
         assert updated == 0
-        mock_firestore.set_document.assert_not_called()
+
+        # Verify the document was created with synthetic song_id
+        call_args = mock_firestore.set_document.call_args
+        doc_data = call_args[0][2]
+        assert doc_data["song_id"] == "spotify:unknown artist:unknown song"
+        assert doc_data["has_karaoke_version"] is False
+        assert doc_data["artist"] == "Unknown Artist"
+        assert doc_data["title"] == "Unknown Song"

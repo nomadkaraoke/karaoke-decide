@@ -697,14 +697,14 @@ class SyncService:
         logger.info(f"Spotify fetch complete: {len(tracks)} total unique tracks")
         return tracks
 
-    def _extract_spotify_track_info(self, track: dict[str, Any]) -> dict[str, str] | None:
-        """Extract artist and title from Spotify track object.
+    def _extract_spotify_track_info(self, track: dict[str, Any]) -> dict[str, Any] | None:
+        """Extract track info from Spotify track object.
 
         Args:
             track: Spotify track object.
 
         Returns:
-            Dict with 'artist' and 'title', or None if invalid.
+            Dict with track info, or None if invalid.
         """
         if not track:
             return None
@@ -720,7 +720,13 @@ class SyncService:
         if not artist:
             return None
 
-        return {"artist": artist, "title": title}
+        return {
+            "artist": artist,
+            "title": title,
+            "popularity": track.get("popularity", 0),
+            "duration_ms": track.get("duration_ms"),
+            "explicit": track.get("explicit", False),
+        }
 
     async def _fetch_lastfm_tracks(self, username: str) -> list[dict[str, str]]:
         """Fetch tracks from Last.fm API.
@@ -847,7 +853,10 @@ class SyncService:
         matched_tracks: list[MatchedTrack],
         source: str,
     ) -> tuple[int, int]:
-        """Create or update UserSong records for matched tracks.
+        """Create or update UserSong records for ALL tracks.
+
+        Stores both matched tracks (with karaoke versions) and unmatched tracks
+        (for "Create Your Own Karaoke" feature).
 
         Args:
             user_id: User ID.
@@ -862,11 +871,20 @@ class SyncService:
         now = datetime.now(UTC)
 
         for match in matched_tracks:
-            if match.catalog_song is None:
-                # Skip unmatched tracks
-                continue
+            catalog_song = match.catalog_song
+            has_karaoke = catalog_song is not None
 
-            song_id = str(match.catalog_song.id)
+            if catalog_song is not None:
+                # Matched track - use catalog song ID
+                song_id = str(catalog_song.id)
+                artist = catalog_song.artist
+                title = catalog_song.title
+            else:
+                # Unmatched track - use synthetic ID based on normalized values
+                song_id = f"spotify:{match.normalized_artist}:{match.normalized_title}"
+                artist = match.original_artist
+                title = match.original_title
+
             user_song_id = f"{user_id}:{song_id}"
 
             # Check if UserSong exists
@@ -894,6 +912,7 @@ class SyncService:
                     "id": user_song_id,
                     "user_id": user_id,
                     "song_id": song_id,
+                    "source": source,
                     "play_count": 1,
                     "last_played_at": now.isoformat(),
                     "is_saved": source == "spotify",  # Spotify saved tracks are "saved"
@@ -901,8 +920,13 @@ class SyncService:
                     "last_sung_at": None,
                     "average_rating": None,
                     "notes": None,
-                    "artist": match.catalog_song.artist,
-                    "title": match.catalog_song.title,
+                    "artist": artist,
+                    "title": title,
+                    "has_karaoke_version": has_karaoke,
+                    "spotify_popularity": match.spotify_popularity,
+                    "duration_ms": match.duration_ms,
+                    "explicit": match.explicit,
+                    "created_at": now.isoformat(),
                     "updated_at": now.isoformat(),
                 }
                 await self.firestore.set_document(

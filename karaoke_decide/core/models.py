@@ -106,6 +106,12 @@ class UserSong(BaseModel):
     artist: str
     title: str
 
+    # Karaoke availability (for "Create Your Own Karaoke" feature)
+    has_karaoke_version: bool = True  # False for Spotify-only songs
+    spotify_popularity: int | None = None  # For sorting/filtering
+    duration_ms: int | None = None  # Song duration
+    explicit: bool = False  # Explicit content flag
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -176,8 +182,15 @@ class Recommendation(BaseModel):
         "decade_match",
         "crowd_pleaser",
         "popular",
+        "generate_karaoke",  # For songs without karaoke version
     ]
 
-    # Optional metadata
+    # Karaoke availability
     brand_count: int = 0
     popularity: int = 0
+    has_karaoke_version: bool = True  # False for generate-only songs
+    is_classic: bool = False  # True if brand_count >= 20
+
+    # Optional metadata for filtering
+    duration_ms: int | None = None
+    explicit: bool = False
