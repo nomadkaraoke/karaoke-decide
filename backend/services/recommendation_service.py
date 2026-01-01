@@ -590,6 +590,7 @@ class RecommendationService:
                             score=score,
                             reason=f"You listen to {song['artist']}",
                             reason_type="known_artist",
+                            is_classic=song["brand_count"] >= self.CLASSIC_THRESHOLD,
                         )
                     )
 
@@ -615,6 +616,7 @@ class RecommendationService:
                             score=score,
                             reason="Popular karaoke song",
                             reason_type="crowd_pleaser",
+                            is_classic=song["brand_count"] >= self.CLASSIC_THRESHOLD,
                         )
                     )
 
