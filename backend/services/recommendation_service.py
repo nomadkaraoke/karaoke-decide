@@ -393,13 +393,14 @@ class RecommendationService:
             }
             score = self._calculate_score(song_data, context, is_known_artist=is_known, has_karaoke=False)
 
+            # Use the already-validated spotify_pop value
             scored.append(
                 ScoredSong(
                     song_id=doc.get("song_id", ""),
                     artist=artist,
                     title=doc.get("title", ""),
                     brand_count=0,
-                    spotify_popularity=doc.get("spotify_popularity", 50),
+                    spotify_popularity=spotify_pop if spotify_pop is not None else 50,
                     score=score,
                     reason=f"Generate karaoke for {artist}",
                     reason_type="generate_karaoke",
