@@ -31,10 +31,11 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Email Delivery:** SendGrid configured for production magic link emails
 
 ### 🚧 Next Up (Post-MLP)
-1. Analytics and usage tracking
-2. Social features (share playlists, follow users)
-3. Advanced recommendation tuning
-4. Mobile app (React Native)
+1. **Audio Analysis ETL** - Load 4TB Spotify audio features for tempo/key/energy filters ([plan](plans/2025-01-spotify-audio-analysis-etl.md))
+2. Analytics and usage tracking
+3. Social features (share playlists, follow users)
+4. Advanced recommendation tuning
+5. Mobile app (React Native)
 
 ### 📋 Full Roadmap
 See [PLAN.md](PLAN.md) for complete implementation phases.
