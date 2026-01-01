@@ -385,8 +385,10 @@ class RecommendationService:
             is_known = artist.lower() in context.known_artists
 
             # Build a song dict for scoring
+            # Use 50 as default if spotify_popularity is missing or None
+            spotify_pop = doc.get("spotify_popularity")
             song_data = {
-                "spotify_popularity": doc.get("spotify_popularity", 50),
+                "spotify_popularity": spotify_pop if spotify_pop is not None else 50,
                 "brand_count": 0,  # No karaoke = 0 brands
             }
             score = self._calculate_score(song_data, context, is_known_artist=is_known, has_karaoke=False)
