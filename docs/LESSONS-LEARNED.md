@@ -764,3 +764,49 @@ await page.getByTestId("genre-rock").click();
 - Use kebab-case: `genre-rock`, `refresh-artists-btn`
 - Include context: `decade-1980s`, `energy-chill`
 - For dynamic elements: `genre-${id}`, `progress-dot-${n}`
+
+---
+
+### 2026-01-02: Debian 12 PEP 668 - Use Virtual Environments
+
+**Context:** Setting up GCE VM for Spotify audio analysis ETL, tried to `pip install` packages globally.
+
+**Lesson:** Debian 12 implements PEP 668 (externally managed Python environment). Running `pip install --user` fails with "externally-managed-environment" error.
+
+**Recommendation:**
+```bash
+# BAD - fails on Debian 12
+pip3 install --user google-cloud-bigquery
+
+# GOOD - use virtual environment
+python3 -m venv /data/venv
+source /data/venv/bin/activate
+pip install google-cloud-bigquery
+```
+
+---
+
+### 2026-01-02: ETL Data Reduction - Extract Only What You Need
+
+**Context:** Planning ETL for 4TB Spotify audio analysis torrent.
+
+**Lesson:** The raw audio analysis JSON contains per-beat, per-segment data that accounts for ~99% of the file size. For our use case (tempo/key filtering), we only need the track-level summary fields.
+
+**Recommendation:**
+- Before ETL, analyze the data structure to identify what you actually need
+- 4TB raw → ~8GB extracted = 99.8% reduction
+- Stream-process large files, don't load entirely into memory
+- Delete processed files immediately to conserve disk space
+
+---
+
+### 2026-01-02: Preserve Raw Source Data for Future Use
+
+**Context:** Had to re-download Spotify metadata dump because original ETL only extracted certain fields.
+
+**Lesson:** When processing large data dumps, always preserve the raw data in cheap archive storage. Future features may need fields you didn't extract initially.
+
+**Recommendation:**
+- Upload raw data to GCS Archive storage class (~$0.0012/GB/month)
+- 4TB costs ~$5/month - cheap insurance
+- Document the data location and schema in archive docs
