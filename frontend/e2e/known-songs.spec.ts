@@ -184,8 +184,8 @@ test.describe("Known Songs Page", () => {
     // Track added songs
     let addedSong = false;
 
-    // Mock known songs endpoint
-    await page.route("**/api/known-songs", async (route) => {
+    // Mock known songs endpoint (wildcard to match query params)
+    await page.route("**/api/known-songs*", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({
           status: 200,

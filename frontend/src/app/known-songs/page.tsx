@@ -100,6 +100,16 @@ export default function KnownSongsPage() {
     loadKnownSongs(1);
   }, [loadKnownSongs]);
 
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Search for songs in catalog
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {

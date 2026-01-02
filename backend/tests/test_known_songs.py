@@ -483,10 +483,10 @@ class TestKnownSongsServiceUnit:
     ) -> None:
         """Test bulk adding known songs."""
 
-        # Mock BigQuery to return song details for some songs
+        # Mock BigQuery to return song details for both songs
         def mock_query(sql, job_config=None):
             result = MagicMock()
-            # Return result for songs 1 and 2, but not 3
+            # Return result for songs 1 and 2
             mock_row_1 = MagicMock()
             mock_row_1.id = "1"
             mock_row_1.artist = "Queen"
@@ -496,7 +496,7 @@ class TestKnownSongsServiceUnit:
             mock_row_2.artist = "Journey"
             mock_row_2.title = "Don't Stop Believin'"
 
-            result.result.return_value = [mock_row_1]
+            result.result.return_value = [mock_row_1, mock_row_2]
             return result
 
         known_songs_service._bigquery_client.query.side_effect = mock_query

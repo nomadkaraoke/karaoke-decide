@@ -4,6 +4,7 @@ Allows users to manually add songs they know they like singing,
 which helps improve recommendation quality.
 """
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -88,15 +89,16 @@ class KnownSongsService:
         Raises:
             ValueError: If song not found in catalog.
         """
-        # Get song details from BigQuery
-        song = self._get_song_by_id(song_id)
+        # Get song details from BigQuery (run in executor to avoid blocking)
+        loop = asyncio.get_running_loop()
+        song = await loop.run_in_executor(None, self._get_song_by_id, song_id)
         if not song:
             raise ValueError(f"Song with ID {song_id} not found in catalog")
 
         now = datetime.now(UTC)
         user_song_id = f"{user_id}:{song_id}"
 
-        # Check if already exists
+        # Check if already exists first
         existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
 
         if existing is not None:
@@ -132,10 +134,15 @@ class KnownSongsService:
             "updated_at": now.isoformat(),
         }
 
+        # Use merge=True to handle potential TOCTOU race condition gracefully
+        # If concurrent request creates the doc, this will merge (effectively no-op
+        # since data is identical). This is safe because we already check existence
+        # above, and the worst case is both requests succeed (acceptable).
         await self.firestore.set_document(
             self.USER_SONGS_COLLECTION,
             user_song_id,
             user_song_data,
+            merge=True,
         )
 
         return AddKnownSongResult(
@@ -193,7 +200,16 @@ class KnownSongsService:
 
         Returns:
             KnownSongsListResult with paginated songs.
+
+        Raises:
+            ValueError: If page < 1 or per_page < 1.
         """
+        # Validate pagination parameters
+        if page < 1:
+            raise ValueError("page must be >= 1")
+        if per_page < 1:
+            raise ValueError("per_page must be >= 1")
+
         offset = (page - 1) * per_page
 
         # Count total known songs for this user
