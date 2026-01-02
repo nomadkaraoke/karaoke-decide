@@ -40,11 +40,8 @@ See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
 
 ### Git Workflow
 
-1. **Never commit directly to `main`** - always use feature branches
-2. **Use git worktrees** for parallel work:
-   ```bash
-   git worktree add -b feature/xyz ../karaoke-decide-feat-xyz main
-   ```
+1. **Never commit directly to `main`** - use `/new-worktree <description>` to start
+2. **Follow global workflow** - see `~/.claude/CLAUDE.md` for command sequence
 3. **PR format:** Summary, changes list, testing info
 4. **CI must pass before merge** - lint, unit tests, backend tests, frontend build
 
@@ -159,14 +156,17 @@ scripts/           # Dev utilities
 
 ## Slash Commands
 
+See `~/.claude/CLAUDE.md` for full workflow. Key commands:
+
 | Command | Purpose |
 |---------|---------|
-| `/plan` | Create implementation plan for a feature |
-| `/implement` | Implement from an existing plan |
-| `/test` | Run tests and report results |
-| `/docs-review` | Check docs before merging PR |
-| `/docs-maintain` | Periodic documentation maintenance |
-| `/coderabbit-review` | Address CodeRabbit PR comments |
+| `/new-worktree <desc>` | Start work in isolated worktree |
+| `/plan` | Create implementation plan |
+| `/implement` | Implement from plan |
+| `/test` | Run tests |
+| `/docs-review` | Check docs before PR |
+| `/review` | Run CodeRabbit CLI locally |
+| `/pr` | Create PR (adds @coderabbitai ignore) |
 
 ## Common Tasks
 
