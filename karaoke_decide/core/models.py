@@ -159,11 +159,23 @@ class QuizSong(BaseModel):
     brand_count: int  # Number of karaoke brands
 
 
+class QuizArtist(BaseModel):
+    """Artist presented in the onboarding quiz."""
+
+    name: str  # Artist name (used as ID)
+    song_count: int  # Number of karaoke songs by this artist
+    top_songs: list[str]  # Top 3 song titles for preview
+    total_brand_count: int  # Sum of brand counts across all songs
+    primary_decade: str  # Most common decade for their songs
+    image_url: str | None = None  # Artist image URL (from Spotify)
+
+
 class QuizResponse(BaseModel):
     """User's response to the onboarding quiz."""
 
     user_id: str
-    known_song_ids: list[str]  # Songs the user recognized
+    known_song_ids: list[str] = Field(default_factory=list)  # Legacy: Songs the user recognized
+    known_artists: list[str] = Field(default_factory=list)  # Artists the user knows
     decade_preference: str | None = None  # Preferred decade
     energy_preference: Literal["chill", "medium", "high"] | None = None
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

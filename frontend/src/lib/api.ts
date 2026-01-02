@@ -368,8 +368,21 @@ export const api = {
         }>;
       }>(`/api/quiz/songs?count=${count}`),
 
+    getArtists: (count: number = 25) =>
+      api.get<{
+        artists: Array<{
+          name: string;
+          song_count: number;
+          top_songs: string[];
+          total_brand_count: number;
+          primary_decade: string;
+          image_url: string | null;
+        }>;
+      }>(`/api/quiz/artists?count=${count}`),
+
     submit: (data: {
-      known_song_ids: string[];
+      known_song_ids?: string[];
+      known_artists?: string[];
       decade_preference?: string | null;
       energy_preference?: "chill" | "medium" | "high" | null;
     }) =>

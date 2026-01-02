@@ -36,13 +36,33 @@ class QuizSongsResponse(BaseModel):
     songs: list[QuizSongResponse]
 
 
+class QuizArtistResponse(BaseModel):
+    """Artist presented in the onboarding quiz."""
+
+    name: str
+    song_count: int
+    top_songs: list[str]
+    total_brand_count: int
+    primary_decade: str
+    image_url: str | None = None
+
+
+class QuizArtistsResponse(BaseModel):
+    """Response containing quiz artists."""
+
+    artists: list[QuizArtistResponse]
+
+
 class QuizSubmitRequest(BaseModel):
     """Request to submit quiz responses."""
 
     known_song_ids: list[str] = Field(
-        ...,
-        description="List of song IDs the user recognized",
-        min_length=0,
+        default_factory=list,
+        description="List of song IDs the user recognized (legacy)",
+    )
+    known_artists: list[str] = Field(
+        default_factory=list,
+        description="List of artist names the user knows",
     )
     decade_preference: str | None = Field(
         None,
@@ -81,11 +101,13 @@ async def get_quiz_songs(
     quiz_service: QuizServiceDep,
     count: int = Query(15, ge=5, le=30, description="Number of quiz songs"),
 ) -> QuizSongsResponse:
-    """Get quiz songs for onboarding.
+    """Get quiz songs for onboarding (legacy endpoint).
 
     Returns a selection of popular karaoke songs for the user to
     indicate which ones they know. Songs are selected to provide
     variety across different artists.
+
+    Note: Consider using /artists instead for better UX.
 
     Requires authentication to track quiz completion.
     """
@@ -106,6 +128,41 @@ async def get_quiz_songs(
     )
 
 
+@router.get("/artists", response_model=QuizArtistsResponse)
+async def get_quiz_artists(
+    user: CurrentUser,
+    quiz_service: QuizServiceDep,
+    count: int = Query(25, ge=10, le=50, description="Number of quiz artists"),
+) -> QuizArtistsResponse:
+    """Get quiz artists for onboarding.
+
+    Returns a selection of popular karaoke artists for the user to
+    indicate which ones they know. This provides a faster and richer
+    onboarding experience than selecting individual songs.
+
+    Artists are selected based on:
+    - Total number of karaoke songs available
+    - Combined brand coverage (popularity proxy)
+
+    Requires authentication to track quiz completion.
+    """
+    artists = await quiz_service.get_quiz_artists(count)
+
+    return QuizArtistsResponse(
+        artists=[
+            QuizArtistResponse(
+                name=artist.name,
+                song_count=artist.song_count,
+                top_songs=artist.top_songs,
+                total_brand_count=artist.total_brand_count,
+                primary_decade=artist.primary_decade,
+                image_url=artist.image_url,
+            )
+            for artist in artists
+        ]
+    )
+
+
 # -----------------------------------------------------------------------------
 # Submit Quiz
 # -----------------------------------------------------------------------------
@@ -119,9 +176,13 @@ async def submit_quiz(
 ) -> QuizSubmitResponse:
     """Submit quiz responses.
 
-    Creates UserSong records for songs the user recognized and
+    Creates UserSong records for artists/songs the user knows and
     stores their preferences (decade, energy). This data is used
     to generate personalized song recommendations.
+
+    You can submit either:
+    - known_artists: List of artist names (recommended, richer data)
+    - known_song_ids: List of song IDs (legacy support)
 
     A user can submit the quiz multiple times - each submission
     will add new songs and update preferences.
@@ -129,6 +190,7 @@ async def submit_quiz(
     result = await quiz_service.submit_quiz(
         user_id=user.id,
         known_song_ids=request.known_song_ids,
+        known_artists=request.known_artists,
         decade_preference=request.decade_preference,
         energy_preference=request.energy_preference,
     )
