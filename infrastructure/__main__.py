@@ -7,9 +7,11 @@ Resources managed:
 - Artifact Registry repository (container images)
 - Cloud Run service (backend API)
 - IAM bindings (service account permissions)
+- Cloudflare Worker (API proxy)
 """
 
 import pulumi
+import pulumi_cloudflare as cloudflare
 import pulumi_gcp as gcp
 
 # Configuration
@@ -325,6 +327,112 @@ for secret_name in REQUIRED_SECRETS:
         secret_id=secret_name,
         role="roles/secretmanager.secretAccessor",
         member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    )
+
+# =============================================================================
+# Cloudflare Worker (API Proxy)
+# =============================================================================
+# Proxies /api/* requests from decide.nomadkaraoke.com to Cloud Run backend.
+# This eliminates CORS issues by keeping everything same-origin.
+#
+# Required config:
+#   pulumi config set cloudflare:apiToken <token> --secret
+#   pulumi config set cloudflareAccountId <account_id>
+#   pulumi config set cloudflareZoneId <zone_id>
+
+cloudflare_account_id = config.get("cloudflareAccountId") or ""
+cloudflare_zone_id = config.get("cloudflareZoneId") or ""
+
+# Worker script content
+API_PROXY_WORKER_SCRIPT = """
+const DEFAULT_BACKEND_URL = "https://karaoke-decide-718638054799.us-central1.run.app";
+
+export default {
+  async fetch(request, env, ctx) {
+    const backendBaseUrl = env.BACKEND_URL || DEFAULT_BACKEND_URL;
+    const url = new URL(request.url);
+
+    // Only proxy /api/* requests
+    if (!url.pathname.startsWith("/api")) {
+      // Pass through to origin (GitHub Pages)
+      return fetch(request);
+    }
+
+    // Build the backend URL
+    const backendUrl = new URL(url.pathname + url.search, backendBaseUrl);
+
+    // Clone headers, removing Cloudflare-specific ones
+    const headers = new Headers(request.headers);
+    headers.delete("cf-connecting-ip");
+    headers.delete("cf-ipcountry");
+    headers.delete("cf-ray");
+    headers.delete("cf-visitor");
+
+    // Forward the request to Cloud Run
+    const backendRequest = new Request(backendUrl.toString(), {
+      method: request.method,
+      headers: headers,
+      body: request.body,
+      redirect: "follow",
+    });
+
+    try {
+      const response = await fetch(backendRequest);
+
+      // Clone response and remove CORS headers (not needed for same-origin)
+      const newHeaders = new Headers(response.headers);
+      newHeaders.delete("access-control-allow-origin");
+      newHeaders.delete("access-control-allow-credentials");
+      newHeaders.delete("access-control-allow-methods");
+      newHeaders.delete("access-control-allow-headers");
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+      });
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error: "Backend unavailable",
+          message: error.message,
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  },
+};
+"""
+
+# Only create Cloudflare resources if account and zone IDs are configured
+if cloudflare_account_id and cloudflare_zone_id:
+    # API proxy Worker script
+    api_proxy_worker = cloudflare.WorkersScript(
+        "api-proxy-worker",
+        account_id=cloudflare_account_id,
+        script_name="karaoke-decide-api-proxy",
+        content=API_PROXY_WORKER_SCRIPT,
+        main_module="worker.js",
+        compatibility_date="2024-01-01",
+    )
+
+    # Route to trigger Worker for /api/* requests
+    api_proxy_route = cloudflare.WorkersRoute(
+        "api-proxy-route",
+        zone_id=cloudflare_zone_id,
+        pattern="decide.nomadkaraoke.com/api/*",
+        script=api_proxy_worker.script_name,
+    )
+
+    pulumi.export("cloudflare_worker_name", api_proxy_worker.script_name)
+    pulumi.export("cloudflare_route_pattern", api_proxy_route.pattern)
+else:
+    pulumi.log.warn(
+        "Cloudflare config not set. Skipping Worker creation. "
+        "Set cloudflareAccountId and cloudflareZoneId to enable."
     )
 
 # =============================================================================

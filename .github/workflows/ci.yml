@@ -233,8 +233,8 @@ jobs:
 
       - name: Build frontend
         working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: https://karaoke-decide-718638054799.us-central1.run.app
+        # NEXT_PUBLIC_API_URL is intentionally not set - uses relative URLs
+        # which are proxied to Cloud Run via Cloudflare Worker
         run: npm run build
 
       - name: Setup Pages

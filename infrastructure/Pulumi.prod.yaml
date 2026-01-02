@@ -2,3 +2,7 @@ config:
   gcp:project: nomadkaraoke
   gcp:region: us-central1
   karaoke-decide:environment: production
+  cloudflare:apiToken:
+    secure: AAABANHUtwvCvGG362g5W6aq6KoQnM95s6TFzWoHEjxGL0KNnUmyZNqP+eGkoo++4O03T44CMiWnBxh9bzIOM9kV+RFwSlqB
+  karaoke-decide:cloudflareAccountId: a7dd2a2bee7151ef4dc7a9f53d99b520
+  karaoke-decide:cloudflareZoneId: 807f07f458f9cd38251f3b7948d55172
