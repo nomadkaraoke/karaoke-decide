@@ -132,4 +132,4 @@ The Audio Analysis API provides more granular data (bars, beats, segments, secti
 
 ## PR
 
-https://github.com/nomadkaraoke/karaoke-decide/pull/27
+<https://github.com/nomadkaraoke/karaoke-decide/pull/27>

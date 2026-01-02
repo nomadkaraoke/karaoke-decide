@@ -101,8 +101,12 @@ sudo apt-get install -y \
     tmux \
     htop
 
-# Install Python packages
-pip3 install --user \
+# Create virtual environment (required for Debian 12 PEP 668)
+python3 -m venv /data/venv
+source /data/venv/bin/activate
+
+# Install Python packages in venv
+pip install \
     google-cloud-bigquery \
     google-cloud-storage \
     orjson \
@@ -127,6 +131,7 @@ echo "2. Monitor download progress:"
 echo "   watch -n 60 'du -sh /data/annas_archive*'"
 echo ""
 echo "3. After download, run ETL:"
+echo "   source /data/venv/bin/activate"
 echo "   python3 /data/scripts/spotify_audio_analysis_etl.py"
 VMSETUP
 )

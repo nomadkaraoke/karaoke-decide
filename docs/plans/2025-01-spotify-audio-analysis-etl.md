@@ -138,8 +138,12 @@ sudo chown $USER:$USER /data
 
 # Install dependencies
 sudo apt-get update
-sudo apt-get install -y python3-pip zstd transmission-cli aria2
-pip3 install google-cloud-bigquery google-cloud-storage orjson tqdm
+sudo apt-get install -y python3-pip python3-venv zstd transmission-cli aria2
+
+# Create and activate virtual environment (required for Debian 12 PEP 668)
+python3 -m venv /data/venv
+source /data/venv/bin/activate
+pip install google-cloud-bigquery google-cloud-storage orjson tqdm
 ```
 
 ### Phase 2: Download Torrent (24-48 hours)

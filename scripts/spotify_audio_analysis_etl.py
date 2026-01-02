@@ -24,25 +24,36 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
+
+def install_package(package_name: str, pip_name: str | None = None) -> None:
+    """Install a package via pip with error handling."""
+    pip_name = pip_name or package_name
+    print(f"Installing {package_name}...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name])
+    except subprocess.CalledProcessError:
+        print(f"ERROR: Failed to install {package_name}.")
+        print("Ensure you're in a venv: source /data/venv/bin/activate")
+        sys.exit(1)
+
+
 try:
     import orjson
 except ImportError:
-    print("Installing orjson...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "orjson"])
+    install_package("orjson")
     import orjson
 
 try:
     from google.cloud import bigquery, storage
 except ImportError:
-    print("Installing google-cloud libraries...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "google-cloud-bigquery", "google-cloud-storage"])
+    install_package("google-cloud-bigquery")
+    install_package("google-cloud-storage")
     from google.cloud import bigquery, storage
 
 try:
     from tqdm import tqdm
 except ImportError:
-    print("Installing tqdm...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "tqdm"])
+    install_package("tqdm")
     from tqdm import tqdm
 
 # Configuration
@@ -162,6 +173,8 @@ def process_file(args: tuple) -> tuple[int, int, Path | None]:
                     errors += 1
 
             proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"zstd decompression failed with code {proc.returncode}")
 
         return (processed, errors, output_path)
 
