@@ -75,18 +75,30 @@ gcloud compute instances delete spotify-etl-vm --zone=us-central1-a --project=no
 
 ## Pending Work
 
-1. Wait for torrent download to complete (~36-48 hrs)
-2. Run ETL script
-3. Verify BigQuery table created
-4. Add table to Pulumi infrastructure
-5. Create BigQuery view joining tracks with audio analysis
-6. Update API to expose audio features in search/filters
+1. Wait for torrent download to complete (~5-6 hrs remaining)
+2. Wait for GCS Archive upload to complete
+3. Run ETL script to extract track-level summaries to BigQuery
+4. Verify BigQuery table created
+5. Add table to Pulumi infrastructure
+6. Create BigQuery view joining tracks with audio analysis
+7. Update API to expose audio features in search/filters
+
+## Raw Data Preservation
+
+**Lesson learned:** Previous metadata ETL only extracted certain fields, requiring re-download later. To avoid this, raw torrent data is being preserved in GCS Archive storage.
+
+- **Bucket:** `gs://nomadkaraoke-raw-archives/spotify-audio-analysis-2025-07/`
+- **Storage class:** Archive ($0.0012/GB/month)
+- **Monthly cost:** ~$5/month for 4TB
+- **Purpose:** Future feature development may need per-segment data (beats, bars, sections)
 
 ## Cost Estimate
 
 - VM runtime (72-96 hrs): ~$20-30
 - SSD storage (5TB, 4 days): ~$3-4
-- **Total**: ~$25-35
+- GCS Archive storage (4TB, ongoing): ~$5/month
+- **Total one-time**: ~$25-35
+- **Total ongoing**: ~$5/month
 
 ## PR
 

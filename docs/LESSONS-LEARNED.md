@@ -802,11 +802,24 @@ pip install google-cloud-bigquery
 
 ### 2026-01-02: Preserve Raw Source Data for Future Use
 
-**Context:** Had to re-download Spotify metadata dump because original ETL only extracted certain fields.
+**Context:** Original Spotify metadata ETL only extracted certain fields. Later feature development required fields we hadn't imported, forcing a complete re-download of the 186GB torrent.
 
-**Lesson:** When processing large data dumps, always preserve the raw data in cheap archive storage. Future features may need fields you didn't extract initially.
+**Lesson:** You can't predict all future feature requirements. Extracting "only what you need" saves BigQuery costs but loses data that may be valuable later. Re-downloading large torrents is time-consuming and may become impossible if seeders disappear.
 
 **Recommendation:**
-- Upload raw data to GCS Archive storage class (~$0.0012/GB/month)
-- 4TB costs ~$5/month - cheap insurance
-- Document the data location and schema in archive docs
+```bash
+# After downloading large datasets, upload raw files to GCS Archive storage
+# Archive class: $0.0012/GB/month = ~$4.80/month for 4TB
+gsutil -m cp -r /data/torrent_folder gs://bucket/raw-archives/
+
+# Use Archive storage class for rarely-accessed data
+gsutil mb -c archive -l us-central1 gs://bucket-archive/
+```
+
+**Cost comparison:**
+- Re-downloading 4TB torrent: 24-48 hours + risk of no seeders
+- GCS Archive storage (4TB): ~$5/month
+- GCS Coldline storage (4TB): ~$16/month
+- GCS Standard storage (4TB): ~$80/month
+
+**Decision:** Always preserve raw source data in cheap archive storage. The monthly cost is negligible compared to re-acquisition risk.
