@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { ProtectedPage } from "@/components/ProtectedPage";
+import { useAuth } from "@/contexts/AuthContext";
 import { QuizSongCard } from "@/components/QuizSongCard";
 import { SparklesIcon, CheckIcon, ChevronRightIcon } from "@/components/icons";
-import { Button, LoadingPulse } from "@/components/ui";
+import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 
 interface QuizSong {
   id: string;
@@ -28,6 +28,7 @@ const ENERGY_OPTIONS: { value: EnergyPreference; label: string; description: str
 
 export default function QuizPage() {
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [quizSongs, setQuizSongs] = useState<QuizSong[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,9 +59,27 @@ export default function QuizPage() {
     }
   }, []);
 
+  // Create guest session if not authenticated
   useEffect(() => {
-    loadQuizSongs();
-  }, [loadQuizSongs]);
+    const initSession = async () => {
+      if (!authLoading && !isAuthenticated) {
+        try {
+          await startGuestSession();
+        } catch (err) {
+          console.error("Failed to create guest session:", err);
+          setError("Failed to start quiz. Please try again.");
+        }
+      }
+    };
+    initSession();
+  }, [authLoading, isAuthenticated, startGuestSession]);
+
+  // Load quiz songs once authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadQuizSongs();
+    }
+  }, [isAuthenticated, loadQuizSongs]);
 
   const toggleSong = (songId: string) => {
     setSelectedSongIds((prev) => {
@@ -91,10 +110,14 @@ export default function QuizPage() {
     }
   };
 
+  // Show loading while auth is being checked
+  if (authLoading || !isAuthenticated) {
+    return <LoadingOverlay message="Starting quiz..." />;
+  }
+
   return (
-    <ProtectedPage>
-      <main className="min-h-screen pb-safe">
-        <div className="max-w-2xl mx-auto px-4 py-6">
+    <main className="min-h-screen pb-safe">
+      <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Progress indicator */}
           <div className="flex items-center justify-center gap-2 mb-8">
             {[1, 2, 3].map((s) => (
@@ -325,6 +348,5 @@ export default function QuizPage() {
           )}
         </div>
       </main>
-    </ProtectedPage>
   );
 }

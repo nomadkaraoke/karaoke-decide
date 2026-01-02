@@ -13,10 +13,10 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from backend.api.deps import (
-    CurrentUser,
     FirestoreServiceDep,
     MusicServiceServiceDep,
     Settings,
+    VerifiedUser,
 )
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
@@ -124,7 +124,7 @@ class DisconnectResponse(BaseModel):
 
 @router.get("", response_model=list[ConnectedServiceResponse])
 async def list_services(
-    user: CurrentUser,
+    user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> list[ConnectedServiceResponse]:
     """List user's connected music services.
@@ -154,7 +154,7 @@ async def list_services(
 
 @router.post("/spotify/connect", response_model=SpotifyConnectResponse)
 async def connect_spotify(
-    user: CurrentUser,
+    user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> SpotifyConnectResponse:
     """Start Spotify OAuth flow.
@@ -247,7 +247,7 @@ async def spotify_callback(
 @router.post("/lastfm/connect", response_model=ConnectedServiceResponse)
 async def connect_lastfm(
     request: LastFmConnectRequest,
-    user: CurrentUser,
+    user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> ConnectedServiceResponse:
     """Connect Last.fm account.
@@ -283,7 +283,7 @@ async def connect_lastfm(
 @router.delete("/{service_type}", response_model=DisconnectResponse)
 async def disconnect_service(
     service_type: str,
-    user: CurrentUser,
+    user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> DisconnectResponse:
     """Disconnect a music service.
@@ -315,7 +315,7 @@ async def disconnect_service(
 
 @router.post("/sync", response_model=SyncJobStartResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync(
-    user: CurrentUser,
+    user: VerifiedUser,
     settings: Settings,
     firestore: FirestoreServiceDep,
 ) -> SyncJobStartResponse:
@@ -364,7 +364,7 @@ async def trigger_sync(
 
 @router.get("/sync/status", response_model=SyncStatusResponse)
 async def get_sync_status(
-    user: CurrentUser,
+    user: VerifiedUser,
     music_service: MusicServiceServiceDep,
     firestore: FirestoreServiceDep,
 ) -> SyncStatusResponse:

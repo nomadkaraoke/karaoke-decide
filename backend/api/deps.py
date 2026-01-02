@@ -102,6 +102,22 @@ async def get_optional_user(
         return None
 
 
+async def get_verified_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Get the current user only if they are verified (not a guest).
+
+    Raises:
+        HTTPException: If user is a guest (not verified).
+    """
+    if user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email verification required. Please verify your email to use this feature.",
+        )
+    return user
+
+
 async def get_music_service_service_dep(
     settings: Annotated[BackendSettings, Depends(get_settings)],
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
@@ -145,6 +161,7 @@ async def get_playlist_service_dep(
 
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
+VerifiedUser = Annotated[User, Depends(get_verified_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]

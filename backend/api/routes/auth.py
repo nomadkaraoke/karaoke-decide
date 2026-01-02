@@ -39,14 +39,107 @@ class UserResponse(BaseModel):
     """Current user information."""
 
     id: str
-    email: str
+    email: str | None = None
     display_name: str | None = None
+    is_guest: bool = False
 
 
 class UpdateProfileRequest(BaseModel):
     """Request to update user profile."""
 
     display_name: str | None = None
+
+
+class UpgradeGuestRequest(BaseModel):
+    """Request to upgrade a guest user to verified."""
+
+    email: EmailStr
+
+
+class UpgradeGuestResponse(BaseModel):
+    """Response after requesting guest upgrade."""
+
+    message: str
+
+
+@router.post("/guest", response_model=AuthResponse)
+async def create_guest_session(
+    auth_service: AuthServiceDep,
+) -> AuthResponse:
+    """Create a guest/anonymous user session.
+
+    This allows users to try the app (quiz, recommendations) without
+    providing an email. Guest users cannot connect music services
+    until they verify their email.
+
+    Guest sessions last 30 days.
+    """
+    try:
+        # Create guest user
+        guest_user = await auth_service.create_guest_user()
+
+        # Generate JWT for guest
+        access_token, expires_in = auth_service.generate_guest_jwt(guest_user)
+
+        return AuthResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=expires_in,
+        )
+
+    except ValueError as e:
+        # JWT secret not configured
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.post("/upgrade", response_model=UpgradeGuestResponse)
+async def request_guest_upgrade(
+    request: UpgradeGuestRequest,
+    user: CurrentUser,
+    auth_service: AuthServiceDep,
+) -> UpgradeGuestResponse:
+    """Request to upgrade a guest account to a verified account.
+
+    Sends a magic link to the provided email. When the user verifies,
+    their guest data will be migrated to the verified account.
+
+    If the email already has an account, the guest data will be merged.
+    """
+    if not user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account is already verified",
+        )
+
+    try:
+        # Store the guest user ID in the magic link so we can upgrade on verify
+        token = auth_service.generate_magic_link_token()
+        await auth_service.store_magic_link(request.email, token)
+
+        # Store the guest_user_id association with this magic link
+        await auth_service.firestore.update_document(
+            auth_service.MAGIC_LINKS_COLLECTION,
+            token,
+            {"guest_user_id": user.id},
+        )
+
+        success = await auth_service.email_service.send_magic_link(request.email, token)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send verification email. Please try again later.",
+            )
+
+        return UpgradeGuestResponse(message="Verification email sent. Check your inbox to complete the upgrade.")
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
 
 
 @router.post("/magic-link", response_model=MagicLinkResponse)
@@ -89,15 +182,27 @@ async def verify_magic_link(
 
     This endpoint:
     1. Validates the magic link token
-    2. Creates a new user if one doesn't exist for this email
-    3. Returns a JWT access token for authentication
+    2. If this was a guest upgrade request, migrates guest data to the verified account
+    3. Creates a new user if one doesn't exist for this email
+    4. Returns a JWT access token for authentication
     """
     try:
+        # Get the magic link document before verification (to check for guest upgrade)
+        magic_link_doc = await auth_service.firestore.get_document(auth_service.MAGIC_LINKS_COLLECTION, request.token)
+        guest_user_id = magic_link_doc.get("guest_user_id") if magic_link_doc else None
+
         # Verify the magic link token
         email = await auth_service.verify_magic_link(request.token)
 
-        # Get or create the user
-        user = await auth_service.get_or_create_user(email)
+        # Handle guest upgrade if applicable
+        if guest_user_id:
+            user = await auth_service.upgrade_guest_to_verified(guest_user_id, email)
+            if user is None:
+                # Guest not found, fall back to normal flow
+                user = await auth_service.get_or_create_user(email)
+        else:
+            # Normal flow: get or create the user
+            user = await auth_service.get_or_create_user(email)
 
         # Generate JWT
         access_token, expires_in = auth_service.generate_jwt(user)
@@ -131,6 +236,7 @@ async def get_current_user_endpoint(user: CurrentUser) -> UserResponse:
         id=user.id,
         email=user.email,
         display_name=user.display_name,
+        is_guest=user.is_guest,
     )
 
 
@@ -160,6 +266,7 @@ async def update_profile(
         id=updated_user.id,
         email=updated_user.email,
         display_name=updated_user.display_name,
+        is_guest=updated_user.is_guest,
     )
 
 
