@@ -140,6 +140,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-02 | Quiz UX Improvements (genre selection step, refresh artists, connect CTA, data-testid) | [archive/2026-01-02-quiz-ux-improvements.md](archive/2026-01-02-quiz-ux-improvements.md) |
 | 2026-01-02 | Guest User Onboarding (frictionless onboarding, guest sessions, upgrade flow) | [archive/2026-01-02-guest-onboarding-flow.md](archive/2026-01-02-guest-onboarding-flow.md) |
 | 2026-01-01 | Enhanced Recommendations (categorized sections, artist diversity, rich filters, Create Your Own Karaoke) | [archive/2026-01-01-enhanced-recommendations.md](archive/2026-01-01-enhanced-recommendations.md) |
 | 2025-12-31 | Sync IAM Fix & Health Monitoring (403 fix, deep health endpoint, scheduled monitoring, comprehensive E2E) | [archive/2025-12-31-sync-iam-fix-and-health-monitoring.md](archive/2025-12-31-sync-iam-fix-and-health-monitoring.md) |
