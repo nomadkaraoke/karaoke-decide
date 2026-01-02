@@ -1,6 +1,6 @@
 """Service for quiz-based onboarding.
 
-Provides quiz songs for data-light users and handles quiz submission
+Provides quiz artists/songs for data-light users and handles quiz submission
 to create UserSong records and update user profiles.
 """
 
@@ -14,7 +14,7 @@ from google.cloud import bigquery
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
-from karaoke_decide.core.models import QuizSong
+from karaoke_decide.core.models import QuizArtist, QuizSong
 
 
 @dataclass
@@ -53,8 +53,10 @@ class QuizService:
 
     # Quiz configuration
     DEFAULT_QUIZ_SIZE = 15
+    DEFAULT_ARTIST_COUNT = 25  # Number of artists to show in quiz
     MIN_BRAND_COUNT = 5  # Songs must be on at least 5 karaoke brands
-    CACHE_TTL_HOURS = 24  # How long to cache quiz songs
+    MIN_ARTIST_SONGS = 3  # Artists must have at least 3 karaoke songs
+    CACHE_TTL_HOURS = 24  # How long to cache quiz data
 
     def __init__(
         self,
@@ -114,10 +116,88 @@ class QuizService:
 
         return diverse_songs
 
+    async def get_quiz_artists(self, count: int = DEFAULT_ARTIST_COUNT) -> list[QuizArtist]:
+        """Get quiz artists for onboarding.
+
+        Returns popular karaoke artists that users are likely to recognize.
+        Artists are selected based on total brand coverage and song count.
+
+        Args:
+            count: Number of quiz artists to return.
+
+        Returns:
+            List of QuizArtist objects for the quiz.
+        """
+        # Fetch artist candidates with aggregated stats
+        candidates = self._fetch_artist_candidates(count * 2)
+
+        # Randomly select final set for variety
+        if len(candidates) > count:
+            candidates = random.sample(candidates, count)
+
+        return candidates
+
+    def _fetch_artist_candidates(self, limit: int) -> list[QuizArtist]:
+        """Fetch quiz artist candidates from BigQuery.
+
+        Gets artists aggregated by total brand coverage and song count.
+
+        Args:
+            limit: Maximum number of candidates to fetch.
+
+        Returns:
+            List of QuizArtist candidates.
+        """
+        sql = f"""
+            WITH artist_stats AS (
+                SELECT
+                    Artist as artist_name,
+                    COUNT(*) as song_count,
+                    SUM(ARRAY_LENGTH(SPLIT(Brands, ','))) as total_brand_count,
+                    ARRAY_AGG(Title ORDER BY ARRAY_LENGTH(SPLIT(Brands, ',')) DESC LIMIT 3) as top_songs
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
+                WHERE ARRAY_LENGTH(SPLIT(Brands, ',')) >= @min_brands
+                GROUP BY Artist
+                HAVING COUNT(*) >= @min_songs
+            )
+            SELECT
+                artist_name,
+                song_count,
+                total_brand_count,
+                top_songs
+            FROM artist_stats
+            ORDER BY total_brand_count DESC, song_count DESC
+            LIMIT @limit
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
+                bigquery.ScalarQueryParameter("min_songs", "INT64", self.MIN_ARTIST_SONGS),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+        results = self.bigquery.query(sql, job_config=job_config).result()
+
+        return [
+            QuizArtist(
+                name=row.artist_name,
+                song_count=row.song_count,
+                top_songs=list(row.top_songs) if row.top_songs else [],
+                total_brand_count=row.total_brand_count,
+                primary_decade="Unknown",  # Will be enhanced later
+                image_url=None,  # Will be fetched from Spotify API
+            )
+            for row in results
+        ]
+
     def _fetch_quiz_candidates(self, limit: int) -> list[QuizSong]:
         """Fetch quiz song candidates from BigQuery.
 
         Gets popular karaoke songs ordered by brand count (popularity proxy).
+        Note: We don't join with Spotify here to avoid duplicates from
+        multiple Spotify versions of the same song.
 
         Args:
             limit: Maximum number of candidates to fetch.
@@ -127,19 +207,13 @@ class QuizService:
         """
         sql = f"""
             SELECT
-                CAST(k.Id AS STRING) as id,
-                k.Artist as artist,
-                k.Title as title,
-                ARRAY_LENGTH(SPLIT(k.Brands, ',')) as brand_count,
-                COALESCE(s.popularity, 0) as spotify_popularity
-            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` s
-                ON LOWER(k.Artist) = LOWER(s.artist_name)
-                AND LOWER(k.Title) = LOWER(s.title)
-            WHERE ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
-            ORDER BY
-                ARRAY_LENGTH(SPLIT(k.Brands, ',')) DESC,
-                COALESCE(s.popularity, 0) DESC
+                CAST(Id AS STRING) as id,
+                Artist as artist,
+                Title as title,
+                ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
+            WHERE ARRAY_LENGTH(SPLIT(Brands, ',')) >= @min_brands
+            ORDER BY ARRAY_LENGTH(SPLIT(Brands, ',')) DESC
             LIMIT @limit
         """
 
@@ -158,7 +232,7 @@ class QuizService:
                 artist=row.artist,
                 title=row.title,
                 decade="Unknown",  # Will be enhanced with release date data later
-                popularity=row.spotify_popularity,
+                popularity=row.brand_count,  # Use brand_count as popularity proxy
                 brand_count=row.brand_count,
             )
             for row in results
@@ -167,18 +241,20 @@ class QuizService:
     async def submit_quiz(
         self,
         user_id: str,
-        known_song_ids: list[str],
+        known_song_ids: list[str] | None = None,
+        known_artists: list[str] | None = None,
         decade_preference: str | None = None,
         energy_preference: Literal["chill", "medium", "high"] | None = None,
     ) -> QuizSubmitResult:
         """Submit quiz responses and update user profile.
 
-        Creates UserSong records for known songs and updates user's
+        Creates UserSong records for known songs/artists and updates user's
         quiz preferences.
 
         Args:
             user_id: User's ID.
-            known_song_ids: List of song IDs the user recognized.
+            known_song_ids: List of song IDs the user recognized (legacy).
+            known_artists: List of artist names the user knows.
             decade_preference: User's preferred decade (e.g., "1980s").
             energy_preference: User's preferred energy level.
 
@@ -187,26 +263,59 @@ class QuizService:
         """
         now = datetime.now(UTC)
         songs_added = 0
+        known_song_ids = known_song_ids or []
+        known_artists = known_artists or []
 
-        # Get song details for the known songs
-        if known_song_ids:
-            song_details = self._get_songs_by_ids(known_song_ids)
-
-            # Create UserSong records for each known song
-            for song in song_details:
+        # If artists were selected, get their top songs
+        if known_artists:
+            artist_songs = self._get_songs_by_artists(known_artists, limit_per_artist=5)
+            for song in artist_songs:
                 user_song_id = f"{user_id}:{song['id']}"
 
                 # Check if already exists
                 existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
 
                 if existing is None:
-                    # Create new UserSong from quiz
                     user_song_data = {
                         "id": user_song_id,
                         "user_id": user_id,
                         "song_id": song["id"],
                         "source": "quiz",
-                        "play_count": 1,  # Implicit: they know it
+                        "play_count": 1,
+                        "last_played_at": None,
+                        "is_saved": False,
+                        "times_sung": 0,
+                        "last_sung_at": None,
+                        "average_rating": None,
+                        "notes": None,
+                        "artist": song["artist"],
+                        "title": song["title"],
+                        "created_at": now.isoformat(),
+                        "updated_at": now.isoformat(),
+                    }
+                    await self.firestore.set_document(
+                        self.USER_SONGS_COLLECTION,
+                        user_song_id,
+                        user_song_data,
+                    )
+                    songs_added += 1
+
+        # Also handle direct song selections (legacy support)
+        if known_song_ids:
+            song_details = self._get_songs_by_ids(known_song_ids)
+
+            for song in song_details:
+                user_song_id = f"{user_id}:{song['id']}"
+
+                existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
+
+                if existing is None:
+                    user_song_data = {
+                        "id": user_song_id,
+                        "user_id": user_id,
+                        "song_id": song["id"],
+                        "source": "quiz",
+                        "play_count": 1,
                         "last_played_at": None,
                         "is_saved": False,
                         "times_sung": 0,
@@ -229,6 +338,7 @@ class QuizService:
         await self._update_user_quiz_data(
             user_id,
             known_song_ids,
+            known_artists,
             decade_preference,
             energy_preference,
             now,
@@ -236,8 +346,49 @@ class QuizService:
 
         return QuizSubmitResult(
             songs_added=songs_added,
-            recommendations_ready=len(known_song_ids) > 0,
+            recommendations_ready=len(known_song_ids) > 0 or len(known_artists) > 0,
         )
+
+    def _get_songs_by_artists(self, artist_names: list[str], limit_per_artist: int = 5) -> list[dict]:
+        """Get top songs for given artists from BigQuery.
+
+        Args:
+            artist_names: List of artist names.
+            limit_per_artist: Max songs per artist.
+
+        Returns:
+            List of dicts with id, artist, title.
+        """
+        if not artist_names:
+            return []
+
+        # Build parameterized query
+        placeholders = ", ".join([f"@artist_{i}" for i in range(len(artist_names))])
+        sql = f"""
+            WITH ranked_songs AS (
+                SELECT
+                    CAST(Id AS STRING) as id,
+                    Artist as artist,
+                    Title as title,
+                    ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count,
+                    ROW_NUMBER() OVER (PARTITION BY Artist ORDER BY ARRAY_LENGTH(SPLIT(Brands, ',')) DESC) as rn
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
+                WHERE LOWER(Artist) IN ({placeholders})
+            )
+            SELECT id, artist, title
+            FROM ranked_songs
+            WHERE rn <= @limit_per_artist
+        """
+
+        params = [
+            bigquery.ScalarQueryParameter(f"artist_{i}", "STRING", name.lower()) for i, name in enumerate(artist_names)
+        ]
+        params.append(bigquery.ScalarQueryParameter("limit_per_artist", "INT64", limit_per_artist))
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        results = self.bigquery.query(sql, job_config=job_config).result()
+
+        return [{"id": row.id, "artist": row.artist, "title": row.title} for row in results]
 
     def _get_songs_by_ids(self, song_ids: list[str]) -> list[dict]:
         """Get song details by IDs from BigQuery.
@@ -273,6 +424,7 @@ class QuizService:
         self,
         user_id: str,
         known_song_ids: list[str],
+        known_artists: list[str],
         decade_preference: str | None,
         energy_preference: Literal["chill", "medium", "high"] | None,
         completed_at: datetime,
@@ -282,28 +434,37 @@ class QuizService:
         Args:
             user_id: User's ID.
             known_song_ids: Song IDs from quiz.
+            known_artists: Artist names from quiz.
             decade_preference: Decade preference.
             energy_preference: Energy preference.
             completed_at: Quiz completion timestamp.
         """
-        # Find user document by user_id
-        docs = await self.firestore.query_documents(
-            self.USERS_COLLECTION,
-            filters=[("user_id", "==", user_id)],
-            limit=1,
-        )
+        # For guest users, store by user_id directly
+        if user_id.startswith("guest_"):
+            doc_id = user_id
+        else:
+            # Find user document by user_id for verified users
+            docs = await self.firestore.query_documents(
+                self.USERS_COLLECTION,
+                filters=[("user_id", "==", user_id)],
+                limit=1,
+            )
 
-        if not docs:
-            return
+            if not docs:
+                return
 
-        # Get document ID (email hash)
-        doc = docs[0]
-        doc_id = self._hash_email(doc["email"])
+            doc = docs[0]
+            # Handle case where email might be None
+            if doc.get("email"):
+                doc_id = self._hash_email(doc["email"])
+            else:
+                doc_id = user_id
 
         # Update quiz fields
         update_data = {
             "quiz_completed_at": completed_at.isoformat(),
             "quiz_songs_known": known_song_ids,
+            "quiz_artists_known": known_artists,
             "updated_at": completed_at.isoformat(),
         }
 
