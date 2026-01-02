@@ -145,7 +145,7 @@ Karaoke song catalog from KaraokeNerds.com.
 | brand_count | INT | Number of brands (popularity signal) |
 
 ### spotify_tracks (256,039,007 rows)
-Spotify track metadata from Anna's Archive dump.
+Spotify track metadata from Anna's Archive dump (original ETL).
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -156,6 +156,21 @@ Spotify track metadata from Anna's Archive dump.
 | popularity | INT | Spotify popularity (0-100) |
 | duration_ms | INT | Track duration |
 | explicit | BOOL | Explicit content flag |
+
+### Spotify Complete Metadata (Complete ETL - 2026-01)
+Additional tables from comprehensive Spotify metadata ETL:
+
+| Table | Rows | Description |
+|-------|------|-------------|
+| `spotify_artists` | ~500K | Artist metadata (id, name, followers, popularity) |
+| `spotify_artist_genres` | ~2-3M | Artist-genre associations for filtering |
+| `spotify_albums` | ~50M | Album metadata with release dates |
+| `spotify_tracks_full` | ~256M | Full track metadata with album references |
+| `spotify_track_artists` | ~300M | Track-artist junction (multi-artist support) |
+| `spotify_audio_features` | ~200M | Audio features (danceability, energy, tempo, etc.) |
+
+**ETL Script:** `scripts/spotify_complete_etl.py`
+**Raw Data Archive:** `gs://nomadkaraoke-raw-archives/spotify-metadata-2025-07/` (Archive storage class)
 
 ## Deployment
 

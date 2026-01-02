@@ -10,24 +10,22 @@ import {
   LogOutIcon,
   MenuIcon,
   XIcon,
-  MusicIcon,
   SparklesIcon,
-  LinkIcon,
   PlaylistIcon,
   SettingsIcon,
+  DatabaseIcon,
 } from "./icons";
 import { Button } from "./ui";
 
 const navLinks = [
   { href: "/", label: "Search", icon: null },
-  { href: "/my-songs", label: "My Songs", icon: MusicIcon, authRequired: true },
+  { href: "/my-data", label: "My Data", icon: DatabaseIcon, authRequired: true },
   { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
-  { href: "/services", label: "Services", icon: LinkIcon, authRequired: true, verifiedOnly: true },
 ];
 
 export function Navigation() {
-  const { user, isAuthenticated, isLoading, isGuest, isVerified, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, isGuest, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -39,7 +37,6 @@ export function Navigation() {
   };
 
   const filteredLinks = navLinks.filter((link) => {
-    if (link.verifiedOnly && !isVerified) return false;
     if (link.authRequired && !isAuthenticated) return false;
     return true;
   });

@@ -8,6 +8,7 @@ interface QuizArtist {
   top_songs: string[];
   total_brand_count: number;
   primary_decade: string;
+  genres?: string[];
   image_url: string | null;
 }
 
@@ -18,12 +19,24 @@ interface QuizArtistCardProps {
   index: number;
 }
 
+/**
+ * Format a Spotify genre for display (e.g., "classic rock" -> "Classic Rock")
+ */
+function formatGenre(genre: string): string {
+  return genre
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function QuizArtistCard({
   artist,
   isSelected,
   onToggle,
   index,
 }: QuizArtistCardProps) {
+  const displayGenres = artist.genres?.slice(0, 3) || [];
+
   return (
     <button
       onClick={onToggle}
@@ -75,6 +88,20 @@ export function QuizArtistCard({
           <p className="text-white/50 text-sm">
             {artist.song_count} karaoke songs
           </p>
+
+          {/* Genre pills */}
+          {displayGenres.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {displayGenres.map((genre, i) => (
+                <span
+                  key={i}
+                  className="text-xs px-2 py-0.5 rounded-full bg-[#ff2d92]/10 text-[#ff2d92]/80 border border-[#ff2d92]/20"
+                >
+                  {formatGenre(genre)}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Top songs preview */}
           {artist.top_songs.length > 0 && (

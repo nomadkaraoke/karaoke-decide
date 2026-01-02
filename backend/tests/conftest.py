@@ -1,5 +1,6 @@
 """Shared test fixtures for backend tests."""
 
+import sys
 from collections.abc import Generator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,10 +8,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.config import BackendSettings
-from backend.services.playlist_service import PlaylistInfo
-from backend.services.quiz_service import QuizStatus, QuizSubmitResult
-from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong
+# Mock google.cloud.tasks_v2 before any imports that need it
+_mock_tasks_v2 = MagicMock()
+_mock_tasks_v2.HttpMethod.POST = 1
+sys.modules["google.cloud.tasks_v2"] = _mock_tasks_v2
+
+import backend.api.deps  # noqa: E402, F401
+import backend.api.routes.catalog  # noqa: E402, F401
+from backend.config import BackendSettings  # noqa: E402
+from backend.services.playlist_service import PlaylistInfo  # noqa: E402
+from backend.services.quiz_service import QuizStatus, QuizSubmitResult  # noqa: E402
+from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong  # noqa: E402
 
 
 @pytest.fixture
@@ -462,6 +470,83 @@ def playlist_client(
         patch(
             "backend.api.deps.get_playlist_service",
             return_value=mock_playlist_service,
+        ),
+    ):
+        from backend.main import app
+
+        yield TestClient(app)
+
+
+@pytest.fixture
+def mock_user_data_service() -> MagicMock:
+    """Mock user data service for API tests."""
+    mock = MagicMock()
+    mock.get_data_summary = AsyncMock(
+        return_value={
+            "services": {
+                "spotify": {"connected": True, "username": "testuser", "tracks_synced": 50},
+                "lastfm": {"connected": False},
+            },
+            "artists": {"total": 10, "by_source": {"spotify": 5, "lastfm": 3, "quiz": 2, "manual": 0}},
+            "songs": {"total": 100, "with_karaoke": 80},
+            "preferences": {"completed": True, "decade": "1990s", "energy": "high", "genres": ["rock"]},
+        }
+    )
+    mock.get_preferences = AsyncMock(
+        return_value={
+            "decade_preference": "1990s",
+            "energy_preference": "high",
+            "genres": ["rock", "pop"],
+        }
+    )
+    mock.update_preferences = AsyncMock(
+        return_value={
+            "decade_preference": "2000s",
+            "energy_preference": "medium",
+            "genres": ["electronic"],
+        }
+    )
+    mock.get_all_artists = AsyncMock(
+        return_value=[
+            {"artist_name": "Queen", "source": "spotify", "rank": 1, "time_range": "medium_term"},
+            {"artist_name": "The Beatles", "source": "quiz", "rank": 1, "time_range": ""},
+        ]
+    )
+    mock.add_artist = AsyncMock(
+        return_value={
+            "artists": ["Queen", "New Artist"],
+            "added": "New Artist",
+        }
+    )
+    mock.remove_artist = AsyncMock(
+        return_value={
+            "removed": "Queen",
+            "removed_from": ["quiz"],
+            "success": True,
+        }
+    )
+    return mock
+
+
+@pytest.fixture
+def my_data_client(
+    mock_catalog_service: MagicMock,
+    mock_auth_service: MagicMock,
+    mock_user_data_service: MagicMock,
+) -> Generator[TestClient, None, None]:
+    """Create test client with mocked user data service."""
+    with (
+        patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ),
+        patch(
+            "backend.api.deps.get_auth_service",
+            return_value=mock_auth_service,
+        ),
+        patch(
+            "backend.api.deps.get_user_data_service",
+            return_value=mock_user_data_service,
         ),
     ):
         from backend.main import app

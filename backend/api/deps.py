@@ -13,6 +13,7 @@ from backend.services.playlist_service import PlaylistService, get_playlist_serv
 from backend.services.quiz_service import QuizService, get_quiz_service
 from backend.services.recommendation_service import RecommendationService, get_recommendation_service
 from backend.services.sync_service import SyncService, get_sync_service
+from backend.services.user_data_service import UserDataService, get_user_data_service
 from karaoke_decide.core.models import User
 
 # Security scheme
@@ -159,6 +160,13 @@ async def get_playlist_service_dep(
     return get_playlist_service(settings, firestore)
 
 
+async def get_user_data_service_dep(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> UserDataService:
+    """Get user data service instance."""
+    return get_user_data_service(firestore)
+
+
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
@@ -171,3 +179,4 @@ SyncServiceDep = Annotated[SyncService, Depends(get_sync_service_dep)]
 QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service_dep)]
 RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommendation_service_dep)]
 PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service_dep)]
+UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]

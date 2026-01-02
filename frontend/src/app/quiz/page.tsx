@@ -14,7 +14,18 @@ interface QuizArtist {
   top_songs: string[];
   total_brand_count: number;
   primary_decade: string;
+  genres?: string[];
   image_url: string | null;
+}
+
+interface DecadeArtist {
+  name: string;
+  top_song: string;
+}
+
+interface DecadeInfo {
+  decade: string;
+  artists: DecadeArtist[];
 }
 
 type EnergyPreference = "chill" | "medium" | "high" | null;
@@ -36,11 +47,19 @@ interface Genre {
 const GENRES: Genre[] = [
   { id: "pop", label: "Pop", exampleArtists: ["Taylor Swift", "Ed Sheeran", "Dua Lipa"], emoji: "🎤" },
   { id: "rock", label: "Rock", exampleArtists: ["Queen", "Bon Jovi", "Foo Fighters"], emoji: "🎸" },
-  { id: "country", label: "Country", exampleArtists: ["Luke Combs", "Carrie Underwood", "Dolly Parton"], emoji: "🤠" },
-  { id: "hiphop", label: "Hip-Hop", exampleArtists: ["Drake", "Eminem", "Kendrick Lamar"], emoji: "🎧" },
+  { id: "hiphop", label: "Hip-Hop / Rap", exampleArtists: ["Drake", "Eminem", "Kendrick Lamar"], emoji: "🎧" },
   { id: "rnb", label: "R&B / Soul", exampleArtists: ["Beyoncé", "Usher", "Alicia Keys"], emoji: "🎹" },
+  { id: "country", label: "Country", exampleArtists: ["Luke Combs", "Carrie Underwood", "Dolly Parton"], emoji: "🤠" },
+  { id: "electronic", label: "Electronic / Dance", exampleArtists: ["Daft Punk", "Calvin Harris", "The Chainsmokers"], emoji: "🎛️" },
+  { id: "metal", label: "Metal / Hard Rock", exampleArtists: ["Metallica", "AC/DC", "Iron Maiden"], emoji: "🤘" },
+  { id: "jazz", label: "Jazz / Standards", exampleArtists: ["Frank Sinatra", "Ella Fitzgerald", "Michael Bublé"], emoji: "🎺" },
+  { id: "latin", label: "Latin", exampleArtists: ["Bad Bunny", "Shakira", "J Balvin"], emoji: "💃" },
+  { id: "indie", label: "Indie / Alternative", exampleArtists: ["Arctic Monkeys", "The 1975", "Tame Impala"], emoji: "🌙" },
+  { id: "kpop", label: "K-Pop", exampleArtists: ["BTS", "BLACKPINK", "Stray Kids"], emoji: "🇰🇷" },
+  { id: "disco", label: "Disco / Funk", exampleArtists: ["ABBA", "Earth, Wind & Fire", "Bee Gees"], emoji: "🕺" },
   { id: "classic-rock", label: "Classic Rock", exampleArtists: ["Journey", "Eagles", "Fleetwood Mac"], emoji: "🎷" },
-  { id: "80s-90s", label: "80s & 90s Hits", exampleArtists: ["Michael Jackson", "Whitney Houston", "Prince"], emoji: "💿" },
+  { id: "musical", label: "Broadway / Musical", exampleArtists: ["Wicked", "Les Misérables", "Hamilton"], emoji: "🎭" },
+  { id: "reggae", label: "Reggae / Ska", exampleArtists: ["Bob Marley", "UB40", "Sean Paul"], emoji: "🇯🇲" },
 ];
 
 export default function QuizPage() {
@@ -60,23 +79,35 @@ export default function QuizPage() {
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [showConnectCTA, setShowConnectCTA] = useState(true);
   const [submitResult, setSubmitResult] = useState<{
     songs_added: number;
     recommendations_ready: boolean;
   } | null>(null);
 
-  const loadQuizArtists = useCallback(async () => {
+  // Decade artists for preference section
+  const [decadeArtists, setDecadeArtists] = useState<DecadeInfo[]>([]);
+
+  const loadQuizArtists = useCallback(async (genres?: string[]) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.quiz.getArtists(25);
+      const response = await api.quiz.getArtists(25, genres);
       setQuizArtists(response.artists);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quiz");
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  const loadDecadeArtists = useCallback(async () => {
+    try {
+      const response = await api.quiz.getDecadeArtists(5);
+      setDecadeArtists(response.decades);
+    } catch (err) {
+      console.error("Failed to load decade artists:", err);
     }
   }, []);
 
@@ -95,12 +126,20 @@ export default function QuizPage() {
     initSession();
   }, [authLoading, isAuthenticated, startGuestSession]);
 
-  // Load quiz artists once authenticated
+  // Load quiz artists once authenticated (initial load, then reload when genres change on step 2)
+  useEffect(() => {
+    if (isAuthenticated && step === 2) {
+      const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres) : undefined;
+      loadQuizArtists(genresArray);
+    }
+  }, [isAuthenticated, step, selectedGenres, loadQuizArtists]);
+
+  // Load decade artists for the preferences section
   useEffect(() => {
     if (isAuthenticated) {
-      loadQuizArtists();
+      loadDecadeArtists();
     }
-  }, [isAuthenticated, loadQuizArtists]);
+  }, [isAuthenticated, loadDecadeArtists]);
 
   const toggleArtist = (artistName: string) => {
     setSelectedArtists((prev) => {
@@ -138,26 +177,25 @@ export default function QuizPage() {
     });
   };
 
-  const handleRefreshArtists = async () => {
+  const handleLoadMoreArtists = async () => {
     try {
-      setIsRefreshing(true);
-      const response = await api.quiz.getArtists(25);
-      // Preserve selections that appear in new batch
-      const newArtistNames = new Set(response.artists.map((a) => a.name));
-      setSelectedArtists((prev) => {
-        const preserved = new Set<string>();
-        prev.forEach((name) => {
-          if (newArtistNames.has(name)) {
-            preserved.add(name);
-          }
-        });
-        return preserved;
-      });
-      setQuizArtists(response.artists);
+      setIsLoadingMore(true);
+      // Pass current artist names as exclusions to get different artists
+      const currentArtistNames = quizArtists.map((a) => a.name);
+      const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres) : undefined;
+      const response = await api.quiz.getArtists(25, genresArray, currentArtistNames);
+
+      // Append new artists to existing list (keeping selections intact)
+      const existingNames = new Set(quizArtists.map((a) => a.name));
+      const newArtists = response.artists.filter((a) => !existingNames.has(a.name));
+
+      if (newArtists.length > 0) {
+        setQuizArtists((prev) => [...prev, ...newArtists]);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load artists");
+      setError(err instanceof Error ? err.message : "Failed to load more artists");
     } finally {
-      setIsRefreshing(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -307,41 +345,29 @@ export default function QuizPage() {
               ) : error ? (
                 <div className="text-center py-8">
                   <p className="text-white/60 mb-4">{error}</p>
-                  <Button onClick={loadQuizArtists} variant="secondary">
+                  <Button onClick={() => loadQuizArtists()} variant="secondary">
                     Try again
                   </Button>
                 </div>
               ) : (
                 <>
-                  {/* Selection count and refresh */}
+                  {/* Selection count */}
                   <div className="flex items-center justify-between mb-4">
                     <span data-testid="artist-selection-count" className="text-white/60 text-sm">
                       {selectedArtists.size} selected
                     </span>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        data-testid="refresh-artists-btn"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRefreshArtists}
-                        isLoading={isRefreshing}
-                        leftIcon={<RefreshIcon className="w-4 h-4" />}
+                    {selectedArtists.size > 0 && (
+                      <button
+                        onClick={() => setSelectedArtists(new Set())}
+                        className="text-sm text-white/40 hover:text-white transition-colors"
                       >
-                        Show Different Artists
-                      </Button>
-                      {selectedArtists.size > 0 && (
-                        <button
-                          onClick={() => setSelectedArtists(new Set())}
-                          className="text-sm text-white/40 hover:text-white transition-colors"
-                        >
-                          Clear all
-                        </button>
-                      )}
-                    </div>
+                        Clear all
+                      </button>
+                    )}
                   </div>
 
                   {/* Artist grid */}
-                  <div data-testid="artist-grid" className="grid grid-cols-1 gap-3 mb-6">
+                  <div data-testid="artist-grid" className="grid grid-cols-1 gap-3 mb-4">
                     {quizArtists.map((artist, index) => (
                       <QuizArtistCard
                         key={artist.name}
@@ -351,6 +377,21 @@ export default function QuizPage() {
                         index={index}
                       />
                     ))}
+                  </div>
+
+                  {/* Load more artists button - at bottom */}
+                  <div className="mb-6">
+                    <Button
+                      data-testid="load-more-artists-btn"
+                      variant="ghost"
+                      size="md"
+                      className="w-full"
+                      onClick={handleLoadMoreArtists}
+                      isLoading={isLoadingMore}
+                      leftIcon={<RefreshIcon className="w-4 h-4" />}
+                    >
+                      Show More Artists
+                    </Button>
                   </div>
 
                   {/* Skip option */}
@@ -428,26 +469,41 @@ export default function QuizPage() {
                 <h2 className="text-lg font-semibold text-white mb-3">
                   Favorite decade?
                 </h2>
-                <div className="flex flex-wrap gap-2">
-                  {DECADES.map((d) => (
-                    <button
-                      key={d}
-                      data-testid={`decade-${d}`}
-                      onClick={() =>
-                        setDecadePreference(decadePreference === d ? null : d)
-                      }
-                      className={`
-                        px-4 py-2 rounded-full text-sm font-medium transition-all
-                        ${
-                          decadePreference === d
-                            ? "bg-[#ff2d92] text-white"
-                            : "bg-white/10 text-white/70 hover:bg-white/20"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {DECADES.map((d) => {
+                    const decadeInfo = decadeArtists.find((da) => da.decade === d);
+                    const exampleArtists = decadeInfo?.artists.slice(0, 3) || [];
+
+                    return (
+                      <button
+                        key={d}
+                        data-testid={`decade-${d}`}
+                        onClick={() =>
+                          setDecadePreference(decadePreference === d ? null : d)
                         }
-                      `}
-                    >
-                      {d}
-                    </button>
-                  ))}
+                        className={`
+                          p-4 rounded-xl text-left transition-all
+                          ${
+                            decadePreference === d
+                              ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
+                              : "bg-white/5 border border-white/10 hover:border-white/20"
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-semibold text-white">{d}</span>
+                          {decadePreference === d && (
+                            <CheckIcon className="w-5 h-5 text-[#ff2d92]" />
+                          )}
+                        </div>
+                        {exampleArtists.length > 0 && (
+                          <p className="text-xs text-white/50 mt-1">
+                            {exampleArtists.map((a) => a.name).join(", ")}
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -539,8 +595,8 @@ export default function QuizPage() {
                     " Your personalized recommendations are ready!"}
                 </p>
 
-                {/* Primary actions */}
-                <div className="space-y-3 mb-8">
+                {/* Primary action */}
+                <div className="mb-8">
                   <Button
                     data-testid="view-recommendations-btn"
                     variant="primary"
@@ -550,15 +606,6 @@ export default function QuizPage() {
                     leftIcon={<SparklesIcon className="w-5 h-5" />}
                   >
                     View Recommendations
-                  </Button>
-                  <Button
-                    data-testid="view-my-songs-btn"
-                    variant="secondary"
-                    size="lg"
-                    className="w-full"
-                    onClick={() => router.push("/my-songs")}
-                  >
-                    View My Songs
                   </Button>
                 </div>
               </div>
