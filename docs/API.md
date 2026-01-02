@@ -63,6 +63,23 @@ Useful for post-deploy verification and scheduled monitoring.
 
 ## Auth ✅ Implemented
 
+### POST /api/auth/guest
+
+Create a guest/anonymous user session. Allows users to try the app (quiz, recommendations) without email verification.
+
+**No authentication required**
+
+**Response:**
+```json
+{
+  "access_token": "<jwt-token>",
+  "token_type": "bearer",
+  "expires_in": 2592000
+}
+```
+
+Guest sessions last 30 days. Guest users cannot connect music services until they verify their email.
+
 ### POST /api/auth/magic-link
 
 Request a magic link to be sent via email. In dev mode (no SendGrid configured), the link is logged to console.
@@ -101,6 +118,31 @@ Verify a magic link token and get an access token.
 }
 ```
 
+### POST /api/auth/upgrade
+
+Request to upgrade a guest account to a verified account. Sends a magic link to the provided email.
+
+**Requires:** Bearer token (guest user)
+
+**Request:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Verification email sent. Check your inbox to complete the upgrade."
+}
+```
+
+When the user clicks the magic link, their guest data (quiz results, etc.) is migrated to the verified account. If the email already has an account, the guest data will be merged.
+
+**Error Responses:**
+- `400` - Account is already verified
+
 ### GET /api/auth/me
 
 Get the current authenticated user.
@@ -110,7 +152,8 @@ Get the current authenticated user.
 {
   "id": "user123",
   "email": "user@example.com",
-  "display_name": "John Doe"
+  "display_name": "John Doe",
+  "is_guest": false
 }
 ```
 
@@ -257,11 +300,13 @@ Get catalog statistics.
 
 ## Services ✅ Implemented
 
+**Note:** All services endpoints require a verified (non-guest) user. Guest users receive a `403 Forbidden` response with message: "Email verification required. Please verify your email to use this feature."
+
 ### GET /api/services
 
 List connected music services.
 
-**Requires:** Bearer token
+**Requires:** Bearer token (verified user only)
 
 **Response:**
 ```json
