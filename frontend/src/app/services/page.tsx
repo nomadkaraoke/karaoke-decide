@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback, FormEvent, useRef } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
+import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   LinkIcon,
   SpotifyIcon,
@@ -60,6 +62,7 @@ interface UserArtist {
 }
 
 export default function ServicesPage() {
+  const { isGuest } = useAuth();
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -267,6 +270,23 @@ export default function ServicesPage() {
       minute: "2-digit",
     });
   };
+
+  // Show upgrade prompt for guest users
+  if (isGuest) {
+    return (
+      <ProtectedPage>
+        <main className="min-h-screen pb-safe">
+          <div className="max-w-2xl mx-auto px-4 py-12">
+            <UpgradePrompt
+              title="Connect Your Music Services"
+              description="Create an account to connect Spotify, Last.fm, and sync your listening history."
+              featureName="Music Services"
+            />
+          </div>
+        </main>
+      </ProtectedPage>
+    );
+  }
 
   return (
     <ProtectedPage>

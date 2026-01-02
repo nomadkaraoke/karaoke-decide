@@ -54,13 +54,17 @@ class AuthService:
         """
         return hashlib.sha256(email.lower().encode()).hexdigest()
 
-    def _generate_user_id(self) -> str:
+    def _generate_user_id(self, is_guest: bool = False) -> str:
         """Generate a unique user ID.
 
+        Args:
+            is_guest: If True, generates a guest_ prefixed ID
+
         Returns:
-            user_ prefixed random hex string
+            user_ or guest_ prefixed random hex string
         """
-        return f"user_{secrets.token_hex(12)}"
+        prefix = "guest" if is_guest else "user"
+        return f"{prefix}_{secrets.token_hex(12)}"
 
     async def store_magic_link(self, email: str, token: str) -> None:
         """Store a magic link token in Firestore.
@@ -174,12 +178,28 @@ class AuthService:
         """Get a user by their user ID.
 
         Args:
-            user_id: User's ID (user_xxx format)
+            user_id: User's ID (user_xxx or guest_xxx format)
 
         Returns:
             User model or None if not found
         """
-        # Query by user_id field
+        # Guest users are stored with user_id as document ID
+        if user_id.startswith("guest_"):
+            doc = await self.firestore.get_document(self.USERS_COLLECTION, user_id)
+            if doc:
+                return User(
+                    id=doc["user_id"],
+                    email=doc.get("email"),
+                    display_name=doc.get("display_name"),
+                    is_guest=doc.get("is_guest", False),
+                    created_at=datetime.fromisoformat(doc["created_at"]),
+                    updated_at=datetime.fromisoformat(doc["updated_at"]),
+                    total_songs_known=doc.get("total_songs_known", 0),
+                    total_songs_sung=doc.get("total_songs_sung", 0),
+                    last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
+                )
+
+        # Regular users: query by user_id field
         docs = await self.firestore.query_documents(
             self.USERS_COLLECTION,
             filters=[("user_id", "==", user_id)],
@@ -192,8 +212,9 @@ class AuthService:
         doc = docs[0]
         return User(
             id=doc["user_id"],
-            email=doc["email"],
+            email=doc.get("email"),
             display_name=doc.get("display_name"),
+            is_guest=doc.get("is_guest", False),
             created_at=datetime.fromisoformat(doc["created_at"]),
             updated_at=datetime.fromisoformat(doc["updated_at"]),
             total_songs_known=doc.get("total_songs_known", 0),
@@ -272,6 +293,239 @@ class AuthService:
         token = self.generate_magic_link_token()
         await self.store_magic_link(email, token)
         return await self.email_service.send_magic_link(email, token)
+
+    async def create_guest_user(self) -> User:
+        """Create a new guest/anonymous user.
+
+        Guest users can use the quiz and get recommendations but cannot
+        connect music services until they verify their email.
+
+        Returns:
+            User model for the guest user
+        """
+        now = datetime.now(UTC)
+        user_id = self._generate_user_id(is_guest=True)
+
+        user_data = {
+            "user_id": user_id,
+            "email": None,
+            "display_name": None,
+            "is_guest": True,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+            "total_songs_known": 0,
+            "total_songs_sung": 0,
+            "last_sync_at": None,
+        }
+
+        # Use the user_id as document ID for guest users (no email to hash)
+        await self.firestore.set_document(self.USERS_COLLECTION, user_id, user_data)
+
+        return User(
+            id=user_id,
+            email=None,
+            display_name=None,
+            is_guest=True,
+            created_at=now,
+            updated_at=now,
+            total_songs_known=0,
+            total_songs_sung=0,
+            last_sync_at=None,
+        )
+
+    def generate_guest_jwt(self, user: User) -> tuple[str, int]:
+        """Generate a JWT token for a guest user.
+
+        Guest tokens have longer expiry (30 days) to persist their session.
+
+        Args:
+            user: Guest user to generate token for
+
+        Returns:
+            Tuple of (token, expires_in_seconds)
+
+        Raises:
+            ValueError: If JWT secret is not configured
+        """
+        if not self.settings.jwt_secret:
+            raise ValueError("JWT_SECRET is not configured")
+
+        now = datetime.now(UTC)
+        # Guest tokens last 30 days (vs 7 days for verified users)
+        expires_at = now + timedelta(days=30)
+        expires_in = int((expires_at - now).total_seconds())
+
+        payload = {
+            "sub": user.id,
+            "email": None,
+            "is_guest": True,
+            "iat": int(now.timestamp()),
+            "exp": int(expires_at.timestamp()),
+        }
+
+        token = jwt.encode(
+            payload,
+            self.settings.jwt_secret,
+            algorithm=self.settings.jwt_algorithm,
+        )
+
+        return token, expires_in
+
+    async def upgrade_guest_to_verified(
+        self,
+        guest_user_id: str,
+        email: str,
+    ) -> User | None:
+        """Upgrade a guest user to a verified user after email verification.
+
+        This migrates all guest data (quiz results, etc.) to the verified account.
+        If the email already has an account, the guest data is merged into it.
+
+        Args:
+            guest_user_id: The guest user's ID
+            email: Verified email address
+
+        Returns:
+            The upgraded/merged User, or None if guest not found
+        """
+        # Get the guest user document
+        guest_doc = await self.firestore.get_document(self.USERS_COLLECTION, guest_user_id)
+        if guest_doc is None:
+            return None
+
+        if not guest_doc.get("is_guest", False):
+            # Not a guest user, nothing to upgrade
+            return await self.get_user_by_id(guest_user_id)
+
+        email_hash = self._hash_email(email)
+        existing_user_doc = await self.firestore.get_document(self.USERS_COLLECTION, email_hash)
+
+        now = datetime.now(UTC)
+
+        if existing_user_doc is not None:
+            # Merge guest data into existing account
+            merged_data = {
+                "updated_at": now.isoformat(),
+                "total_songs_known": existing_user_doc.get("total_songs_known", 0)
+                + guest_doc.get("total_songs_known", 0),
+            }
+            # If guest completed quiz but existing user hasn't, keep guest quiz data
+            if guest_doc.get("quiz_completed_at") and not existing_user_doc.get("quiz_completed_at"):
+                merged_data["quiz_completed_at"] = guest_doc.get("quiz_completed_at")
+                merged_data["quiz_songs_known"] = guest_doc.get("quiz_songs_known", [])
+                merged_data["quiz_decade_pref"] = guest_doc.get("quiz_decade_pref")
+                merged_data["quiz_energy_pref"] = guest_doc.get("quiz_energy_pref")
+
+            await self.firestore.update_document(self.USERS_COLLECTION, email_hash, merged_data)
+
+            # Migrate any UserSong documents from guest to existing user
+            await self._migrate_user_songs(guest_user_id, existing_user_doc["user_id"])
+
+            # Delete the guest user document
+            await self.firestore.delete_document(self.USERS_COLLECTION, guest_user_id)
+
+            return User(
+                id=existing_user_doc["user_id"],
+                email=email.lower(),
+                display_name=existing_user_doc.get("display_name"),
+                is_guest=False,
+                created_at=datetime.fromisoformat(existing_user_doc["created_at"]),
+                updated_at=now,
+                total_songs_known=merged_data["total_songs_known"],
+                total_songs_sung=existing_user_doc.get("total_songs_sung", 0),
+                last_sync_at=(
+                    datetime.fromisoformat(existing_user_doc["last_sync_at"])
+                    if existing_user_doc.get("last_sync_at")
+                    else None
+                ),
+            )
+        else:
+            # Create new verified user from guest data
+            new_user_id = self._generate_user_id(is_guest=False)
+
+            user_data = {
+                "user_id": new_user_id,
+                "email": email.lower(),
+                "display_name": guest_doc.get("display_name"),
+                "is_guest": False,
+                "created_at": guest_doc.get("created_at", now.isoformat()),
+                "updated_at": now.isoformat(),
+                "total_songs_known": guest_doc.get("total_songs_known", 0),
+                "total_songs_sung": guest_doc.get("total_songs_sung", 0),
+                "last_sync_at": guest_doc.get("last_sync_at"),
+                # Preserve quiz data
+                "quiz_completed_at": guest_doc.get("quiz_completed_at"),
+                "quiz_songs_known": guest_doc.get("quiz_songs_known", []),
+                "quiz_decade_pref": guest_doc.get("quiz_decade_pref"),
+                "quiz_energy_pref": guest_doc.get("quiz_energy_pref"),
+            }
+
+            await self.firestore.set_document(self.USERS_COLLECTION, email_hash, user_data)
+
+            # Migrate any UserSong documents from guest to new user
+            await self._migrate_user_songs(guest_user_id, new_user_id)
+
+            # Delete the guest user document
+            await self.firestore.delete_document(self.USERS_COLLECTION, guest_user_id)
+
+            return User(
+                id=new_user_id,
+                email=email.lower(),
+                display_name=guest_doc.get("display_name"),
+                is_guest=False,
+                created_at=datetime.fromisoformat(guest_doc.get("created_at", now.isoformat())),
+                updated_at=now,
+                total_songs_known=guest_doc.get("total_songs_known", 0),
+                total_songs_sung=guest_doc.get("total_songs_sung", 0),
+                last_sync_at=None,
+            )
+
+    async def _migrate_user_songs(self, from_user_id: str, to_user_id: str) -> int:
+        """Migrate UserSong documents from one user to another.
+
+        Args:
+            from_user_id: Source user ID
+            to_user_id: Target user ID
+
+        Returns:
+            Number of songs migrated
+        """
+        # Query all user_songs for the source user
+        songs = await self.firestore.query_documents(
+            "user_songs",
+            filters=[("user_id", "==", from_user_id)],
+            limit=1000,
+        )
+
+        migrated = 0
+        for song in songs:
+            old_id = song.get("id", f"{from_user_id}:{song.get('song_id', '')}")
+            new_id = f"{to_user_id}:{song.get('song_id', '')}"
+
+            # Check if target already has this song
+            existing = await self.firestore.get_document("user_songs", new_id)
+            if existing:
+                # Merge play counts
+                await self.firestore.update_document(
+                    "user_songs",
+                    new_id,
+                    {
+                        "play_count": existing.get("play_count", 0) + song.get("play_count", 0),
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    },
+                )
+            else:
+                # Move the song to new user
+                song["id"] = new_id
+                song["user_id"] = to_user_id
+                song["updated_at"] = datetime.now(UTC).isoformat()
+                await self.firestore.set_document("user_songs", new_id, song)
+
+            # Delete the old document
+            await self.firestore.delete_document("user_songs", old_id)
+            migrated += 1
+
+        return migrated
 
     async def update_user_profile(
         self,

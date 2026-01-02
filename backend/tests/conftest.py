@@ -107,6 +107,19 @@ def mock_auth_service(
     # Mock update_user_profile
     mock.update_user_profile = AsyncMock(return_value=sample_user)
 
+    # Mock firestore service (needed for verify endpoint to check guest upgrade)
+    mock.firestore = mock_firestore_service
+    mock.MAGIC_LINKS_COLLECTION = "magic_links"
+
+    # Mock upgrade_guest_to_verified
+    mock.upgrade_guest_to_verified = AsyncMock(return_value=sample_user)
+
+    # Mock create_guest_user
+    mock.create_guest_user = AsyncMock(return_value=sample_user)
+
+    # Mock generate_guest_jwt
+    mock.generate_guest_jwt = MagicMock(return_value=("test-guest-jwt-token", 2592000))
+
     return mock
 
 

@@ -23,11 +23,11 @@ const navLinks = [
   { href: "/my-songs", label: "My Songs", icon: MusicIcon, authRequired: true },
   { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
-  { href: "/services", label: "Services", icon: LinkIcon, authRequired: true },
+  { href: "/services", label: "Services", icon: LinkIcon, authRequired: true, verifiedOnly: true },
 ];
 
 export function Navigation() {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, isGuest, isVerified, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -38,9 +38,11 @@ export function Navigation() {
     window.location.href = "/";
   };
 
-  const filteredLinks = navLinks.filter(
-    (link) => !link.authRequired || isAuthenticated
-  );
+  const filteredLinks = navLinks.filter((link) => {
+    if (link.verifiedOnly && !isVerified) return false;
+    if (link.authRequired && !isAuthenticated) return false;
+    return true;
+  });
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0a0f]/80 border-b border-white/5">
@@ -85,6 +87,24 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-3">
             {isLoading ? (
               <div className="w-20 h-8 rounded-lg bg-white/5 animate-pulse" />
+            ) : isGuest ? (
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-1 text-xs font-medium rounded-full bg-amber-500/20 text-amber-400">
+                  Guest
+                </span>
+                <Link href="/login">
+                  <Button variant="primary" size="sm">
+                    Create Account
+                  </Button>
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Clear session"
+                >
+                  <LogOutIcon className="w-4 h-4" />
+                </button>
+              </div>
             ) : isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <Link
@@ -167,6 +187,33 @@ export function Navigation() {
             <div className="pt-2 border-t border-white/10">
               {isLoading ? (
                 <div className="w-full h-12 rounded-xl bg-white/5 animate-pulse" />
+              ) : isGuest ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10">
+                    <UserIcon className="w-5 h-5 text-amber-400" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-white">Guest Session</p>
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-500/20 text-amber-400">
+                          Guest
+                        </span>
+                      </div>
+                      <p className="text-xs text-white/40">Create an account to save progress</p>
+                    </div>
+                  </div>
+                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="primary" className="w-full">
+                      Create Account
+                    </Button>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-white/40 hover:bg-white/5 transition-colors"
+                  >
+                    <LogOutIcon className="w-5 h-5" />
+                    <span className="text-sm font-medium">Clear Session</span>
+                  </button>
+                </div>
               ) : isAuthenticated ? (
                 <div className="space-y-2">
                   <Link

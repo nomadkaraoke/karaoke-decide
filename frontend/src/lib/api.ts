@@ -115,16 +115,32 @@ export const api = {
         { token }
       ),
 
-    getMe: () => api.get<{ id: string; email: string; display_name: string | null }>("/api/auth/me"),
+    createGuestSession: () =>
+      api.post<{ access_token: string; token_type: string; expires_in: number }>(
+        "/api/auth/guest"
+      ),
+
+    upgradeGuest: (email: string) =>
+      api.post<{ message: string }>("/api/auth/upgrade", { email }),
+
+    getMe: () =>
+      api.get<{
+        id: string;
+        email: string | null;
+        display_name: string | null;
+        is_guest: boolean;
+      }>("/api/auth/me"),
 
     updateProfile: (data: { display_name?: string | null }) =>
-      apiRequest<{ id: string; email: string; display_name: string | null }>(
-        "/api/auth/profile",
-        {
-          method: "PUT",
-          body: JSON.stringify(data),
-        }
-      ),
+      apiRequest<{
+        id: string;
+        email: string | null;
+        display_name: string | null;
+        is_guest: boolean;
+      }>("/api/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
 
     logout: () => api.post<{ message: string }>("/api/auth/logout"),
   },

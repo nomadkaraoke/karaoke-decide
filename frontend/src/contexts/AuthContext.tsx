@@ -12,17 +12,22 @@ import { api, getAuthToken, setAuthToken, clearAuthToken } from "@/lib/api";
 
 interface User {
   id: string;
-  email: string;
+  email: string | null;
   display_name: string | null;
+  is_guest: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isGuest: boolean;
+  isVerified: boolean;
   login: (token: string) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  startGuestSession: () => Promise<void>;
+  requestUpgrade: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,6 +72,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const startGuestSession = useCallback(async () => {
+    try {
+      const response = await api.auth.createGuestSession();
+      setAuthToken(response.access_token);
+      await checkAuth();
+    } catch (error) {
+      console.error("Failed to create guest session:", error);
+      throw error;
+    }
+  }, [checkAuth]);
+
+  const requestUpgrade = useCallback(async (email: string) => {
+    await api.auth.upgradeGuest(email);
+    // Email sent - user needs to click link to verify
+  }, []);
+
   // Check auth on mount
   useEffect(() => {
     checkAuth();
@@ -84,15 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [checkAuth]);
 
+  const isGuest = user?.is_guest ?? false;
+  const isVerified = !!user && !user.is_guest;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
         isAuthenticated: !!user,
+        isGuest,
+        isVerified,
         login,
         logout,
         checkAuth,
+        startGuestSession,
+        requestUpgrade,
       }}
     >
       {children}

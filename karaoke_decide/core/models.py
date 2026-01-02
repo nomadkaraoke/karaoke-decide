@@ -10,8 +10,9 @@ class User(BaseModel):
     """User account."""
 
     id: str
-    email: str
+    email: str | None = None  # None for guest users
     display_name: str | None = None
+    is_guest: bool = False  # True for anonymous/guest users
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { SongCard } from "@/components/SongCard";
-import { SearchIcon } from "@/components/icons";
-import { LoadingPulse } from "@/components/ui";
+import { SearchIcon, SparklesIcon } from "@/components/icons";
+import { LoadingPulse, Button } from "@/components/ui";
 
 interface Song {
   id: number;
@@ -14,12 +16,33 @@ interface Song {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [songs, setSongs] = useState<Song[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isStartingSession, setIsStartingSession] = useState(false);
+
+  const handleGetStarted = async () => {
+    if (isAuthenticated) {
+      router.push("/quiz");
+      return;
+    }
+
+    setIsStartingSession(true);
+    try {
+      await startGuestSession();
+      router.push("/quiz");
+    } catch (err) {
+      console.error("Failed to start session:", err);
+      setError("Failed to start. Please try again.");
+    } finally {
+      setIsStartingSession(false);
+    }
+  };
 
   // Load popular songs on mount
   useEffect(() => {
@@ -104,6 +127,32 @@ export default function Home() {
     <main className="relative min-h-screen pb-safe">
       {/* Content */}
       <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Welcome Banner - shown to non-authenticated users */}
+        {!authLoading && !isAuthenticated && (
+          <div className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-[#ff2d92]/20 via-[#b347ff]/20 to-[#00f5ff]/20 border border-white/10">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#ff2d92] to-[#b347ff] flex items-center justify-center mb-4">
+                <SparklesIcon className="w-8 h-8 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">
+                Find Your Next Karaoke Song
+              </h1>
+              <p className="text-white/70 mb-6 max-w-md">
+                Take a quick quiz to discover songs you already know. No sign-up required.
+              </p>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleGetStarted}
+                isLoading={isStartingSession}
+                leftIcon={<SparklesIcon className="w-5 h-5" />}
+              >
+                Get Started
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Search bar */}
         <div className="relative group mb-6">
           <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] opacity-30 blur-sm group-focus-within:opacity-60 transition-opacity" />
