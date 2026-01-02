@@ -226,7 +226,30 @@ MAILSLURP_API_KEY=<key> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production
 PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts --grep "Authenticated"
 ```
 
-To get a PROD_TEST_TOKEN:
+#### Generating PROD_TEST_TOKEN
+
+**Option 1: Use the automated script (recommended for CI/agents)**
+
+```bash
+# Install dependencies (if not already installed)
+pip install google-cloud-firestore google-cloud-secret-manager python-jose
+
+# Generate token for default test user (andrew@beveridge.uk)
+python scripts/get_prod_test_token.py
+
+# Generate token for a specific user
+python scripts/get_prod_test_token.py --email user@example.com
+
+# Use directly with tests
+PROD_TEST_TOKEN=$(python scripts/get_prod_test_token.py) npx playwright test e2e/production-comprehensive.spec.ts --grep "Authenticated"
+```
+
+Prerequisites for the script:
+- `gcloud auth application-default login` (authenticated with access to nomadkaraoke project)
+- Access to Secret Manager secrets (JWT_SECRET)
+
+**Option 2: Manual extraction from browser**
+
 1. Login to https://decide.nomadkaraoke.com
 2. Open browser DevTools → Application → Local Storage
 3. Copy the `karaoke_decide_token` value
@@ -237,6 +260,8 @@ The comprehensive tests cover:
 - Services page and sync functionality
 - My Songs, Recommendations, Playlists pages
 - Quiz functionality
+- **Known Songs page** (search, add songs)
+- **My Data page** (preferences)
 - API health endpoints
 - Error handling
 
