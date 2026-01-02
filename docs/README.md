@@ -17,7 +17,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
-- **Authentication:** Magic link auth with JWT tokens (Phase 2 complete, secrets configured)
+- **Authentication:** Magic link auth with JWT tokens, guest sessions for frictionless onboarding
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
 - **Async Music Sync:** Background sync via Cloud Tasks with progress tracking
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
@@ -83,8 +83,10 @@ cd frontend && npm run dev
 ### Live Endpoints
 - `GET /api/health` - Basic health check
 - `GET /api/health/deep` - Deep health check (validates Firestore, BigQuery, Cloud Tasks)
+- `POST /api/auth/guest` - Create guest session (no auth required)
 - `POST /api/auth/magic-link` - Request magic link email
 - `POST /api/auth/verify` - Verify token, get JWT
+- `POST /api/auth/upgrade` - Upgrade guest to verified (requires guest auth)
 - `GET /api/auth/me` - Get current user (requires auth)
 - `PUT /api/auth/profile` - Update user profile (requires auth)
 - `GET /api/catalog/songs?q=<query>` - Search songs
@@ -137,6 +139,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-02 | Guest User Onboarding (frictionless onboarding, guest sessions, upgrade flow) | [archive/2026-01-02-guest-onboarding-flow.md](archive/2026-01-02-guest-onboarding-flow.md) |
 | 2026-01-01 | Enhanced Recommendations (categorized sections, artist diversity, rich filters, Create Your Own Karaoke) | [archive/2026-01-01-enhanced-recommendations.md](archive/2026-01-01-enhanced-recommendations.md) |
 | 2025-12-31 | Sync IAM Fix & Health Monitoring (403 fix, deep health endpoint, scheduled monitoring, comprehensive E2E) | [archive/2025-12-31-sync-iam-fix-and-health-monitoring.md](archive/2025-12-31-sync-iam-fix-and-health-monitoring.md) |
 | 2025-12-31 | **Production Hotfix** (Cloud Run secrets, magic link auth fix) | [archive/2025-12-31-cloud-run-secrets-hotfix.md](archive/2025-12-31-cloud-run-secrets-hotfix.md) |
