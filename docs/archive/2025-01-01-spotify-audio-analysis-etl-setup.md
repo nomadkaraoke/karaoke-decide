@@ -2,7 +2,16 @@
 
 ## Summary
 
-Set up infrastructure and started ETL process to load 4TB Spotify Audio Analysis data into BigQuery. This data will enable filtering karaoke songs by tempo, key, mode, and energy.
+Downloaded 4TB Spotify Audio Analysis torrent and preserved raw data in GCS Archive. The audio analysis ETL was ultimately **not needed** because the simpler `spotify_audio_features` table (from metadata dump) already contains all the fields needed for karaoke filtering (tempo, key, mode, energy, etc.).
+
+## Final Outcome
+
+| Item | Status |
+|------|--------|
+| Torrent download | ✅ Complete (3.6 TB) |
+| Raw data preservation | ✅ 3.45 TiB in GCS Archive |
+| BigQuery ETL | ⏭️ Not needed - audio features table exists |
+| VM cleanup | ✅ Deleted |
 
 ## What Was Done
 
@@ -25,10 +34,10 @@ Set up infrastructure and started ETL process to load 4TB Spotify Audio Analysis
 - **Region**: us-central1-a (same as BigQuery)
 - **Python env**: Virtual environment at `/data/venv`
 
-### Torrent Download Started
-- Download speed: ~28 MB/s
+### Torrent Download Completed
+- Download speed: ~28-107 MB/s
 - Total size: 3.6 TB
-- ETA: 36-48 hours from start time
+- Completed: 2026-01-02 05:13 EST
 
 ## Data Schema
 
@@ -73,15 +82,36 @@ python3 /data/scripts/spotify_audio_analysis_etl.py
 gcloud compute instances delete spotify-etl-vm --zone=us-central1-a --project=nomadkaraoke
 ```
 
-## Pending Work
+## Why Audio Analysis ETL Was Not Needed
 
-1. Wait for torrent download to complete (~5-6 hrs remaining)
-2. Wait for GCS Archive upload to complete
-3. Run ETL script to extract track-level summaries to BigQuery
-4. Verify BigQuery table created
-5. Add table to Pulumi infrastructure
-6. Create BigQuery view joining tracks with audio analysis
-7. Update API to expose audio features in search/filters
+The `spotify_audio_features` table (229.5M rows) was loaded from the Spotify metadata dump and contains all the fields we need:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| track_id | STRING | Join key |
+| tempo | FLOAT64 | BPM |
+| key | INT64 | Musical key (0-11) |
+| mode | INT64 | Major (1) / Minor (0) |
+| energy | FLOAT64 | Energy level (0-1) |
+| danceability | FLOAT64 | Danceability (0-1) |
+| loudness | FLOAT64 | dB level |
+| valence | FLOAT64 | Positivity (0-1) |
+| acousticness | FLOAT64 | Acoustic probability |
+| instrumentalness | FLOAT64 | Instrumental probability |
+| liveness | FLOAT64 | Live recording probability |
+| speechiness | FLOAT64 | Spoken word probability |
+| duration_ms | INT64 | Track duration |
+| time_signature | INT64 | Time signature |
+
+The Audio Analysis API provides more granular data (bars, beats, segments, sections) but the track-level features are already available in the simpler Audio Features API data.
+
+## Remaining Work
+
+1. ~~Wait for torrent download to complete~~ ✅
+2. ~~Wait for GCS Archive upload to complete~~ ✅
+3. ~~Run ETL script~~ ⏭️ Not needed
+4. Create BigQuery view joining tracks with audio features
+5. Update API to expose audio features in search/filters
 
 ## Raw Data Preservation
 
@@ -92,13 +122,13 @@ gcloud compute instances delete spotify-etl-vm --zone=us-central1-a --project=no
 - **Monthly cost:** ~$5/month for 4TB
 - **Purpose:** Future feature development may need per-segment data (beats, bars, sections)
 
-## Cost Estimate
+## Actual Costs
 
-- VM runtime (72-96 hrs): ~$20-30
-- SSD storage (5TB, 4 days): ~$3-4
-- GCS Archive storage (4TB, ongoing): ~$5/month
-- **Total one-time**: ~$25-35
-- **Total ongoing**: ~$5/month
+- VM runtime (~10 hrs): ~$3
+- SSD storage (5TB, ~10 hrs): ~$0.50
+- GCS Archive storage (3.45 TiB, ongoing): ~$4/month
+- **Total one-time**: ~$4
+- **Total ongoing**: ~$4/month
 
 ## PR
 
