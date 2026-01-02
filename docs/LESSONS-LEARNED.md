@@ -764,3 +764,59 @@ await page.getByTestId("genre-rock").click();
 - Use kebab-case: `genre-rock`, `refresh-artists-btn`
 - Include context: `decade-1980s`, `energy-chill`
 - For dynamic elements: `genre-${id}`, `progress-dot-${n}`
+
+---
+
+### 2026-01-01: Extract ALL Metadata During ETL, Not Just What You Need Now
+
+**Context:** Original Spotify ETL only extracted basic track/artist data needed for the current feature. Later discovered we needed artist genres and album release dates, requiring a new ETL script.
+
+**Lesson:** Large dataset ETL is expensive (VM time, network, processing). When you have access to a rich data source, extract everything useful in one pass rather than making multiple trips.
+
+**Recommendation:**
+1. Before ETL, explore the full schema of your data source
+2. Identify ALL potentially useful fields (even for future features)
+3. Extract normalized tables that preserve relationships
+4. Consider audio features, metadata, and junction tables
+5. Store in separate tables - disk is cheap, re-ETL is expensive
+
+```python
+# BAD - only extract what you need today
+query = "SELECT id, name FROM artists"
+
+# GOOD - extract everything useful
+TABLES_TO_EXTRACT = [
+    {"table": "artists", "query": "SELECT id, name, popularity, followers..."},
+    {"table": "artist_genres", "query": "SELECT artist_id, genre..."},
+    {"table": "albums", "query": "SELECT id, release_date, album_type..."},
+    {"table": "audio_features", "query": "SELECT track_id, danceability, energy..."},
+]
+```
+
+**Future-proofing bonus:** Audio features (danceability, energy, valence) enable "high energy karaoke" or "chill karaoke" filtering without re-ETL.
+
+---
+
+### 2026-01-01: Don't Create "Library" Features Without Library Data
+
+**Context:** Built a "My Songs" / "Songs in Your Library" feature that implied users had song-level listening data. In reality, Spotify only provides top artists (not full listening history), and very few users have Last.fm accounts with scrobble data.
+
+**Lesson:** The UI created a false mental model. Users expected to see songs they'd actually listened to, but instead saw songs from artists they selected in a quiz - making it feel like recommendations, not their actual library. The feature was confusing and misleading.
+
+**Recommendation:**
+1. **Be honest about your data.** If you can't get song-level listening history, don't pretend you have it.
+2. **Match UI to reality.** Call it what it is: "Artists You Like" not "Your Library"
+3. **Show inputs, not illusions.** A "My Data" tab that shows all recommendation inputs (quiz answers, connected services, liked artists) is more honest and useful than a fake library.
+4. **Enable experimentation.** When users can see and edit their preference data, they understand how the system works and can tweak it to get better recommendations.
+
+**Better approach:**
+```
+# Instead of "My Songs" (implying we have listening data)
+# Use "My Data" showing:
+- Quiz preferences: genres, decades, energy level
+- Artists you like: (source: Spotify / quiz / manual)
+- Connected services: what data each provides
+- Songs you've rated: loved / hated
+```
+
+**See also:** `docs/VISION.md` - "User Data & Profile" section for full design rationale.

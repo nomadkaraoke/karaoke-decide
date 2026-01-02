@@ -44,6 +44,7 @@ class QuizArtistResponse(BaseModel):
     top_songs: list[str]
     total_brand_count: int
     primary_decade: str
+    genres: list[str] = []
     image_url: str | None = None
 
 
@@ -51,6 +52,26 @@ class QuizArtistsResponse(BaseModel):
     """Response containing quiz artists."""
 
     artists: list[QuizArtistResponse]
+
+
+class DecadeArtist(BaseModel):
+    """Example artist for a decade."""
+
+    name: str
+    top_song: str
+
+
+class DecadeInfo(BaseModel):
+    """Decade with example artists."""
+
+    decade: str
+    artists: list[DecadeArtist]
+
+
+class DecadeArtistsResponse(BaseModel):
+    """Response containing decade example artists."""
+
+    decades: list[DecadeInfo]
 
 
 class QuizSubmitRequest(BaseModel):
@@ -133,6 +154,8 @@ async def get_quiz_artists(
     user: CurrentUser,
     quiz_service: QuizServiceDep,
     count: int = Query(25, ge=10, le=50, description="Number of quiz artists"),
+    genres: list[str] = Query(default=[], description="Filter by genres (e.g., pop, rock, hiphop)"),
+    exclude: list[str] = Query(default=[], description="Artist names to exclude (for pagination)"),
 ) -> QuizArtistsResponse:
     """Get quiz artists for onboarding.
 
@@ -143,10 +166,17 @@ async def get_quiz_artists(
     Artists are selected based on:
     - Total number of karaoke songs available
     - Combined brand coverage (popularity proxy)
+    - Optional genre filter from user selections
+
+    Use `exclude` parameter to load more artists without duplicates.
 
     Requires authentication to track quiz completion.
     """
-    artists = await quiz_service.get_quiz_artists(count)
+    artists = await quiz_service.get_quiz_artists(
+        count=count,
+        genres=genres if genres else None,
+        exclude_artists=exclude if exclude else None,
+    )
 
     return QuizArtistsResponse(
         artists=[
@@ -156,9 +186,36 @@ async def get_quiz_artists(
                 top_songs=artist.top_songs,
                 total_brand_count=artist.total_brand_count,
                 primary_decade=artist.primary_decade,
+                genres=artist.genres,
                 image_url=artist.image_url,
             )
             for artist in artists
+        ]
+    )
+
+
+@router.get("/decade-artists", response_model=DecadeArtistsResponse)
+async def get_decade_artists(
+    user: CurrentUser,
+    quiz_service: QuizServiceDep,
+    artists_per_decade: int = Query(5, ge=3, le=10, description="Artists per decade"),
+) -> DecadeArtistsResponse:
+    """Get example artists for each decade.
+
+    Returns top karaoke artists organized by their primary decade,
+    helping users understand what era each decade represents.
+
+    Useful for the decade preference selection in the quiz.
+    """
+    decade_data = await quiz_service.get_decade_artists(artists_per_decade)
+
+    return DecadeArtistsResponse(
+        decades=[
+            DecadeInfo(
+                decade=decade,
+                artists=[DecadeArtist(name=a["name"], top_song=a["top_song"]) for a in artists],
+            )
+            for decade, artists in decade_data.items()
         ]
     )
 
