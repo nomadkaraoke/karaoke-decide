@@ -1,6 +1,7 @@
 """Tests for known songs routes and service."""
 
 from collections.abc import Generator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -324,7 +325,7 @@ class TestKnownSongsServiceUnit:
         mock_result.id = "1"
         mock_result.artist = "Queen"
         mock_result.title = "Bohemian Rhapsody"
-        known_songs_service._bigquery_client.query.return_value.result.return_value = [mock_result]
+        known_songs_service._bigquery_client.query.return_value.result.return_value = [mock_result]  # type: ignore[union-attr]
 
         # Mock Firestore to return no existing document
         mock_firestore_service.get_document.return_value = None
@@ -357,7 +358,7 @@ class TestKnownSongsServiceUnit:
         mock_result.id = "1"
         mock_result.artist = "Queen"
         mock_result.title = "Bohemian Rhapsody"
-        known_songs_service._bigquery_client.query.return_value.result.return_value = [mock_result]
+        known_songs_service._bigquery_client.query.return_value.result.return_value = [mock_result]  # type: ignore[union-attr]
 
         # Mock Firestore to return existing document
         mock_firestore_service.get_document.return_value = {
@@ -384,7 +385,7 @@ class TestKnownSongsServiceUnit:
     ) -> None:
         """Test adding a song that doesn't exist in catalog."""
         # Mock BigQuery to return no results
-        known_songs_service._bigquery_client.query.return_value.result.return_value = []
+        known_songs_service._bigquery_client.query.return_value.result.return_value = []  # type: ignore[union-attr]
 
         with pytest.raises(ValueError, match="not found in catalog"):
             await known_songs_service.add_known_song(
@@ -484,7 +485,7 @@ class TestKnownSongsServiceUnit:
         """Test bulk adding known songs."""
 
         # Mock BigQuery to return song details for both songs
-        def mock_query(sql, job_config=None):
+        def mock_query(sql: str, job_config: Any = None) -> MagicMock:
             result = MagicMock()
             # Return result for songs 1 and 2
             mock_row_1 = MagicMock()
@@ -499,7 +500,7 @@ class TestKnownSongsServiceUnit:
             result.result.return_value = [mock_row_1, mock_row_2]
             return result
 
-        known_songs_service._bigquery_client.query.side_effect = mock_query
+        known_songs_service._bigquery_client.query.side_effect = mock_query  # type: ignore[union-attr]
 
         # First call returns None (new), second call returns existing
         mock_firestore_service.get_document.side_effect = [None, {"id": "existing"}]
