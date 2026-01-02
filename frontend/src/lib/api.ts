@@ -593,4 +593,47 @@ export const api = {
     removeSong: (playlistId: string, songId: string) =>
       api.delete<Record<string, never>>(`/api/playlists/${playlistId}/songs/${songId}`),
   },
+
+  // ============================================================================
+  // Known Songs endpoints
+  // ============================================================================
+
+  knownSongs: {
+    list: (page: number = 1, perPage: number = 20) =>
+      api.get<{
+        songs: Array<{
+          id: string;
+          song_id: string;
+          artist: string;
+          title: string;
+          source: string;
+          is_saved: boolean;
+          created_at: string;
+          updated_at: string;
+        }>;
+        total: number;
+        page: number;
+        per_page: number;
+      }>(`/api/known-songs?page=${page}&per_page=${perPage}`),
+
+    add: (songId: number) =>
+      api.post<{
+        added: boolean;
+        song_id: string;
+        artist: string;
+        title: string;
+        already_existed: boolean;
+      }>("/api/known-songs", { song_id: songId }),
+
+    bulkAdd: (songIds: number[]) =>
+      api.post<{
+        added: number;
+        already_existed: number;
+        not_found: number;
+        total_requested: number;
+      }>("/api/known-songs/bulk", { song_ids: songIds }),
+
+    remove: (songId: number) =>
+      api.delete<Record<string, never>>(`/api/known-songs/${songId}`),
+  },
 };

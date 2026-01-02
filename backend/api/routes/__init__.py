@@ -6,6 +6,7 @@ from backend.api.routes.auth import router as auth_router
 from backend.api.routes.catalog import router as catalog_router
 from backend.api.routes.health import router as health_router
 from backend.api.routes.internal import router as internal_router
+from backend.api.routes.known_songs import router as known_songs_router
 from backend.api.routes.playlists import router as playlists_router
 from backend.api.routes.quiz import router as quiz_router
 from backend.api.routes.recommendations import router as recommendations_router
@@ -21,6 +22,7 @@ router.include_router(services_router, prefix="/services", tags=["services"])
 router.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 router.include_router(recommendations_router, prefix="/my", tags=["my"])
 router.include_router(playlists_router, prefix="/playlists", tags=["playlists"])
+router.include_router(known_songs_router, prefix="/known-songs", tags=["known-songs"])
 
 # Internal routes (Cloud Tasks callbacks) - separate prefix outside /api
 internal_api_router = internal_router

@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
 from backend.services.quiz_service import QuizService, get_quiz_service
@@ -159,6 +160,14 @@ async def get_playlist_service_dep(
     return get_playlist_service(settings, firestore)
 
 
+async def get_known_songs_service_dep(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> KnownSongsService:
+    """Get known songs service instance."""
+    return get_known_songs_service(settings, firestore)
+
+
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
@@ -171,3 +180,4 @@ SyncServiceDep = Annotated[SyncService, Depends(get_sync_service_dep)]
 QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service_dep)]
 RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommendation_service_dep)]
 PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service_dep)]
+KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_service_dep)]

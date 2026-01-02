@@ -11,6 +11,7 @@ import {
   MenuIcon,
   XIcon,
   MusicIcon,
+  MicrophoneIcon,
   SparklesIcon,
   LinkIcon,
   PlaylistIcon,
@@ -21,6 +22,7 @@ import { Button } from "./ui";
 const navLinks = [
   { href: "/", label: "Search", icon: null },
   { href: "/my-songs", label: "My Songs", icon: MusicIcon, authRequired: true },
+  { href: "/known-songs", label: "Add Songs", icon: MicrophoneIcon, authRequired: true },
   { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
   { href: "/services", label: "Services", icon: LinkIcon, authRequired: true, verifiedOnly: true },

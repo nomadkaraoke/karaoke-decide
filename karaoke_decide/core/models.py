@@ -90,7 +90,7 @@ class UserSong(BaseModel):
     song_id: str
 
     # Source tracking
-    source: Literal["spotify", "lastfm", "quiz"] = "spotify"
+    source: Literal["spotify", "lastfm", "quiz", "known_songs"] = "spotify"
 
     # From listening history
     play_count: int = 0
