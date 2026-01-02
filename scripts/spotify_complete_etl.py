@@ -312,38 +312,39 @@ def extract_table(extraction: TableExtraction) -> int:
     total_count = 0
     current_file = None
 
-    for row in cursor:
-        if row_count == 0:
-            file_path = table_output_dir / f"{extraction.bigquery_table}_{file_num:04d}.ndjson.gz"
-            current_file = gzip.open(file_path, "wt", encoding="utf-8")
+    try:
+        for row in cursor:
+            if row_count == 0:
+                file_path = table_output_dir / f"{extraction.bigquery_table}_{file_num:04d}.ndjson.gz"
+                current_file = gzip.open(file_path, "wt", encoding="utf-8")
 
-        # Convert row to dict with proper types
-        record: dict[str, Any] = {}
-        for i, col_name in enumerate(column_names):
-            value = row[i]
-            # Handle bytes
-            if isinstance(value, bytes):
-                value = value.decode("utf-8", errors="replace")
-            # Handle booleans (SQLite stores as 0/1)
-            if col_name == "explicit" and value is not None:
-                value = bool(value)
-            record[col_name] = value
+            # Convert row to dict with proper types
+            record: dict[str, Any] = {}
+            for i, col_name in enumerate(column_names):
+                value = row[i]
+                # Handle bytes
+                if isinstance(value, bytes):
+                    value = value.decode("utf-8", errors="replace")
+                # Handle booleans (SQLite stores as 0/1)
+                if col_name == "explicit" and value is not None:
+                    value = bool(value)
+                record[col_name] = value
 
-        current_file.write(json.dumps(record) + "\n")
+            current_file.write(json.dumps(record) + "\n")
 
-        row_count += 1
-        total_count += 1
+            row_count += 1
+            total_count += 1
 
-        if row_count >= BATCH_SIZE:
+            if row_count >= BATCH_SIZE:
+                current_file.close()
+                current_file = None
+                file_num += 1
+                row_count = 0
+                log(f"  Exported {total_count:,} rows...")
+    finally:
+        if current_file is not None:
             current_file.close()
-            file_num += 1
-            row_count = 0
-            log(f"  Exported {total_count:,} rows...")
-
-    if current_file and row_count > 0:
-        current_file.close()
-
-    conn.close()
+        conn.close()
     log(f"  Complete: {total_count:,} rows in {file_num + 1} files")
     return file_num + 1
 

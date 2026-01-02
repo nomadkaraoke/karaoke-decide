@@ -184,6 +184,7 @@ class QuizService:
         # Build genre filter clause if genres provided
         genre_filter = ""
         genre_join = ""
+        genre_patterns: list[str] = []
         if genres:
             # Map frontend genre IDs to Spotify genre patterns
             genre_patterns = self._map_genre_ids_to_patterns(genres)
@@ -253,8 +254,7 @@ class QuizService:
         ]
 
         # Add genre pattern parameters
-        if genres:
-            genre_patterns = self._map_genre_ids_to_patterns(genres)
+        if genre_patterns:
             for i, pattern in enumerate(genre_patterns):
                 params.append(bigquery.ScalarQueryParameter(f"genre_pattern_{i}", "STRING", pattern))
 

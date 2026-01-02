@@ -130,15 +130,20 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
       // Refetch to ensure we have server state
       await loadPreferences();
       setSuccessMessage("Preferences saved! Changes will apply to your next recommendations.");
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save preferences");
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => setSuccessMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   const handleCancel = () => {
     setEditedPreferences(null);

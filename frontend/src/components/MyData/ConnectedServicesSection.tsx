@@ -242,7 +242,7 @@ export function ConnectedServicesSection({
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
+    return date.toLocaleString(undefined, {
       month: "short",
       day: "numeric",
       hour: "2-digit",
@@ -258,6 +258,7 @@ export function ConnectedServicesSection({
       <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
         <button
           onClick={onToggle}
+          aria-expanded={isExpanded}
           className="w-full p-5 flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-3">
@@ -294,6 +295,7 @@ export function ConnectedServicesSection({
       {/* Header */}
       <button
         onClick={onToggle}
+        aria-expanded={isExpanded}
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">

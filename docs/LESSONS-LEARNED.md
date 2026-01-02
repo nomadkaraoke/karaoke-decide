@@ -815,7 +815,7 @@ TABLES_TO_EXTRACT = [
 ]
 ```
 
-**Future-proofing bonus:** Audio features (danceability, energy, valence) enable "high energy karaoke" or "chill karaoke" filtering without re-ETL.
+**Future-proofing bonus:** Audio features (danceability, energy, valence) enable "high-energy karaoke" or "chill karaoke" filtering without re-ETL.
 
 ---
 
@@ -832,7 +832,7 @@ TABLES_TO_EXTRACT = [
 4. **Enable experimentation.** When users can see and edit their preference data, they understand how the system works and can tweak it to get better recommendations.
 
 **Better approach:**
-```
+```text
 # Instead of "My Songs" (implying we have listening data)
 # Use "My Data" showing:
 - Quiz preferences: genres, decades, energy level

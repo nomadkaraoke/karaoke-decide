@@ -251,7 +251,7 @@ export function YourArtistsSection({
                                   title="Remove artist"
                                 >
                                   {removingArtist === artist.artist_name ? (
-                                    <span className="animate-spin">...</span>
+                                    <span className="animate-pulse">...</span>
                                   ) : (
                                     <XIcon className="w-3 h-3" />
                                   )}
