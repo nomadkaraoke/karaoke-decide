@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://karaoke-decide-718638054799.us-central1.run.app
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2025-12-31)
+## Current Status (2026-01-01)
 
-**Phase:** MLP COMPLETE (Minimum Lovable Product) - All success criteria met
+**Phase:** MLP COMPLETE + Enhanced Recommendations
 
 ### ✅ What's Working
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
@@ -21,6 +21,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Music Services:** Spotify OAuth and Last.fm connection (Phase 3 complete)
 - **Async Music Sync:** Background sync via Cloud Tasks with progress tracking
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
+- **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Frontend Auth & Discovery:** Full auth flow, My Songs, Recommendations, Quiz UI, Services page (Phase 5 complete)
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
@@ -102,6 +103,7 @@ cd frontend && npm run dev
 - `GET /api/quiz/status` - Get quiz completion status
 - `GET /api/my/songs` - Get user's song library
 - `GET /api/my/recommendations` - Get personalized recommendations
+- `GET /api/my/recommendations/categorized` - Categorized recommendations with rich filters
 - `GET /api/playlists` - List user's playlists
 - `POST /api/playlists` - Create new playlist
 - `GET /api/playlists/{id}` - Get playlist by ID
@@ -135,6 +137,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-01 | Enhanced Recommendations (categorized sections, artist diversity, rich filters, Create Your Own Karaoke) | [archive/2026-01-01-enhanced-recommendations.md](archive/2026-01-01-enhanced-recommendations.md) |
 | 2025-12-31 | Sync IAM Fix & Health Monitoring (403 fix, deep health endpoint, scheduled monitoring, comprehensive E2E) | [archive/2025-12-31-sync-iam-fix-and-health-monitoring.md](archive/2025-12-31-sync-iam-fix-and-health-monitoring.md) |
 | 2025-12-31 | **Production Hotfix** (Cloud Run secrets, magic link auth fix) | [archive/2025-12-31-cloud-run-secrets-hotfix.md](archive/2025-12-31-cloud-run-secrets-hotfix.md) |
 | 2025-12-31 | Async Music Sync & CodeRabbit Fixes (Cloud Tasks, progress UI, 11 bug fixes) | [archive/2025-12-31-async-sync-coderabbit-fixes.md](archive/2025-12-31-async-sync-coderabbit-fixes.md) |

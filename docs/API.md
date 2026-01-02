@@ -551,6 +551,93 @@ Get personalized karaoke song recommendations.
 - `decade_match` - Matches your decade preference from quiz
 - `crowd_pleaser` - Popular karaoke song for all audiences
 - `popular` - High popularity score on streaming services
+- `generate_karaoke` - Song without karaoke version (use Generator)
+
+### GET /api/my/recommendations/categorized
+
+Get recommendations organized into categories with rich filtering options.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| has_karaoke | bool | Filter by karaoke availability (true/false/null for all) |
+| min_popularity | int | Minimum Spotify popularity (0-100) |
+| max_popularity | int | Maximum Spotify popularity (0-100, for "hidden gems") |
+| exclude_explicit | bool | Hide explicit content (default: false) |
+| min_duration_ms | int | Minimum song duration in milliseconds |
+| max_duration_ms | int | Maximum song duration in milliseconds |
+| classics_only | bool | Only show songs with brand_count >= 20 (default: false) |
+
+**Response:**
+```json
+{
+  "from_artists_you_know": [
+    {
+      "song_id": "40718",
+      "artist": "Elton John",
+      "title": "I'm Still Standing",
+      "score": 0.779,
+      "reason": "You listen to Elton John",
+      "reason_type": "known_artist",
+      "brand_count": 21,
+      "popularity": 84,
+      "has_karaoke_version": true,
+      "is_classic": true,
+      "duration_ms": null,
+      "explicit": false
+    }
+  ],
+  "create_your_own": [
+    {
+      "song_id": "spotify:sub-focus:push-the-tempo",
+      "artist": "Sub Focus",
+      "title": "Push The Tempo",
+      "score": 0.35,
+      "reason": "Generate karaoke for Sub Focus",
+      "reason_type": "generate_karaoke",
+      "brand_count": 0,
+      "popularity": 50,
+      "has_karaoke_version": false,
+      "is_classic": false,
+      "duration_ms": 180000,
+      "explicit": false
+    }
+  ],
+  "crowd_pleasers": [
+    {
+      "song_id": "100",
+      "artist": "Queen",
+      "title": "Bohemian Rhapsody",
+      "score": 0.65,
+      "reason": "Popular karaoke song",
+      "reason_type": "crowd_pleaser",
+      "brand_count": 50,
+      "popularity": 90,
+      "has_karaoke_version": true,
+      "is_classic": true,
+      "duration_ms": null,
+      "explicit": false
+    }
+  ],
+  "total_count": 35,
+  "filters_applied": {
+    "has_karaoke": null,
+    "min_popularity": null,
+    "max_popularity": null,
+    "exclude_explicit": false,
+    "min_duration_ms": null,
+    "max_duration_ms": null,
+    "classics_only": false
+  }
+}
+```
+
+**Categories:**
+- `from_artists_you_know` - Karaoke songs by artists in your library (max 15, 3 per artist)
+- `create_your_own` - Songs from your library without karaoke versions (max 10)
+- `crowd_pleasers` - Popular karaoke songs for discovery (max 10)
 
 ---
 
