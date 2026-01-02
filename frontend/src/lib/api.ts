@@ -14,6 +14,42 @@ export class ApiError extends Error {
   }
 }
 
+export class NetworkError extends Error {
+  constructor(
+    message: string,
+    public originalError?: Error
+  ) {
+    super(message);
+    this.name = "NetworkError";
+  }
+
+  static isNetworkError(error: unknown): error is NetworkError {
+    return error instanceof NetworkError;
+  }
+
+  static getHelpfulMessage(error: Error): string {
+    const msg = error.message.toLowerCase();
+
+    if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("network request failed")) {
+      return "Unable to connect to server. Please check your internet connection, try disabling VPN or ad-blockers, or try using mobile data instead of WiFi.";
+    }
+
+    if (msg.includes("timeout") || msg.includes("timed out")) {
+      return "The request timed out. Please check your internet connection and try again.";
+    }
+
+    if (msg.includes("cors") || msg.includes("cross-origin")) {
+      return "Connection blocked by browser security. Try disabling browser extensions or using incognito mode.";
+    }
+
+    if (msg.includes("ssl") || msg.includes("certificate")) {
+      return "Secure connection failed. Please check your network settings or try a different network.";
+    }
+
+    return "A network error occurred. Please check your internet connection and try again.";
+  }
+}
+
 /**
  * Get the stored auth token
  */
@@ -56,10 +92,18 @@ async function apiRequest<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    // Network-level errors (no response received)
+    const originalError = error instanceof Error ? error : new Error(String(error));
+    const helpfulMessage = NetworkError.getHelpfulMessage(originalError);
+    throw new NetworkError(helpfulMessage, originalError);
+  }
 
   // Handle 401 - clear token and redirect
   if (response.status === 401) {

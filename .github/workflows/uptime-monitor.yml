@@ -1,0 +1,260 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    # Run every 5 minutes (GitHub Actions minimum)
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+# Prevent concurrent runs
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Check Production Endpoints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout for status updates
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check Health Endpoint
+        id: health
+        continue-on-error: true
+        run: |
+          start_time=$(date +%s%3N)
+          response=$(curl -s -w "\n%{http_code}" --max-time 30 \
+            "https://karaoke-decide-718638054799.us-central1.run.app/api/health")
+          end_time=$(date +%s%3N)
+          latency=$((end_time - start_time))
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "latency=$latency" >> $GITHUB_OUTPUT
+
+          if [ "$status_code" = "200" ]; then
+            echo "result=up" >> $GITHUB_OUTPUT
+            echo "✅ Health: UP (${latency}ms)"
+          else
+            echo "result=down" >> $GITHUB_OUTPUT
+            echo "❌ Health: DOWN (HTTP $status_code)"
+          fi
+
+      - name: Check Deep Health Endpoint
+        id: deep_health
+        continue-on-error: true
+        run: |
+          start_time=$(date +%s%3N)
+          response=$(curl -s -w "\n%{http_code}" --max-time 30 \
+            "https://karaoke-decide-718638054799.us-central1.run.app/api/health/deep")
+          end_time=$(date +%s%3N)
+          latency=$((end_time - start_time))
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "latency=$latency" >> $GITHUB_OUTPUT
+
+          if [ "$status_code" = "200" ]; then
+            status=$(echo "$body" | jq -r '.status' 2>/dev/null || echo "unknown")
+            if [ "$status" = "healthy" ]; then
+              echo "result=up" >> $GITHUB_OUTPUT
+              echo "✅ Deep Health: UP (${latency}ms) - All services healthy"
+            else
+              echo "result=degraded" >> $GITHUB_OUTPUT
+              echo "⚠️ Deep Health: DEGRADED (${latency}ms) - Status: $status"
+            fi
+          else
+            echo "result=down" >> $GITHUB_OUTPUT
+            echo "❌ Deep Health: DOWN (HTTP $status_code)"
+          fi
+
+      - name: Check Catalog Search
+        id: catalog
+        continue-on-error: true
+        run: |
+          start_time=$(date +%s%3N)
+          response=$(curl -s -w "\n%{http_code}" --max-time 30 \
+            "https://karaoke-decide-718638054799.us-central1.run.app/api/catalog/songs?q=queen&per_page=1")
+          end_time=$(date +%s%3N)
+          latency=$((end_time - start_time))
+
+          status_code=$(echo "$response" | tail -n 1)
+          body=$(echo "$response" | head -n -1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "latency=$latency" >> $GITHUB_OUTPUT
+
+          if [ "$status_code" = "200" ]; then
+            total=$(echo "$body" | jq -r '.total' 2>/dev/null || echo "0")
+            if [ "$total" -gt 0 ]; then
+              echo "result=up" >> $GITHUB_OUTPUT
+              echo "✅ Catalog Search: UP (${latency}ms) - Found $total results"
+            else
+              echo "result=degraded" >> $GITHUB_OUTPUT
+              echo "⚠️ Catalog Search: DEGRADED - No results returned"
+            fi
+          else
+            echo "result=down" >> $GITHUB_OUTPUT
+            echo "❌ Catalog Search: DOWN (HTTP $status_code)"
+          fi
+
+      - name: Check Auth Endpoint (Magic Link Request)
+        id: auth
+        continue-on-error: true
+        run: |
+          start_time=$(date +%s%3N)
+          # Test with invalid email format to check endpoint is responding
+          # (won't send email, but confirms auth service is up)
+          response=$(curl -s -w "\n%{http_code}" --max-time 30 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"email":"uptime-check@test.invalid"}' \
+            "https://karaoke-decide-718638054799.us-central1.run.app/api/auth/magic-link")
+          end_time=$(date +%s%3N)
+          latency=$((end_time - start_time))
+
+          status_code=$(echo "$response" | tail -n 1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "latency=$latency" >> $GITHUB_OUTPUT
+
+          # 200 = success (won't send to invalid domain), 422 = validation error (also OK)
+          if [ "$status_code" = "200" ] || [ "$status_code" = "422" ]; then
+            echo "result=up" >> $GITHUB_OUTPUT
+            echo "✅ Auth Service: UP (${latency}ms)"
+          else
+            echo "result=down" >> $GITHUB_OUTPUT
+            echo "❌ Auth Service: DOWN (HTTP $status_code)"
+          fi
+
+      - name: Check Frontend
+        id: frontend
+        continue-on-error: true
+        run: |
+          start_time=$(date +%s%3N)
+          response=$(curl -s -w "\n%{http_code}" --max-time 30 \
+            "https://decide.nomadkaraoke.com")
+          end_time=$(date +%s%3N)
+          latency=$((end_time - start_time))
+
+          status_code=$(echo "$response" | tail -n 1)
+
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "latency=$latency" >> $GITHUB_OUTPUT
+
+          if [ "$status_code" = "200" ]; then
+            echo "result=up" >> $GITHUB_OUTPUT
+            echo "✅ Frontend: UP (${latency}ms)"
+          else
+            echo "result=down" >> $GITHUB_OUTPUT
+            echo "❌ Frontend: DOWN (HTTP $status_code)"
+          fi
+
+      - name: Generate Status Summary
+        id: summary
+        run: |
+          echo "## Uptime Check Results - $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Endpoint | Status | Latency | HTTP |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|---------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Health | ${{ steps.health.outputs.result == 'up' && '✅ UP' || '❌ DOWN' }} | ${{ steps.health.outputs.latency }}ms | ${{ steps.health.outputs.status_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deep Health | ${{ steps.deep_health.outputs.result == 'up' && '✅ UP' || (steps.deep_health.outputs.result == 'degraded' && '⚠️ DEGRADED' || '❌ DOWN') }} | ${{ steps.deep_health.outputs.latency }}ms | ${{ steps.deep_health.outputs.status_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Catalog | ${{ steps.catalog.outputs.result == 'up' && '✅ UP' || '❌ DOWN' }} | ${{ steps.catalog.outputs.latency }}ms | ${{ steps.catalog.outputs.status_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Auth | ${{ steps.auth.outputs.result == 'up' && '✅ UP' || '❌ DOWN' }} | ${{ steps.auth.outputs.latency }}ms | ${{ steps.auth.outputs.status_code }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend | ${{ steps.frontend.outputs.result == 'up' && '✅ UP' || '❌ DOWN' }} | ${{ steps.frontend.outputs.latency }}ms | ${{ steps.frontend.outputs.status_code }} |" >> $GITHUB_STEP_SUMMARY
+
+          # Determine overall status
+          if [ "${{ steps.health.outputs.result }}" = "up" ] && \
+             [ "${{ steps.deep_health.outputs.result }}" = "up" ] && \
+             [ "${{ steps.catalog.outputs.result }}" = "up" ] && \
+             [ "${{ steps.auth.outputs.result }}" = "up" ] && \
+             [ "${{ steps.frontend.outputs.result }}" = "up" ]; then
+            echo "overall=up" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ All Systems Operational" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.health.outputs.result }}" = "down" ] || \
+               [ "${{ steps.deep_health.outputs.result }}" = "down" ]; then
+            echo "overall=down" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ❌ Major Outage Detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "overall=degraded" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ Partial Outage / Degraded Performance" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Update Status Badge Data
+        if: always()
+        run: |
+          mkdir -p .github/status
+          cat > .github/status/current.json << EOF
+          {
+            "timestamp": "$(date -u '+%Y-%m-%dT%H:%M:%SZ')",
+            "overall": "${{ steps.summary.outputs.overall }}",
+            "endpoints": {
+              "health": {
+                "status": "${{ steps.health.outputs.result }}",
+                "latency": ${{ steps.health.outputs.latency || 0 }},
+                "http_code": ${{ steps.health.outputs.status_code || 0 }}
+              },
+              "deep_health": {
+                "status": "${{ steps.deep_health.outputs.result }}",
+                "latency": ${{ steps.deep_health.outputs.latency || 0 }},
+                "http_code": ${{ steps.deep_health.outputs.status_code || 0 }}
+              },
+              "catalog": {
+                "status": "${{ steps.catalog.outputs.result }}",
+                "latency": ${{ steps.catalog.outputs.latency || 0 }},
+                "http_code": ${{ steps.catalog.outputs.status_code || 0 }}
+              },
+              "auth": {
+                "status": "${{ steps.auth.outputs.result }}",
+                "latency": ${{ steps.auth.outputs.latency || 0 }},
+                "http_code": ${{ steps.auth.outputs.status_code || 0 }}
+              },
+              "frontend": {
+                "status": "${{ steps.frontend.outputs.result }}",
+                "latency": ${{ steps.frontend.outputs.latency || 0 }},
+                "http_code": ${{ steps.frontend.outputs.status_code || 0 }}
+              }
+            }
+          }
+          EOF
+
+          echo "Status data generated:"
+          cat .github/status/current.json
+
+      - name: Send Alert on Failure
+        if: steps.summary.outputs.overall == 'down'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.sendgrid.net
+          server_port: 587
+          username: apikey
+          password: ${{ secrets.SENDGRID_API_KEY }}
+          subject: "🚨 Karaoke Decide DOWN - Uptime Alert"
+          to: andrew@beveridge.uk
+          from: noreply@nomadkaraoke.com
+          body: |
+            ⚠️ ALERT: Karaoke Decide is experiencing an outage!
+
+            Time: ${{ github.event.repository.updated_at }}
+
+            Endpoint Status:
+            - Health: ${{ steps.health.outputs.result }} (HTTP ${{ steps.health.outputs.status_code }})
+            - Deep Health: ${{ steps.deep_health.outputs.result }} (HTTP ${{ steps.deep_health.outputs.status_code }})
+            - Catalog: ${{ steps.catalog.outputs.result }} (HTTP ${{ steps.catalog.outputs.status_code }})
+            - Auth: ${{ steps.auth.outputs.result }} (HTTP ${{ steps.auth.outputs.status_code }})
+            - Frontend: ${{ steps.frontend.outputs.result }} (HTTP ${{ steps.frontend.outputs.status_code }})
+
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Cloud Run Logs:
+            https://console.cloud.google.com/run/detail/us-central1/karaoke-decide/logs?project=nomadkaraoke

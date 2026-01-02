@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { api, setAuthToken } from "@/lib/api";
+import { api, setAuthToken, NetworkError, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui";
 import { CheckIcon, XIcon, LoaderIcon } from "@/components/icons";
+
+type ErrorType = "network" | "expired" | "invalid" | "unknown";
 
 function VerifyContent() {
   const router = useRouter();
@@ -16,41 +18,70 @@ function VerifyContent() {
     "verifying"
   );
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<ErrorType>("unknown");
+  const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    const verifyToken = async () => {
-      const token = searchParams.get("token");
+  const verifyToken = useCallback(async () => {
+    const token = searchParams.get("token");
 
-      if (!token) {
-        setStatus("error");
-        setError("No verification token found. Please request a new magic link.");
-        return;
-      }
+    if (!token) {
+      setStatus("error");
+      setErrorType("invalid");
+      setError("No verification token found. Please request a new magic link.");
+      return;
+    }
 
-      try {
-        const response = await api.auth.verifyToken(token);
-        setAuthToken(response.access_token);
-        setStatus("success");
+    setStatus("verifying");
+    setError(null);
 
-        // Refresh auth context
-        await checkAuth();
+    try {
+      const response = await api.auth.verifyToken(token);
+      setAuthToken(response.access_token);
+      setStatus("success");
 
-        // Redirect after a brief delay to show success
-        setTimeout(() => {
-          router.push("/my-songs");
-        }, 1500);
-      } catch (err) {
-        setStatus("error");
+      // Refresh auth context
+      await checkAuth();
+
+      // Redirect after a brief delay to show success
+      setTimeout(() => {
+        router.push("/my-songs");
+      }, 1500);
+    } catch (err) {
+      setStatus("error");
+
+      if (NetworkError.isNetworkError(err)) {
+        setErrorType("network");
+        setError(err.message);
+      } else if (err instanceof ApiError) {
+        if (err.message.includes("expired")) {
+          setErrorType("expired");
+          setError("This magic link has expired. Please request a new one.");
+        } else if (err.message.includes("already been used")) {
+          setErrorType("invalid");
+          setError("This magic link has already been used. Please request a new one.");
+        } else {
+          setErrorType("invalid");
+          setError(err.message);
+        }
+      } else {
+        setErrorType("unknown");
         setError(
           err instanceof Error
             ? err.message
             : "Failed to verify token. It may have expired or already been used."
         );
       }
-    };
-
-    verifyToken();
+    }
   }, [searchParams, checkAuth, router]);
+
+  useEffect(() => {
+    verifyToken();
+  }, [verifyToken]);
+
+  const handleRetry = () => {
+    setRetryCount((c) => c + 1);
+    verifyToken();
+  };
 
   if (status === "verifying") {
     return (
@@ -102,13 +133,40 @@ function VerifyContent() {
         </div>
 
         <h1 className="text-2xl font-bold text-white mb-2">
-          Verification failed
+          {errorType === "network" ? "Connection Error" : "Verification Failed"}
         </h1>
         <p className="text-white/60 mb-6">{error}</p>
 
+        {/* Network error troubleshooting tips */}
+        {errorType === "network" && (
+          <div className="bg-white/5 rounded-lg p-4 mb-6 text-left">
+            <p className="text-white/80 text-sm font-medium mb-2">Troubleshooting tips:</p>
+            <ul className="text-white/60 text-sm space-y-1 list-disc list-inside">
+              <li>Try using mobile data instead of WiFi</li>
+              <li>Disable VPN or ad-blocker extensions</li>
+              <li>Try opening in incognito/private mode</li>
+              <li>Check if you&apos;re on a corporate or school network</li>
+            </ul>
+          </div>
+        )}
+
         <div className="space-y-3">
+          {/* Retry button for network errors */}
+          {errorType === "network" && (
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={handleRetry}
+            >
+              {retryCount > 0 ? `Retry Again (${retryCount})` : "Try Again"}
+            </Button>
+          )}
+
           <Link href="/login">
-            <Button variant="primary" className="w-full">
+            <Button
+              variant={errorType === "network" ? "ghost" : "primary"}
+              className="w-full"
+            >
               Request New Link
             </Button>
           </Link>
