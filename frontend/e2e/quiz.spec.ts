@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Quiz onboarding flow tests
+ * Tests the 4-step quiz: Genre Selection → Artist Selection → Preferences → Results
+ * Uses data-testid selectors for maintainability
  */
 test.describe("Quiz Onboarding", () => {
   test.beforeEach(async ({ page }) => {
@@ -23,173 +25,157 @@ test.describe("Quiz Onboarding", () => {
         }),
       });
     });
-  });
 
-  test("quiz page shows song selection (step 1)", async ({ page }) => {
-    // Mock quiz songs
-    await page.route("**/api/quiz/songs*", async (route) => {
+    // Mock quiz artists
+    await page.route("**/api/quiz/artists*", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          songs: [
+          artists: [
             {
-              id: "quiz1",
-              artist: "Queen",
-              title: "Bohemian Rhapsody",
-              decade: "1970s",
-              popularity: 95,
-              brand_count: 15,
+              name: "Queen",
+              song_count: 58,
+              top_songs: ["Bohemian Rhapsody", "Don't Stop Me Now", "We Will Rock You"],
+              total_brand_count: 15,
+              primary_decade: "1970s",
+              image_url: null,
             },
             {
-              id: "quiz2",
-              artist: "Journey",
-              title: "Don't Stop Believin'",
-              decade: "1980s",
-              popularity: 90,
-              brand_count: 12,
+              name: "Journey",
+              song_count: 35,
+              top_songs: ["Don't Stop Believin'", "Open Arms", "Faithfully"],
+              total_brand_count: 12,
+              primary_decade: "1980s",
+              image_url: null,
             },
             {
-              id: "quiz3",
-              artist: "ABBA",
-              title: "Dancing Queen",
-              decade: "1970s",
-              popularity: 88,
-              brand_count: 10,
+              name: "ABBA",
+              song_count: 42,
+              top_songs: ["Dancing Queen", "Mamma Mia", "Take a Chance on Me"],
+              total_brand_count: 10,
+              primary_decade: "1970s",
+              image_url: null,
             },
           ],
         }),
       });
     });
+  });
 
+  test("quiz page shows genre selection (step 1)", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
-    // Check heading
-    await expect(page.getByText(/which songs do you know/i)).toBeVisible({ timeout: 10000 });
+    // Check heading for genre selection using data-testid
+    await expect(page.getByTestId("quiz-heading")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("quiz-heading")).toHaveText(/what music do you like/i);
 
-    // Check song cards are displayed
-    await expect(page.getByText("Bohemian Rhapsody")).toBeVisible();
-    await expect(page.getByText("Don't Stop Believin'")).toBeVisible();
-    await expect(page.getByText("Dancing Queen")).toBeVisible();
+    // Check genre cards are displayed using data-testid
+    await expect(page.getByTestId("genre-pop")).toBeVisible();
+    await expect(page.getByTestId("genre-rock")).toBeVisible();
+    await expect(page.getByTestId("genre-country")).toBeVisible();
 
-    // Check progress indicator (3 dots)
-    const dots = page.locator('.rounded-full.w-3.h-3');
-    await expect(dots).toHaveCount(3);
+    // Check progress indicator (4 dots) using data-testid
+    await expect(page.getByTestId("progress-indicator")).toBeVisible();
+    await expect(page.getByTestId("progress-dot-1")).toBeVisible();
+    await expect(page.getByTestId("progress-dot-2")).toBeVisible();
+    await expect(page.getByTestId("progress-dot-3")).toBeVisible();
+    await expect(page.getByTestId("progress-dot-4")).toBeVisible();
   });
 
-  test("can select songs in quiz", async ({ page }) => {
-    await page.route("**/api/quiz/songs*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          songs: [
-            {
-              id: "quiz1",
-              artist: "Queen",
-              title: "Bohemian Rhapsody",
-              decade: "1970s",
-              popularity: 95,
-              brand_count: 15,
-            },
-          ],
-        }),
-      });
-    });
-
+  test("can select genres in quiz", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
-    // Wait for song to appear
-    await expect(page.getByText("Bohemian Rhapsody")).toBeVisible({ timeout: 10000 });
+    // Wait for genres to appear using data-testid
+    await expect(page.getByTestId("genre-pop")).toBeVisible({ timeout: 10000 });
 
-    // Initially shows "0 of 1 selected"
-    await expect(page.getByText(/0 of 1 selected/i)).toBeVisible();
+    // Initially shows instruction using data-testid
+    await expect(page.getByTestId("genre-selection-count")).toHaveText(/select genres or skip/i);
 
-    // Click to select
-    await page.getByText("Bohemian Rhapsody").click();
+    // Click to select Pop
+    await page.getByTestId("genre-pop").click();
 
-    // Now shows "1 of 1 selected"
-    await expect(page.getByText(/1 of 1 selected/i)).toBeVisible();
+    // Now shows "1 genre selected"
+    await expect(page.getByTestId("genre-selection-count")).toHaveText(/1 genre selected/i);
+
+    // Select another genre
+    await page.getByTestId("genre-rock").click();
+
+    // Now shows "2 genres selected"
+    await expect(page.getByTestId("genre-selection-count")).toHaveText(/2 genres selected/i);
   });
 
-  test("can navigate to step 2 (preferences)", async ({ page }) => {
-    await page.route("**/api/quiz/songs*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          songs: [
-            {
-              id: "quiz1",
-              artist: "Queen",
-              title: "Bohemian Rhapsody",
-              decade: "1970s",
-              popularity: 95,
-              brand_count: 15,
-            },
-          ],
-        }),
-      });
-    });
-
+  test("can navigate to step 2 (artist selection)", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
-    // Wait for step 1 content
-    await expect(page.getByText("Bohemian Rhapsody")).toBeVisible({ timeout: 10000 });
+    // Wait for step 1 content using data-testid
+    await expect(page.getByTestId("quiz-heading")).toBeVisible({ timeout: 10000 });
 
-    // Click continue
-    await page.getByRole("button", { name: /continue/i }).click();
+    // Click continue/skip
+    await page.getByRole("button", { name: /skip|continue/i }).click();
 
-    // Should see step 2 content
-    await expect(page.getByText(/your preferences/i)).toBeVisible();
-    await expect(page.getByText(/favorite decade/i)).toBeVisible();
-    await expect(page.getByText(/energy level/i)).toBeVisible();
+    // Should see step 2 content (artist selection) using data-testid
+    await expect(page.getByTestId("artist-heading")).toBeVisible();
+    await expect(page.getByTestId("artist-heading")).toHaveText(/which artists do you know/i);
+    await expect(page.getByTestId("artist-grid")).toBeVisible();
   });
 
-  test("step 2 has decade and energy options", async ({ page }) => {
-    await page.route("**/api/quiz/songs*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ songs: [] }),
-      });
-    });
-
+  test("step 2 has artist cards and refresh button", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate to step 2
-    await page.getByRole("button", { name: /continue/i }).click();
+    await page.getByRole("button", { name: /skip|continue/i }).click();
 
-    // Check decade options
-    await expect(page.getByRole("button", { name: "1980s" })).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole("button", { name: "1990s" })).toBeVisible();
+    // Check artist heading and grid using data-testid
+    await expect(page.getByTestId("artist-heading")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("artist-grid")).toBeVisible();
 
-    // Check energy options
-    await expect(page.getByText("Chill")).toBeVisible();
-    await expect(page.getByText("Medium")).toBeVisible();
-    await expect(page.getByText("High Energy")).toBeVisible();
+    // Check refresh button exists using data-testid
+    await expect(page.getByTestId("refresh-artists-btn")).toBeVisible();
+
+    // Check "I don't know any" option using data-testid
+    await expect(page.getByTestId("skip-artists-btn")).toBeVisible();
   });
 
-  test("can submit quiz and see results", async ({ page }) => {
-    await page.route("**/api/quiz/songs*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ songs: [] }),
-      });
-    });
+  test("step 3 has decade and energy options", async ({ page }) => {
+    await page.goto("/quiz");
+    await page.waitForLoadState("networkidle");
 
+    // Navigate to step 2
+    await page.getByRole("button", { name: /skip|continue/i }).click();
+    await expect(page.getByTestId("artist-heading")).toBeVisible({ timeout: 5000 });
+
+    // Navigate to step 3
+    await page.getByRole("button", { name: /continue/i }).click();
+
+    // Check preferences heading using data-testid
+    await expect(page.getByTestId("preferences-heading")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("preferences-heading")).toHaveText(/your preferences/i);
+
+    // Check decade options using data-testid
+    await expect(page.getByTestId("decade-section")).toBeVisible();
+    await expect(page.getByTestId("decade-1980s")).toBeVisible();
+    await expect(page.getByTestId("decade-1990s")).toBeVisible();
+
+    // Check energy options using data-testid
+    await expect(page.getByTestId("energy-section")).toBeVisible();
+    await expect(page.getByTestId("energy-chill")).toBeVisible();
+    await expect(page.getByTestId("energy-medium")).toBeVisible();
+    await expect(page.getByTestId("energy-high")).toBeVisible();
+  });
+
+  test("can submit quiz and see results with connect CTA", async ({ page }) => {
     await page.route("**/api/quiz/submit", async (route) => {
       await route.fulfill({
         status: 201,
         contentType: "application/json",
         body: JSON.stringify({
           message: "Quiz completed successfully",
-          songs_added: 5,
+          songs_added: 15,
           recommendations_ready: true,
         }),
       });
@@ -198,16 +184,27 @@ test.describe("Quiz Onboarding", () => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
-    // Navigate to step 2
+    // Navigate through all steps
+    // Step 1 → Step 2
+    await page.getByRole("button", { name: /skip|continue/i }).click();
+    await expect(page.getByTestId("artist-heading")).toBeVisible({ timeout: 5000 });
+
+    // Step 2 → Step 3
     await page.getByRole("button", { name: /continue/i }).click();
-    await expect(page.getByText(/your preferences/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("preferences-heading")).toBeVisible({ timeout: 5000 });
 
     // Click finish
     await page.getByRole("button", { name: /finish quiz/i }).click();
 
-    // Should see success state (step 3)
-    await expect(page.getByText(/quiz complete/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/added 5 songs/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /view recommendations/i })).toBeVisible();
+    // Should see success state (step 4) using data-testid
+    await expect(page.getByTestId("results-section")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId("results-heading")).toHaveText(/quiz complete/i);
+    await expect(page.getByTestId("results-message")).toContainText(/found 15 karaoke songs/i);
+    await expect(page.getByTestId("view-recommendations-btn")).toBeVisible();
+
+    // Should see connect CTA using data-testid
+    await expect(page.getByTestId("connect-cta")).toBeVisible();
+    await expect(page.getByTestId("connect-cta-heading")).toHaveText(/want even better recommendations/i);
+    await expect(page.getByTestId("connect-spotify-btn")).toBeVisible();
   });
 });

@@ -735,3 +735,32 @@ gcloud firestore indexes composite create \
 ```
 
 **Tip:** The error message includes a direct URL to create the missing index in Firebase Console.
+
+---
+
+### 2026-01-02: Use data-testid for E2E Test Selectors
+
+**Context:** CodeRabbit flagged Playwright tests using brittle selectors like `getByText(/rock/i)` and CSS class selectors that could break when UI text or styling changes.
+
+**Lesson:** Using `data-testid` attributes makes tests more maintainable and resilient to UI changes. Text content, CSS classes, and element structure often change during design iterations, but test IDs remain stable.
+
+**Recommendation:**
+```tsx
+// Component - add data-testid to key elements
+<button data-testid="genre-rock" onClick={...}>
+  🎸 Rock
+</button>
+
+// Test - use getByTestId instead of text/role selectors
+// BAD - breaks if text changes
+await page.getByText(/rock/i).click();
+await page.getByRole("button", { name: /🎸 Rock/i }).click();
+
+// GOOD - stable selector
+await page.getByTestId("genre-rock").click();
+```
+
+**Naming convention:**
+- Use kebab-case: `genre-rock`, `refresh-artists-btn`
+- Include context: `decade-1980s`, `energy-chill`
+- For dynamic elements: `genre-${id}`, `progress-dot-${n}`
