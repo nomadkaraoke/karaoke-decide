@@ -32,7 +32,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Email Delivery:** SendGrid configured for production magic link emails
 
 ### 🚧 Next Up (Post-MLP)
-1. **Audio Analysis ETL** - Load 4TB Spotify audio features for tempo/key/energy filters ([plan](plans/2025-01-spotify-audio-analysis-etl.md))
+1. **Energy/Tempo Filters** - Use audio features data for "high energy karaoke" / "chill karaoke" filtering
 2. Analytics and usage tracking
 3. Social features (share playlists, follow users)
 4. Advanced recommendation tuning
@@ -80,7 +80,13 @@ cd frontend && npm run dev
 | Table | Rows | Description |
 |-------|------|-------------|
 | `karaoke_decide.karaokenerds_raw` | 275,809 | Karaoke songs with brand counts |
-| `karaoke_decide.spotify_tracks` | 256,039,007 | Spotify track metadata |
+| `karaoke_decide.spotify_tracks` | 256M | Spotify track metadata (original ETL) |
+| `karaoke_decide.spotify_artists` | 500K | Artist metadata (followers, popularity) |
+| `karaoke_decide.spotify_artist_genres` | 2-3M | Artist-genre associations |
+| `karaoke_decide.spotify_albums` | 50M | Album metadata with release dates |
+| `karaoke_decide.spotify_tracks_full` | 256M | Full track metadata with ISRC |
+| `karaoke_decide.spotify_track_artists` | 300M | Track-artist junction (multi-artist) |
+| `karaoke_decide.spotify_audio_features` | 200M | Audio features (energy, tempo, etc.) |
 
 ### Live Endpoints
 - `GET /api/health` - Basic health check
