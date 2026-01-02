@@ -689,3 +689,49 @@ job_docs = await firestore.query_documents(
 ```
 
 **Why tests didn't catch this:** Tests mocked `FirestoreService`, not the underlying Firestore client. The mock returned expected data regardless of sync/async usage.
+
+---
+
+### 2026-01-01: dict.get() Returns None When Key Exists with None Value
+
+**Context:** Categorized recommendations endpoint failing with `TypeError: unsupported operand type(s) for /: 'NoneType' and 'float'`.
+
+**Lesson:** `dict.get("key", default)` only returns the default if the key is **missing**. If the key exists but has value `None`, it returns `None`, not the default. This is a common Python gotcha.
+
+**Recommendation:**
+```python
+# BAD - returns None if doc["spotify_popularity"] is None
+spotify_pop = doc.get("spotify_popularity", 50)
+score = spotify_pop / 100.0  # TypeError if None!
+
+# GOOD - explicitly handle None
+spotify_pop = doc.get("spotify_popularity")
+spotify_pop = spotify_pop if spotify_pop is not None else 50
+score = spotify_pop / 100.0  # Now safe
+
+# Alternative - use or (but beware of 0 being falsy)
+spotify_pop = doc.get("spotify_popularity") or 50  # Only use if 0 is not valid
+```
+
+---
+
+### 2026-01-01: Firestore Composite Indexes for Multi-Field Queries
+
+**Context:** Querying user_songs with `has_karaoke_version == False`, `user_id == X`, ordered by `play_count` failing with index error.
+
+**Lesson:** Firestore requires composite indexes for queries that filter on multiple fields or filter + order by different field. These must be created manually - they're not auto-generated.
+
+**Recommendation:**
+```bash
+# Create composite index via gcloud
+gcloud firestore indexes composite create \
+  --project=PROJECT_ID \
+  --collection-group=user_songs \
+  --field-config field-path=has_karaoke_version,order=ASCENDING \
+  --field-config field-path=user_id,order=ASCENDING \
+  --field-config field-path=play_count,order=DESCENDING
+
+# Or click the link in the error message - Firestore provides direct creation URL
+```
+
+**Tip:** The error message includes a direct URL to create the missing index in Firebase Console.
