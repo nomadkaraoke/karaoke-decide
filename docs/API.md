@@ -915,6 +915,114 @@ All fields are optional. Use `null` to clear a preference.
 
 ---
 
+## Known Songs ✅ Implemented
+
+Endpoints for users to manually add songs they already know they like singing, independent of music service sync.
+
+### GET /api/known-songs
+
+Get user's known songs list.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| page | int | Page number (default: 1, min: 1) |
+| per_page | int | Results per page (default: 20, max: 100) |
+
+**Response:**
+```json
+{
+  "songs": [
+    {
+      "id": "user123:1",
+      "user_id": "user123",
+      "song_id": "1",
+      "source": "known_songs",
+      "is_saved": true,
+      "artist": "Queen",
+      "title": "Bohemian Rhapsody",
+      "created_at": "2024-01-01T12:00:00Z",
+      "updated_at": "2024-01-01T12:00:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 20
+}
+```
+
+### POST /api/known-songs
+
+Add a song to user's known songs.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "song_id": 1
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "added": true,
+  "song_id": "1",
+  "artist": "Queen",
+  "title": "Bohemian Rhapsody",
+  "already_existed": false
+}
+```
+
+**Error Responses:**
+- `404` - Song not found in catalog
+
+### POST /api/known-songs/bulk
+
+Bulk add multiple songs to user's known songs.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "song_ids": [1, 2, 3]
+}
+```
+
+**Response:**
+```json
+{
+  "added": 2,
+  "already_existed": 1,
+  "not_found": 0,
+  "total_requested": 3
+}
+```
+
+### DELETE /api/known-songs/{song_id}
+
+Remove a song from user's known songs.
+
+**Requires:** Bearer token
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| song_id | int | Song ID to remove |
+
+**Response:** `204 No Content`
+
+**Error Responses:**
+- `404` - Song not in user's known songs (or was added from different source)
+
+**Note:** Only songs with source "known_songs" can be removed via this endpoint. Songs synced from Spotify/Last.fm use different endpoints.
+
+---
+
 ## My Songs (Not Yet Implemented)
 
 ### GET /api/my/history

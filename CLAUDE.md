@@ -165,7 +165,7 @@ See `~/.claude/CLAUDE.md` for full workflow. Key commands:
 | `/implement` | Implement from plan |
 | `/test` | Run tests |
 | `/docs-review` | Check docs before PR |
-| `/review` | Run CodeRabbit CLI locally |
+| `/coderabbit` | Run CodeRabbit CLI locally |
 | `/pr` | Create PR (adds @coderabbitai ignore) |
 
 ## Common Tasks
