@@ -15,6 +15,28 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-02: Mock google.cloud Before Imports in conftest.py
+
+**Context:** Adding new API routes that triggered imports of modules using `google.cloud.tasks_v2`, which isn't available in the test environment.
+
+**Lesson:** When using `patch()` for dependency injection in pytest, the modules being patched must be imported before the patch decorators are evaluated. But importing modules that depend on unavailable packages (like `google.cloud.tasks_v2`) will fail.
+
+**Recommendation:** Mock unavailable packages at module level in conftest.py using `sys.modules` before any imports:
+```python
+import sys
+from unittest.mock import MagicMock
+
+# Mock before any imports that need it
+_mock_tasks_v2 = MagicMock()
+_mock_tasks_v2.HttpMethod.POST = 1
+sys.modules["google.cloud.tasks_v2"] = _mock_tasks_v2
+
+# Now safe to import modules that depend on it
+import backend.api.deps  # noqa: E402
+```
+
+---
+
 ### 2024-12-30: BigQuery over Firestore for Large Catalogs
 
 **Context:** Loading 275K karaoke songs and 256M Spotify tracks for search/browse.
