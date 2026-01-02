@@ -100,8 +100,9 @@ cd frontend && npm run dev
 - `DELETE /api/services/{type}` - Disconnect service
 - `POST /api/services/sync` - Trigger listening history sync
 - `GET /api/services/sync/status` - Get sync status
-- `GET /api/quiz/songs` - Get quiz songs for onboarding
-- `POST /api/quiz/submit` - Submit quiz responses
+- `GET /api/quiz/artists` - Get quiz artists for onboarding (recommended)
+- `GET /api/quiz/songs` - Get quiz songs for onboarding (legacy)
+- `POST /api/quiz/submit` - Submit quiz responses (accepts artists or songs)
 - `GET /api/quiz/status` - Get quiz completion status
 - `GET /api/my/songs` - Get user's song library
 - `GET /api/my/recommendations` - Get personalized recommendations
