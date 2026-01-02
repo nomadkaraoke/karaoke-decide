@@ -929,3 +929,29 @@ Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
 **Files:**
 - `infrastructure/cloudflare-worker/api-proxy.js` - Worker code
 - `infrastructure/cloudflare-worker/README.md` - Setup instructions
+
+---
+
+### 2026-01-02: E2E Tests Must Be Updated When UI Routes Change
+
+**Context:** Production E2E tests were failing because `/services` and `/my-songs` routes now redirect to `/my-data`, and `/discover` was renamed to `/recommendations`.
+
+**Lesson:** When refactoring UI to consolidate pages (e.g., merging separate pages into a unified "My Data" page), E2E tests that navigate to the old URLs will fail because:
+1. Redirects may not complete before assertions run
+2. Expected headings/selectors won't exist on the new page
+
+**Recommendation:**
+1. When creating redirect pages, immediately update E2E tests to use new URLs
+2. Update test assertions to match new page headings/structure
+3. Use `data-testid` attributes for stable selectors (already in LESSONS-LEARNED)
+4. Run prod E2E tests as part of the refactoring PR, not as a follow-up
+
+```typescript
+// BAD - navigating to old URL that redirects
+await page.goto(`${PROD_URL}/services`);
+await expect(page.getByRole("heading", { name: /music services/i })).toBeVisible();
+
+// GOOD - navigate directly to new URL with correct heading
+await page.goto(`${PROD_URL}/my-data`);
+await expect(page.getByRole("heading", { name: /my data/i })).toBeVisible();
+```

@@ -188,17 +188,17 @@ test.describe("Production Comprehensive E2E Tests", () => {
     });
 
     test("services page shows connected services", async ({ page }) => {
-      await page.goto(`${PROD_URL}/services`);
+      // /services redirects to /my-data, so navigate there directly
+      await page.goto(`${PROD_URL}/my-data`);
       await page.waitForLoadState("networkidle");
 
-      // Should show Music Services heading
+      // Should show My Data heading (services are now part of My Data page)
       await expect(
-        page.getByRole("heading", { name: /music services/i })
+        page.getByRole("heading", { name: /my data/i })
       ).toBeVisible({ timeout: 10000 });
 
-      // Should show Spotify and Last.fm sections
-      await expect(page.locator("h2").filter({ hasText: "Spotify" })).toBeVisible();
-      await expect(page.locator("h2").filter({ hasText: "Last.fm" })).toBeVisible();
+      // Should show Connected Services section
+      await expect(page.getByText(/connected services/i)).toBeVisible({ timeout: 10000 });
 
       // Check for connected status (assuming test account has services connected)
       const connectedBadges = page.getByText("Connected");
@@ -207,7 +207,8 @@ test.describe("Production Comprehensive E2E Tests", () => {
     });
 
     test("sync triggers successfully and shows progress", async ({ page }) => {
-      await page.goto(`${PROD_URL}/services`);
+      // /services redirects to /my-data, so navigate there directly
+      await page.goto(`${PROD_URL}/my-data`);
       await page.waitForLoadState("networkidle");
 
       // Look for sync button
@@ -237,20 +238,21 @@ test.describe("Production Comprehensive E2E Tests", () => {
     });
 
     test("my songs page loads", async ({ page }) => {
-      await page.goto(`${PROD_URL}/my-songs`);
+      // /my-songs redirects to /my-data, so navigate there directly
+      await page.goto(`${PROD_URL}/my-data`);
       await page.waitForLoadState("networkidle");
 
-      // Should show My Songs heading or empty state
-      const heading = page.getByRole("heading", { name: /my songs/i });
+      // Should show My Data heading (my songs is now part of My Data page)
+      const heading = page.getByRole("heading", { name: /my data/i });
       await expect(heading).toBeVisible({ timeout: 10000 });
     });
 
     test("recommendations page loads", async ({ page }) => {
-      await page.goto(`${PROD_URL}/discover`);
+      await page.goto(`${PROD_URL}/recommendations`);
       await page.waitForLoadState("networkidle");
 
-      // Should show Discover heading
-      const heading = page.getByRole("heading", { name: /discover/i });
+      // Should show Recommendations heading
+      const heading = page.getByRole("heading", { name: /recommendations/i });
       await expect(heading).toBeVisible({ timeout: 10000 });
     });
 
@@ -267,13 +269,25 @@ test.describe("Production Comprehensive E2E Tests", () => {
       await page.goto(`${PROD_URL}/quiz`);
       await page.waitForLoadState("networkidle");
 
-      // Should show quiz content or completion state
-      const quizContent = page.locator('[data-testid="quiz-content"]');
+      // Quiz page has multiple steps with different testids:
+      // Step 1: genre selection (quiz-heading, genre-grid)
+      // Step 2: artist selection (artist-heading, artist-grid)
+      // Step 3: preferences (preferences-heading)
+      // Step 4: results (results-section)
+      const quizHeading = page.getByTestId("quiz-heading");
+      const artistHeading = page.getByTestId("artist-heading");
+      const preferencesHeading = page.getByTestId("preferences-heading");
+      const resultsSection = page.getByTestId("results-section");
       const completedMessage = page.getByText(/completed|no more|all done/i);
 
-      // Either quiz is available or already completed
-      const hasContent =
-        (await quizContent.count()) > 0 || (await completedMessage.count()) > 0;
+      // Check if any quiz step or completed state is visible
+      const hasQuizStep1 = (await quizHeading.count()) > 0;
+      const hasQuizStep2 = (await artistHeading.count()) > 0;
+      const hasQuizStep3 = (await preferencesHeading.count()) > 0;
+      const hasQuizStep4 = (await resultsSection.count()) > 0;
+      const hasCompleted = (await completedMessage.count()) > 0;
+
+      const hasContent = hasQuizStep1 || hasQuizStep2 || hasQuizStep3 || hasQuizStep4 || hasCompleted;
       expect(hasContent).toBeTruthy();
     });
 
