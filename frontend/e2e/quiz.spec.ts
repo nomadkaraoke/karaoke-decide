@@ -39,6 +39,7 @@ test.describe("Quiz Onboarding", () => {
               top_songs: ["Bohemian Rhapsody", "Don't Stop Me Now", "We Will Rock You"],
               total_brand_count: 15,
               primary_decade: "1970s",
+              genres: ["classic rock", "glam rock", "arena rock"],
               image_url: null,
             },
             {
@@ -47,6 +48,7 @@ test.describe("Quiz Onboarding", () => {
               top_songs: ["Don't Stop Believin'", "Open Arms", "Faithfully"],
               total_brand_count: 12,
               primary_decade: "1980s",
+              genres: ["classic rock", "arena rock", "soft rock"],
               image_url: null,
             },
             {
@@ -55,7 +57,68 @@ test.describe("Quiz Onboarding", () => {
               top_songs: ["Dancing Queen", "Mamma Mia", "Take a Chance on Me"],
               total_brand_count: 10,
               primary_decade: "1970s",
+              genres: ["pop", "disco", "europop"],
               image_url: null,
+            },
+          ],
+        }),
+      });
+    });
+
+    // Mock decade artists
+    await page.route("**/api/quiz/decade-artists*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          decades: [
+            {
+              decade: "1970s",
+              artists: [
+                { name: "Queen", top_song: "Bohemian Rhapsody" },
+                { name: "ABBA", top_song: "Dancing Queen" },
+                { name: "Elton John", top_song: "Tiny Dancer" },
+              ],
+            },
+            {
+              decade: "1980s",
+              artists: [
+                { name: "Michael Jackson", top_song: "Billie Jean" },
+                { name: "Prince", top_song: "Purple Rain" },
+                { name: "Madonna", top_song: "Like a Prayer" },
+              ],
+            },
+            {
+              decade: "1990s",
+              artists: [
+                { name: "Mariah Carey", top_song: "Vision of Love" },
+                { name: "Backstreet Boys", top_song: "I Want It That Way" },
+                { name: "Nirvana", top_song: "Smells Like Teen Spirit" },
+              ],
+            },
+            {
+              decade: "2000s",
+              artists: [
+                { name: "Beyoncé", top_song: "Crazy in Love" },
+                { name: "Eminem", top_song: "Lose Yourself" },
+                { name: "Amy Winehouse", top_song: "Valerie" },
+              ],
+            },
+            {
+              decade: "2010s",
+              artists: [
+                { name: "Adele", top_song: "Rolling in the Deep" },
+                { name: "Bruno Mars", top_song: "Uptown Funk" },
+                { name: "Taylor Swift", top_song: "Shake It Off" },
+              ],
+            },
+            {
+              decade: "2020s",
+              artists: [
+                { name: "Dua Lipa", top_song: "Levitating" },
+                { name: "The Weeknd", top_song: "Blinding Lights" },
+                { name: "Olivia Rodrigo", top_song: "drivers license" },
+              ],
             },
           ],
         }),
@@ -123,7 +186,7 @@ test.describe("Quiz Onboarding", () => {
     await expect(page.getByTestId("artist-grid")).toBeVisible();
   });
 
-  test("step 2 has artist cards and refresh button", async ({ page }) => {
+  test("step 2 has artist cards and load more button", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
 
@@ -134,8 +197,8 @@ test.describe("Quiz Onboarding", () => {
     await expect(page.getByTestId("artist-heading")).toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId("artist-grid")).toBeVisible();
 
-    // Check refresh button exists using data-testid
-    await expect(page.getByTestId("refresh-artists-btn")).toBeVisible();
+    // Check "Show More Artists" button exists using data-testid
+    await expect(page.getByTestId("load-more-artists-btn")).toBeVisible();
 
     // Check "I don't know any" option using data-testid
     await expect(page.getByTestId("skip-artists-btn")).toBeVisible();

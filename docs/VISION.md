@@ -20,10 +20,10 @@ Current solutions are inadequate:
 
 **Nomad Karaoke Decide** helps you discover songs to sing based on:
 
-1. **What you know** - Connect Spotify/Last.fm to see songs from your listening history
+1. **What you know** - Recommend songs from artists you listen to (via Spotify/Last.fm top artists, or quiz selections)
 2. **What you can sing** - Optional vocal range detection matches you to singable songs
 3. **What's popular** - Filter by karaoke crowd-pleasers and general popularity
-4. **Your preferences** - Quick quiz for users without streaming data
+4. **Your preferences** - Quick quiz captures genres, decades, and energy preferences
 
 ### Key Insight: Any Song Can Be Karaoke
 
@@ -117,10 +117,7 @@ We serve two user types **equally from day one**:
    - Analyze vocal track for pitch range
    - Pre-compute top 1000 karaoke songs, expand over time
 
-5. **User Listening History**
-   - Real-time from Spotify API (with user OAuth)
-   - Real-time from Last.fm API
-   - Apple Music (future)
+5. **User Music Preferences** - See detailed breakdown in "Music Service Data Capabilities" section below
 
 ## Vocal Range Feature
 
@@ -142,6 +139,196 @@ We serve two user types **equally from day one**:
 - Store vocal range data per song (min/max pitch, tessitura)
 - Match user range to song range with configurable tolerance
 - "Show me songs within 2 semitones of my range"
+
+## Music Service Data Capabilities
+
+Understanding exactly what data we can extract from each music service is critical for setting user expectations and building honest features.
+
+### Spotify API
+
+**Scopes required:** `user-top-read user-library-read`
+
+#### Artist-Level Data
+| Data Type | Availability | Details |
+|-----------|--------------|---------|
+| Top Artists | ~150 max | 50 per time range (short_term, medium_term, long_term), deduplicated |
+| Followed Artists | Available | Requires `user-follow-read` scope (not currently enabled) |
+
+#### Song-Level Data
+| Data Type | Availability | Details |
+|-----------|--------------|---------|
+| Top Tracks | ~150 max | 50 per time range × 3 ranges, deduplicated |
+| Saved/Liked Tracks | Thousands | Paginated via `/me/tracks`, can fetch user's entire liked library |
+| Full Listening History | **NOT AVAILABLE** | Spotify does not expose play history beyond top tracks |
+
+**Key limitation:** Spotify's API does not provide full listening history. We can only see:
+1. What tracks are in the user's top 50 (per time range)
+2. What tracks the user has explicitly "liked" (saved)
+
+**Recommendation engine implications:**
+- Use top artists heavily (good signal of taste)
+- Saved tracks are high-quality signal (user explicitly liked them)
+- Cannot see "songs they've listened to but didn't save"
+
+### Last.fm API
+
+**Authentication:** Username only (public scrobble data)
+
+#### Artist-Level Data
+| Data Type | Availability | Details |
+|-----------|--------------|---------|
+| Top Artists | Up to 1,000 | Single request with `limit=1000` via `user.getTopArtists` |
+| Artist Play Counts | Yes | Total scrobbles per artist |
+
+#### Song-Level Data
+| Data Type | Availability | Details |
+|-----------|--------------|---------|
+| Top Tracks | 10,000+ | Paginated via `user.getTopTracks`, 1000/page |
+| Track Play Counts | Yes | Exact play count per track |
+| Full Scrobble History | **YES** | `user.getRecentTracks` returns every scrobble with timestamp |
+| Loved Tracks | Yes | Tracks user explicitly marked as loved |
+
+**Key advantage:** Last.fm is the only service that provides full song-level listening history. For users with Last.fm connected, we have:
+- Every song they've ever scrobbled (with play counts)
+- Timestamp data (when they listened)
+- Ability to import their complete listening history into our database
+
+**Recommendation engine implications:**
+- Last.fm users get the richest experience
+- Can recommend based on actual songs listened, not just artists
+- Play counts indicate familiarity (songs listened 10+ times = knows the lyrics)
+- Should encourage Spotify users to also connect Last.fm for better recommendations
+
+### Apple Music (Future)
+
+Not yet implemented. API research needed.
+
+### Quiz-Based Preferences
+
+For users without streaming data or who prefer not to connect services:
+
+#### Artist-Level Data
+| Data Type | Source | Details |
+|-----------|--------|---------|
+| Liked Artists | Quiz selection | User picks artists they know from curated list |
+| Preferred Genres | Quiz selection | 15 inclusive genre categories |
+
+#### Song-Level Data
+| Data Type | Source | Details |
+|-----------|--------|---------|
+| Known Songs | Future quiz | "Pick songs you know" from popular karaoke list |
+| Loved/Hated Songs | Manual feedback | User marks songs after seeing recommendations |
+
+### Data Storage Strategy
+
+Given these API limitations, we should store:
+
+```
+User Preferences (Firestore)
+├── artists_liked[]           # From any source, with source tag
+│   ├── artist_name
+│   ├── source: "spotify" | "lastfm" | "quiz" | "manual"
+│   └── play_count (if available)
+├── songs_liked[]             # High-confidence songs
+│   ├── track_id (spotify/internal)
+│   ├── artist, title
+│   ├── source
+│   └── play_count (if available)
+├── songs_loved[]             # Explicit positive signal
+├── songs_hated[]             # Explicit negative signal (never recommend)
+├── genres_preferred[]
+├── decades_preferred[]
+└── connected_services{}
+    ├── spotify: { connected_at, last_sync }
+    └── lastfm: { username, connected_at, last_sync }
+```
+
+### Recommendation Engine Weighting
+
+Different data sources should have different weights:
+
+| Data Source | Artist Weight | Song Weight | Rationale |
+|-------------|---------------|-------------|-----------|
+| Last.fm scrobbles (10+ plays) | N/A | 1.0 | User definitely knows this song |
+| Last.fm scrobbles (3-9 plays) | N/A | 0.7 | User probably knows this song |
+| Spotify saved tracks | N/A | 0.9 | User explicitly liked it |
+| Spotify top tracks | N/A | 0.8 | High engagement |
+| Spotify/Last.fm top artists | 1.0 | N/A | Strong taste signal |
+| Quiz-selected artists | 0.8 | N/A | User says they like them |
+| User-loved songs | N/A | 1.0 | Explicit positive signal |
+| User-hated songs | N/A | -1.0 | Never recommend |
+
+## User Data & Profile ("My Data")
+
+### Design Decision: Transparency Over "Library" Illusion
+
+**Problem:** The original "My Songs" / "Songs in Your Library" feature was misleading because:
+
+1. **We don't actually have song-level listening data for most users.** Spotify's API provides top artists and top tracks (limited), but not full listening history. Only Last.fm provides comprehensive song-level scrobble data, and very few users have Last.fm accounts.
+
+2. **The quiz added confusion.** When users selected artists during the quiz, those artists' songs were added to "My Songs" - making it feel like recommendations rather than their actual library. The mental model was broken.
+
+3. **"Music Services" was too narrow.** Users had no visibility into what data the system actually knew about them or how that data influenced recommendations.
+
+### Solution: "My Data" Tab
+
+Replace both "My Songs" and "Music Services" with a unified **"My Data"** tab that shows users all inputs to the recommendation engine.
+
+#### Section 1: Connected Services
+Show which services are connected and **what data each provides**:
+
+| Service | Status | What We Get |
+|---------|--------|-------------|
+| Spotify | Connected ✓ | 127 top artists, 89 saved tracks |
+| Last.fm | Not connected | [Connect to import full listening history] |
+
+Include a prompt encouraging Spotify-only users to connect Last.fm for richer song-level data.
+
+#### Section 2: Your Artists (Artist-Level Data)
+Editable list of artists you like, with source attribution:
+
+| Artist | Source | Actions |
+|--------|--------|---------|
+| Taylor Swift | Spotify top artist | [Remove] |
+| Green Day | Quiz selection | [Remove] |
+| Paramore | Added manually | [Remove] |
+
+[+ Add Artist] button for manual additions.
+
+#### Section 3: Your Songs (Song-Level Data)
+Only shown if user has song-level data (Last.fm or Spotify saved tracks):
+
+| Song | Artist | Source | Play Count | Actions |
+|------|--------|--------|------------|---------|
+| Mr. Brightside | The Killers | Last.fm (47 plays) | 47 | [Love] [Hide] |
+| Bohemian Rhapsody | Queen | Spotify saved | - | [Love] [Hide] |
+
+#### Section 4: Preferences
+Quiz-derived preferences, all editable:
+
+- **Genres:** Rock, Pop, Indie [Edit]
+- **Decades:** 90s, 2000s [Edit]
+- **Energy:** Mix of chill and high energy [Edit]
+
+#### Section 5: Feedback (Future)
+- **Loved songs:** Songs explicitly marked as great to sing
+- **Hidden songs:** Songs you never want recommended
+- **Vocal range:** Your detected range (once implemented)
+- **Karaoke history:** Songs sung and how they went
+
+### Benefits
+
+1. **Transparency:** Users understand exactly what the system knows about them
+2. **Experimentation:** Easy to tweak preferences and see how recommendations change (e.g., add/remove genres, change decade preferences)
+3. **Control:** Clear path to modify any data point
+4. **Honest mental model:** No pretending we have data we don't have
+
+### Implementation Notes
+
+- All data should be editable directly from "My Data"
+- Show data source for each item (e.g., "from Spotify" vs "from quiz")
+- Group by category: Preferences, Connected Services, Feedback, etc.
+- Consider showing "recommendation weight" for power users
 
 ## Quiz-Based Onboarding (Data-Light Users)
 
@@ -225,3 +412,4 @@ See [docs/REQUIREMENTS-QA.md](docs/REQUIREMENTS-QA.md) for the full Q&A that sha
 - **Data-light approach:** Quiz-based onboarding
 - **Platform:** CLI + API first, then responsive web
 - **MLP excludes:** Vocal range, post-song tracking, social features, venue filtering
+- **User data transparency:** "My Data" tab instead of misleading "My Songs" - show all recommendation inputs, not fake library (see "User Data & Profile" section)

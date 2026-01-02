@@ -461,6 +461,8 @@ Get quiz artists for onboarding (recommended). Returns popular karaoke artists w
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | count | int | Number of artists (default: 25, min: 10, max: 50) |
+| genres | list[str] | Filter by genre IDs (e.g., `genres=rock&genres=pop`) |
+| exclude | list[str] | Exclude artist names for pagination (e.g., `exclude=Queen&exclude=ABBA`) |
 
 **Response:**
 ```json
@@ -472,7 +474,37 @@ Get quiz artists for onboarding (recommended). Returns popular karaoke artists w
       "top_songs": ["Bohemian Rhapsody", "Don't Stop Me Now", "We Will Rock You"],
       "total_brand_count": 312,
       "primary_decade": "1970s",
+      "genres": ["classic rock", "glam rock", "arena rock"],
       "image_url": null
+    }
+  ]
+}
+```
+
+**Note:** Genre filtering requires the Spotify artist genres table to be populated via ETL. Falls back to unfiltered results if table doesn't exist.
+
+### GET /api/quiz/decade-artists
+
+Get example artists for each decade. Useful for helping users understand what era each decade represents.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| artists_per_decade | int | Artists per decade (default: 5, min: 3, max: 10) |
+
+**Response:**
+```json
+{
+  "decades": [
+    {
+      "decade": "1980s",
+      "artists": [
+        { "name": "Michael Jackson", "top_song": "Billie Jean" },
+        { "name": "Prince", "top_song": "Purple Rain" },
+        { "name": "Madonna", "top_song": "Like a Prayer" }
+      ]
     }
   ]
 }
@@ -718,6 +750,168 @@ Get recommendations organized into categories with rich filtering options.
 - `from_artists_you_know` - Karaoke songs by artists in your library (max 15, 3 per artist)
 - `create_your_own` - Songs from your library without karaoke versions (max 10)
 - `crowd_pleasers` - Popular karaoke songs for discovery (max 10)
+
+---
+
+## My Data ✅ Implemented
+
+User data management endpoints for the unified My Data page.
+
+### GET /api/my/data/summary
+
+Get aggregated summary of user's data.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "services": {
+    "spotify": {
+      "connected": true,
+      "username": "SpotifyUser123",
+      "tracks_synced": 150,
+      "last_sync_at": "2024-12-30T12:00:00Z"
+    },
+    "lastfm": {
+      "connected": false
+    }
+  },
+  "artists": {
+    "total": 25,
+    "by_source": {
+      "spotify": 20,
+      "quiz": 5
+    }
+  },
+  "songs": {
+    "total": 150,
+    "with_karaoke": 120
+  },
+  "preferences": {
+    "completed": true,
+    "decade": "1980s",
+    "energy": "high",
+    "genres": ["rock", "pop"]
+  }
+}
+```
+
+### GET /api/my/data/artists
+
+Get user's artists from all sources (sync + quiz + manual).
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "artists": [
+    {
+      "artist_name": "Queen",
+      "source": "spotify",
+      "rank": 1,
+      "time_range": "medium_term",
+      "popularity": 90,
+      "genres": ["rock", "glam rock"],
+      "playcount": null
+    },
+    {
+      "artist_name": "ABBA",
+      "source": "quiz",
+      "rank": 0,
+      "time_range": "",
+      "popularity": null,
+      "genres": [],
+      "playcount": null
+    }
+  ],
+  "total": 2
+}
+```
+
+### POST /api/my/data/artists
+
+Add an artist manually.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "artist_name": "Elton John"
+}
+```
+
+**Response:**
+```json
+{
+  "message": "Artist added successfully",
+  "artist_name": "Elton John"
+}
+```
+
+**Error Responses:**
+- `400` - Artist already in user's data
+
+### DELETE /api/my/data/artists/{artist_name}
+
+Remove an artist from user's data.
+
+**Requires:** Bearer token
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| artist_name | string | Artist name (URL encoded) |
+
+**Response:**
+```json
+{
+  "message": "Artist removed successfully"
+}
+```
+
+### GET /api/my/data/preferences
+
+Get user's quiz/recommendation preferences.
+
+**Requires:** Bearer token
+
+**Response:**
+```json
+{
+  "decade_preference": "1980s",
+  "energy_preference": "high",
+  "genres": ["rock", "pop"]
+}
+```
+
+### PUT /api/my/data/preferences
+
+Update user's preferences.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "decade_preference": "1990s",
+  "energy_preference": "medium",
+  "genres": ["rock", "pop", "metal"]
+}
+```
+
+All fields are optional. Use `null` to clear a preference.
+
+**Response:**
+```json
+{
+  "decade_preference": "1990s",
+  "energy_preference": "medium",
+  "genres": ["rock", "pop", "metal"]
+}
+```
 
 ---
 

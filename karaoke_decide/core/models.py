@@ -167,6 +167,7 @@ class QuizArtist(BaseModel):
     top_songs: list[str]  # Top 3 song titles for preview
     total_brand_count: int  # Sum of brand counts across all songs
     primary_decade: str  # Most common decade for their songs
+    genres: list[str] = Field(default_factory=list)  # Genres from Spotify
     image_url: str | None = None  # Artist image URL (from Spotify)
 
 

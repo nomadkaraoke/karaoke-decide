@@ -116,7 +116,12 @@ class QuizService:
 
         return diverse_songs
 
-    async def get_quiz_artists(self, count: int = DEFAULT_ARTIST_COUNT) -> list[QuizArtist]:
+    async def get_quiz_artists(
+        self,
+        count: int = DEFAULT_ARTIST_COUNT,
+        genres: list[str] | None = None,
+        exclude_artists: list[str] | None = None,
+    ) -> list[QuizArtist]:
         """Get quiz artists for onboarding.
 
         Returns popular karaoke artists that users are likely to recognize.
@@ -124,12 +129,18 @@ class QuizService:
 
         Args:
             count: Number of quiz artists to return.
+            genres: Optional list of genres to filter by.
+            exclude_artists: Optional list of artist names to exclude (for pagination).
 
         Returns:
             List of QuizArtist objects for the quiz.
         """
         # Fetch artist candidates with aggregated stats
-        candidates = self._fetch_artist_candidates(count * 2)
+        candidates = self._fetch_artist_candidates(
+            limit=count * 2,
+            genres=genres,
+            exclude_artists=exclude_artists,
+        )
 
         # Randomly select final set for variety
         if len(candidates) > count:
@@ -137,17 +148,164 @@ class QuizService:
 
         return candidates
 
-    def _fetch_artist_candidates(self, limit: int) -> list[QuizArtist]:
+    async def get_decade_artists(self, artists_per_decade: int = 5) -> dict[str, list[dict]]:
+        """Get example artists for each decade.
+
+        Returns top karaoke artists organized by decade, useful for
+        helping users understand what era each decade represents.
+
+        Args:
+            artists_per_decade: Number of artists per decade.
+
+        Returns:
+            Dict mapping decade strings to list of artist info dicts.
+        """
+        return self._fetch_decade_artists(artists_per_decade)
+
+    def _fetch_artist_candidates(
+        self,
+        limit: int,
+        genres: list[str] | None = None,
+        exclude_artists: list[str] | None = None,
+    ) -> list[QuizArtist]:
         """Fetch quiz artist candidates from BigQuery.
 
         Gets artists aggregated by total brand coverage and song count.
+        Optionally filters by genres and excludes previously shown artists.
 
         Args:
             limit: Maximum number of candidates to fetch.
+            genres: Optional genres to filter by.
+            exclude_artists: Optional artist names to exclude.
 
         Returns:
             List of QuizArtist candidates.
         """
+        # Build genre filter clause if genres provided
+        genre_filter = ""
+        genre_join = ""
+        genre_patterns: list[str] = []
+        if genres:
+            # Map frontend genre IDs to Spotify genre patterns
+            genre_patterns = self._map_genre_ids_to_patterns(genres)
+            if genre_patterns:
+                # Join with spotify_artist_genres table via artist_id
+                genre_join = f"""
+                    LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artist_genres` sag
+                        ON sa.artist_id = sag.artist_id
+                """
+                pattern_conditions = " OR ".join(
+                    [f"LOWER(sag.genre) LIKE @genre_pattern_{i}" for i in range(len(genre_patterns))]
+                )
+                genre_filter = f"AND ({pattern_conditions})"
+
+        # Build exclusion clause
+        exclude_clause = ""
+        if exclude_artists:
+            exclude_placeholders = ", ".join([f"@exclude_{i}" for i in range(len(exclude_artists))])
+            exclude_clause = f"AND LOWER(k.Artist) NOT IN ({exclude_placeholders})"
+
+        # Query with optional genre filtering
+        # Note: Genre data comes from spotify_artist_genres table (after ETL)
+        # We use LEFT JOIN so artists without genre data still appear
+        sql = f"""
+            WITH artist_stats AS (
+                SELECT
+                    k.Artist as artist_name,
+                    COUNT(DISTINCT k.Id) as song_count,
+                    SUM(ARRAY_LENGTH(SPLIT(k.Brands, ','))) as total_brand_count,
+                    ARRAY_AGG(DISTINCT k.Title ORDER BY k.Title LIMIT 3) as top_songs
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
+                LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists` sa
+                    ON LOWER(k.Artist) = LOWER(sa.artist_name)
+                {genre_join}
+                WHERE ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
+                {genre_filter}
+                {exclude_clause}
+                GROUP BY k.Artist
+                HAVING COUNT(DISTINCT k.Id) >= @min_songs
+            ),
+            artist_genres AS (
+                SELECT
+                    LOWER(sa.artist_name) as artist_name_lower,
+                    ARRAY_AGG(DISTINCT sag.genre ORDER BY sag.genre LIMIT 5) as genres
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists` sa
+                JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artist_genres` sag
+                    ON sa.artist_id = sag.artist_id
+                GROUP BY LOWER(sa.artist_name)
+            )
+            SELECT
+                s.artist_name,
+                s.song_count,
+                s.total_brand_count,
+                s.top_songs,
+                COALESCE(g.genres, []) as genres
+            FROM artist_stats s
+            LEFT JOIN artist_genres g ON LOWER(s.artist_name) = g.artist_name_lower
+            ORDER BY s.total_brand_count DESC, s.song_count DESC
+            LIMIT @limit
+        """
+
+        # Build query parameters
+        params = [
+            bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
+            bigquery.ScalarQueryParameter("min_songs", "INT64", self.MIN_ARTIST_SONGS),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+
+        # Add genre pattern parameters
+        if genre_patterns:
+            for i, pattern in enumerate(genre_patterns):
+                params.append(bigquery.ScalarQueryParameter(f"genre_pattern_{i}", "STRING", pattern))
+
+        # Add exclusion parameters
+        if exclude_artists:
+            for i, name in enumerate(exclude_artists):
+                params.append(bigquery.ScalarQueryParameter(f"exclude_{i}", "STRING", name.lower()))
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+
+        try:
+            results = self.bigquery.query(sql, job_config=job_config).result()
+        except Exception:
+            # Fall back to simpler query if genre tables don't exist yet
+            return self._fetch_artist_candidates_simple(limit, exclude_artists)
+
+        return [
+            QuizArtist(
+                name=row.artist_name,
+                song_count=row.song_count,
+                top_songs=list(row.top_songs) if row.top_songs else [],
+                total_brand_count=row.total_brand_count,
+                primary_decade="Unknown",  # Enhanced with decade data below
+                genres=list(row.genres) if row.genres else [],
+                image_url=None,
+            )
+            for row in results
+        ]
+
+    def _fetch_artist_candidates_simple(
+        self,
+        limit: int,
+        exclude_artists: list[str] | None = None,
+    ) -> list[QuizArtist]:
+        """Simple fallback query without genre data.
+
+        Used when spotify_artist_genres table doesn't exist yet.
+        """
+        exclude_clause = ""
+        params = [
+            bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
+            bigquery.ScalarQueryParameter("min_songs", "INT64", self.MIN_ARTIST_SONGS),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+
+        if exclude_artists:
+            exclude_placeholders = ", ".join([f"@exclude_{i}" for i in range(len(exclude_artists))])
+            exclude_clause = f"AND LOWER(Artist) NOT IN ({exclude_placeholders})"
+            for i, name in enumerate(exclude_artists):
+                params.append(bigquery.ScalarQueryParameter(f"exclude_{i}", "STRING", name.lower()))
+
         sql = f"""
             WITH artist_stats AS (
                 SELECT
@@ -157,27 +315,17 @@ class QuizService:
                     ARRAY_AGG(Title ORDER BY ARRAY_LENGTH(SPLIT(Brands, ',')) DESC LIMIT 3) as top_songs
                 FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
                 WHERE ARRAY_LENGTH(SPLIT(Brands, ',')) >= @min_brands
+                {exclude_clause}
                 GROUP BY Artist
                 HAVING COUNT(*) >= @min_songs
             )
-            SELECT
-                artist_name,
-                song_count,
-                total_brand_count,
-                top_songs
+            SELECT artist_name, song_count, total_brand_count, top_songs
             FROM artist_stats
             ORDER BY total_brand_count DESC, song_count DESC
             LIMIT @limit
         """
 
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
-                bigquery.ScalarQueryParameter("min_songs", "INT64", self.MIN_ARTIST_SONGS),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ]
-        )
-
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
         results = self.bigquery.query(sql, job_config=job_config).result()
 
         return [
@@ -186,11 +334,125 @@ class QuizService:
                 song_count=row.song_count,
                 top_songs=list(row.top_songs) if row.top_songs else [],
                 total_brand_count=row.total_brand_count,
-                primary_decade="Unknown",  # Will be enhanced later
-                image_url=None,  # Will be fetched from Spotify API
+                primary_decade="Unknown",
+                genres=[],
+                image_url=None,
             )
             for row in results
         ]
+
+    def _map_genre_ids_to_patterns(self, genre_ids: list[str]) -> list[str]:
+        """Map frontend genre IDs to Spotify genre search patterns.
+
+        Frontend uses simplified IDs like 'rock', 'hiphop'.
+        Spotify genres are more specific like 'classic rock', 'hip hop'.
+
+        Args:
+            genre_ids: Frontend genre IDs.
+
+        Returns:
+            List of SQL LIKE patterns for matching Spotify genres.
+        """
+        # Map genre IDs to patterns that match Spotify's genre vocabulary
+        genre_map = {
+            "pop": "%pop%",
+            "rock": "%rock%",
+            "hiphop": "%hip hop%",
+            "rnb": "%r&b%",
+            "country": "%country%",
+            "electronic": "%electro%",
+            "dance": "%dance%",
+            "metal": "%metal%",
+            "jazz": "%jazz%",
+            "latin": "%latin%",
+            "reggaeton": "%reggaeton%",
+            "indie": "%indie%",
+            "alternative": "%alternative%",
+            "kpop": "%k-pop%",
+            "disco": "%disco%",
+            "funk": "%funk%",
+            "soul": "%soul%",
+            "classic-rock": "%classic rock%",
+            "musical": "%broadway%",
+            "reggae": "%reggae%",
+        }
+
+        patterns = []
+        for gid in genre_ids:
+            if gid in genre_map:
+                patterns.append(genre_map[gid])
+            else:
+                # Default: wrap in wildcards
+                patterns.append(f"%{gid}%")
+
+        return patterns
+
+    def _fetch_decade_artists(self, artists_per_decade: int) -> dict[str, list[dict]]:
+        """Fetch top artists for each decade.
+
+        Args:
+            artists_per_decade: Number of artists per decade.
+
+        Returns:
+            Dict mapping decade to list of artist info.
+        """
+        # For now, use a hardcoded list of iconic artists per decade
+        # This provides reliable results even before ETL of album dates
+        # TODO: Replace with BigQuery query after album ETL complete
+        decade_artists = {
+            "1960s": [
+                {"name": "The Beatles", "top_song": "Hey Jude"},
+                {"name": "Elvis Presley", "top_song": "Can't Help Falling in Love"},
+                {"name": "The Supremes", "top_song": "Stop! In the Name of Love"},
+                {"name": "Aretha Franklin", "top_song": "Respect"},
+                {"name": "Frank Sinatra", "top_song": "My Way"},
+            ],
+            "1970s": [
+                {"name": "Queen", "top_song": "Bohemian Rhapsody"},
+                {"name": "ABBA", "top_song": "Dancing Queen"},
+                {"name": "Elton John", "top_song": "Tiny Dancer"},
+                {"name": "Bee Gees", "top_song": "Stayin' Alive"},
+                {"name": "Fleetwood Mac", "top_song": "Dreams"},
+            ],
+            "1980s": [
+                {"name": "Michael Jackson", "top_song": "Billie Jean"},
+                {"name": "Prince", "top_song": "Purple Rain"},
+                {"name": "Madonna", "top_song": "Like a Prayer"},
+                {"name": "Whitney Houston", "top_song": "I Wanna Dance with Somebody"},
+                {"name": "Journey", "top_song": "Don't Stop Believin'"},
+            ],
+            "1990s": [
+                {"name": "Mariah Carey", "top_song": "Vision of Love"},
+                {"name": "Backstreet Boys", "top_song": "I Want It That Way"},
+                {"name": "Celine Dion", "top_song": "My Heart Will Go On"},
+                {"name": "Nirvana", "top_song": "Smells Like Teen Spirit"},
+                {"name": "Spice Girls", "top_song": "Wannabe"},
+            ],
+            "2000s": [
+                {"name": "Beyoncé", "top_song": "Crazy in Love"},
+                {"name": "Eminem", "top_song": "Lose Yourself"},
+                {"name": "Amy Winehouse", "top_song": "Valerie"},
+                {"name": "Kelly Clarkson", "top_song": "Since U Been Gone"},
+                {"name": "Usher", "top_song": "Yeah!"},
+            ],
+            "2010s": [
+                {"name": "Adele", "top_song": "Rolling in the Deep"},
+                {"name": "Bruno Mars", "top_song": "Uptown Funk"},
+                {"name": "Taylor Swift", "top_song": "Shake It Off"},
+                {"name": "Ed Sheeran", "top_song": "Shape of You"},
+                {"name": "Lady Gaga", "top_song": "Shallow"},
+            ],
+            "2020s": [
+                {"name": "Dua Lipa", "top_song": "Levitating"},
+                {"name": "The Weeknd", "top_song": "Blinding Lights"},
+                {"name": "Olivia Rodrigo", "top_song": "drivers license"},
+                {"name": "Harry Styles", "top_song": "As It Was"},
+                {"name": "Doja Cat", "top_song": "Say So"},
+            ],
+        }
+
+        # Trim to requested count
+        return {decade: artists[:artists_per_decade] for decade, artists in decade_artists.items()}
 
     def _fetch_quiz_candidates(self, limit: int) -> list[QuizSong]:
         """Fetch quiz song candidates from BigQuery.

@@ -237,10 +237,86 @@ export const api = {
   },
 
   // ============================================================================
-  // My Songs / Recommendations endpoints
+  // My Data / Songs / Recommendations endpoints
   // ============================================================================
 
   my: {
+    // My Data summary
+    getDataSummary: () =>
+      api.get<{
+        services: Record<
+          string,
+          {
+            connected: boolean;
+            username?: string;
+            tracks_synced?: number;
+            last_sync_at?: string;
+          }
+        >;
+        artists: {
+          total: number;
+          by_source: Record<string, number>;
+        };
+        songs: {
+          total: number;
+          with_karaoke: number;
+        };
+        preferences: {
+          completed: boolean;
+          decade?: string;
+          energy?: string;
+          genres?: string[];
+        };
+      }>("/api/my/data/summary"),
+
+    // My Data artists
+    getDataArtists: () =>
+      api.get<{
+        artists: Array<{
+          artist_name: string;
+          source: string;
+          rank: number;
+          time_range: string;
+          popularity: number | null;
+          genres: string[];
+          playcount: number | null;
+        }>;
+        total: number;
+      }>("/api/my/data/artists"),
+
+    addDataArtist: (artistName: string) =>
+      api.post<{ message: string; artist_name: string }>("/api/my/data/artists", {
+        artist_name: artistName,
+      }),
+
+    removeDataArtist: (artistName: string) =>
+      api.delete<{ message: string }>(
+        `/api/my/data/artists/${encodeURIComponent(artistName)}`
+      ),
+
+    // My Data preferences
+    getPreferences: () =>
+      api.get<{
+        decade_preference: string | null;
+        energy_preference: "chill" | "medium" | "high" | null;
+        genres: string[];
+      }>("/api/my/data/preferences"),
+
+    updatePreferences: (data: {
+      decade_preference?: string | null;
+      energy_preference?: "chill" | "medium" | "high" | null;
+      genres?: string[];
+    }) =>
+      apiRequest<{
+        decade_preference: string | null;
+        energy_preference: "chill" | "medium" | "high" | null;
+        genres: string[];
+      }>("/api/my/data/preferences", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+
+    // Songs
     getSongs: (page: number = 1, perPage: number = 20) =>
       api.get<{
         songs: Array<{
@@ -412,17 +488,37 @@ export const api = {
         }>;
       }>(`/api/quiz/songs?count=${count}`),
 
-    getArtists: (count: number = 25) =>
-      api.get<{
+    getArtists: (count: number = 25, genres?: string[], exclude?: string[]) => {
+      const params = new URLSearchParams({ count: count.toString() });
+      if (genres && genres.length > 0) {
+        genres.forEach((g) => params.append("genres", g));
+      }
+      if (exclude && exclude.length > 0) {
+        exclude.forEach((e) => params.append("exclude", e));
+      }
+      return api.get<{
         artists: Array<{
           name: string;
           song_count: number;
           top_songs: string[];
           total_brand_count: number;
           primary_decade: string;
+          genres: string[];
           image_url: string | null;
         }>;
-      }>(`/api/quiz/artists?count=${count}`),
+      }>(`/api/quiz/artists?${params.toString()}`);
+    },
+
+    getDecadeArtists: (artistsPerDecade: number = 5) =>
+      api.get<{
+        decades: Array<{
+          decade: string;
+          artists: Array<{
+            name: string;
+            top_song: string;
+          }>;
+        }>;
+      }>(`/api/quiz/decade-artists?artists_per_decade=${artistsPerDecade}`),
 
     submit: (data: {
       known_song_ids?: string[];
