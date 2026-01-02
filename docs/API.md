@@ -451,9 +451,36 @@ Get current sync status for all connected services and any active sync job.
 
 ## Quiz ✅ Implemented
 
+### GET /api/quiz/artists
+
+Get quiz artists for onboarding (recommended). Returns popular karaoke artists with their top songs for users to identify which they know. Each selected artist adds multiple songs to the user's library.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| count | int | Number of artists (default: 25, min: 10, max: 50) |
+
+**Response:**
+```json
+{
+  "artists": [
+    {
+      "name": "Queen",
+      "song_count": 45,
+      "top_songs": ["Bohemian Rhapsody", "Don't Stop Me Now", "We Will Rock You"],
+      "total_brand_count": 312,
+      "primary_decade": "1970s",
+      "image_url": null
+    }
+  ]
+}
+```
+
 ### GET /api/quiz/songs
 
-Get quiz songs for onboarding. Returns popular karaoke songs for users to identify which they know.
+Get quiz songs for onboarding (legacy). Returns popular karaoke songs for users to identify which they know.
 
 **Requires:** Bearer token
 
@@ -480,18 +507,26 @@ Get quiz songs for onboarding. Returns popular karaoke songs for users to identi
 
 ### POST /api/quiz/submit
 
-Submit quiz responses with known songs and preferences.
+Submit quiz responses with known artists or songs and preferences.
 
 **Requires:** Bearer token
 
-**Request:**
+**Request (Artist-based - recommended):**
+```json
+{
+  "known_artists": ["Queen", "ABBA", "Elton John"],
+  "decade_preference": "1980s",
+  "energy_preference": "high"
+}
+```
+
+**Request (Song-based - legacy):**
 ```json
 {
   "known_song_ids": ["1", "2", "3"],
   "decade_preference": "1980s",
   "energy_preference": "high"
 }
-```
 
 **Response:**
 ```json
