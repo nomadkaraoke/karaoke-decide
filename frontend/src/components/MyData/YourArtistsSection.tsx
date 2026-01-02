@@ -129,6 +129,7 @@ export function YourArtistsSection({
       {/* Header */}
       <button
         onClick={onToggle}
+        aria-expanded={isExpanded}
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
