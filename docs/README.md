@@ -24,11 +24,12 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Frontend Auth & Discovery:** Full auth flow, Recommendations, Quiz UI (Phase 5 complete)
 - **My Data Page:** Unified data management (replaces My Songs + Services) with editable preferences
+- **Known Songs:** Manual song entry for users to add songs they know they like singing
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
 - **User Profile:** Profile settings page with display name management (Phase 6 Part 3)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
-- **CI/Testing:** 135 unit tests, 300+ backend tests, E2E tests with Playwright
+- **CI/Testing:** 135 unit tests, 319 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 
 ### 🚧 Next Up (Post-MLP)
@@ -114,6 +115,10 @@ cd frontend && npm run dev
 - `POST /api/quiz/submit` - Submit quiz responses (accepts artists or songs)
 - `GET /api/quiz/status` - Get quiz completion status
 - `GET /api/my/songs` - Get user's song library
+- `GET /api/known-songs` - Get user's manually-added known songs
+- `POST /api/known-songs` - Add a song to known songs
+- `POST /api/known-songs/bulk` - Bulk add songs to known songs
+- `DELETE /api/known-songs/{id}` - Remove a known song
 - `GET /api/my/data/summary` - Get aggregated data summary
 - `GET /api/my/data/artists` - Get user's artists from all sources
 - `POST /api/my/data/artists` - Add artist manually
@@ -155,6 +160,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-02 | Known Songs (manual song entry for songs users know they like singing) | [archive/2026-01-02-known-songs-feature.md](archive/2026-01-02-known-songs-feature.md) |
 | 2026-01-02 | My Data Page (unified data management, replaces My Songs + Services, editable preferences) | [archive/2026-01-02-my-data-page.md](archive/2026-01-02-my-data-page.md) |
 | 2026-01-02 | Quiz UX Improvements (genre selection step, refresh artists, connect CTA, data-testid) | [archive/2026-01-02-quiz-ux-improvements.md](archive/2026-01-02-quiz-ux-improvements.md) |
 | 2026-01-02 | Guest User Onboarding (frictionless onboarding, guest sessions, upgrade flow) | [archive/2026-01-02-guest-onboarding-flow.md](archive/2026-01-02-guest-onboarding-flow.md) |
