@@ -7,7 +7,7 @@
 A karaoke song discovery app that helps users find songs to sing based on their music listening history.
 
 - **Live site:** https://decide.nomadkaraoke.com
-- **API:** https://karaoke-decide-718638054799.us-central1.run.app
+- **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
 ## Current Status (2026-01-02)
@@ -31,6 +31,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
 - **CI/Testing:** 135 unit tests, 319 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
+- **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
 
 ### 🚧 Next Up (Post-MLP)
 1. **Energy/Tempo Filters** - Use audio features data for "high energy karaoke" / "chill karaoke" filtering
@@ -160,6 +161,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-02 | Cloudflare API Proxy (eliminates CORS, same-origin /api/* requests via Worker) | [archive/2026-01-02-cloudflare-api-proxy.md](archive/2026-01-02-cloudflare-api-proxy.md) |
 | 2026-01-02 | Known Songs (manual song entry for songs users know they like singing) | [archive/2026-01-02-known-songs-feature.md](archive/2026-01-02-known-songs-feature.md) |
 | 2026-01-02 | My Data Page (unified data management, replaces My Songs + Services, editable preferences) | [archive/2026-01-02-my-data-page.md](archive/2026-01-02-my-data-page.md) |
 | 2026-01-02 | Quiz UX Improvements (genre selection step, refresh artists, connect CTA, data-testid) | [archive/2026-01-02-quiz-ux-improvements.md](archive/2026-01-02-quiz-ux-improvements.md) |

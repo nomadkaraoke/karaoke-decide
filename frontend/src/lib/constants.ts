@@ -2,9 +2,10 @@
  * Application constants
  */
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://karaoke-decide-718638054799.us-central1.run.app";
+// In production, use relative URLs (empty string) so requests go through
+// Cloudflare Worker proxy at /api/*. For local development, set
+// NEXT_PUBLIC_API_URL=http://localhost:8000
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const AUTH_TOKEN_KEY = "karaoke_decide_token";
 

@@ -901,3 +901,31 @@ gsutil mb -c archive -l us-central1 gs://bucket-archive/
 - GCS Standard storage (4TB): ~$80/month
 
 **Decision:** Always preserve raw source data in cheap archive storage. The monthly cost is negligible compared to re-acquisition risk.
+
+---
+
+### 2026-01-02: Use Cloudflare Worker Proxy to Avoid CORS
+
+**Context:** API requests from `decide.nomadkaraoke.com` to Cloud Run at `karaoke-decide-*.run.app` were failing with CORS errors, especially when the backend returned 500 errors (CORS headers missing on error responses).
+
+**Lesson:** Cross-origin API requests create unnecessary complexity. When you control both frontend and backend, route them through the same origin. Since `decide.nomadkaraoke.com` is behind Cloudflare, a Worker can proxy `/api/*` to Cloud Run.
+
+**Recommendation:**
+1. Create a Cloudflare Worker that proxies `/api/*` to Cloud Run
+2. Configure route: `decide.nomadkaraoke.com/api/*`
+3. Frontend uses relative URLs (`/api/...` instead of full Cloud Run URL)
+4. No CORS configuration needed (same-origin requests)
+
+```
+Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
+```
+
+**Benefits:**
+- No CORS issues (same-origin)
+- Infrastructure hidden from users
+- Can add edge caching, rate limiting later
+- Simpler debugging (no cross-origin complexity)
+
+**Files:**
+- `infrastructure/cloudflare-worker/api-proxy.js` - Worker code
+- `infrastructure/cloudflare-worker/README.md` - Setup instructions

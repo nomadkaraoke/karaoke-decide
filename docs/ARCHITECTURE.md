@@ -15,9 +15,15 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │                │  .com)          │                                 │
 └────────┬───────┴────────┬────────┴─────────────────────────────────┘
          │                │
-         └────────┬───────┘
-                  │
-                  ▼
+         │                ▼
+         │   ┌────────────────────────┐
+         │   │   Cloudflare Worker    │  (API Proxy)
+         │   │   /api/* → Cloud Run   │
+         │   └───────────┬────────────┘
+         │               │
+         └───────┬───────┘
+                 │
+                 ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Backend API                                   │
 │                    (FastAPI on Cloud Run)                           │
@@ -25,8 +31,9 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │  /api/catalog/*   - Karaoke song catalog (BigQuery)        ✅ LIVE  │
 │  /api/auth/*      - Magic link authentication              ✅ LIVE  │
 │  /api/services/*  - Music service OAuth & sync             ✅ LIVE  │
-│  /api/my/*        - User's matched songs, history          PLANNED  │
-│  /api/playlists/* - Playlist management                    PLANNED  │
+│  /api/my/*        - User data, recommendations             ✅ LIVE  │
+│  /api/playlists/* - Playlist management                    ✅ LIVE  │
+│  /api/quiz/*      - Onboarding quiz                        ✅ LIVE  │
 └────────┬───────────────────┬────────────────────────────────────────┘
          │                   │
          ▼                   ▼
@@ -48,6 +55,22 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │  playlists      │
 └─────────────────┘
 ```
+
+## Cloudflare Worker (API Proxy)
+
+The web frontend at `decide.nomadkaraoke.com` uses a Cloudflare Worker to proxy API requests to Cloud Run. This eliminates CORS issues by keeping frontend and API on the same origin.
+
+```
+Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
+       → decide.nomadkaraoke.com/*      → GitHub Pages
+```
+
+**Why?**
+- No CORS configuration needed (same-origin requests)
+- Cloud Run URL not exposed to users
+- Can add edge caching/rate limiting in future
+
+**Configuration:** Managed via Pulumi in `infrastructure/__main__.py`. See `infrastructure/cloudflare-worker/README.md` for setup.
 
 ## Data Flow
 
