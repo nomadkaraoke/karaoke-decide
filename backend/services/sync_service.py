@@ -486,19 +486,17 @@ class SyncService:
         current_oldest_timestamp = oldest_timestamp
         scrobble_counts: dict[str, int] = {}  # Track play counts for each song
 
-        logger.info(f"Starting incremental scrobble sync from timestamp {oldest_timestamp}")
+        logger.info(f"Starting incremental scrobble sync to timestamp {oldest_timestamp}")
 
-        async for scrobble in self.lastfm.get_all_scrobbles(username, from_timestamp=None):
+        # Use to_timestamp to only fetch scrobbles BEFORE what we've already processed
+        # This lets the Last.fm API filter on the server side for efficiency
+        async for scrobble in self.lastfm.get_all_scrobbles(username, to_timestamp=oldest_timestamp):
             # Get scrobble timestamp
             date_info = scrobble.get("date", {})
             if isinstance(date_info, dict):
                 scrobble_ts = int(date_info.get("uts", 0))
             else:
                 scrobble_ts = 0
-
-            # If we've already processed this far, skip
-            if oldest_timestamp and scrobble_ts >= oldest_timestamp:
-                continue
 
             scrobble_count += 1
 
