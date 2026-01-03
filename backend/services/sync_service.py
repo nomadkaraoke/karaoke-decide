@@ -57,9 +57,9 @@ class SyncService:
     LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
-    # Full scrobble history - limit to avoid timeout for large libraries
+    # Full scrobble history - now incremental with progress tracking
     LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
-    LASTFM_MAX_SCROBBLES = 50000  # Cap scrobbles to avoid timeout (5min Cloud Run limit)
+    LASTFM_BATCH_SIZE = 1000  # Save progress every N scrobbles
 
     def __init__(
         self,
@@ -286,62 +286,134 @@ class SyncService:
         service: MusicService,
         progress_callback: ProgressCallback | None,
     ) -> SyncResult:
-        """Sync Last.fm with progress updates and artist fetching."""
+        """Sync Last.fm with incremental progress saving.
+
+        This method saves data incrementally as it fetches, so even if
+        interrupted, progress is preserved and can be resumed.
+        """
         try:
             await self.music_service_service.update_sync_status(user_id, "lastfm", "syncing")
-
-            if progress_callback:
-                await progress_callback(
-                    current_service="lastfm",
-                    current_phase="fetching",
-                    total_tracks=0,
-                    processed_tracks=0,
-                    matched_tracks=0,
-                )
 
             username = service.service_username
             if not username:
                 raise MusicServiceError("No Last.fm username configured")
 
-            # Fetch tracks
-            tracks = await self._fetch_lastfm_tracks(username)
+            # Get existing scrobble progress (for resume capability)
+            progress = await self.music_service_service.get_scrobble_progress(user_id, "lastfm")
+            oldest_timestamp = progress.get("oldest_scrobble_timestamp")
+            history_complete = progress.get("scrobble_history_complete", False)
+            total_scrobbles_processed = progress.get("scrobbles_processed", 0)
+
+            logger.info(
+                f"Last.fm sync starting for {username}: "
+                f"oldest_timestamp={oldest_timestamp}, "
+                f"history_complete={history_complete}, "
+                f"scrobbles_processed={total_scrobbles_processed}"
+            )
+
+            total_tracks_fetched = 0
+            total_tracks_matched = 0
+            total_created = 0
+            total_updated = 0
 
             if progress_callback:
                 await progress_callback(
                     current_service="lastfm",
-                    current_phase="matching",
-                    total_tracks=len(tracks),
+                    current_phase="fetching_top_tracks",
+                    total_tracks=0,
                     processed_tracks=0,
                     matched_tracks=0,
                 )
 
-            # Match to catalog (batch)
-            matched = await self.track_matcher.batch_match_tracks(tracks)
-            tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
+            # Step 1: Always fetch and save top tracks (they have accurate playcounts)
+            top_tracks = await self.lastfm.get_all_top_tracks(
+                username=username,
+                period="overall",
+                max_tracks=self.LASTFM_TOP_TRACKS_LIMIT,
+            )
+            logger.info(f"Last.fm top tracks: fetched {len(top_tracks)} tracks")
 
+            if top_tracks:
+                top_track_infos = [self._extract_lastfm_track_info(t) for t in top_tracks]
+                top_track_infos = [t for t in top_track_infos if t]  # Filter None
+                matched = await self.track_matcher.batch_match_tracks(top_track_infos)
+                created, updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+                total_tracks_fetched += len(top_track_infos)
+                total_tracks_matched += sum(1 for m in matched if m.catalog_song is not None)
+                total_created += created
+                total_updated += updated
+                logger.info(f"Last.fm top tracks: saved {created} new, {updated} updated")
+
+            # Step 2: Fetch scrobble history incrementally (if not complete)
+            if self.LASTFM_FULL_SCROBBLE_HISTORY and not history_complete:
+                if progress_callback:
+                    await progress_callback(
+                        current_service="lastfm",
+                        current_phase="fetching_scrobbles",
+                        total_tracks=total_tracks_fetched,
+                        processed_tracks=total_tracks_fetched,
+                        matched_tracks=total_tracks_matched,
+                    )
+
+                # Build set of already-saved tracks to avoid duplicates
+                seen_keys: set[str] = set()
+                for t in top_tracks:
+                    info = self._extract_lastfm_track_info(t)
+                    if info:
+                        seen_keys.add(f"{info['artist']}:{info['title']}".lower())
+
+                scrobble_result = await self._sync_scrobbles_incremental(
+                    user_id=user_id,
+                    username=username,
+                    seen_keys=seen_keys,
+                    oldest_timestamp=oldest_timestamp,
+                    total_scrobbles_processed=total_scrobbles_processed,
+                    progress_callback=progress_callback,
+                )
+
+                total_tracks_fetched += scrobble_result["tracks_fetched"]
+                total_tracks_matched += scrobble_result["tracks_matched"]
+                total_created += scrobble_result["created"]
+                total_updated += scrobble_result["updated"]
+
+            # Step 3: Fetch loved tracks (small set, always refresh)
             if progress_callback:
                 await progress_callback(
                     current_service="lastfm",
-                    current_phase="storing",
-                    total_tracks=len(tracks),
-                    processed_tracks=len(tracks),
-                    matched_tracks=tracks_matched,
+                    current_phase="fetching_loved",
+                    total_tracks=total_tracks_fetched,
+                    processed_tracks=total_tracks_fetched,
+                    matched_tracks=total_tracks_matched,
                 )
 
-            # Create/update UserSongs
-            created, updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+            loved_result = await self._sync_loved_tracks(user_id, username)
+            total_tracks_fetched += loved_result["tracks_fetched"]
+            total_tracks_matched += loved_result["tracks_matched"]
+            total_created += loved_result["created"]
+            total_updated += loved_result["updated"]
 
-            # Fetch and store top artists
+            # Step 4: Fetch and store top artists
+            if progress_callback:
+                await progress_callback(
+                    current_service="lastfm",
+                    current_phase="fetching_artists",
+                    total_tracks=total_tracks_fetched,
+                    processed_tracks=total_tracks_fetched,
+                    matched_tracks=total_tracks_matched,
+                )
+
             artists_stored = await self._fetch_and_store_lastfm_artists(user_id, username)
 
-            await self.music_service_service.update_sync_status(user_id, "lastfm", "idle", tracks_synced=tracks_matched)
+            await self.music_service_service.update_sync_status(
+                user_id, "lastfm", "idle", tracks_synced=total_tracks_matched
+            )
 
             return SyncResult(
                 service_type="lastfm",
-                tracks_fetched=len(tracks),
-                tracks_matched=tracks_matched,
-                user_songs_created=created,
-                user_songs_updated=updated,
+                tracks_fetched=total_tracks_fetched,
+                tracks_matched=total_tracks_matched,
+                user_songs_created=total_created,
+                user_songs_updated=total_updated,
                 artists_stored=artists_stored,
             )
 
@@ -378,6 +450,217 @@ class SyncService:
                 user_songs_updated=0,
                 error=error_msg,
             )
+
+    async def _sync_scrobbles_incremental(
+        self,
+        user_id: str,
+        username: str,
+        seen_keys: set[str],
+        oldest_timestamp: int | None,
+        total_scrobbles_processed: int,
+        progress_callback: ProgressCallback | None,
+    ) -> dict[str, int]:
+        """Fetch and save scrobbles incrementally with progress tracking.
+
+        Processes scrobbles in batches, saving after each batch so progress
+        is preserved if interrupted. Can resume from where it left off.
+
+        Args:
+            user_id: User ID.
+            username: Last.fm username.
+            seen_keys: Set of "artist:title" keys already processed.
+            oldest_timestamp: Unix timestamp to fetch scrobbles BEFORE (for resume).
+            total_scrobbles_processed: Total scrobbles processed so far.
+            progress_callback: Progress callback.
+
+        Returns:
+            Dict with tracks_fetched, tracks_matched, created, updated counts.
+        """
+        tracks_fetched = 0
+        tracks_matched = 0
+        created = 0
+        updated = 0
+
+        batch: list[dict[str, Any]] = []
+        scrobble_count = 0
+        current_oldest_timestamp = oldest_timestamp
+        scrobble_counts: dict[str, int] = {}  # Track play counts for each song
+
+        logger.info(f"Starting incremental scrobble sync from timestamp {oldest_timestamp}")
+
+        async for scrobble in self.lastfm.get_all_scrobbles(username, from_timestamp=None):
+            # Get scrobble timestamp
+            date_info = scrobble.get("date", {})
+            if isinstance(date_info, dict):
+                scrobble_ts = int(date_info.get("uts", 0))
+            else:
+                scrobble_ts = 0
+
+            # If we've already processed this far, skip
+            if oldest_timestamp and scrobble_ts >= oldest_timestamp:
+                continue
+
+            scrobble_count += 1
+
+            # Extract track info
+            title = scrobble.get("name", "")
+            artist_data = scrobble.get("artist", {})
+            if isinstance(artist_data, dict):
+                artist = artist_data.get("name", "") or artist_data.get("#text", "")
+            else:
+                artist = str(artist_data)
+
+            if not title or not artist:
+                continue
+
+            key = f"{artist}:{title}".lower()
+            scrobble_counts[key] = scrobble_counts.get(key, 0) + 1
+
+            # Track oldest timestamp we've seen
+            if scrobble_ts > 0:
+                if current_oldest_timestamp is None or scrobble_ts < current_oldest_timestamp:
+                    current_oldest_timestamp = scrobble_ts
+
+            # Add to batch if new
+            if key not in seen_keys:
+                seen_keys.add(key)
+                batch.append(
+                    {
+                        "artist": artist,
+                        "title": title,
+                        "playcount": None,  # Will set from scrobble_counts
+                        "rank": None,
+                        "from_scrobbles": True,
+                    }
+                )
+
+            # Process batch when it reaches size limit
+            if len(batch) >= self.LASTFM_BATCH_SIZE:
+                # Set playcounts from accumulated scrobble counts
+                for track in batch:
+                    track_key = f"{track['artist']}:{track['title']}".lower()
+                    track["playcount"] = scrobble_counts.get(track_key, 1)
+
+                # Match and save batch
+                matched = await self.track_matcher.batch_match_tracks(batch)
+                batch_created, batch_updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+
+                tracks_fetched += len(batch)
+                tracks_matched += sum(1 for m in matched if m.catalog_song is not None)
+                created += batch_created
+                updated += batch_updated
+
+                # Update progress in Firestore
+                await self.music_service_service.update_scrobble_progress(
+                    user_id=user_id,
+                    service_type="lastfm",
+                    oldest_scrobble_timestamp=current_oldest_timestamp,
+                    scrobbles_processed=total_scrobbles_processed + scrobble_count,
+                )
+
+                logger.info(
+                    f"Last.fm scrobbles: processed {scrobble_count}, "
+                    f"saved batch of {len(batch)} new tracks, "
+                    f"oldest_ts={current_oldest_timestamp}"
+                )
+
+                if progress_callback:
+                    await progress_callback(
+                        current_service="lastfm",
+                        current_phase="fetching_scrobbles",
+                        total_tracks=tracks_fetched,
+                        processed_tracks=scrobble_count,
+                        matched_tracks=tracks_matched,
+                    )
+
+                batch = []
+
+            # Log progress every 10k scrobbles
+            if scrobble_count % 10000 == 0:
+                logger.info(f"Last.fm scrobbles: processed {scrobble_count}")
+
+        # Process final batch
+        if batch:
+            for track in batch:
+                track_key = f"{track['artist']}:{track['title']}".lower()
+                track["playcount"] = scrobble_counts.get(track_key, 1)
+
+            matched = await self.track_matcher.batch_match_tracks(batch)
+            batch_created, batch_updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+
+            tracks_fetched += len(batch)
+            tracks_matched += sum(1 for m in matched if m.catalog_song is not None)
+            created += batch_created
+            updated += batch_updated
+
+        # Mark history as complete
+        await self.music_service_service.update_scrobble_progress(
+            user_id=user_id,
+            service_type="lastfm",
+            oldest_scrobble_timestamp=current_oldest_timestamp,
+            scrobble_history_complete=True,
+            scrobbles_processed=total_scrobbles_processed + scrobble_count,
+        )
+
+        logger.info(
+            f"Last.fm scrobble sync complete: {scrobble_count} scrobbles, "
+            f"{tracks_fetched} unique tracks, {tracks_matched} matched"
+        )
+
+        return {
+            "tracks_fetched": tracks_fetched,
+            "tracks_matched": tracks_matched,
+            "created": created,
+            "updated": updated,
+        }
+
+    async def _sync_loved_tracks(self, user_id: str, username: str) -> dict[str, int]:
+        """Fetch and save loved tracks.
+
+        Returns:
+            Dict with tracks_fetched, tracks_matched, created, updated counts.
+        """
+        tracks_fetched = 0
+        tracks_matched = 0
+        created = 0
+        updated = 0
+
+        page = 1
+        while tracks_fetched < self.LASTFM_LOVED_TRACKS_LIMIT:
+            response = await self.lastfm.get_loved_tracks(username, limit=100, page=page)
+            items = response.get("lovedtracks", {}).get("track", [])
+            if not items:
+                break
+
+            track_infos = []
+            for item in items:
+                if tracks_fetched >= self.LASTFM_LOVED_TRACKS_LIMIT:
+                    break
+                track_info = self._extract_lastfm_track_info(item)
+                if track_info:
+                    track_info["is_loved"] = True
+                    track_infos.append(track_info)
+                    tracks_fetched += 1
+
+            if track_infos:
+                matched = await self.track_matcher.batch_match_tracks(track_infos)
+                batch_created, batch_updated = await self._upsert_user_songs(user_id, matched, "lastfm")
+                tracks_matched += sum(1 for m in matched if m.catalog_song is not None)
+                created += batch_created
+                updated += batch_updated
+
+            if len(items) < 100:
+                break
+            page += 1
+
+        logger.info(f"Last.fm loved tracks: {tracks_fetched} fetched, {tracks_matched} matched")
+
+        return {
+            "tracks_fetched": tracks_fetched,
+            "tracks_matched": tracks_matched,
+            "created": created,
+            "updated": updated,
+        }
 
     async def _fetch_and_store_spotify_artists(self, user_id: str, access_token: str) -> int:
         """Fetch and store user's top artists from Spotify.
@@ -567,7 +850,8 @@ class SyncService:
     async def sync_lastfm(self, user_id: str, service: MusicService) -> SyncResult:
         """Sync Last.fm listening history.
 
-        Fetches top tracks, loved tracks, and recent tracks.
+        Uses incremental sync with progress tracking. Saves data as it fetches
+        so progress is preserved if interrupted.
 
         Args:
             user_id: User ID.
@@ -576,59 +860,8 @@ class SyncService:
         Returns:
             SyncResult with counts.
         """
-        try:
-            # Mark as syncing
-            await self.music_service_service.update_sync_status(user_id, "lastfm", "syncing")
-
-            username = service.service_username
-            if not username:
-                raise MusicServiceError("No Last.fm username configured")
-
-            # Fetch tracks
-            tracks = await self._fetch_lastfm_tracks(username)
-
-            # Match to catalog
-            matched = await self.track_matcher.batch_match_tracks(tracks)
-
-            # Create/update UserSongs
-            created, updated = await self._upsert_user_songs(user_id, matched, "lastfm")
-
-            # Calculate stats
-            tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
-
-            # Mark as complete
-            await self.music_service_service.update_sync_status(user_id, "lastfm", "idle", tracks_synced=tracks_matched)
-
-            return SyncResult(
-                service_type="lastfm",
-                tracks_fetched=len(tracks),
-                tracks_matched=tracks_matched,
-                user_songs_created=created,
-                user_songs_updated=updated,
-            )
-
-        except ExternalServiceError as e:
-            error_msg = f"Last.fm API error: {e}"
-            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
-            return SyncResult(
-                service_type="lastfm",
-                tracks_fetched=0,
-                tracks_matched=0,
-                user_songs_created=0,
-                user_songs_updated=0,
-                error=error_msg,
-            )
-        except Exception as e:
-            error_msg = f"Unexpected error: {e}"
-            await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
-            return SyncResult(
-                service_type="lastfm",
-                tracks_fetched=0,
-                tracks_matched=0,
-                user_songs_created=0,
-                user_songs_updated=0,
-                error=error_msg,
-            )
+        # Delegate to the incremental sync method
+        return await self._sync_lastfm_with_progress(user_id, service, progress_callback=None)
 
     async def _fetch_spotify_tracks(self, access_token: str) -> list[dict[str, str]]:
         """Fetch tracks from Spotify API.
@@ -744,144 +977,6 @@ class SyncService:
             "rank": rank,
             "time_range": time_range,
         }
-
-    async def _fetch_lastfm_tracks(self, username: str) -> list[dict[str, Any]]:
-        """Fetch tracks from Last.fm API with real play counts.
-
-        Fetches data in order of richness:
-        1. Top tracks (ranked by playcount, gives official aggregated counts)
-        2. Full scrobble history (gives complete coverage of ALL songs ever played)
-        3. Loved tracks (may include songs not scrobbled recently)
-
-        The full scrobble fetch ensures we capture every unique song the user
-        has ever listened to, not just their top 1000.
-
-        Args:
-            username: Last.fm username.
-
-        Returns:
-            List of dicts with 'artist', 'title', 'playcount', 'rank' keys.
-        """
-        tracks: list[dict[str, Any]] = []
-        seen: set[str] = set()
-        # Track play counts from scrobbles (for songs not in top tracks)
-        scrobble_counts: dict[str, int] = {}
-
-        logger.info(f"Starting Last.fm track fetch for username: {username}")
-
-        # Step 1: Fetch top tracks (overall) with pagination - up to 1000 tracks
-        # This gives us tracks ranked by actual play count with official aggregation
-        top_tracks = await self.lastfm.get_all_top_tracks(
-            username=username,
-            period="overall",
-            max_tracks=self.LASTFM_TOP_TRACKS_LIMIT,
-        )
-        logger.info(f"Last.fm top tracks: fetched {len(top_tracks)} tracks with play counts")
-
-        for item in top_tracks:
-            track_info = self._extract_lastfm_track_info(item)
-            if track_info:
-                key = f"{track_info['artist']}:{track_info['title']}".lower()
-                if key not in seen:
-                    seen.add(key)
-                    tracks.append(track_info)
-
-        top_count = len(tracks)
-        logger.info(f"Last.fm top tracks total: {top_count} unique tracks")
-
-        # Step 2: Fetch scrobble history for coverage beyond top tracks
-        if self.LASTFM_FULL_SCROBBLE_HISTORY:
-            logger.info(f"Fetching Last.fm scrobble history (max {self.LASTFM_MAX_SCROBBLES})...")
-            scrobble_count = 0
-            new_from_scrobbles = 0
-
-            async for scrobble in self.lastfm.get_all_scrobbles(username):
-                scrobble_count += 1
-
-                # Stop if we've hit the limit to avoid timeout
-                if scrobble_count > self.LASTFM_MAX_SCROBBLES:
-                    logger.info(f"Last.fm scrobbles: reached limit of {self.LASTFM_MAX_SCROBBLES}")
-                    break
-
-                # Log progress every 10k scrobbles
-                if scrobble_count % 10000 == 0:
-                    logger.info(
-                        f"Last.fm scrobbles: processed {scrobble_count}, "
-                        f"found {new_from_scrobbles} new unique tracks"
-                    )
-
-                # Extract artist and title from scrobble
-                title = scrobble.get("name", "")
-                artist_data = scrobble.get("artist", {})
-                if isinstance(artist_data, dict):
-                    artist = artist_data.get("name", "") or artist_data.get("#text", "")
-                else:
-                    artist = str(artist_data)
-
-                if not title or not artist:
-                    continue
-
-                key = f"{artist}:{title}".lower()
-
-                # Count this scrobble
-                scrobble_counts[key] = scrobble_counts.get(key, 0) + 1
-
-                # If not already seen from top tracks, add it
-                if key not in seen:
-                    seen.add(key)
-                    new_from_scrobbles += 1
-                    tracks.append(
-                        {
-                            "artist": artist,
-                            "title": title,
-                            "playcount": None,  # Will be set from scrobble_counts below
-                            "rank": None,  # Not in top tracks
-                            "from_scrobbles": True,
-                        }
-                    )
-
-            # Update playcount for tracks discovered via scrobbles
-            for track in tracks:
-                if track.get("from_scrobbles") and track.get("playcount") is None:
-                    key = f"{track['artist']}:{track['title']}".lower()
-                    track["playcount"] = scrobble_counts.get(key, 1)
-
-            logger.info(
-                f"Last.fm scrobble history complete: {scrobble_count} total scrobbles, "
-                f"{new_from_scrobbles} new unique tracks discovered"
-            )
-
-        # Step 3: Fetch loved tracks (may include tracks not scrobbled recently)
-        loved_count = 0
-        page = 1
-        fetched = 0
-        while fetched < self.LASTFM_LOVED_TRACKS_LIMIT:
-            response = await self.lastfm.get_loved_tracks(username, limit=100, page=page)
-            items = response.get("lovedtracks", {}).get("track", [])
-            logger.info(f"Last.fm loved tracks: page={page}, items returned={len(items)}")
-            if not items:
-                break
-
-            for item in items:
-                track_info = self._extract_lastfm_track_info(item)
-                if track_info:
-                    key = f"{track_info['artist']}:{track_info['title']}".lower()
-                    if key not in seen:
-                        seen.add(key)
-                        # Loved tracks don't have playcount, mark as loved
-                        track_info["is_loved"] = True
-                        tracks.append(track_info)
-                        fetched += 1
-                        loved_count += 1
-
-            if len(items) < 100:
-                break
-            page += 1
-
-        logger.info(f"Last.fm loved tracks total: {loved_count} new unique tracks")
-        logger.info(f"Last.fm fetch complete: {len(tracks)} total unique tracks")
-
-        return tracks
 
     def _extract_lastfm_track_info(self, track: dict[str, Any]) -> dict[str, Any] | None:
         """Extract artist, title, and playcount from Last.fm track object.
