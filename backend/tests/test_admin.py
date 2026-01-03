@@ -170,15 +170,15 @@ class TestAdminStats:
         async def mock_count(collection: str, filters: list | None = None) -> int:
             if collection == "users":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
-                # All user queries now include user_id != "" filter for karaoke-decide users
+                # Stats queries use is_guest filter to identify karaoke-decide users
                 if filter_dict.get("is_guest") is False:
                     return 60
                 if filter_dict.get("is_guest") is True:
                     return 40
                 if "last_sync_at" in filter_dict:
                     return 25
-                # Base case: just user_id filter = total users
-                if "user_id" in filter_dict:
+                # Total users query uses is_guest "in" filter
+                if "is_guest" in filter_dict:
                     return 100
             if collection == "sync_jobs":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}

@@ -204,6 +204,34 @@ users_is_guest_index = gcp.firestore.Index(
     ],
 )
 
+# Composite index for users filtering by user_id (to exclude karaoke-gen users)
+# Required by: GET /api/admin/users (listing all users with pagination)
+# The Firestore DB is shared with karaoke-gen which has different user schema
+# Note: Firestore requires inequality filter field (user_id) before order field (created_at)
+# Index #1: user_id ASC, created_at DESC - for basic user_id != "" queries
+users_user_id_index = gcp.firestore.Index(
+    "users-user-id-created-index",
+    project=project,
+    database="(default)",
+    collection="users",
+    fields=[
+        {"field_path": "user_id", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "DESCENDING"},
+    ],
+)
+
+# Index #2: created_at DESC, user_id DESC - for ordering with inequality filter
+users_created_user_id_index = gcp.firestore.Index(
+    "users-created-user-id-index",
+    project=project,
+    database="(default)",
+    collection="users",
+    fields=[
+        {"field_path": "created_at", "order": "DESCENDING"},
+        {"field_path": "user_id", "order": "DESCENDING"},
+    ],
+)
+
 # NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
 # It was created manually/automatically and is required by GET /api/services/sync/status
 # Not managed by Pulumi to avoid conflicts with existing index

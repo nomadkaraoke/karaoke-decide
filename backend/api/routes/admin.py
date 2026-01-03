@@ -50,21 +50,19 @@ async def get_admin_stats(
 
     Returns aggregate counts for users, sync jobs, and service connections.
 
-    Note: The Firestore DB is shared with karaoke-gen. We filter for karaoke-decide
-    users by requiring the user_id field to exist (karaoke-gen users don't have it).
+    Note: The Firestore DB is shared with karaoke-gen (being migrated to separate collection).
+    Count queries use simple filters to avoid complex Firestore index requirements.
+    Once migration is complete, these counts will only include karaoke-decide users.
     """
-    # User stats - only count karaoke-decide users (those with user_id field)
-    total_users = await firestore.count_documents("users", filters=[("user_id", "!=", "")])
-    verified_users = await firestore.count_documents(
-        "users", filters=[("user_id", "!=", ""), ("is_guest", "==", False)]
-    )
-    guest_users = await firestore.count_documents("users", filters=[("user_id", "!=", ""), ("is_guest", "==", True)])
+    # User stats - count users with is_guest field (karaoke-decide specific field)
+    # Using is_guest filter to exclude karaoke-gen users which don't have this field
+    total_users = await firestore.count_documents("users", filters=[("is_guest", "in", [True, False])])
+    verified_users = await firestore.count_documents("users", filters=[("is_guest", "==", False)])
+    guest_users = await firestore.count_documents("users", filters=[("is_guest", "==", True)])
 
-    # Active users (synced in last 7 days) - only karaoke-decide users
+    # Active users (synced in last 7 days)
     seven_days_ago = datetime.now(UTC) - timedelta(days=7)
-    active_users = await firestore.count_documents(
-        "users", filters=[("user_id", "!=", ""), ("last_sync_at", ">=", seven_days_ago)]
-    )
+    active_users = await firestore.count_documents("users", filters=[("last_sync_at", ">=", seven_days_ago)])
 
     # Sync job stats (last 24 hours)
     twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
