@@ -3,9 +3,12 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
+
+if TYPE_CHECKING:
+    from backend.services.catalog_lookup import CatalogLookup
 
 logger = logging.getLogger(__name__)
 
@@ -70,13 +73,19 @@ class TrackMatcher:
         r"\s*\bwith\b\s+.*$",  # with Another Artist (word boundary to avoid "Saoirse")
     ]
 
-    def __init__(self, catalog_service: BigQueryCatalogService):
+    def __init__(
+        self,
+        catalog_service: BigQueryCatalogService,
+        catalog_lookup: "CatalogLookup | None" = None,
+    ):
         """Initialize the track matcher.
 
         Args:
-            catalog_service: BigQuery catalog service for searching songs.
+            catalog_service: BigQuery catalog service for searching songs (fallback).
+            catalog_lookup: Optional in-memory catalog for instant matching.
         """
         self.catalog_service = catalog_service
+        self.catalog_lookup = catalog_lookup
         self._compiled_title_patterns = [re.compile(p, re.IGNORECASE) for p in self.TITLE_REMOVE_PATTERNS]
         self._compiled_artist_patterns = [re.compile(p, re.IGNORECASE) for p in self.ARTIST_REMOVE_PATTERNS]
 
@@ -270,9 +279,27 @@ class TrackMatcher:
             for artist, title in sample:
                 logger.info(f"Track matcher sample: '{artist}' - '{title}'")
 
-        # Execute batch query to get all matches at once
-        matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
-        logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
+        # Use in-memory lookup if available (instant), otherwise fall back to BigQuery
+        if self.catalog_lookup and self.catalog_lookup.is_loaded:
+            logger.info("Track matcher: using in-memory catalog lookup (instant)")
+            matched_songs: dict[tuple[str, str], SongResult] = {}
+            for norm_artist, norm_title in unique_normalized:
+                entry = self.catalog_lookup.match(norm_artist, norm_title)
+                if entry:
+                    # Convert CatalogEntry to SongResult for compatibility
+                    matched_songs[(norm_artist, norm_title)] = SongResult(
+                        id=entry.id,
+                        artist=entry.artist,
+                        title=entry.title,
+                        brands=entry.brands,
+                        brand_count=entry.brand_count,
+                    )
+            logger.info(f"Track matcher: in-memory lookup found {len(matched_songs)} matches")
+        else:
+            # Fallback to BigQuery (slower but works if catalog not loaded)
+            logger.info("Track matcher: falling back to BigQuery (catalog not loaded)")
+            matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
+            logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
 
         # Build results maintaining original order
         results: list[MatchedTrack] = []
@@ -336,20 +363,27 @@ _track_matcher: TrackMatcher | None = None
 
 def get_track_matcher(
     catalog_service: BigQueryCatalogService | None = None,
+    catalog_lookup: "CatalogLookup | None" = None,
 ) -> TrackMatcher:
     """Get the track matcher instance.
 
     Args:
         catalog_service: Optional catalog service override (for testing).
+        catalog_lookup: Optional in-memory catalog for instant matching.
 
     Returns:
         TrackMatcher instance.
     """
     global _track_matcher
 
+    # Import here to avoid circular dependency
+    from backend.services.catalog_lookup import get_catalog_lookup
+
     if _track_matcher is None or catalog_service is not None:
         if catalog_service is None:
             catalog_service = BigQueryCatalogService()
-        _track_matcher = TrackMatcher(catalog_service)
+        if catalog_lookup is None:
+            catalog_lookup = get_catalog_lookup()
+        _track_matcher = TrackMatcher(catalog_service, catalog_lookup)
 
     return _track_matcher
