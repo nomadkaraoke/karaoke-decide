@@ -226,6 +226,43 @@ class BigQueryCatalogService:
         result = list(self.client.query(sql).result())[0]
         return int(result.count)
 
+    def get_all_songs(self) -> list[SongResult]:
+        """Load entire catalog for in-memory lookup.
+
+        Returns all songs from the karaoke catalog. This is used by
+        CatalogLookup to pre-load the entire catalog into memory
+        for instant matching during sync.
+
+        Returns:
+            List of all SongResult objects (~275K entries).
+        """
+        sql = f"""
+            SELECT
+                Id as id,
+                Artist as artist,
+                Title as title,
+                Brands as brands,
+                ARRAY_LENGTH(SPLIT(Brands, ',')) as brand_count
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw`
+        """
+
+        logger.info("Loading all songs from BigQuery...")
+        results = self.client.query(sql).result()
+
+        songs = [
+            SongResult(
+                id=row.id,
+                artist=row.artist,
+                title=row.title,
+                brands=row.brands,
+                brand_count=row.brand_count,
+            )
+            for row in results
+        ]
+
+        logger.info(f"Loaded {len(songs):,} songs from BigQuery")
+        return songs
+
     def get_stats(self) -> dict:
         """Get catalog statistics."""
         sql = f"""

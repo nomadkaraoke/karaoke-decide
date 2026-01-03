@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import internal_api_router, router
 from backend.config import get_backend_settings
+from backend.services.catalog_lookup import get_catalog_lookup
+from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 # Configure logging to output to stdout for Cloud Run
 logging.basicConfig(
@@ -18,18 +20,31 @@ logging.basicConfig(
     stream=sys.stdout,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
     settings = get_backend_settings()
-    print(f"Starting Karaoke Decide API ({settings.environment})")
+    logger.info(f"Starting Karaoke Decide API ({settings.environment})")
+
+    # Pre-load karaoke catalog into memory for instant matching
+    # This makes sync ~100x faster by avoiding BigQuery queries per track
+    try:
+        catalog_lookup = get_catalog_lookup()
+        bigquery_service = BigQueryCatalogService()
+        catalog_lookup.load_from_bigquery(bigquery_service)
+        logger.info(f"Catalog loaded: {catalog_lookup.entry_count:,} songs ready for instant matching")
+    except Exception as e:
+        logger.error(f"Failed to load catalog: {e}")
+        # Don't fail startup - sync will fall back to BigQuery queries
 
     yield
 
     # Shutdown
-    print("Shutting down Karaoke Decide API")
+    logger.info("Shutting down Karaoke Decide API")
 
 
 def create_app() -> FastAPI:
