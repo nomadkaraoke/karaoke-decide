@@ -334,8 +334,9 @@ class SyncService:
             logger.info(f"Last.fm top tracks: fetched {len(top_tracks)} tracks")
 
             if top_tracks:
-                top_track_infos = [self._extract_lastfm_track_info(t) for t in top_tracks]
-                top_track_infos = [t for t in top_track_infos if t]  # Filter None
+                top_track_infos: list[dict[str, Any]] = [
+                    t for t in (self._extract_lastfm_track_info(t) for t in top_tracks) if t is not None
+                ]
                 matched = await self.track_matcher.batch_match_tracks(top_track_infos)
                 created, updated = await self._upsert_user_songs(user_id, matched, "lastfm")
                 total_tracks_fetched += len(top_track_infos)
