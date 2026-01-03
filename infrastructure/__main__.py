@@ -280,7 +280,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
             "max_instance_count": 10,
         },
         "max_instance_request_concurrency": 80,
-        "timeout": "300s",
+        "timeout": "1800s",  # 30 minutes for large Last.fm sync operations
         "service_account": f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
     },
     traffics=[

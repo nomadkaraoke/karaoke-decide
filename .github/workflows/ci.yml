@@ -320,7 +320,7 @@ jobs:
             --allow-unauthenticated \
             --memory 512Mi \
             --cpu 1 \
-            --timeout 300 \
+            --timeout 1800 \
             --concurrency 80 \
             --max-instances 10 \
             --min-instances 0 \

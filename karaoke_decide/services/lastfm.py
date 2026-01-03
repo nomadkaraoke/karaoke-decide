@@ -139,6 +139,7 @@ class LastFmClient:
         self,
         username: str,
         from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
         progress_callback: ProgressCallback | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Fetch ALL scrobbles for a user with pagination.
@@ -151,6 +152,8 @@ class LastFmClient:
             username: Last.fm username
             from_timestamp: Optional UNIX timestamp to fetch scrobbles after
                            (for incremental sync of new scrobbles only)
+            to_timestamp: Optional UNIX timestamp to fetch scrobbles before
+                         (for incremental sync of older scrobbles only)
             progress_callback: Optional async callback for progress updates
 
         Yields:
@@ -167,6 +170,7 @@ class LastFmClient:
                 limit=200,  # Max per page
                 page=page,
                 from_timestamp=from_timestamp,
+                to_timestamp=to_timestamp,
             )
 
             tracks_data = response.get("recenttracks", {})
