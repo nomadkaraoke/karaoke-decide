@@ -169,15 +169,17 @@ class TestAdminStats:
         # Configure mock to return different counts for different queries
         async def mock_count(collection: str, filters: list | None = None) -> int:
             if collection == "users":
-                if not filters:
-                    return 100
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
+                # All user queries now include user_id != "" filter for karaoke-decide users
                 if filter_dict.get("is_guest") is False:
                     return 60
                 if filter_dict.get("is_guest") is True:
                     return 40
                 if "last_sync_at" in filter_dict:
                     return 25
+                # Base case: just user_id filter = total users
+                if "user_id" in filter_dict:
+                    return 100
             if collection == "sync_jobs":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
                 status = filter_dict.get("status")
@@ -293,9 +295,9 @@ class TestAdminUsersList:
         )
         assert response.status_code == 200
 
-        # Verify filter was applied
+        # Verify filter was applied (includes base filter for karaoke-decide users)
         call_args = mock_admin_firestore_service.query_documents.call_args
-        assert call_args[1].get("filters") == [("is_guest", "==", False)]
+        assert call_args[1].get("filters") == [("user_id", "!=", ""), ("is_guest", "==", False)]
 
     def test_list_users_with_pagination(
         self,

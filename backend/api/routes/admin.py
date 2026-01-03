@@ -49,15 +49,22 @@ async def get_admin_stats(
     """Get dashboard statistics.
 
     Returns aggregate counts for users, sync jobs, and service connections.
-    """
-    # User stats
-    total_users = await firestore.count_documents("users")
-    verified_users = await firestore.count_documents("users", filters=[("is_guest", "==", False)])
-    guest_users = await firestore.count_documents("users", filters=[("is_guest", "==", True)])
 
-    # Active users (synced in last 7 days)
+    Note: The Firestore DB is shared with karaoke-gen. We filter for karaoke-decide
+    users by requiring the user_id field to exist (karaoke-gen users don't have it).
+    """
+    # User stats - only count karaoke-decide users (those with user_id field)
+    total_users = await firestore.count_documents("users", filters=[("user_id", "!=", "")])
+    verified_users = await firestore.count_documents(
+        "users", filters=[("user_id", "!=", ""), ("is_guest", "==", False)]
+    )
+    guest_users = await firestore.count_documents("users", filters=[("user_id", "!=", ""), ("is_guest", "==", True)])
+
+    # Active users (synced in last 7 days) - only karaoke-decide users
     seven_days_ago = datetime.now(UTC) - timedelta(days=7)
-    active_users = await firestore.count_documents("users", filters=[("last_sync_at", ">=", seven_days_ago)])
+    active_users = await firestore.count_documents(
+        "users", filters=[("user_id", "!=", ""), ("last_sync_at", ">=", seven_days_ago)]
+    )
 
     # Sync job stats (last 24 hours)
     twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
@@ -131,7 +138,9 @@ async def list_users(
     search: str | None = Query(default=None, description="Search by email"),
 ) -> UserListResponse:
     """List users with pagination and filtering."""
-    filters: list[tuple[str, str, object]] = []
+    # Filter for karaoke-decide users only (those with user_id field).
+    # The Firestore DB is shared with karaoke-gen which has different user schema.
+    filters: list[tuple[str, str, object]] = [("user_id", "!=", "")]
 
     if filter == "verified":
         filters.append(("is_guest", "==", False))
