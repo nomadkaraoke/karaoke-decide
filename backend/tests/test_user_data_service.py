@@ -34,8 +34,10 @@ class TestGetDataSummary:
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:
         """Should return complete data summary."""
-        # Mock user document
-        mock_firestore.get_document.return_value = {
+        # Mock user document lookup via query_documents (for non-guest users)
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_completed_at": "2024-01-01T00:00:00",
             "quiz_decade_pref": "1990s",
             "quiz_energy_pref": "high",
@@ -43,8 +45,10 @@ class TestGetDataSummary:
             "quiz_artists_known": ["Queen", "The Beatles"],
         }
 
-        # Mock synced artists
+        # Mock query_documents: first call for _get_user_document, then user_artists, then music_services
         mock_firestore.query_documents.side_effect = [
+            # _get_user_document query
+            [user_doc],
             # user_artists query
             [
                 {"source": "spotify", "artist_name": "Artist1"},
@@ -82,8 +86,8 @@ class TestGetDataSummary:
     @pytest.mark.asyncio
     async def test_handles_empty_user(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should handle user with no data."""
-        mock_firestore.get_document.return_value = None
-        mock_firestore.query_documents.side_effect = [[], []]
+        # Mock query_documents: first call for _get_user_document (empty), then user_artists, then music_services
+        mock_firestore.query_documents.side_effect = [[], [], []]
         mock_firestore.count_documents.side_effect = [0, 0]
 
         result = await user_data_service.get_data_summary("user123")
@@ -99,11 +103,14 @@ class TestGetPreferences:
     @pytest.mark.asyncio
     async def test_returns_preferences(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should return user preferences."""
-        mock_firestore.get_document.return_value = {
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_decade_pref": "1980s",
             "quiz_energy_pref": "chill",
             "quiz_genres_pref": ["jazz", "soul"],
         }
+        mock_firestore.query_documents.return_value = [user_doc]
 
         result = await user_data_service.get_preferences("user123")
 
@@ -116,7 +123,7 @@ class TestGetPreferences:
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:
         """Should return defaults when user not found."""
-        mock_firestore.get_document.return_value = None
+        mock_firestore.query_documents.return_value = []
 
         result = await user_data_service.get_preferences("user123")
 
@@ -131,11 +138,15 @@ class TestUpdatePreferences:
     @pytest.mark.asyncio
     async def test_updates_all_preferences(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should update all preference fields."""
-        mock_firestore.get_document.return_value = {
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_decade_pref": "2000s",
             "quiz_energy_pref": "medium",
             "quiz_genres_pref": ["electronic"],
         }
+        # First query for _get_user_document (update), second for _get_user_document (return)
+        mock_firestore.query_documents.side_effect = [[user_doc], [user_doc]]
 
         await user_data_service.update_preferences(
             user_id="user123",
@@ -147,7 +158,7 @@ class TestUpdatePreferences:
         mock_firestore.update_document.assert_called_once()
         call_args = mock_firestore.update_document.call_args
         assert call_args[0][0] == "users"
-        assert call_args[0][1] == "user123"
+        assert call_args[0][1] == "email_hash_123"  # Uses the doc ID from query
         assert call_args[0][2]["quiz_decade_pref"] == "2000s"
         assert call_args[0][2]["quiz_energy_pref"] == "medium"
         assert call_args[0][2]["quiz_genres_pref"] == ["electronic"]
@@ -155,11 +166,15 @@ class TestUpdatePreferences:
     @pytest.mark.asyncio
     async def test_partial_update(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should only update provided fields."""
-        mock_firestore.get_document.return_value = {
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_decade_pref": "1990s",
             "quiz_energy_pref": "high",
             "quiz_genres_pref": [],
         }
+        # First query for _get_user_document (update), second for _get_user_document (return)
+        mock_firestore.query_documents.side_effect = [[user_doc], [user_doc]]
 
         await user_data_service.update_preferences(
             user_id="user123",
@@ -178,19 +193,27 @@ class TestGetAllArtists:
     @pytest.mark.asyncio
     async def test_combines_all_sources(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should combine artists from all sources."""
-        mock_firestore.query_documents.return_value = [
-            {
-                "artist_name": "Spotify Artist",
-                "source": "spotify",
-                "rank": 1,
-                "time_range": "medium_term",
-                "popularity": 80,
-                "genres": ["rock"],
-            },
-        ]
-        mock_firestore.get_document.return_value = {
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_artists_known": ["Quiz Artist", "Manual Artist"],
         }
+        # First: user_artists query, second: _get_user_document query
+        mock_firestore.query_documents.side_effect = [
+            # user_artists query
+            [
+                {
+                    "artist_name": "Spotify Artist",
+                    "source": "spotify",
+                    "rank": 1,
+                    "time_range": "medium_term",
+                    "popularity": 80,
+                    "genres": ["rock"],
+                },
+            ],
+            # _get_user_document query
+            [user_doc],
+        ]
 
         result = await user_data_service.get_all_artists("user123")
 
@@ -202,12 +225,16 @@ class TestGetAllArtists:
     @pytest.mark.asyncio
     async def test_deduplicates_artists(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should not duplicate artists that appear in both synced and quiz."""
-        mock_firestore.query_documents.return_value = [
-            {"artist_name": "Queen", "source": "spotify", "rank": 1},
-        ]
-        mock_firestore.get_document.return_value = {
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
             "quiz_artists_known": ["queen"],  # Same artist, different case
         }
+        # First: user_artists query, second: _get_user_document query
+        mock_firestore.query_documents.side_effect = [
+            [{"artist_name": "Queen", "source": "spotify", "rank": 1}],
+            [user_doc],
+        ]
 
         result = await user_data_service.get_all_artists("user123")
 
@@ -222,12 +249,16 @@ class TestAddArtist:
     @pytest.mark.asyncio
     async def test_adds_artist(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should add artist to quiz_artists_known."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": ["Existing Artist", "New Artist"],
+        }
         mock_doc = MagicMock()
         mock_doc.update = AsyncMock()
         mock_firestore.collection.return_value.document.return_value = mock_doc
-        mock_firestore.get_document.return_value = {
-            "quiz_artists_known": ["Existing Artist", "New Artist"],
-        }
+        # First: _get_user_document, second: _get_user_document for return value
+        mock_firestore.query_documents.side_effect = [[user_doc], [user_doc]]
 
         result = await user_data_service.add_artist("user123", "New Artist")
 
@@ -243,13 +274,16 @@ class TestRemoveArtist:
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:
         """Should remove artist from quiz_artists_known."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": ["Artist to Remove", "Other Artist"],
+        }
         mock_doc = MagicMock()
         mock_doc.update = AsyncMock()
         mock_firestore.collection.return_value.document.return_value = mock_doc
-        mock_firestore.get_document.return_value = {
-            "quiz_artists_known": ["Artist to Remove", "Other Artist"],
-        }
-        mock_firestore.query_documents.return_value = []
+        # First: _get_user_document, second: user_artists query
+        mock_firestore.query_documents.side_effect = [[user_doc], []]
 
         result = await user_data_service.remove_artist("user123", "Artist to Remove")
 
@@ -261,12 +295,18 @@ class TestRemoveArtist:
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:
         """Should remove artist from user_artists collection."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": [],
+        }
         mock_doc = MagicMock()
         mock_doc.update = AsyncMock()
         mock_firestore.collection.return_value.document.return_value = mock_doc
-        mock_firestore.get_document.return_value = {"quiz_artists_known": []}
-        mock_firestore.query_documents.return_value = [
-            {"id": "artist_doc_id", "artist_name": "Synced Artist", "source": "spotify"},
+        # First: _get_user_document, second: user_artists query
+        mock_firestore.query_documents.side_effect = [
+            [user_doc],
+            [{"id": "artist_doc_id", "artist_name": "Synced Artist", "source": "spotify"}],
         ]
 
         result = await user_data_service.remove_artist("user123", "Synced Artist")
@@ -278,8 +318,13 @@ class TestRemoveArtist:
     @pytest.mark.asyncio
     async def test_returns_not_found(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should return success=False when artist not found."""
-        mock_firestore.get_document.return_value = {"quiz_artists_known": []}
-        mock_firestore.query_documents.return_value = []
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": [],
+        }
+        # First: _get_user_document, second: user_artists query
+        mock_firestore.query_documents.side_effect = [[user_doc], []]
 
         result = await user_data_service.remove_artist("user123", "Nonexistent Artist")
 

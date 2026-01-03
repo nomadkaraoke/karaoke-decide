@@ -57,8 +57,9 @@ class SyncService:
     LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
-    # Full scrobble history - fetches EVERY scrobble for complete coverage
-    LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching all scrobbles
+    # Full scrobble history - limit to avoid timeout for large libraries
+    LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
+    LASTFM_MAX_SCROBBLES = 50000  # Cap scrobbles to avoid timeout (5min Cloud Run limit)
 
     def __init__(
         self,
@@ -788,14 +789,19 @@ class SyncService:
         top_count = len(tracks)
         logger.info(f"Last.fm top tracks total: {top_count} unique tracks")
 
-        # Step 2: Fetch FULL scrobble history for complete coverage
+        # Step 2: Fetch scrobble history for coverage beyond top tracks
         if self.LASTFM_FULL_SCROBBLE_HISTORY:
-            logger.info("Fetching complete Last.fm scrobble history...")
+            logger.info(f"Fetching Last.fm scrobble history (max {self.LASTFM_MAX_SCROBBLES})...")
             scrobble_count = 0
             new_from_scrobbles = 0
 
             async for scrobble in self.lastfm.get_all_scrobbles(username):
                 scrobble_count += 1
+
+                # Stop if we've hit the limit to avoid timeout
+                if scrobble_count > self.LASTFM_MAX_SCROBBLES:
+                    logger.info(f"Last.fm scrobbles: reached limit of {self.LASTFM_MAX_SCROBBLES}")
+                    break
 
                 # Log progress every 10k scrobbles
                 if scrobble_count % 10000 == 0:
