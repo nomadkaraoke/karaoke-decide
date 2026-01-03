@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 
 interface BadgeProps {
-  variant?: "default" | "spotify" | "lastfm" | "quiz" | "success" | "warning" | "error";
+  variant?: "default" | "spotify" | "lastfm" | "quiz" | "success" | "warning" | "error" | "danger" | "primary" | "secondary";
   size?: "sm" | "md";
   children: ReactNode;
   className?: string;
@@ -23,6 +23,9 @@ export function Badge({
     success: "bg-green-500/20 text-green-400 border-green-500/30",
     warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
     error: "bg-red-500/20 text-red-400 border-red-500/30",
+    danger: "bg-red-500/20 text-red-400 border-red-500/30",
+    primary: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    secondary: "bg-white/10 text-white/60 border-white/20",
   };
 
   const sizeClasses = {

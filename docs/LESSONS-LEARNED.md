@@ -15,6 +15,56 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-03: Next.js Static Export Cannot Use Dynamic Route Segments
+
+**Context:** Building admin detail pages with URLs like `/admin/users/[id]` for a Next.js app using `output: export` (static export for GitHub Pages).
+
+**Lesson:** Next.js 16 with `output: export` requires `generateStaticParams()` to pre-generate ALL possible dynamic routes at build time. Even returning an empty array doesn't work - the build fails with "missing generateStaticParams()". This is a known limitation (see [GitHub Issue #79380](https://github.com/vercel/next.js/issues/79380)).
+
+**Recommendation:** Use query parameters for dynamic content in static exports:
+```tsx
+// Instead of: /admin/users/[id]/page.tsx
+// Use: /admin/users/detail/page.tsx with ?id=xxx
+
+// In detail/page.tsx:
+const searchParams = useSearchParams();
+const userId = searchParams.get("id");
+
+// Update links to use query params:
+<Link href={`/admin/users/detail?id=${user.id}`}>View</Link>
+```
+
+---
+
+### 2026-01-03: FastAPI dependency_overrides for Test Mocking
+
+**Context:** Testing admin routes that require authenticated admin users with mocked Firestore.
+
+**Lesson:** FastAPI's `app.dependency_overrides` is cleaner than patching module-level functions. The override pattern properly scopes mocks to each test and avoids import path issues.
+
+**Recommendation:**
+```python
+@pytest.fixture
+def admin_client(mock_firestore: MagicMock, admin_user: User):
+    from backend.api.deps import get_current_user, get_firestore
+    from backend.main import app
+
+    async def override_get_current_user():
+        return admin_user
+
+    async def override_get_firestore():
+        return mock_firestore
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_firestore] = override_get_firestore
+
+    yield TestClient(app)
+
+    app.dependency_overrides.clear()  # Clean up after test
+```
+
+---
+
 ### 2026-01-02: In-Memory Sorting for Complex Firestore Queries
 
 **Context:** Needed to sort user songs by multiple fields (playcount desc, rank asc, sync_count desc) for the "how well user knows" ranking.

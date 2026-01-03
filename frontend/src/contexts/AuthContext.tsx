@@ -15,6 +15,7 @@ interface User {
   email: string | null;
   display_name: string | null;
   is_guest: boolean;
+  is_admin: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +24,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isGuest: boolean;
   isVerified: boolean;
+  isAdmin: boolean;
   login: (token: string) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -107,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isGuest = user?.is_guest ?? false;
   const isVerified = !!user && !user.is_guest;
+  const isAdmin = user?.is_admin ?? false;
 
   return (
     <AuthContext.Provider
@@ -116,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isGuest,
         isVerified,
+        isAdmin,
         login,
         logout,
         checkAuth,
