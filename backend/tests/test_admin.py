@@ -241,7 +241,7 @@ class TestAdminUsersList:
         mock_admin_firestore_service.query_documents = AsyncMock(
             return_value=[
                 {
-                    "id": "user1",
+                    "user_id": "user1",
                     "email": "user1@example.com",
                     "display_name": "User One",
                     "is_guest": False,
@@ -252,7 +252,7 @@ class TestAdminUsersList:
                     "total_songs_known": 10,
                 },
                 {
-                    "id": "user2",
+                    "user_id": "user2",
                     "email": "user2@example.com",
                     "display_name": "User Two",
                     "is_guest": True,
@@ -327,7 +327,7 @@ class TestAdminUsersList:
         mock_admin_firestore_service.query_documents = AsyncMock(
             return_value=[
                 {
-                    "id": "user1",
+                    "user_id": "user1",
                     "email": "test@example.com",
                     "display_name": "Test User",
                     "is_guest": False,
@@ -338,7 +338,7 @@ class TestAdminUsersList:
                     "total_songs_known": 0,
                 },
                 {
-                    "id": "user2",
+                    "user_id": "user2",
                     "email": "other@example.com",
                     "display_name": "Other User",
                     "is_guest": False,
@@ -373,41 +373,59 @@ class TestAdminUserDetail:
         mock_admin_firestore_service: MagicMock,
     ) -> None:
         """Admin should be able to get user detail."""
-        mock_admin_firestore_service.get_document = AsyncMock(
-            return_value={
-                "id": "user123",
-                "email": "user@example.com",
-                "display_name": "Test User",
-                "is_guest": False,
-                "is_admin": False,
-                "created_at": datetime(2024, 1, 1, tzinfo=UTC),
+        user_doc = {
+            "user_id": "user_123",
+            "email": "user@example.com",
+            "display_name": "Test User",
+            "is_guest": False,
+            "is_admin": False,
+            "created_at": datetime(2024, 1, 1, tzinfo=UTC),
+            "last_sync_at": datetime(2024, 1, 10, tzinfo=UTC),
+            "quiz_completed_at": datetime(2024, 1, 5, tzinfo=UTC),
+            "total_songs_known": 50,
+        }
+        service_docs = [
+            {
+                "service_type": "spotify",
+                "service_username": "testuser",
+                "sync_status": "idle",
                 "last_sync_at": datetime(2024, 1, 10, tzinfo=UTC),
-                "quiz_completed_at": datetime(2024, 1, 5, tzinfo=UTC),
-                "total_songs_known": 50,
-            }
-        )
-        mock_admin_firestore_service.query_documents = AsyncMock(
-            return_value=[
-                {
-                    "service_type": "spotify",
-                    "service_username": "testuser",
-                    "sync_status": "idle",
-                    "last_sync_at": datetime(2024, 1, 10, tzinfo=UTC),
-                    "tracks_synced": 100,
-                    "sync_error": None,
-                },
-            ]
-        )
+                "tracks_synced": 100,
+                "sync_error": None,
+            },
+        ]
+        sync_job_docs: list[dict[str, Any]] = []
+
+        # For non-guest users, query_documents is called:
+        # 1. First to find user by user_id
+        # 2. Then for services
+        # 3. Then for sync_jobs
+        call_count = 0
+
+        async def query_side_effect(
+            collection: str, filters: list[Any] | None = None, **kwargs: Any
+        ) -> list[dict[str, Any]]:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:  # User lookup
+                return [user_doc]
+            elif collection == "music_services":
+                return service_docs
+            elif collection == "sync_jobs":
+                return sync_job_docs
+            return []
+
+        mock_admin_firestore_service.query_documents = AsyncMock(side_effect=query_side_effect)
         mock_admin_firestore_service.count_documents = AsyncMock(return_value=10)
 
         response = admin_client.get(
-            "/api/admin/users/user123",
+            "/api/admin/users/user_123",
             headers={"Authorization": "Bearer test-token"},
         )
         assert response.status_code == 200
 
         data = response.json()
-        assert data["id"] == "user123"
+        assert data["id"] == "user_123"
         assert data["email"] == "user@example.com"
         assert len(data["services"]) == 1
         assert data["services"][0]["service_type"] == "spotify"
@@ -419,10 +437,11 @@ class TestAdminUserDetail:
         mock_admin_firestore_service: MagicMock,
     ) -> None:
         """Should return 404 for non-existent user."""
-        mock_admin_firestore_service.get_document = AsyncMock(return_value=None)
+        # For non-guest users, query_documents returns empty list
+        mock_admin_firestore_service.query_documents = AsyncMock(return_value=[])
 
         response = admin_client.get(
-            "/api/admin/users/nonexistent",
+            "/api/admin/users/user_nonexistent",
             headers={"Authorization": "Bearer test-token"},
         )
         assert response.status_code == 404
@@ -460,8 +479,8 @@ class TestAdminSyncJobsList:
             },
         ]
         user_docs = [
-            {"id": "user1", "email": "user1@example.com"},
-            {"id": "user2", "email": "user2@example.com"},
+            {"user_id": "user1", "email": "user1@example.com"},
+            {"user_id": "user2", "email": "user2@example.com"},
         ]
 
         def query_side_effect(collection: str, filters: list[Any] | None = None, **kwargs: Any) -> list[dict[str, Any]]:
@@ -470,8 +489,8 @@ class TestAdminSyncJobsList:
             if collection == "users" and filters:
                 # Handle batch "in" query for user emails
                 for field, op, value in filters:
-                    if field == "id" and op == "in":
-                        return [d for d in user_docs if d["id"] in value]
+                    if field == "user_id" and op == "in":
+                        return [d for d in user_docs if d["user_id"] in value]
             return []
 
         mock_admin_firestore_service.query_documents = AsyncMock(side_effect=query_side_effect)

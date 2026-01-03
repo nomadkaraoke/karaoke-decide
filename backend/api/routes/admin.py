@@ -160,7 +160,7 @@ async def list_users(
     users = []
     for doc in user_docs:
         user_item = UserListItem(
-            id=doc.get("id", ""),
+            id=doc.get("user_id", ""),
             email=doc.get("email"),
             display_name=doc.get("display_name"),
             is_guest=doc.get("is_guest", False),
@@ -199,8 +199,18 @@ async def get_user_detail(
     firestore: FirestoreServiceDep,
 ) -> UserDetail:
     """Get detailed information about a specific user."""
-    # Get user document
-    user_doc = await firestore.get_document("users", user_id)
+    # Get user document - guest users use user_id as doc ID, regular users need query
+    if user_id.startswith("guest_"):
+        user_doc = await firestore.get_document("users", user_id)
+    else:
+        # Regular users: query by user_id field (doc ID is email hash)
+        user_docs = await firestore.query_documents(
+            "users",
+            filters=[("user_id", "==", user_id)],
+            limit=1,
+        )
+        user_doc = user_docs[0] if user_docs else None
+
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -249,7 +259,7 @@ async def get_user_detail(
     playlists_count = await firestore.count_documents("playlists", filters=[("user_id", "==", user_id)])
 
     return UserDetail(
-        id=user_doc.get("id", ""),
+        id=user_doc.get("user_id", ""),
         email=user_doc.get("email"),
         display_name=user_doc.get("display_name"),
         is_guest=user_doc.get("is_guest", False),
@@ -310,9 +320,9 @@ async def list_sync_jobs(
     for i in range(0, len(user_ids), 30):
         batch_ids = user_ids[i : i + 30]
         if batch_ids:
-            user_docs = await firestore.query_documents("users", filters=[("id", "in", batch_ids)])
+            user_docs = await firestore.query_documents("users", filters=[("user_id", "in", batch_ids)])
             for user_doc in user_docs:
-                user_emails[user_doc.get("id", "")] = user_doc.get("email")
+                user_emails[user_doc.get("user_id", "")] = user_doc.get("email")
 
     jobs = [
         SyncJobListItem(
