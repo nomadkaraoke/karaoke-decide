@@ -11,9 +11,9 @@ interface UserSong {
   artist: string;
   title: string;
   source: string;
-  sync_count?: number;  // Times seen during sync (legacy)
-  playcount?: number;   // Actual play count from Last.fm
-  rank?: number;        // Rank in user's top list
+  sync_count?: number;  // Times track appeared during sync (dedup counter)
+  playcount?: number;   // Actual play count from Last.fm (optional, may be null)
+  rank?: number;        // Position in user's top list (optional, may be null)
   is_saved: boolean;
   times_sung: number;
   spotify_popularity?: number;
