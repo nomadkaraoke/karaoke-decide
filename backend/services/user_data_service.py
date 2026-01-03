@@ -20,6 +20,32 @@ class UserDataService:
     def __init__(self, firestore: FirestoreService):
         self.firestore = firestore
 
+    async def _get_user_document(self, user_id: str) -> tuple[dict[str, Any] | None, str | None]:
+        """Find a user document by user_id.
+
+        For guest users, the document ID is the user_id itself.
+        For verified users, the document ID is the email hash, so we need to query.
+
+        Returns:
+            Tuple of (user_doc, doc_id) or (None, None) if not found
+        """
+        # Guest users: doc ID = user_id
+        if user_id.startswith("guest_"):
+            doc = await self.firestore.get_document("decide_users", user_id)
+            if doc:
+                return doc, user_id
+            return None, None
+
+        # Verified users: query by user_id field
+        docs = await self.firestore.query_documents(
+            collection="decide_users",
+            filters=[("user_id", "==", user_id)],
+            limit=1,
+        )
+        if docs:
+            return docs[0], docs[0].get("id")
+        return None, None
+
     async def get_data_summary(self, user_id: str) -> dict[str, Any]:
         """Get aggregated summary of user's data for My Data page.
 
@@ -30,7 +56,7 @@ class UserDataService:
         - Quiz completion status
         """
         # Get user profile for quiz preferences
-        user_doc = await self.firestore.get_document("users", user_id)
+        user_doc, _ = await self._get_user_document(user_id)
         user_data = user_doc or {}
 
         # Count artists by source
@@ -107,7 +133,7 @@ class UserDataService:
 
     async def get_preferences(self, user_id: str) -> dict[str, Any]:
         """Get user's quiz preferences."""
-        user_doc = await self.firestore.get_document("users", user_id)
+        user_doc, _ = await self._get_user_document(user_id)
         if not user_doc:
             return {
                 "decade_preference": None,
@@ -132,6 +158,9 @@ class UserDataService:
 
         Only updates fields that are explicitly provided (not None).
         """
+        # Find the user document to get the correct document ID
+        user_doc, doc_id = await self._get_user_document(user_id)
+
         update_data: dict[str, Any] = {
             "updated_at": datetime.now(UTC).isoformat(),
         }
@@ -145,7 +174,14 @@ class UserDataService:
         if genres is not None:
             update_data["quiz_genres_pref"] = genres
 
-        await self.firestore.update_document("users", user_id, update_data)
+        if doc_id:
+            # Update existing user document
+            await self.firestore.update_document("decide_users", doc_id, update_data)
+        else:
+            # User document doesn't exist - create it with set+merge
+            # This handles edge cases where user exists in JWT but not in Firestore
+            update_data["user_id"] = user_id
+            await self.firestore.set_document("decide_users", user_id, update_data, merge=True)
 
         return await self.get_preferences(user_id)
 
@@ -177,7 +213,7 @@ class UserDataService:
             )
 
         # Get quiz/manual artists from user profile
-        user_doc = await self.firestore.get_document("users", user_id)
+        user_doc, _ = await self._get_user_document(user_id)
         if user_doc:
             quiz_artists = user_doc.get("quiz_artists_known", [])
             for idx, artist_name in enumerate(quiz_artists):
@@ -195,6 +231,17 @@ class UserDataService:
                         }
                     )
 
+        # Sort by "how well user knows the artist":
+        # 1. playcount (actual plays from Last.fm) - higher is better
+        # 2. rank (position in top list) - lower is better
+        # 3. source priority (lastfm > spotify > quiz)
+        def sort_key(a: dict) -> tuple[int, int, int]:
+            playcount = a.get("playcount") or 0
+            rank = a.get("rank") or 9999
+            source_order = {"lastfm": 0, "spotify": 1, "quiz": 2}.get(a.get("source", "quiz"), 3)
+            return (-playcount, rank, source_order)
+
+        artists.sort(key=sort_key)
         return artists
 
     async def add_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
@@ -205,20 +252,36 @@ class UserDataService:
         Returns:
             Updated list of quiz/manual artists
         """
-        # Use ArrayUnion to add without duplicates
-        await (
-            self.firestore.collection("users")
-            .document(user_id)
-            .update(
-                {
-                    "quiz_artists_known": ArrayUnion([artist_name]),
-                    "updated_at": datetime.now(UTC).isoformat(),
-                }
+        # Find the user document to get the correct document ID
+        user_doc, doc_id = await self._get_user_document(user_id)
+
+        if doc_id:
+            # Use ArrayUnion to add without duplicates
+            await (
+                self.firestore.collection("decide_users")
+                .document(doc_id)
+                .update(
+                    {
+                        "quiz_artists_known": ArrayUnion([artist_name]),
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    }
+                )
             )
-        )
+        else:
+            # Create user document if it doesn't exist
+            await self.firestore.set_document(
+                "decide_users",
+                user_id,
+                {
+                    "user_id": user_id,
+                    "quiz_artists_known": [artist_name],
+                    "updated_at": datetime.now(UTC).isoformat(),
+                },
+                merge=True,
+            )
 
         # Return updated artist list
-        user_doc = await self.firestore.get_document("users", user_id)
+        user_doc, _ = await self._get_user_document(user_id)
         return {
             "artists": user_doc.get("quiz_artists_known", []) if user_doc else [],
             "added": artist_name,
@@ -233,16 +296,18 @@ class UserDataService:
         """
         removed_from: list[str] = []
 
+        # Find the user document to get the correct document ID
+        user_doc, doc_id = await self._get_user_document(user_id)
+
         # Remove from quiz_artists_known (case-insensitive)
-        user_doc = await self.firestore.get_document("users", user_id)
-        if user_doc:
+        if user_doc and doc_id:
             quiz_artists = user_doc.get("quiz_artists_known", [])
             # Find matching artist (case-insensitive)
             matching = [a for a in quiz_artists if a.lower() == artist_name.lower()]
             if matching:
                 await (
-                    self.firestore.collection("users")
-                    .document(user_id)
+                    self.firestore.collection("decide_users")
+                    .document(doc_id)
                     .update(
                         {
                             "quiz_artists_known": ArrayRemove(matching),

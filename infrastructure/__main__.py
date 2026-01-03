@@ -7,9 +7,11 @@ Resources managed:
 - Artifact Registry repository (container images)
 - Cloud Run service (backend API)
 - IAM bindings (service account permissions)
+- Cloudflare Worker (API proxy)
 """
 
 import pulumi
+import pulumi_cloudflare as cloudflare
 import pulumi_gcp as gcp
 
 # Configuration
@@ -176,6 +178,60 @@ service_account_user = gcp.serviceaccount.IAMMember(
 # Firestore Indexes
 # =============================================================================
 
+# Composite index for sync_jobs filtering by status and created_at
+# Required by: GET /api/admin/stats (filtering sync jobs by status within time window)
+sync_jobs_status_index = gcp.firestore.Index(
+    "sync-jobs-status-created-index",
+    project=project,
+    database="(default)",
+    collection="sync_jobs",
+    fields=[
+        {"field_path": "status", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "ASCENDING"},
+    ],
+)
+
+# Composite index for decide_users filtering by is_guest and ordering by created_at
+# Required by: GET /api/admin/users (filtering verified/guest users with pagination)
+decide_users_is_guest_index = gcp.firestore.Index(
+    "decide-users-is-guest-created-index",
+    project=project,
+    database="(default)",
+    collection="decide_users",
+    fields=[
+        {"field_path": "is_guest", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "DESCENDING"},
+    ],
+)
+
+# Composite index for decide_users filtering by user_id
+# Required by: GET /api/admin/users (listing all users with pagination)
+# Note: decide_users is karaoke-decide's dedicated collection (separate from karaoke-gen's gen_users)
+# Index #1: user_id ASC, created_at DESC - for user lookups with ordering
+decide_users_user_id_index = gcp.firestore.Index(
+    "decide-users-user-id-created-index",
+    project=project,
+    database="(default)",
+    collection="decide_users",
+    fields=[
+        {"field_path": "user_id", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "DESCENDING"},
+    ],
+)
+
+# Index #2: created_at DESC, user_id DESC - for pagination ordering
+decide_users_created_user_id_index = gcp.firestore.Index(
+    "decide-users-created-user-id-index",
+    project=project,
+    database="(default)",
+    collection="decide_users",
+    fields=[
+        {"field_path": "created_at", "order": "DESCENDING"},
+        {"field_path": "user_id", "order": "DESCENDING"},
+    ],
+)
+
+
 # NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
 # It was created manually/automatically and is required by GET /api/services/sync/status
 # Not managed by Pulumi to avoid conflicts with existing index
@@ -278,7 +334,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
             "max_instance_count": 10,
         },
         "max_instance_request_concurrency": 80,
-        "timeout": "300s",
+        "timeout": "1800s",  # 30 minutes for large Last.fm sync operations
         "service_account": f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
     },
     traffics=[
@@ -288,7 +344,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
         }
     ],
     scaling={
-        "min_instance_count": 0,
+        "min_instance_count": 1,  # Keep one instance warm to avoid cold starts
     },
     opts=pulumi.ResourceOptions(protect=True),
 )
@@ -325,6 +381,112 @@ for secret_name in REQUIRED_SECRETS:
         secret_id=secret_name,
         role="roles/secretmanager.secretAccessor",
         member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    )
+
+# =============================================================================
+# Cloudflare Worker (API Proxy)
+# =============================================================================
+# Proxies /api/* requests from decide.nomadkaraoke.com to Cloud Run backend.
+# This eliminates CORS issues by keeping everything same-origin.
+#
+# Required config:
+#   pulumi config set cloudflare:apiToken <token> --secret
+#   pulumi config set cloudflareAccountId <account_id>
+#   pulumi config set cloudflareZoneId <zone_id>
+
+cloudflare_account_id = config.get("cloudflareAccountId") or ""
+cloudflare_zone_id = config.get("cloudflareZoneId") or ""
+
+# Worker script content
+API_PROXY_WORKER_SCRIPT = """
+const DEFAULT_BACKEND_URL = "https://karaoke-decide-718638054799.us-central1.run.app";
+
+export default {
+  async fetch(request, env, ctx) {
+    const backendBaseUrl = env.BACKEND_URL || DEFAULT_BACKEND_URL;
+    const url = new URL(request.url);
+
+    // Only proxy /api/* requests
+    if (!url.pathname.startsWith("/api")) {
+      // Pass through to origin (GitHub Pages)
+      return fetch(request);
+    }
+
+    // Build the backend URL
+    const backendUrl = new URL(url.pathname + url.search, backendBaseUrl);
+
+    // Clone headers, removing Cloudflare-specific ones
+    const headers = new Headers(request.headers);
+    headers.delete("cf-connecting-ip");
+    headers.delete("cf-ipcountry");
+    headers.delete("cf-ray");
+    headers.delete("cf-visitor");
+
+    // Forward the request to Cloud Run
+    const backendRequest = new Request(backendUrl.toString(), {
+      method: request.method,
+      headers: headers,
+      body: request.body,
+      redirect: "follow",
+    });
+
+    try {
+      const response = await fetch(backendRequest);
+
+      // Clone response and remove CORS headers (not needed for same-origin)
+      const newHeaders = new Headers(response.headers);
+      newHeaders.delete("access-control-allow-origin");
+      newHeaders.delete("access-control-allow-credentials");
+      newHeaders.delete("access-control-allow-methods");
+      newHeaders.delete("access-control-allow-headers");
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+      });
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error: "Backend unavailable",
+          message: error.message,
+        }),
+        {
+          status: 502,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  },
+};
+"""
+
+# Only create Cloudflare resources if account and zone IDs are configured
+if cloudflare_account_id and cloudflare_zone_id:
+    # API proxy Worker script
+    api_proxy_worker = cloudflare.WorkersScript(
+        "api-proxy-worker",
+        account_id=cloudflare_account_id,
+        script_name="karaoke-decide-api-proxy",
+        content=API_PROXY_WORKER_SCRIPT,
+        main_module="worker.js",
+        compatibility_date="2024-01-01",
+    )
+
+    # Route to trigger Worker for /api/* requests
+    api_proxy_route = cloudflare.WorkersRoute(
+        "api-proxy-route",
+        zone_id=cloudflare_zone_id,
+        pattern="decide.nomadkaraoke.com/api/*",
+        script=api_proxy_worker.script_name,
+    )
+
+    pulumi.export("cloudflare_worker_name", api_proxy_worker.script_name)
+    pulumi.export("cloudflare_route_pattern", api_proxy_route.pattern)
+else:
+    pulumi.log.warn(
+        "Cloudflare config not set. Skipping Worker creation. "
+        "Set cloudflareAccountId and cloudflareZoneId to enable."
     )
 
 # =============================================================================

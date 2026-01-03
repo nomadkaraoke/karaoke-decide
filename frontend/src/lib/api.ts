@@ -173,6 +173,7 @@ export const api = {
         email: string | null;
         display_name: string | null;
         is_guest: boolean;
+        is_admin: boolean;
       }>("/api/auth/me"),
 
     updateProfile: (data: { display_name?: string | null }) =>
@@ -688,5 +689,192 @@ export const api = {
 
     removeSong: (playlistId: string, songId: string) =>
       api.delete<Record<string, never>>(`/api/playlists/${playlistId}/songs/${songId}`),
+  },
+
+  // ============================================================================
+  // Known Songs endpoints
+  // ============================================================================
+
+  knownSongs: {
+    list: (page: number = 1, perPage: number = 20) =>
+      api.get<{
+        songs: Array<{
+          id: string;
+          song_id: string;
+          artist: string;
+          title: string;
+          source: string;
+          is_saved: boolean;
+          created_at: string;
+          updated_at: string;
+        }>;
+        total: number;
+        page: number;
+        per_page: number;
+      }>(`/api/known-songs?page=${page}&per_page=${perPage}`),
+
+    add: (songId: number) =>
+      api.post<{
+        added: boolean;
+        song_id: string;
+        artist: string;
+        title: string;
+        already_existed: boolean;
+      }>("/api/known-songs", { song_id: songId }),
+
+    bulkAdd: (songIds: number[]) =>
+      api.post<{
+        added: number;
+        already_existed: number;
+        not_found: number;
+        total_requested: number;
+      }>("/api/known-songs/bulk", { song_ids: songIds }),
+
+    remove: (songId: number) =>
+      api.delete<Record<string, never>>(`/api/known-songs/${songId}`),
+  },
+
+  // ============================================================================
+  // Admin endpoints
+  // ============================================================================
+
+  admin: {
+    getStats: () =>
+      api.get<{
+        users: {
+          total: number;
+          verified: number;
+          guests: number;
+          active_7d: number;
+        };
+        sync_jobs: {
+          total: number;
+          pending: number;
+          in_progress: number;
+          completed: number;
+          failed: number;
+        };
+        services: {
+          spotify_connected: number;
+          lastfm_connected: number;
+        };
+      }>("/api/admin/stats"),
+
+    listUsers: (params?: {
+      limit?: number;
+      offset?: number;
+      filter?: "all" | "verified" | "guests";
+      search?: string;
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.append("limit", params.limit.toString());
+      if (params?.offset) searchParams.append("offset", params.offset.toString());
+      if (params?.filter) searchParams.append("filter", params.filter);
+      if (params?.search) searchParams.append("search", params.search);
+      const queryString = searchParams.toString();
+      return api.get<{
+        users: Array<{
+          id: string;
+          email: string | null;
+          display_name: string | null;
+          is_guest: boolean;
+          is_admin: boolean;
+          created_at: string;
+          last_sync_at: string | null;
+          quiz_completed_at: string | null;
+          total_songs_known: number;
+        }>;
+        total: number;
+        limit: number;
+        offset: number;
+      }>(queryString ? `/api/admin/users?${queryString}` : "/api/admin/users");
+    },
+
+    getUser: (userId: string) =>
+      api.get<{
+        id: string;
+        email: string | null;
+        display_name: string | null;
+        is_guest: boolean;
+        is_admin: boolean;
+        created_at: string;
+        last_sync_at: string | null;
+        quiz_completed_at: string | null;
+        total_songs_known: number;
+        services: Array<{
+          service_type: string;
+          service_username: string;
+          sync_status: string;
+          last_sync_at: string | null;
+          tracks_synced: number;
+          sync_error: string | null;
+        }>;
+        sync_jobs: Array<{
+          id: string;
+          status: string;
+          created_at: string;
+          completed_at: string | null;
+          error: string | null;
+        }>;
+        data_summary: {
+          artists_count: number;
+          songs_count: number;
+          playlists_count: number;
+        };
+      }>(`/api/admin/users/${userId}`),
+
+    listSyncJobs: (params?: {
+      limit?: number;
+      offset?: number;
+      status?: "all" | "pending" | "in_progress" | "completed" | "failed";
+    }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.append("limit", params.limit.toString());
+      if (params?.offset) searchParams.append("offset", params.offset.toString());
+      if (params?.status) searchParams.append("status", params.status);
+      const queryString = searchParams.toString();
+      return api.get<{
+        jobs: Array<{
+          id: string;
+          user_id: string;
+          user_email: string | null;
+          status: string;
+          created_at: string;
+          completed_at: string | null;
+          error: string | null;
+        }>;
+        total: number;
+        limit: number;
+        offset: number;
+      }>(queryString ? `/api/admin/sync-jobs?${queryString}` : "/api/admin/sync-jobs");
+    },
+
+    getSyncJob: (jobId: string) =>
+      api.get<{
+        id: string;
+        user_id: string;
+        user_email: string | null;
+        status: string;
+        created_at: string;
+        completed_at: string | null;
+        error: string | null;
+        progress: {
+          current_service: string | null;
+          current_phase: string | null;
+          total_tracks: number;
+          processed_tracks: number;
+          matched_tracks: number;
+          percentage: number;
+        } | null;
+        results: Array<{
+          service_type: string;
+          tracks_fetched: number;
+          tracks_matched: number;
+          user_songs_created: number;
+          user_songs_updated: number;
+          artists_stored: number;
+          error: string | null;
+        }>;
+      }>(`/api/admin/sync-jobs/${jobId}`),
   },
 };

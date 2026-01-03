@@ -215,28 +215,53 @@ For comprehensive production testing with automated email login:
 ```bash
 cd frontend
 
-# Run with Mailslurp (creates temporary test accounts)
-MAILSLURP_API_KEY=<key> npx playwright test e2e/production-comprehensive.spec.ts
+# Run with TestMail.app (uses unique tag-based email addresses)
+TESTMAIL_API_KEY=<key> TESTMAIL_NAMESPACE=<ns> npx playwright test e2e/production-comprehensive.spec.ts
 
 # Run with pre-authenticated token for service-related tests
 # (Use andrew@beveridge.uk account which has Spotify/Last.fm connected)
-MAILSLURP_API_KEY=<key> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts
+TESTMAIL_API_KEY=<key> TESTMAIL_NAMESPACE=<ns> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts
 
-# Run only authenticated tests (faster, no Mailslurp needed)
+# Run only authenticated tests (faster, no TestMail needed)
 PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts --grep "Authenticated"
 ```
 
-To get a PROD_TEST_TOKEN:
+#### Generating PROD_TEST_TOKEN
+
+**Option 1: Use the automated script (recommended for CI/agents)**
+
+```bash
+# Install dependencies (if not already installed)
+pip install google-cloud-firestore google-cloud-secret-manager python-jose
+
+# Generate token for default test user (andrew@beveridge.uk)
+python scripts/get_prod_test_token.py
+
+# Generate token for a specific user
+python scripts/get_prod_test_token.py --email user@example.com
+
+# Use directly with tests
+PROD_TEST_TOKEN=$(python scripts/get_prod_test_token.py) npx playwright test e2e/production-comprehensive.spec.ts --grep "Authenticated"
+```
+
+Prerequisites for the script:
+- `gcloud auth application-default login` (authenticated with access to nomadkaraoke project)
+- Access to Secret Manager secrets (JWT_SECRET)
+
+**Option 2: Manual extraction from browser**
+
 1. Login to https://decide.nomadkaraoke.com
 2. Open browser DevTools → Application → Local Storage
 3. Copy the `karaoke_decide_token` value
 
 The comprehensive tests cover:
-- Magic link authentication flow (via Mailslurp)
+- Magic link authentication flow (via TestMail.app)
 - Search and catalog browsing
 - Services page and sync functionality
 - My Songs, Recommendations, Playlists pages
 - Quiz functionality
+- **Known Songs page** (search, add songs)
+- **My Data page** (preferences)
 - API health endpoints
 - Error handling
 

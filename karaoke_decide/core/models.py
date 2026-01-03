@@ -13,6 +13,7 @@ class User(BaseModel):
     email: str | None = None  # None for guest users
     display_name: str | None = None
     is_guest: bool = False  # True for anonymous/guest users
+    is_admin: bool = False  # True for admin users
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -90,10 +91,12 @@ class UserSong(BaseModel):
     song_id: str
 
     # Source tracking
-    source: Literal["spotify", "lastfm", "quiz"] = "spotify"
+    source: Literal["spotify", "lastfm", "quiz", "known_songs"] = "spotify"
 
     # From listening history
-    play_count: int = 0
+    play_count: int = 0  # Legacy: sync count (times seen during sync)
+    playcount: int | None = None  # Actual play count from Last.fm
+    rank: int | None = None  # Rank in user's top list
     last_played_at: datetime | None = None
     is_saved: bool = False
 

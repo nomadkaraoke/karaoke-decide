@@ -8,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
 from backend.services.quiz_service import QuizService, get_quiz_service
@@ -119,6 +120,22 @@ async def get_verified_user(
     return user
 
 
+async def get_admin_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Get the current user only if they are an admin.
+
+    Raises:
+        HTTPException: If user is not an admin.
+    """
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
 async def get_music_service_service_dep(
     settings: Annotated[BackendSettings, Depends(get_settings)],
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
@@ -160,6 +177,14 @@ async def get_playlist_service_dep(
     return get_playlist_service(settings, firestore)
 
 
+async def get_known_songs_service_dep(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> KnownSongsService:
+    """Get known songs service instance."""
+    return get_known_songs_service(settings, firestore)
+
+
 async def get_user_data_service_dep(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
 ) -> UserDataService:
@@ -170,6 +195,7 @@ async def get_user_data_service_dep(
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
+AdminUser = Annotated[User, Depends(get_admin_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]
@@ -179,4 +205,5 @@ SyncServiceDep = Annotated[SyncService, Depends(get_sync_service_dep)]
 QuizServiceDep = Annotated[QuizService, Depends(get_quiz_service_dep)]
 RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommendation_service_dep)]
 PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service_dep)]
+KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_service_dep)]
 UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]

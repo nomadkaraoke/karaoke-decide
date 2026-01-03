@@ -1,6 +1,8 @@
 """Tests for sync service."""
 
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -42,6 +44,14 @@ def mock_music_service_service() -> MagicMock:
     mock.get_user_services = AsyncMock(return_value=[])
     mock.get_valid_spotify_token = AsyncMock(return_value="valid-token")
     mock.update_sync_status = AsyncMock(return_value=None)
+    mock.get_scrobble_progress = AsyncMock(
+        return_value={
+            "oldest_scrobble_timestamp": None,
+            "scrobble_history_complete": False,
+            "scrobbles_processed": 0,
+        }
+    )
+    mock.update_scrobble_progress = AsyncMock(return_value=None)
     return mock
 
 
@@ -100,11 +110,25 @@ def mock_lastfm_client() -> MagicMock:
         return_value={
             "toptracks": {
                 "track": [
-                    {"name": "Song 1", "artist": {"name": "Artist 1"}},
-                    {"name": "Song 2", "artist": {"name": "Artist 2"}},
+                    {"name": "Song 1", "artist": {"name": "Artist 1"}, "playcount": "100"},
+                    {"name": "Song 2", "artist": {"name": "Artist 2"}, "playcount": "50"},
                 ]
             }
         }
+    )
+    # New method for fetching all top tracks with play counts and pagination
+    mock.get_all_top_tracks = AsyncMock(
+        return_value=[
+            {"name": "Song 1", "artist": {"name": "Artist 1"}, "playcount": "100", "rank": 1},
+            {"name": "Song 2", "artist": {"name": "Artist 2"}, "playcount": "50", "rank": 2},
+        ]
+    )
+    # New method for fetching all top artists with play counts and pagination
+    mock.get_all_top_artists = AsyncMock(
+        return_value=[
+            {"name": "Artist 1", "playcount": "500", "rank": 1},
+            {"name": "Artist 2", "playcount": "300", "rank": 2},
+        ]
     )
     mock.get_loved_tracks = AsyncMock(
         return_value={
@@ -124,6 +148,19 @@ def mock_lastfm_client() -> MagicMock:
             }
         }
     )
+
+    # Mock for full scrobble history - async generator
+    async def mock_scrobbles(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
+        """Mock async generator for get_all_scrobbles."""
+        scrobbles = [
+            {"name": "Scrobble Song 1", "artist": {"name": "Scrobble Artist 1"}},
+            {"name": "Scrobble Song 2", "artist": {"name": "Scrobble Artist 2"}},
+            {"name": "Song 1", "artist": {"name": "Artist 1"}},  # Duplicate of top track
+        ]
+        for scrobble in scrobbles:
+            yield scrobble
+
+    mock.get_all_scrobbles = mock_scrobbles
     return mock
 
 
@@ -349,13 +386,15 @@ class TestSyncLastFm:
         self,
         sync_service: SyncService,
         mock_music_service_service: MagicMock,
+        mock_lastfm_client: MagicMock,
         sample_lastfm_service: MusicService,
     ) -> None:
         """Successful Last.fm sync returns counts."""
         result = await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
         assert result.service_type == "lastfm"
-        assert result.tracks_fetched > 0
+        # With the new incremental approach, tracks come from top tracks
+        mock_lastfm_client.get_all_top_tracks.assert_called()
         assert result.error is None
 
     @pytest.mark.asyncio
@@ -363,10 +402,12 @@ class TestSyncLastFm:
         self,
         sync_service: SyncService,
         mock_lastfm_client: MagicMock,
+        mock_music_service_service: MagicMock,
         sample_lastfm_service: MusicService,
     ) -> None:
         """Handles Last.fm API errors gracefully."""
-        mock_lastfm_client.get_top_tracks = AsyncMock(side_effect=ExternalServiceError("Last.fm", "User not found"))
+        # Now uses get_all_top_tracks for paginated fetching
+        mock_lastfm_client.get_all_top_tracks = AsyncMock(side_effect=ExternalServiceError("Last.fm", "User not found"))
 
         result = await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
@@ -435,41 +476,63 @@ class TestFetchSpotifyTracks:
         assert len(same_songs) == 1
 
 
-class TestFetchLastFmTracks:
-    """Tests for _fetch_lastfm_tracks method."""
+class TestSyncLastFmIncremental:
+    """Tests for incremental Last.fm sync methods."""
 
     @pytest.mark.asyncio
-    async def test_fetches_top_tracks(self, sync_service: SyncService, mock_lastfm_client: MagicMock) -> None:
-        """Fetches top tracks from Last.fm."""
-        tracks = await sync_service._fetch_lastfm_tracks("testuser")
+    async def test_sync_saves_top_tracks(
+        self,
+        sync_service: SyncService,
+        mock_lastfm_client: MagicMock,
+        mock_music_service_service: MagicMock,
+        sample_lastfm_service: MusicService,
+    ) -> None:
+        """Top tracks are fetched and saved via get_all_top_tracks."""
+        result = await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
-        mock_lastfm_client.get_top_tracks.assert_called()
-        assert any(t["title"] == "Song 1" for t in tracks)
+        mock_lastfm_client.get_all_top_tracks.assert_called()
+        assert result.service_type == "lastfm"
 
     @pytest.mark.asyncio
-    async def test_fetches_loved_tracks(self, sync_service: SyncService, mock_lastfm_client: MagicMock) -> None:
-        """Fetches loved tracks from Last.fm."""
-        tracks = await sync_service._fetch_lastfm_tracks("testuser")
+    async def test_sync_fetches_loved_tracks(
+        self,
+        sync_service: SyncService,
+        mock_lastfm_client: MagicMock,
+        mock_music_service_service: MagicMock,
+        sample_lastfm_service: MusicService,
+    ) -> None:
+        """Loved tracks are fetched as part of sync."""
+        await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
         mock_lastfm_client.get_loved_tracks.assert_called()
-        assert any(t["title"] == "Loved Song" for t in tracks)
 
     @pytest.mark.asyncio
-    async def test_fetches_recent_tracks(self, sync_service: SyncService, mock_lastfm_client: MagicMock) -> None:
-        """Fetches recent tracks from Last.fm."""
-        tracks = await sync_service._fetch_lastfm_tracks("testuser")
+    async def test_sync_checks_scrobble_progress(
+        self,
+        sync_service: SyncService,
+        mock_lastfm_client: MagicMock,
+        mock_music_service_service: MagicMock,
+        sample_lastfm_service: MusicService,
+    ) -> None:
+        """Sync checks for existing scrobble progress to support resume."""
+        await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
-        mock_lastfm_client.get_recent_tracks.assert_called()
-        assert any(t["title"] == "Recent Song" for t in tracks)
+        mock_music_service_service.get_scrobble_progress.assert_called_with("user_123", "lastfm")
 
     @pytest.mark.asyncio
-    async def test_handles_artist_text_format(self, sync_service: SyncService, mock_lastfm_client: MagicMock) -> None:
-        """Handles Last.fm #text artist format."""
-        # Last.fm sometimes returns artist as {"#text": "Artist Name"}
-        tracks = await sync_service._fetch_lastfm_tracks("testuser")
+    async def test_sync_marks_history_complete(
+        self,
+        sync_service: SyncService,
+        mock_lastfm_client: MagicMock,
+        mock_music_service_service: MagicMock,
+        sample_lastfm_service: MusicService,
+    ) -> None:
+        """Sync marks history as complete when finished."""
+        await sync_service.sync_lastfm("user_123", sample_lastfm_service)
 
-        # Recent tracks use #text format in our mock
-        assert any(t["artist"] == "Recent Artist" for t in tracks)
+        # Should call update_scrobble_progress with history_complete=True
+        calls = mock_music_service_service.update_scrobble_progress.call_args_list
+        assert any(call.kwargs.get("scrobble_history_complete") is True for call in calls)
 
 
 class TestExtractTrackInfo:
@@ -510,7 +573,7 @@ class TestExtractTrackInfo:
         assert sync_service._extract_spotify_track_info({"name": ""}) is None
 
     def test_extract_lastfm_track_basic(self, sync_service: SyncService) -> None:
-        """Extracts basic Last.fm track info."""
+        """Extracts basic Last.fm track info including playcount and rank."""
         track = {
             "name": "Test Song",
             "artist": {"name": "Test Artist"},
@@ -518,7 +581,27 @@ class TestExtractTrackInfo:
 
         result = sync_service._extract_lastfm_track_info(track)
 
-        assert result == {"artist": "Test Artist", "title": "Test Song"}
+        assert result is not None
+        assert result["artist"] == "Test Artist"
+        assert result["title"] == "Test Song"
+        # Default values for playcount and rank when not provided
+        assert result["playcount"] is None
+        assert result["rank"] is None
+
+    def test_extract_lastfm_track_with_playcount(self, sync_service: SyncService) -> None:
+        """Extracts Last.fm track info with playcount."""
+        track = {
+            "name": "Test Song",
+            "artist": {"name": "Test Artist"},
+            "playcount": "150",
+            "rank": 5,
+        }
+
+        result = sync_service._extract_lastfm_track_info(track)
+
+        assert result is not None
+        assert result["playcount"] == 150
+        assert result["rank"] == 5
 
     def test_extract_lastfm_track_text_format(self, sync_service: SyncService) -> None:
         """Handles Last.fm #text artist format."""
@@ -570,13 +653,13 @@ class TestUpsertUserSongs:
 
     @pytest.mark.asyncio
     async def test_updates_existing_user_songs(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
-        """Updates play count for existing UserSong."""
+        """Updates sync_count for existing UserSong."""
         mock_firestore.get_document = AsyncMock(
             return_value={
                 "id": "user_123:song_123",
                 "user_id": "user_123",
                 "song_id": "song_123",
-                "play_count": 5,
+                "sync_count": 5,  # Now called sync_count instead of play_count
             }
         )
 
@@ -601,9 +684,9 @@ class TestUpsertUserSongs:
         assert created == 0
         assert updated == 1
 
-        # Check play count was incremented
+        # Check sync_count was incremented
         call_args = mock_firestore.update_document.call_args
-        assert call_args[0][2]["play_count"] == 6
+        assert call_args[0][2]["sync_count"] == 6
 
     @pytest.mark.asyncio
     async def test_stores_unmatched_tracks_for_generate_feature(

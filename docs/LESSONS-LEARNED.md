@@ -15,6 +15,90 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-03: Next.js Static Export Cannot Use Dynamic Route Segments
+
+**Context:** Building admin detail pages with URLs like `/admin/users/[id]` for a Next.js app using `output: export` (static export for GitHub Pages).
+
+**Lesson:** Next.js 16 with `output: export` requires `generateStaticParams()` to pre-generate ALL possible dynamic routes at build time. Even returning an empty array doesn't work - the build fails with "missing generateStaticParams()". This is a known limitation (see [GitHub Issue #79380](https://github.com/vercel/next.js/issues/79380)).
+
+**Recommendation:** Use query parameters for dynamic content in static exports:
+```tsx
+// Instead of: /admin/users/[id]/page.tsx
+// Use: /admin/users/detail/page.tsx with ?id=xxx
+
+// In detail/page.tsx:
+const searchParams = useSearchParams();
+const userId = searchParams.get("id");
+
+// Update links to use query params:
+<Link href={`/admin/users/detail?id=${user.id}`}>View</Link>
+```
+
+---
+
+### 2026-01-03: FastAPI dependency_overrides for Test Mocking
+
+**Context:** Testing admin routes that require authenticated admin users with mocked Firestore.
+
+**Lesson:** FastAPI's `app.dependency_overrides` is cleaner than patching module-level functions. The override pattern properly scopes mocks to each test and avoids import path issues.
+
+**Recommendation:**
+```python
+@pytest.fixture
+def admin_client(mock_firestore: MagicMock, admin_user: User):
+    from backend.api.deps import get_current_user, get_firestore
+    from backend.main import app
+
+    async def override_get_current_user():
+        return admin_user
+
+    async def override_get_firestore():
+        return mock_firestore
+
+    app.dependency_overrides[get_current_user] = override_get_current_user
+    app.dependency_overrides[get_firestore] = override_get_firestore
+
+    yield TestClient(app)
+
+    app.dependency_overrides.clear()  # Clean up after test
+```
+
+---
+
+### 2026-01-02: In-Memory Sorting for Complex Firestore Queries
+
+**Context:** Needed to sort user songs by multiple fields (playcount desc, rank asc, sync_count desc) for the "how well user knows" ranking.
+
+**Lesson:** Firestore doesn't support complex multi-field sorting in queries. For user libraries (typically <1000 items), in-memory sorting after fetching is simpler and performant enough.
+
+**Recommendation:** For user-scoped data with reasonable limits:
+```python
+# Fetch more than needed for pagination
+docs = await firestore.query_documents(collection, filters=[...], limit=1000)
+
+# Sort in memory with custom key function
+def sort_key(doc):
+    return (-doc.get("playcount", 0), doc.get("rank", 9999))
+
+sorted_docs = sorted(docs, key=sort_key)
+paginated = sorted_docs[offset:offset+limit]
+```
+
+---
+
+### 2026-01-02: Distinguish Sync Count from Actual Play Count
+
+**Context:** The `play_count` field was misleadingly storing "times seen during sync" not actual plays.
+
+**Lesson:** Be explicit about what counts mean. "play_count" sounds like actual plays, but was really just how many times we saw the track during sync operations.
+
+**Recommendation:** Use clear field names:
+- `sync_count` - Times track appeared during sync (dedup counter)
+- `playcount` - Actual play count from Last.fm
+- `rank` - Position in user's top list from streaming service
+
+---
+
 ### 2026-01-02: Mock google.cloud Before Imports in conftest.py
 
 **Context:** Adding new API routes that triggered imports of modules using `google.cloud.tasks_v2`, which isn't available in the test environment.
@@ -554,7 +638,7 @@ gcloud secrets add-iam-policy-binding SECRET_NAME \
 
 ### 2025-12-31: Never Hardcode API Keys in Test Files
 
-**Context:** E2E test file committed with hardcoded Mailslurp API key.
+**Context:** E2E test file committed with hardcoded API key.
 
 **Lesson:** API keys in source code are a security risk and can be scraped by bots. Always use environment variables for secrets, even in test files.
 
@@ -564,7 +648,7 @@ gcloud secrets add-iam-policy-binding SECRET_NAME \
 const API_KEY = "sk_actual_key_value";
 
 // GOOD - read from environment
-const API_KEY = process.env.MAILSLURP_API_KEY || "";
+const API_KEY = process.env.TESTMAIL_API_KEY || "";
 ```
 
 ---
@@ -924,3 +1008,57 @@ This data enables future features like:
 3. If data enables potential future features, extract it
 4. The cost of extraction (few hours VM time) is trivial vs. re-acquisition later
 5. Seed torrents back to the community - don't just take
+
+---
+
+### 2026-01-02: Use Cloudflare Worker Proxy to Avoid CORS
+
+**Context:** API requests from `decide.nomadkaraoke.com` to Cloud Run at `karaoke-decide-*.run.app` were failing with CORS errors, especially when the backend returned 500 errors (CORS headers missing on error responses).
+
+**Lesson:** Cross-origin API requests create unnecessary complexity. When you control both frontend and backend, route them through the same origin. Since `decide.nomadkaraoke.com` is behind Cloudflare, a Worker can proxy `/api/*` to Cloud Run.
+
+**Recommendation:**
+1. Create a Cloudflare Worker that proxies `/api/*` to Cloud Run
+2. Configure route: `decide.nomadkaraoke.com/api/*`
+3. Frontend uses relative URLs (`/api/...` instead of full Cloud Run URL)
+4. No CORS configuration needed (same-origin requests)
+
+```
+Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
+```
+
+**Benefits:**
+- No CORS issues (same-origin)
+- Infrastructure hidden from users
+- Can add edge caching, rate limiting later
+- Simpler debugging (no cross-origin complexity)
+
+**Files:**
+- `infrastructure/cloudflare-worker/api-proxy.js` - Worker code
+- `infrastructure/cloudflare-worker/README.md` - Setup instructions
+
+---
+
+### 2026-01-02: E2E Tests Must Be Updated When UI Routes Change
+
+**Context:** Production E2E tests were failing because `/services` and `/my-songs` routes now redirect to `/my-data`, and `/discover` was renamed to `/recommendations`.
+
+**Lesson:** When refactoring UI to consolidate pages (e.g., merging separate pages into a unified "My Data" page), E2E tests that navigate to the old URLs will fail because:
+1. Redirects may not complete before assertions run
+2. Expected headings/selectors won't exist on the new page
+
+**Recommendation:**
+1. When creating redirect pages, immediately update E2E tests to use new URLs
+2. Update test assertions to match new page headings/structure
+3. Use `data-testid` attributes for stable selectors (already in LESSONS-LEARNED)
+4. Run prod E2E tests as part of the refactoring PR, not as a follow-up
+
+```typescript
+// BAD - navigating to old URL that redirects
+await page.goto(`${PROD_URL}/services`);
+await expect(page.getByRole("heading", { name: /music services/i })).toBeVisible();
+
+// GOOD - navigate directly to new URL with correct heading
+await page.goto(`${PROD_URL}/my-data`);
+await expect(page.getByRole("heading", { name: /my data/i })).toBeVisible();
+```

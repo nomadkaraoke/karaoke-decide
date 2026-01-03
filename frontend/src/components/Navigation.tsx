@@ -10,22 +10,25 @@ import {
   LogOutIcon,
   MenuIcon,
   XIcon,
+  MicrophoneIcon,
   SparklesIcon,
   PlaylistIcon,
   SettingsIcon,
   DatabaseIcon,
+  ShieldIcon,
 } from "./icons";
 import { Button } from "./ui";
 
 const navLinks = [
   { href: "/", label: "Search", icon: null },
   { href: "/my-data", label: "My Data", icon: DatabaseIcon, authRequired: true },
+  { href: "/known-songs", label: "Add Songs", icon: MicrophoneIcon, authRequired: true },
   { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
   { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
 ];
 
 export function Navigation() {
-  const { user, isAuthenticated, isLoading, isGuest, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, isGuest, isAdmin, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -78,6 +81,22 @@ export function Navigation() {
                 </Link>
               );
             })}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className={`
+                  px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5
+                  ${
+                    pathname.startsWith("/admin")
+                      ? "bg-purple-500/20 text-purple-300"
+                      : "text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10"
+                  }
+                `}
+              >
+                <ShieldIcon className="w-4 h-4" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           {/* Desktop Auth Section */}
@@ -179,6 +198,23 @@ export function Navigation() {
                 </Link>
               );
             })}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors
+                  ${
+                    pathname.startsWith("/admin")
+                      ? "bg-purple-500/20 text-purple-300"
+                      : "text-purple-400/60 hover:text-purple-300 hover:bg-purple-500/10"
+                  }
+                `}
+              >
+                <ShieldIcon className="w-5 h-5" />
+                Admin
+              </Link>
+            )}
 
             {/* Mobile Auth Section */}
             <div className="pt-2 border-t border-white/10">

@@ -611,12 +611,11 @@ Get songs from user's listening history matched to karaoke catalog.
       "title": "Bohemian Rhapsody",
       "source": "spotify",
       "play_count": 10,
+      "playcount": 250,
+      "rank": 5,
+      "spotify_popularity": 85,
       "is_saved": true,
-      "times_sung": 2,
-      "last_played_at": "2024-01-15T12:00:00Z",
-      "last_sung_at": "2024-01-10T20:00:00Z",
-      "average_rating": 4.5,
-      "notes": "Great for warming up"
+      "times_sung": 2
     }
   ],
   "total": 150,
@@ -915,6 +914,114 @@ All fields are optional. Use `null` to clear a preference.
 
 ---
 
+## Known Songs ✅ Implemented
+
+Endpoints for users to manually add songs they already know they like singing, independent of music service sync.
+
+### GET /api/known-songs
+
+Get user's known songs list.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| page | int | Page number (default: 1, min: 1) |
+| per_page | int | Results per page (default: 20, max: 100) |
+
+**Response:**
+```json
+{
+  "songs": [
+    {
+      "id": "user123:1",
+      "user_id": "user123",
+      "song_id": "1",
+      "source": "known_songs",
+      "is_saved": true,
+      "artist": "Queen",
+      "title": "Bohemian Rhapsody",
+      "created_at": "2024-01-01T12:00:00Z",
+      "updated_at": "2024-01-01T12:00:00Z"
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 20
+}
+```
+
+### POST /api/known-songs
+
+Add a song to user's known songs.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "song_id": 1
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "added": true,
+  "song_id": "1",
+  "artist": "Queen",
+  "title": "Bohemian Rhapsody",
+  "already_existed": false
+}
+```
+
+**Error Responses:**
+- `404` - Song not found in catalog
+
+### POST /api/known-songs/bulk
+
+Bulk add multiple songs to user's known songs.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "song_ids": [1, 2, 3]
+}
+```
+
+**Response:**
+```json
+{
+  "added": 2,
+  "already_existed": 1,
+  "not_found": 0,
+  "total_requested": 3
+}
+```
+
+### DELETE /api/known-songs/{song_id}
+
+Remove a song from user's known songs.
+
+**Requires:** Bearer token
+
+**Path Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| song_id | int | Song ID to remove |
+
+**Response:** `204 No Content`
+
+**Error Responses:**
+- `404` - Song not in user's known songs (or was added from different source)
+
+**Note:** Only songs with source "known_songs" can be removed via this endpoint. Songs synced from Spotify/Last.fm use different endpoints.
+
+---
+
 ## My Songs (Not Yet Implemented)
 
 ### GET /api/my/history
@@ -1082,6 +1189,192 @@ Remove a song from a playlist.
 **Response:** `204 No Content`
 
 Note: If the song is not in the playlist, this is a no-op (no error).
+
+---
+
+## Admin ✅ Implemented
+
+Admin endpoints for system management. All endpoints require admin privileges (`is_admin: true` on user).
+
+### GET /api/admin/stats
+
+Get dashboard statistics.
+
+**Requires:** Bearer token (admin)
+
+**Response:**
+```json
+{
+  "users": {
+    "total": 150,
+    "verified": 100,
+    "guests": 50,
+    "active_7d": 45
+  },
+  "sync_jobs_24h": {
+    "pending": 0,
+    "in_progress": 2,
+    "completed": 25,
+    "failed": 3
+  },
+  "services": {
+    "spotify_connected": 85,
+    "lastfm_connected": 30
+  }
+}
+```
+
+### GET /api/admin/users
+
+List all users with pagination and filtering.
+
+**Requires:** Bearer token (admin)
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | int | Results per page (default: 20, max: 100) |
+| offset | int | Number to skip (default: 0) |
+| filter | string | "all", "verified", or "guests" |
+| search | string | Search by email |
+
+**Response:**
+```json
+{
+  "users": [
+    {
+      "id": "user-uuid",
+      "email": "user@example.com",
+      "display_name": "John Doe",
+      "is_guest": false,
+      "is_admin": false,
+      "created_at": "2024-12-30T12:00:00Z",
+      "last_sync_at": "2024-12-30T14:00:00Z",
+      "quiz_completed_at": "2024-12-30T12:30:00Z",
+      "total_songs_known": 150
+    }
+  ],
+  "total": 150
+}
+```
+
+### GET /api/admin/users/{user_id}
+
+Get detailed user information.
+
+**Requires:** Bearer token (admin)
+
+**Response:**
+```json
+{
+  "id": "user-uuid",
+  "email": "user@example.com",
+  "display_name": "John Doe",
+  "is_guest": false,
+  "is_admin": false,
+  "created_at": "2024-12-30T12:00:00Z",
+  "last_sync_at": "2024-12-30T14:00:00Z",
+  "quiz_completed_at": "2024-12-30T12:30:00Z",
+  "total_songs_known": 150,
+  "services": [
+    {
+      "service_type": "spotify",
+      "service_username": "SpotifyUser123",
+      "sync_status": "idle",
+      "last_sync_at": "2024-12-30T14:00:00Z",
+      "tracks_synced": 150,
+      "sync_error": null
+    }
+  ],
+  "sync_jobs": [
+    {
+      "id": "job-uuid",
+      "status": "completed",
+      "created_at": "2024-12-30T14:00:00Z",
+      "completed_at": "2024-12-30T14:05:00Z",
+      "error": null
+    }
+  ],
+  "data_summary": {
+    "artists_count": 50,
+    "songs_count": 150,
+    "playlists_count": 3
+  }
+}
+```
+
+### GET /api/admin/sync-jobs
+
+List sync jobs with pagination and filtering.
+
+**Requires:** Bearer token (admin)
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| limit | int | Results per page (default: 20, max: 100) |
+| offset | int | Number to skip (default: 0) |
+| status | string | "all", "pending", "in_progress", "completed", or "failed" |
+
+**Response:**
+```json
+{
+  "jobs": [
+    {
+      "id": "job-uuid",
+      "user_id": "user-uuid",
+      "user_email": "user@example.com",
+      "status": "completed",
+      "created_at": "2024-12-30T14:00:00Z",
+      "completed_at": "2024-12-30T14:05:00Z",
+      "error": null
+    }
+  ],
+  "total": 100
+}
+```
+
+### GET /api/admin/sync-jobs/{job_id}
+
+Get detailed sync job information.
+
+**Requires:** Bearer token (admin)
+
+**Response:**
+```json
+{
+  "id": "job-uuid",
+  "user_id": "user-uuid",
+  "user_email": "user@example.com",
+  "status": "completed",
+  "created_at": "2024-12-30T14:00:00Z",
+  "completed_at": "2024-12-30T14:05:00Z",
+  "error": null,
+  "progress": {
+    "current_service": null,
+    "current_phase": null,
+    "total_tracks": 500,
+    "processed_tracks": 500,
+    "matched_tracks": 350,
+    "percentage": 100
+  },
+  "results": [
+    {
+      "service_type": "spotify",
+      "tracks_fetched": 500,
+      "tracks_matched": 350,
+      "user_songs_created": 200,
+      "user_songs_updated": 150,
+      "artists_stored": 75,
+      "error": null
+    }
+  ]
+}
+```
+
+**Error Responses:**
+- `403` - Admin access required
+- `404` - Job not found
 
 ---
 

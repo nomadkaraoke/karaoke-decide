@@ -74,7 +74,7 @@ class RecommendationService:
     """
 
     USER_SONGS_COLLECTION = "user_songs"
-    USERS_COLLECTION = "users"
+    USERS_COLLECTION = "decide_users"
 
     # BigQuery config
     PROJECT_ID = "nomadkaraoke"
@@ -435,15 +435,27 @@ class RecommendationService:
             filters=[("user_id", "==", user_id)],
         )
 
-        # Get paginated results
+        # Get paginated results - sort by playcount (actual plays) first, then by rank
+        # Note: Firestore doesn't support complex sorting, so we fetch more and sort in memory
         docs = await self.firestore.query_documents(
             self.USER_SONGS_COLLECTION,
             filters=[("user_id", "==", user_id)],
-            order_by="play_count",
-            order_direction="DESCENDING",
-            limit=limit,
-            offset=offset,
+            limit=min(limit + offset + 100, 1000),  # Fetch enough for sorting
         )
+
+        # Sort by "how well user knows the song":
+        # 1. playcount (actual plays from Last.fm) - higher is better
+        # 2. rank (position in top list) - lower is better
+        # 3. sync_count (legacy) as fallback
+        def sort_key(doc: dict[str, Any]) -> tuple[int, int, int]:
+            playcount = doc.get("playcount") or 0
+            rank = doc.get("rank") or 9999  # High rank for songs without rank
+            sync_count = doc.get("sync_count") or doc.get("play_count") or 0
+            # Negate playcount so higher values sort first
+            return (-playcount, rank, -sync_count)
+
+        sorted_docs = sorted(docs, key=sort_key)
+        paginated_docs = sorted_docs[offset : offset + limit]
 
         songs = [
             UserSong(
@@ -451,7 +463,9 @@ class RecommendationService:
                 user_id=doc["user_id"],
                 song_id=doc["song_id"],
                 source=doc.get("source", "spotify"),
-                play_count=doc.get("play_count", 0),
+                play_count=doc.get("sync_count") or doc.get("play_count", 0),
+                playcount=doc.get("playcount"),
+                rank=doc.get("rank"),
                 last_played_at=(datetime.fromisoformat(doc["last_played_at"]) if doc.get("last_played_at") else None),
                 is_saved=doc.get("is_saved", False),
                 times_sung=doc.get("times_sung", 0),
@@ -460,10 +474,11 @@ class RecommendationService:
                 notes=doc.get("notes"),
                 artist=doc["artist"],
                 title=doc["title"],
+                spotify_popularity=doc.get("spotify_popularity"),
                 created_at=(datetime.fromisoformat(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
                 updated_at=(datetime.fromisoformat(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
             )
-            for doc in docs
+            for doc in paginated_docs
         ]
 
         return songs, total

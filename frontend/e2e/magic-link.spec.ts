@@ -1,34 +1,40 @@
 import { test, expect } from "@playwright/test";
-import MailSlurp from "mailslurp-client";
-
-// API key should be set via environment variable: MAILSLURP_API_KEY
-const MAILSLURP_API_KEY = process.env.MAILSLURP_API_KEY || "";
+import {
+  createTestMailClient,
+  generateTestTag,
+  getEmailAddress,
+  waitForEmail,
+  extractUrlFromEmail,
+} from "./utils/testmail";
 
 /**
  * End-to-end magic link authentication test
  * Tests the complete flow: request magic link -> receive email -> click link -> authenticated
+ *
+ * Required environment variables:
+ * - TESTMAIL_API_KEY: Your TestMail.app API key
+ * - TESTMAIL_NAMESPACE: Your TestMail.app namespace
  */
 test.describe("Magic Link E2E", () => {
-  let mailslurp: MailSlurp;
+  const testMailClient = createTestMailClient();
 
-  test.beforeAll(() => {
-    mailslurp = new MailSlurp({ apiKey: MAILSLURP_API_KEY });
-  });
+  test.skip(!testMailClient, "Requires TESTMAIL_API_KEY and TESTMAIL_NAMESPACE env vars");
 
   test("complete magic link authentication flow", async ({ page }) => {
     // Increase timeout for this test as it involves email delivery
     test.setTimeout(120000);
 
-    // Step 1: Create a new Mailslurp inbox
-    const inbox = await mailslurp.inboxController.createInboxWithDefaults();
-    console.log(`Created inbox: ${inbox.emailAddress}`);
+    // Step 1: Generate a unique tag for this test
+    const tag = generateTestTag();
+    const testEmail = getEmailAddress(testMailClient!.namespace, tag);
+    console.log(`Test email: ${testEmail}`);
 
     // Step 2: Go to login page and request magic link
     await page.goto("/login");
     await expect(page.getByText("Welcome back")).toBeVisible();
 
     const emailInput = page.getByLabel(/email/i);
-    await emailInput.fill(inbox.emailAddress!);
+    await emailInput.fill(testEmail);
 
     const submitButton = page.getByRole("button", { name: /send magic link/i });
     await submitButton.click();
@@ -37,27 +43,23 @@ test.describe("Magic Link E2E", () => {
     await expect(page.getByText(/check your email/i)).toBeVisible({ timeout: 10000 });
     console.log("Magic link request successful");
 
-    // Step 4: Wait for and fetch the email from Mailslurp
+    // Step 4: Wait for email to arrive using TestMail.app's livequery
     console.log("Waiting for magic link email...");
-    const email = await mailslurp.waitController.waitForLatestEmail({
-      inboxId: inbox.id!,
-      timeout: 60000,
-      unreadOnly: true,
-    });
+    const email = await waitForEmail(testMailClient!, tag, 60000);
 
-    expect(email.subject).toContain("Sign in");
+    expect(email.subject.toLowerCase()).toContain("sign in");
     console.log(`Received email with subject: ${email.subject}`);
 
     // Step 5: Extract magic link from email body
-    const emailBody = email.body || "";
-    const magicLinkMatch = emailBody.match(/https?:\/\/[^\s"<>]+\/auth\/verify\?token=[^\s"<>]+/);
+    const magicLinkPattern = /https?:\/\/[^\s"<>]+\/auth\/verify\?token=[^\s"<>]+/;
+    const magicLink = extractUrlFromEmail(email, magicLinkPattern);
 
-    if (!magicLinkMatch) {
-      console.log("Email body:", emailBody);
+    if (!magicLink) {
+      console.log("Email HTML:", email.html);
+      console.log("Email text:", email.text);
       throw new Error("Could not find magic link in email");
     }
 
-    const magicLink = magicLinkMatch[0];
     console.log(`Found magic link: ${magicLink}`);
 
     // Step 6: Visit the magic link
@@ -79,7 +81,6 @@ test.describe("Magic Link E2E", () => {
 
     console.log("Magic link authentication successful!");
 
-    // Cleanup: delete the inbox
-    await mailslurp.inboxController.deleteInbox({ inboxId: inbox.id! });
+    // No cleanup needed - TestMail.app emails auto-expire
   });
 });

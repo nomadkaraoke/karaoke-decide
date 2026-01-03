@@ -24,6 +24,10 @@ from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
 
+# Sync job is considered stale if no progress update in this many seconds
+# BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable
+STALE_JOB_THRESHOLD_SECONDS = 300
+
 router = APIRouter()
 
 
@@ -392,9 +396,33 @@ async def get_sync_status(
             if job_data:
                 job = SyncJob.from_dict(job_data)
 
-                # Include if pending, in_progress, or completed within last minute
+                # Check if in_progress job is stale (no heartbeat for too long)
+                if job.status == SyncJobStatus.IN_PROGRESS and job.updated_at:
+                    age_seconds = (datetime.now(UTC) - job.updated_at).total_seconds()
+                    if age_seconds > STALE_JOB_THRESHOLD_SECONDS:
+                        # Auto-mark as failed - job likely crashed
+                        logger.warning(
+                            f"Marking stale sync job {job.id} as failed "
+                            f"(no progress for {int(age_seconds)} seconds)"
+                        )
+                        timeout_error = f"Sync timed out (no progress for {int(age_seconds)} seconds)"
+                        completed_at = datetime.now(UTC)
+                        await firestore.update_document(
+                            "sync_jobs",
+                            job.id,
+                            {
+                                "status": SyncJobStatus.FAILED.value,
+                                "error": timeout_error,
+                                "completed_at": completed_at.isoformat(),
+                            },
+                        )
+                        job.status = SyncJobStatus.FAILED
+                        job.error = timeout_error
+                        job.completed_at = completed_at
+
+                # Include if pending, in_progress, or completed/failed within last minute
                 include_job = job.status in (SyncJobStatus.PENDING, SyncJobStatus.IN_PROGRESS)
-                if job.status == SyncJobStatus.COMPLETED and job.completed_at:
+                if job.status in (SyncJobStatus.COMPLETED, SyncJobStatus.FAILED) and job.completed_at:
                     seconds_since = (datetime.now(UTC) - job.completed_at).total_seconds()
                     include_job = seconds_since < 60
                 if include_job:

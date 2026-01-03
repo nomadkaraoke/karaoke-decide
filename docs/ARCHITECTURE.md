@@ -15,9 +15,15 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │                │  .com)          │                                 │
 └────────┬───────┴────────┬────────┴─────────────────────────────────┘
          │                │
-         └────────┬───────┘
-                  │
-                  ▼
+         │                ▼
+         │   ┌────────────────────────┐
+         │   │   Cloudflare Worker    │  (API Proxy)
+         │   │   /api/* → Cloud Run   │
+         │   └───────────┬────────────┘
+         │               │
+         └───────┬───────┘
+                 │
+                 ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        Backend API                                   │
 │                    (FastAPI on Cloud Run)                           │
@@ -25,8 +31,9 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │  /api/catalog/*   - Karaoke song catalog (BigQuery)        ✅ LIVE  │
 │  /api/auth/*      - Magic link authentication              ✅ LIVE  │
 │  /api/services/*  - Music service OAuth & sync             ✅ LIVE  │
-│  /api/my/*        - User's matched songs, history          PLANNED  │
-│  /api/playlists/* - Playlist management                    PLANNED  │
+│  /api/my/*        - User data, recommendations             ✅ LIVE  │
+│  /api/playlists/* - Playlist management                    ✅ LIVE  │
+│  /api/quiz/*      - Onboarding quiz                        ✅ LIVE  │
 └────────┬───────────────────┬────────────────────────────────────────┘
          │                   │
          ▼                   ▼
@@ -42,12 +49,28 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │   Firestore     │
 │   (User Data)   │
 ├─────────────────┤
-│  users          │
+│  decide_users   │
 │  music_services │
 │  user_songs     │
 │  playlists      │
 └─────────────────┘
 ```
+
+## Cloudflare Worker (API Proxy)
+
+The web frontend at `decide.nomadkaraoke.com` uses a Cloudflare Worker to proxy API requests to Cloud Run. This eliminates CORS issues by keeping frontend and API on the same origin.
+
+```
+Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
+       → decide.nomadkaraoke.com/*      → GitHub Pages
+```
+
+**Why?**
+- No CORS configuration needed (same-origin requests)
+- Cloud Run URL not exposed to users
+- Can add edge caching/rate limiting in future
+
+**Configuration:** Managed via Pulumi in `infrastructure/__main__.py`. See `infrastructure/cloudflare-worker/README.md` for setup.
 
 ## Data Flow
 
@@ -99,13 +122,18 @@ GET /api/my/songs?sort=play_count
 
 ### Firestore Collections
 
+> **Note:** karaoke-decide and karaoke-gen share the same Firestore database in the `nomadkaraoke` project.
+> Each app uses separate collections: `decide_users` for karaoke-decide, `gen_users` for karaoke-gen.
+
 | Collection | Primary Key | Description |
 |------------|-------------|-------------|
-| `users` | email hash | User accounts |
-| `music_services` | user_id + service_type | Connected accounts |
-| `karaoke_songs` | normalized artist-title | Song catalog |
+| `decide_users` | email hash / guest_id | User accounts (karaoke-decide) |
+| `music_services` | user_id + service_type | Connected music accounts |
+| `karaoke_songs` | normalized artist-title | Song catalog (shared) |
 | `user_songs` | user_id + song_id | User-song relationships |
+| `user_artists` | user_id + artist_name | User-artist relationships |
 | `playlists` | auto-generated | User playlists |
+| `sync_jobs` | auto-generated | Music sync job tracking |
 | `sung_records` | auto-generated | Singing history |
 
 ### Composite Indexes Needed

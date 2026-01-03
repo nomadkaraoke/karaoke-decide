@@ -423,6 +423,75 @@ class MusicServiceService:
             update_data,
         )
 
+    async def update_scrobble_progress(
+        self,
+        user_id: str,
+        service_type: str,
+        oldest_scrobble_timestamp: int | None = None,
+        scrobble_history_complete: bool | None = None,
+        scrobbles_processed: int | None = None,
+    ) -> None:
+        """Update scrobble sync progress for incremental sync.
+
+        Tracks progress through scrobble history so sync can resume from
+        where it left off if interrupted.
+
+        Args:
+            user_id: User ID.
+            service_type: Service type (should be 'lastfm').
+            oldest_scrobble_timestamp: Unix timestamp of oldest scrobble processed.
+            scrobble_history_complete: True if all history has been synced.
+            scrobbles_processed: Total number of scrobbles processed so far.
+        """
+        service_id = self._get_service_id(user_id, service_type)
+        now = datetime.now(UTC)
+
+        update_data: dict[str, Any] = {
+            "updated_at": now.isoformat(),
+        }
+
+        if oldest_scrobble_timestamp is not None:
+            update_data["oldest_scrobble_timestamp"] = oldest_scrobble_timestamp
+
+        if scrobble_history_complete is not None:
+            update_data["scrobble_history_complete"] = scrobble_history_complete
+
+        if scrobbles_processed is not None:
+            update_data["scrobbles_processed"] = scrobbles_processed
+
+        await self.firestore.update_document(
+            self.SERVICES_COLLECTION,
+            service_id,
+            update_data,
+        )
+
+    async def get_scrobble_progress(
+        self,
+        user_id: str,
+        service_type: str,
+    ) -> dict[str, Any]:
+        """Get scrobble sync progress for a service.
+
+        Returns:
+            Dict with oldest_scrobble_timestamp, scrobble_history_complete,
+            and scrobbles_processed fields.
+        """
+        service_id = self._get_service_id(user_id, service_type)
+        doc = await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
+
+        if not doc:
+            return {
+                "oldest_scrobble_timestamp": None,
+                "scrobble_history_complete": False,
+                "scrobbles_processed": 0,
+            }
+
+        return {
+            "oldest_scrobble_timestamp": doc.get("oldest_scrobble_timestamp"),
+            "scrobble_history_complete": doc.get("scrobble_history_complete", False),
+            "scrobbles_processed": doc.get("scrobbles_processed", 0),
+        }
+
     # -------------------------------------------------------------------------
     # Token Management
     # -------------------------------------------------------------------------

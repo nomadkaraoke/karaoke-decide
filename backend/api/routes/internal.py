@@ -103,8 +103,8 @@ async def process_sync_task(
 
         job = SyncJob.from_dict(job_data)
 
-        # Check if already completed or failed
-        if job.status in (SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
+        # Check if already in progress, completed, or failed
+        if job.status in (SyncJobStatus.IN_PROGRESS, SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
             logger.info(f"Job already {job.status.value}: {job_id}")
             return SyncProcessResponse(
                 job_id=job_id,
@@ -243,8 +243,8 @@ async def _send_sync_completion_email(
     """
     from backend.services.email_service import get_email_service
 
-    # Get user email
-    user_data = await firestore.get_document("users", user_id)
+    # Get user email from decide_users collection
+    user_data = await firestore.get_document("decide_users", user_id)
     if not user_data or not user_data.get("email"):
         logger.warning(f"No email found for user: {user_id}")
         return

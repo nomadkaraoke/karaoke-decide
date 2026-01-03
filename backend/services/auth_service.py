@@ -22,7 +22,7 @@ class AuthenticationError(Exception):
 class AuthService:
     """Service for authentication operations."""
 
-    USERS_COLLECTION = "users"
+    USERS_COLLECTION = "decide_users"
     MAGIC_LINKS_COLLECTION = "magic_links"
 
     def __init__(
@@ -139,6 +139,7 @@ class AuthService:
                 id=doc["user_id"],
                 email=doc["email"],
                 display_name=doc.get("display_name"),
+                is_admin=doc.get("is_admin", False),
                 created_at=datetime.fromisoformat(doc["created_at"]),
                 updated_at=datetime.fromisoformat(doc["updated_at"]),
                 total_songs_known=doc.get("total_songs_known", 0),
@@ -192,6 +193,7 @@ class AuthService:
                     email=doc.get("email"),
                     display_name=doc.get("display_name"),
                     is_guest=doc.get("is_guest", False),
+                    is_admin=doc.get("is_admin", False),
                     created_at=datetime.fromisoformat(doc["created_at"]),
                     updated_at=datetime.fromisoformat(doc["updated_at"]),
                     total_songs_known=doc.get("total_songs_known", 0),
@@ -215,6 +217,7 @@ class AuthService:
             email=doc.get("email"),
             display_name=doc.get("display_name"),
             is_guest=doc.get("is_guest", False),
+            is_admin=doc.get("is_admin", False),
             created_at=datetime.fromisoformat(doc["created_at"]),
             updated_at=datetime.fromisoformat(doc["updated_at"]),
             total_songs_known=doc.get("total_songs_known", 0),
@@ -574,6 +577,7 @@ class AuthService:
             id=doc["user_id"],
             email=doc["email"],
             display_name=display_name if display_name is not None else doc.get("display_name"),
+            is_admin=doc.get("is_admin", False),
             created_at=datetime.fromisoformat(doc["created_at"]),
             updated_at=now,
             total_songs_known=doc.get("total_songs_known", 0),

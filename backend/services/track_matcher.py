@@ -3,9 +3,12 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
+
+if TYPE_CHECKING:
+    from backend.services.catalog_lookup import CatalogLookup
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,10 @@ class MatchedTrack:
     spotify_popularity: int | None = None
     duration_ms: int | None = None
     explicit: bool = False
+
+    # Last.fm specific metadata
+    playcount: int | None = None  # Actual play count from Last.fm (real listens!)
+    rank: int | None = None  # Rank in user's top tracks/artists list
 
 
 class TrackMatcher:
@@ -66,13 +73,19 @@ class TrackMatcher:
         r"\s*\bwith\b\s+.*$",  # with Another Artist (word boundary to avoid "Saoirse")
     ]
 
-    def __init__(self, catalog_service: BigQueryCatalogService):
+    def __init__(
+        self,
+        catalog_service: BigQueryCatalogService,
+        catalog_lookup: "CatalogLookup | None" = None,
+    ):
         """Initialize the track matcher.
 
         Args:
-            catalog_service: BigQuery catalog service for searching songs.
+            catalog_service: BigQuery catalog service for searching songs (fallback).
+            catalog_lookup: Optional in-memory catalog for instant matching.
         """
         self.catalog_service = catalog_service
+        self.catalog_lookup = catalog_lookup
         self._compiled_title_patterns = [re.compile(p, re.IGNORECASE) for p in self.TITLE_REMOVE_PATTERNS]
         self._compiled_artist_patterns = [re.compile(p, re.IGNORECASE) for p in self.ARTIST_REMOVE_PATTERNS]
 
@@ -220,7 +233,7 @@ class TrackMatcher:
 
         Args:
             tracks: List of dicts with 'artist', 'title', and optionally
-                   'popularity', 'duration_ms', 'explicit' keys.
+                   'popularity', 'duration_ms', 'explicit', 'playcount', 'rank' keys.
 
         Returns:
             List of MatchedTrack results in same order as input.
@@ -231,14 +244,17 @@ class TrackMatcher:
         logger.info(f"Track matcher: received {len(tracks)} tracks to match")
 
         # First, normalize all tracks and build lookup structures
-        # (orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit)
-        normalized_tracks: list[tuple[str, str, str, str, int | None, int | None, bool]] = []
+        # Track info tuple: (orig_artist, orig_title, norm_artist, norm_title,
+        #                    popularity, duration_ms, explicit, playcount, rank)
+        normalized_tracks: list[tuple[str, str, str, str, int | None, int | None, bool, int | None, int | None]] = []
         for track in tracks:
             artist = track.get("artist", "")
             title = track.get("title", "")
             popularity = track.get("popularity")
             duration_ms = track.get("duration_ms")
             explicit = track.get("explicit", False)
+            playcount = track.get("playcount")
+            rank = track.get("rank")
             normalized_tracks.append(
                 (
                     artist,
@@ -248,6 +264,8 @@ class TrackMatcher:
                     popularity,
                     duration_ms,
                     explicit,
+                    playcount,
+                    rank,
                 )
             )
 
@@ -261,13 +279,41 @@ class TrackMatcher:
             for artist, title in sample:
                 logger.info(f"Track matcher sample: '{artist}' - '{title}'")
 
-        # Execute batch query to get all matches at once
-        matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
-        logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
+        # Use in-memory lookup if available (instant), otherwise fall back to BigQuery
+        if self.catalog_lookup and self.catalog_lookup.is_loaded:
+            logger.info("Track matcher: using in-memory catalog lookup (instant)")
+            matched_songs: dict[tuple[str, str], SongResult] = {}
+            for norm_artist, norm_title in unique_normalized:
+                entry = self.catalog_lookup.match(norm_artist, norm_title)
+                if entry:
+                    # Convert CatalogEntry to SongResult for compatibility
+                    matched_songs[(norm_artist, norm_title)] = SongResult(
+                        id=entry.id,
+                        artist=entry.artist,
+                        title=entry.title,
+                        brands=entry.brands,
+                        brand_count=entry.brand_count,
+                    )
+            logger.info(f"Track matcher: in-memory lookup found {len(matched_songs)} matches")
+        else:
+            # Fallback to BigQuery (slower but works if catalog not loaded)
+            logger.info("Track matcher: falling back to BigQuery (catalog not loaded)")
+            matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
+            logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
 
         # Build results maintaining original order
         results: list[MatchedTrack] = []
-        for orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit in normalized_tracks:
+        for (
+            orig_artist,
+            orig_title,
+            norm_artist,
+            norm_title,
+            popularity,
+            duration_ms,
+            explicit,
+            playcount,
+            rank,
+        ) in normalized_tracks:
             # Look up match using normalized values
             key = (norm_artist, norm_title)
             catalog_song = matched_songs.get(key)
@@ -283,6 +329,8 @@ class TrackMatcher:
                     spotify_popularity=popularity,
                     duration_ms=duration_ms,
                     explicit=explicit,
+                    playcount=playcount,
+                    rank=rank,
                 )
             )
 
@@ -315,20 +363,27 @@ _track_matcher: TrackMatcher | None = None
 
 def get_track_matcher(
     catalog_service: BigQueryCatalogService | None = None,
+    catalog_lookup: "CatalogLookup | None" = None,
 ) -> TrackMatcher:
     """Get the track matcher instance.
 
     Args:
         catalog_service: Optional catalog service override (for testing).
+        catalog_lookup: Optional in-memory catalog for instant matching.
 
     Returns:
         TrackMatcher instance.
     """
     global _track_matcher
 
+    # Import here to avoid circular dependency
+    from backend.services.catalog_lookup import get_catalog_lookup
+
     if _track_matcher is None or catalog_service is not None:
         if catalog_service is None:
             catalog_service = BigQueryCatalogService()
-        _track_matcher = TrackMatcher(catalog_service)
+        if catalog_lookup is None:
+            catalog_lookup = get_catalog_lookup()
+        _track_matcher = TrackMatcher(catalog_service, catalog_lookup)
 
     return _track_matcher
