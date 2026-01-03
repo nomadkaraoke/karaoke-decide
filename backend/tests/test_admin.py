@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -68,10 +69,10 @@ def admin_client(
         from backend.api.deps import get_current_user, get_firestore
         from backend.main import app
 
-        async def override_get_current_user():
+        async def override_get_current_user() -> User:
             return sample_admin_user
 
-        async def override_get_firestore():
+        async def override_get_firestore() -> MagicMock:
             return mock_admin_firestore_service
 
         app.dependency_overrides[get_current_user] = override_get_current_user
@@ -96,10 +97,10 @@ def non_admin_client(
         from backend.api.deps import get_current_user, get_firestore
         from backend.main import app
 
-        async def override_get_current_user():
+        async def override_get_current_user() -> User:
             return sample_non_admin_user
 
-        async def override_get_firestore():
+        async def override_get_firestore() -> MagicMock:
             return mock_admin_firestore_service
 
         app.dependency_overrides[get_current_user] = override_get_current_user
@@ -463,7 +464,7 @@ class TestAdminSyncJobsList:
             {"id": "user2", "email": "user2@example.com"},
         ]
 
-        def query_side_effect(collection, filters=None, **kwargs):
+        def query_side_effect(collection: str, filters: list[Any] | None = None, **kwargs: Any) -> list[dict[str, Any]]:
             if collection == "sync_jobs":
                 return job_docs
             if collection == "users" and filters:
