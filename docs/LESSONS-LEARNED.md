@@ -988,6 +988,29 @@ gsutil mb -c archive -l us-central1 gs://bucket-archive/
 
 ---
 
+### 2026-01-02: Don't Skip ETL Because Current Features Don't Need It
+
+**Context:** Audio Analysis ETL was marked "not needed" because `spotify_audio_features` table already had basic tempo/key/mode data for filtering.
+
+**Lesson:** Just because current features don't require data doesn't mean you should skip extracting it. The Audio Analysis torrent contains unique data not available elsewhere:
+- **Sections array** - Temporal breakdown (intro, verse, chorus) with per-section tempo/key changes
+- **Confidence scores** - Quality indicators for all analysis values
+- **Fade markers** - `end_of_fade_in`, `start_of_fade_out` for audio visualization
+
+This data enables future features like:
+- Song structure visualization
+- Finding songs with tempo changes
+- Confidence-weighted filtering
+
+**Recommendation:**
+1. When you have access to a unique dataset, extract ALL useful data
+2. Don't justify skipping with "we already have something similar"
+3. If data enables potential future features, extract it
+4. The cost of extraction (few hours VM time) is trivial vs. re-acquisition later
+5. Seed torrents back to the community - don't just take
+
+---
+
 ### 2026-01-02: Use Cloudflare Worker Proxy to Avoid CORS
 
 **Context:** API requests from `decide.nomadkaraoke.com` to Cloud Run at `karaoke-decide-*.run.app` were failing with CORS errors, especially when the backend returned 500 errors (CORS headers missing on error responses).
