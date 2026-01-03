@@ -25,7 +25,8 @@ from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 logger = logging.getLogger(__name__)
 
 # Sync job is considered stale if no progress update in this many seconds
-STALE_JOB_THRESHOLD_SECONDS = 120
+# BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable
+STALE_JOB_THRESHOLD_SECONDS = 300
 
 router = APIRouter()
 
