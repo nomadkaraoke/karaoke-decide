@@ -50,19 +50,18 @@ async def get_admin_stats(
 
     Returns aggregate counts for users, sync jobs, and service connections.
 
-    Note: The Firestore DB is shared with karaoke-gen (being migrated to separate collection).
-    Count queries use simple filters to avoid complex Firestore index requirements.
-    Once migration is complete, these counts will only include karaoke-decide users.
+    Note: Uses the decide_users collection which is separate from karaoke-gen's gen_users.
+    Both apps share the same Firestore database but use different collections.
     """
-    # User stats - count users with is_guest field (karaoke-decide specific field)
-    # Using is_guest filter to exclude karaoke-gen users which don't have this field
-    total_users = await firestore.count_documents("users", filters=[("is_guest", "in", [True, False])])
-    verified_users = await firestore.count_documents("users", filters=[("is_guest", "==", False)])
-    guest_users = await firestore.count_documents("users", filters=[("is_guest", "==", True)])
+    # User stats - count from decide_users collection (karaoke-decide only)
+    # The decide_users collection was created to separate from karaoke-gen's gen_users
+    total_users = await firestore.count_documents("decide_users")
+    verified_users = await firestore.count_documents("decide_users", filters=[("is_guest", "==", False)])
+    guest_users = await firestore.count_documents("decide_users", filters=[("is_guest", "==", True)])
 
     # Active users (synced in last 7 days)
     seven_days_ago = datetime.now(UTC) - timedelta(days=7)
-    active_users = await firestore.count_documents("users", filters=[("last_sync_at", ">=", seven_days_ago)])
+    active_users = await firestore.count_documents("decide_users", filters=[("last_sync_at", ">=", seven_days_ago)])
 
     # Sync job stats (last 24 hours)
     twenty_four_hours_ago = datetime.now(UTC) - timedelta(hours=24)
@@ -136,9 +135,9 @@ async def list_users(
     search: str | None = Query(default=None, description="Search by email"),
 ) -> UserListResponse:
     """List users with pagination and filtering."""
-    # Filter for karaoke-decide users only (those with user_id field).
-    # The Firestore DB is shared with karaoke-gen which has different user schema.
-    filters: list[tuple[str, str, object]] = [("user_id", "!=", "")]
+    # Query from decide_users collection (karaoke-decide only)
+    # No need to filter by user_id since this collection only has karaoke-decide users
+    filters: list[tuple[str, str, object]] = []
 
     if filter == "verified":
         filters.append(("is_guest", "==", False))
@@ -152,11 +151,11 @@ async def list_users(
     # or integrate Algolia/Elasticsearch for full-text search.
 
     # Get total count for pagination
-    total = await firestore.count_documents("users", filters=filters if filters else None)
+    total = await firestore.count_documents("decide_users", filters=filters if filters else None)
 
     # Get users with pagination
     user_docs = await firestore.query_documents(
-        "users",
+        "decide_users",
         filters=filters if filters else None,
         order_by="created_at",
         order_direction="DESCENDING",
@@ -208,11 +207,11 @@ async def get_user_detail(
     """Get detailed information about a specific user."""
     # Get user document - guest users use user_id as doc ID, regular users need query
     if user_id.startswith("guest_"):
-        user_doc = await firestore.get_document("users", user_id)
+        user_doc = await firestore.get_document("decide_users", user_id)
     else:
         # Regular users: query by user_id field (doc ID is email hash)
         user_docs = await firestore.query_documents(
-            "users",
+            "decide_users",
             filters=[("user_id", "==", user_id)],
             limit=1,
         )
@@ -327,7 +326,7 @@ async def list_sync_jobs(
     for i in range(0, len(user_ids), 30):
         batch_ids = user_ids[i : i + 30]
         if batch_ids:
-            user_docs = await firestore.query_documents("users", filters=[("user_id", "in", batch_ids)])
+            user_docs = await firestore.query_documents("decide_users", filters=[("user_id", "in", batch_ids)])
             for user_doc in user_docs:
                 user_emails[user_doc.get("user_id", "")] = user_doc.get("email")
 
@@ -371,7 +370,7 @@ async def get_sync_job_detail(
     user_id = job_doc.get("user_id", "")
     user_email = None
     if user_id:
-        user_doc = await firestore.get_document("users", user_id)
+        user_doc = await firestore.get_document("decide_users", user_id)
         if user_doc:
             user_email = user_doc.get("email")
 

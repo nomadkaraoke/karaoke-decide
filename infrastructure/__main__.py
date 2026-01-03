@@ -191,41 +191,40 @@ sync_jobs_status_index = gcp.firestore.Index(
     ],
 )
 
-# Composite index for users filtering by is_guest and ordering by created_at
+# Composite index for decide_users filtering by is_guest and ordering by created_at
 # Required by: GET /api/admin/users (filtering verified/guest users with pagination)
-users_is_guest_index = gcp.firestore.Index(
-    "users-is-guest-created-index",
+decide_users_is_guest_index = gcp.firestore.Index(
+    "decide-users-is-guest-created-index",
     project=project,
     database="(default)",
-    collection="users",
+    collection="decide_users",
     fields=[
         {"field_path": "is_guest", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "DESCENDING"},
     ],
 )
 
-# Composite index for users filtering by user_id (to exclude karaoke-gen users)
+# Composite index for decide_users filtering by user_id
 # Required by: GET /api/admin/users (listing all users with pagination)
-# The Firestore DB is shared with karaoke-gen which has different user schema
-# Note: Firestore requires inequality filter field (user_id) before order field (created_at)
-# Index #1: user_id ASC, created_at DESC - for basic user_id != "" queries
-users_user_id_index = gcp.firestore.Index(
-    "users-user-id-created-index",
+# Note: decide_users is karaoke-decide's dedicated collection (separate from karaoke-gen's gen_users)
+# Index #1: user_id ASC, created_at DESC - for user lookups with ordering
+decide_users_user_id_index = gcp.firestore.Index(
+    "decide-users-user-id-created-index",
     project=project,
     database="(default)",
-    collection="users",
+    collection="decide_users",
     fields=[
         {"field_path": "user_id", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "DESCENDING"},
     ],
 )
 
-# Index #2: created_at DESC, user_id DESC - for ordering with inequality filter
-users_created_user_id_index = gcp.firestore.Index(
-    "users-created-user-id-index",
+# Index #2: created_at DESC, user_id DESC - for pagination ordering
+decide_users_created_user_id_index = gcp.firestore.Index(
+    "decide-users-created-user-id-index",
     project=project,
     database="(default)",
-    collection="users",
+    collection="decide_users",
     fields=[
         {"field_path": "created_at", "order": "DESCENDING"},
         {"field_path": "user_id", "order": "DESCENDING"},

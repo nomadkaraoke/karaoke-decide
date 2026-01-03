@@ -62,7 +62,7 @@ def get_user_by_email(email: str) -> dict | None:
     db = firestore.Client(project=PROJECT_ID)
     email_hash = hashlib.sha256(email.lower().encode()).hexdigest()
 
-    doc = db.collection("users").document(email_hash).get()
+    doc = db.collection("decide_users").document(email_hash).get()
     if doc.exists:
         return doc.to_dict()
     return None

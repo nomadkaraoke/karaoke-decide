@@ -49,7 +49,7 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │   Firestore     │
 │   (User Data)   │
 ├─────────────────┤
-│  users          │
+│  decide_users   │
 │  music_services │
 │  user_songs     │
 │  playlists      │
@@ -122,13 +122,18 @@ GET /api/my/songs?sort=play_count
 
 ### Firestore Collections
 
+> **Note:** karaoke-decide and karaoke-gen share the same Firestore database in the `nomadkaraoke` project.
+> Each app uses separate collections: `decide_users` for karaoke-decide, `gen_users` for karaoke-gen.
+
 | Collection | Primary Key | Description |
 |------------|-------------|-------------|
-| `users` | email hash | User accounts |
-| `music_services` | user_id + service_type | Connected accounts |
-| `karaoke_songs` | normalized artist-title | Song catalog |
+| `decide_users` | email hash / guest_id | User accounts (karaoke-decide) |
+| `music_services` | user_id + service_type | Connected music accounts |
+| `karaoke_songs` | normalized artist-title | Song catalog (shared) |
 | `user_songs` | user_id + song_id | User-song relationships |
+| `user_artists` | user_id + artist_name | User-artist relationships |
 | `playlists` | auto-generated | User playlists |
+| `sync_jobs` | auto-generated | Music sync job tracking |
 | `sung_records` | auto-generated | Singing history |
 
 ### Composite Indexes Needed
