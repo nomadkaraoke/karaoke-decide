@@ -120,6 +120,22 @@ async def get_verified_user(
     return user
 
 
+async def get_admin_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Get the current user only if they are an admin.
+
+    Raises:
+        HTTPException: If user is not an admin.
+    """
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return user
+
+
 async def get_music_service_service_dep(
     settings: Annotated[BackendSettings, Depends(get_settings)],
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
@@ -179,6 +195,7 @@ async def get_user_data_service_dep(
 # Type aliases for cleaner route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
+AdminUser = Annotated[User, Depends(get_admin_user)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]

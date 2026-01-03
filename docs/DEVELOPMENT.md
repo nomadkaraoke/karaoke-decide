@@ -128,6 +128,59 @@ See `.env.example` for all available variables. Key ones:
 | `JWT_SECRET` | Secret for signing tokens | Yes |
 | `SENDGRID_API_KEY` | For magic link emails | Yes |
 
+## Admin User Setup
+
+Admin users have access to the `/admin` dashboard for user management, sync job monitoring, and system stats. Admin status is controlled by the `is_admin` field in Firestore.
+
+### Setting Admin Users
+
+**Option 1: Firebase Console**
+1. Go to [Firebase Console](https://console.firebase.google.com) → Your Project → Firestore
+2. Navigate to `users` collection
+3. Find the user document by ID or email
+4. Add or set field: `is_admin` = `true` (boolean)
+
+**Option 2: Firebase CLI**
+```bash
+# First, find the user ID (from Firebase Console or by querying)
+firebase firestore:get users/<USER_ID>
+
+# Update the user document
+firebase firestore:set users/<USER_ID> --merge '{"is_admin": true}'
+```
+
+**Option 3: Python Script**
+```python
+from google.cloud import firestore
+
+db = firestore.Client()
+
+# By user ID
+db.collection("users").document("<USER_ID>").update({"is_admin": True})
+
+# Or find by email first
+users = db.collection("users").where("email", "==", "admin@example.com").get()
+for user in users:
+    user.reference.update({"is_admin": True})
+    print(f"Set admin for user {user.id}")
+```
+
+### Verifying Admin Access
+
+After setting `is_admin: true`:
+1. Have the user log out and log back in (to refresh their JWT)
+2. They should see an "Admin" link in the navigation
+3. Navigating to `/admin` should show the dashboard
+
+### Revoking Admin Access
+
+Set `is_admin` to `false` or delete the field:
+```python
+db.collection("users").document("<USER_ID>").update({"is_admin": False})
+```
+
+---
+
 ## Adding a New Feature
 
 1. **Plan**: Update PLAN.md if needed

@@ -10,11 +10,12 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-02)
+## Current Status (2026-01-03)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard
 
 ### ✅ What's Working
+- **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
 - **Authentication:** Magic link auth with JWT tokens, guest sessions for frictionless onboarding
@@ -135,6 +136,11 @@ cd frontend && npm run dev
 - `DELETE /api/playlists/{id}` - Delete playlist
 - `POST /api/playlists/{id}/songs` - Add song to playlist
 - `DELETE /api/playlists/{id}/songs/{song_id}` - Remove song from playlist
+- `GET /api/admin/stats` - Admin dashboard stats (admin only)
+- `GET /api/admin/users` - List all users with pagination (admin only)
+- `GET /api/admin/users/{id}` - Get user detail (admin only)
+- `GET /api/admin/sync-jobs` - List sync jobs (admin only)
+- `GET /api/admin/sync-jobs/{id}` - Get sync job detail (admin only)
 
 ## For AI Agents
 
@@ -161,6 +167,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-03 | Admin Dashboard (user management, sync job monitoring, system stats) | [archive/2026-01-03-admin-dashboard.md](archive/2026-01-03-admin-dashboard.md) |
 | 2026-01-02 | User Data UX (My Data page reorg, playcount pills, "Artists/Songs You Know", improved sorting) | [archive/2026-01-02-user-data-ux-improvements.md](archive/2026-01-02-user-data-ux-improvements.md) |
 | 2026-01-02 | Cloudflare API Proxy (eliminates CORS, same-origin /api/* requests via Worker) | [archive/2026-01-02-cloudflare-api-proxy.md](archive/2026-01-02-cloudflare-api-proxy.md) |
 | 2026-01-02 | Known Songs (manual song entry for songs users know they like singing) | [archive/2026-01-02-known-songs-feature.md](archive/2026-01-02-known-songs-feature.md) |
