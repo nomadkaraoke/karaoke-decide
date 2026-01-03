@@ -42,6 +42,7 @@ class UserResponse(BaseModel):
     email: str | None = None
     display_name: str | None = None
     is_guest: bool = False
+    is_admin: bool = False
 
 
 class UpdateProfileRequest(BaseModel):
@@ -237,6 +238,7 @@ async def get_current_user_endpoint(user: CurrentUser) -> UserResponse:
         email=user.email,
         display_name=user.display_name,
         is_guest=user.is_guest,
+        is_admin=user.is_admin,
     )
 
 
@@ -267,6 +269,7 @@ async def update_profile(
         email=updated_user.email,
         display_name=updated_user.display_name,
         is_guest=updated_user.is_guest,
+        is_admin=updated_user.is_admin,
     )
 
 
