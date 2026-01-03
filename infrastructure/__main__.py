@@ -178,6 +178,32 @@ service_account_user = gcp.serviceaccount.IAMMember(
 # Firestore Indexes
 # =============================================================================
 
+# Composite index for sync_jobs filtering by status and created_at
+# Required by: GET /api/admin/stats (filtering sync jobs by status within time window)
+sync_jobs_status_index = gcp.firestore.Index(
+    "sync-jobs-status-created-index",
+    project=project,
+    database="(default)",
+    collection="sync_jobs",
+    fields=[
+        {"field_path": "status", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "ASCENDING"},
+    ],
+)
+
+# Composite index for users filtering by is_guest and ordering by created_at
+# Required by: GET /api/admin/users (filtering verified/guest users with pagination)
+users_is_guest_index = gcp.firestore.Index(
+    "users-is-guest-created-index",
+    project=project,
+    database="(default)",
+    collection="users",
+    fields=[
+        {"field_path": "is_guest", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "DESCENDING"},
+    ],
+)
+
 # NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
 # It was created manually/automatically and is required by GET /api/services/sync/status
 # Not managed by Pulumi to avoid conflicts with existing index
