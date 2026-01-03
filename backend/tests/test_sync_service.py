@@ -138,6 +138,19 @@ def mock_lastfm_client() -> MagicMock:
             }
         }
     )
+
+    # Mock for full scrobble history - async generator
+    async def mock_scrobbles(*args, **kwargs):
+        """Mock async generator for get_all_scrobbles."""
+        scrobbles = [
+            {"name": "Scrobble Song 1", "artist": {"name": "Scrobble Artist 1"}},
+            {"name": "Scrobble Song 2", "artist": {"name": "Scrobble Artist 2"}},
+            {"name": "Song 1", "artist": {"name": "Artist 1"}},  # Duplicate of top track
+        ]
+        for scrobble in scrobbles:
+            yield scrobble
+
+    mock.get_all_scrobbles = mock_scrobbles
     return mock
 
 

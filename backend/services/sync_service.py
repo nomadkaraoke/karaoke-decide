@@ -57,6 +57,8 @@ class SyncService:
     LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
+    # Full scrobble history - fetches EVERY scrobble for complete coverage
+    LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching all scrobbles
 
     def __init__(
         self,
@@ -745,8 +747,13 @@ class SyncService:
     async def _fetch_lastfm_tracks(self, username: str) -> list[dict[str, Any]]:
         """Fetch tracks from Last.fm API with real play counts.
 
-        Uses get_all_top_tracks to fetch up to 1000 tracks ranked by play count,
-        plus loved tracks for additional coverage.
+        Fetches data in order of richness:
+        1. Top tracks (ranked by playcount, gives official aggregated counts)
+        2. Full scrobble history (gives complete coverage of ALL songs ever played)
+        3. Loved tracks (may include songs not scrobbled recently)
+
+        The full scrobble fetch ensures we capture every unique song the user
+        has ever listened to, not just their top 1000.
 
         Args:
             username: Last.fm username.
@@ -756,11 +763,13 @@ class SyncService:
         """
         tracks: list[dict[str, Any]] = []
         seen: set[str] = set()
+        # Track play counts from scrobbles (for songs not in top tracks)
+        scrobble_counts: dict[str, int] = {}
 
         logger.info(f"Starting Last.fm track fetch for username: {username}")
 
-        # Fetch top tracks (overall) with pagination - up to 1000 tracks
-        # This gives us tracks ranked by actual play count!
+        # Step 1: Fetch top tracks (overall) with pagination - up to 1000 tracks
+        # This gives us tracks ranked by actual play count with official aggregation
         top_tracks = await self.lastfm.get_all_top_tracks(
             username=username,
             period="overall",
@@ -779,7 +788,64 @@ class SyncService:
         top_count = len(tracks)
         logger.info(f"Last.fm top tracks total: {top_count} unique tracks")
 
-        # Fetch loved tracks (may include tracks not in top list)
+        # Step 2: Fetch FULL scrobble history for complete coverage
+        if self.LASTFM_FULL_SCROBBLE_HISTORY:
+            logger.info("Fetching complete Last.fm scrobble history...")
+            scrobble_count = 0
+            new_from_scrobbles = 0
+
+            async for scrobble in self.lastfm.get_all_scrobbles(username):
+                scrobble_count += 1
+
+                # Log progress every 10k scrobbles
+                if scrobble_count % 10000 == 0:
+                    logger.info(
+                        f"Last.fm scrobbles: processed {scrobble_count}, "
+                        f"found {new_from_scrobbles} new unique tracks"
+                    )
+
+                # Extract artist and title from scrobble
+                title = scrobble.get("name", "")
+                artist_data = scrobble.get("artist", {})
+                if isinstance(artist_data, dict):
+                    artist = artist_data.get("name", "") or artist_data.get("#text", "")
+                else:
+                    artist = str(artist_data)
+
+                if not title or not artist:
+                    continue
+
+                key = f"{artist}:{title}".lower()
+
+                # Count this scrobble
+                scrobble_counts[key] = scrobble_counts.get(key, 0) + 1
+
+                # If not already seen from top tracks, add it
+                if key not in seen:
+                    seen.add(key)
+                    new_from_scrobbles += 1
+                    tracks.append(
+                        {
+                            "artist": artist,
+                            "title": title,
+                            "playcount": None,  # Will be set from scrobble_counts below
+                            "rank": None,  # Not in top tracks
+                            "from_scrobbles": True,
+                        }
+                    )
+
+            # Update playcount for tracks discovered via scrobbles
+            for track in tracks:
+                if track.get("from_scrobbles") and track.get("playcount") is None:
+                    key = f"{track['artist']}:{track['title']}".lower()
+                    track["playcount"] = scrobble_counts.get(key, 1)
+
+            logger.info(
+                f"Last.fm scrobble history complete: {scrobble_count} total scrobbles, "
+                f"{new_from_scrobbles} new unique tracks discovered"
+            )
+
+        # Step 3: Fetch loved tracks (may include tracks not scrobbled recently)
         loved_count = 0
         page = 1
         fetched = 0
