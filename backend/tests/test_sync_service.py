@@ -1,6 +1,8 @@
 """Tests for sync service."""
 
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -140,7 +142,7 @@ def mock_lastfm_client() -> MagicMock:
     )
 
     # Mock for full scrobble history - async generator
-    async def mock_scrobbles(*args, **kwargs):
+    async def mock_scrobbles(*args: Any, **kwargs: Any) -> AsyncGenerator[dict[str, Any], None]:
         """Mock async generator for get_all_scrobbles."""
         scrobbles = [
             {"name": "Scrobble Song 1", "artist": {"name": "Scrobble Artist 1"}},
