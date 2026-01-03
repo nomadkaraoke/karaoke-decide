@@ -168,18 +168,17 @@ class TestAdminStats:
 
         # Configure mock to return different counts for different queries
         async def mock_count(collection: str, filters: list | None = None) -> int:
-            if collection == "users":
+            if collection == "decide_users":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
-                # All user queries now include user_id != "" filter for karaoke-decide users
+                # Stats queries use decide_users collection (karaoke-decide only)
                 if filter_dict.get("is_guest") is False:
                     return 60
                 if filter_dict.get("is_guest") is True:
                     return 40
                 if "last_sync_at" in filter_dict:
                     return 25
-                # Base case: just user_id filter = total users
-                if "user_id" in filter_dict:
-                    return 100
+                # Total users query (no filter)
+                return 100
             if collection == "sync_jobs":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
                 status = filter_dict.get("status")
@@ -295,9 +294,9 @@ class TestAdminUsersList:
         )
         assert response.status_code == 200
 
-        # Verify filter was applied (includes base filter for karaoke-decide users)
+        # Verify filter was applied (no user_id filter since decide_users only has karaoke-decide users)
         call_args = mock_admin_firestore_service.query_documents.call_args
-        assert call_args[1].get("filters") == [("user_id", "!=", ""), ("is_guest", "==", False)]
+        assert call_args[1].get("filters") == [("is_guest", "==", False)]
 
     def test_list_users_with_pagination(
         self,
@@ -488,7 +487,7 @@ class TestAdminSyncJobsList:
         def query_side_effect(collection: str, filters: list[Any] | None = None, **kwargs: Any) -> list[dict[str, Any]]:
             if collection == "sync_jobs":
                 return job_docs
-            if collection == "users" and filters:
+            if collection == "decide_users" and filters:
                 # Handle batch "in" query for user emails
                 for field, op, value in filters:
                     if field == "user_id" and op == "in":
@@ -569,7 +568,7 @@ class TestAdminSyncJobDetail:
                         },
                     ],
                 },
-                ("users", "user1"): {
+                ("decide_users", "user1"): {
                     "email": "user1@example.com",
                 },
             }.get((collection, doc_id))
@@ -622,7 +621,7 @@ class TestAdminSyncJobDetail:
                     "progress": None,
                     "results": [],
                 },
-                ("users", "user1"): {
+                ("decide_users", "user1"): {
                     "email": "user1@example.com",
                 },
             }.get((collection, doc_id))

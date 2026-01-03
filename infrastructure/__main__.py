@@ -191,18 +191,46 @@ sync_jobs_status_index = gcp.firestore.Index(
     ],
 )
 
-# Composite index for users filtering by is_guest and ordering by created_at
+# Composite index for decide_users filtering by is_guest and ordering by created_at
 # Required by: GET /api/admin/users (filtering verified/guest users with pagination)
-users_is_guest_index = gcp.firestore.Index(
-    "users-is-guest-created-index",
+decide_users_is_guest_index = gcp.firestore.Index(
+    "decide-users-is-guest-created-index",
     project=project,
     database="(default)",
-    collection="users",
+    collection="decide_users",
     fields=[
         {"field_path": "is_guest", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "DESCENDING"},
     ],
 )
+
+# Composite index for decide_users filtering by user_id
+# Required by: GET /api/admin/users (listing all users with pagination)
+# Note: decide_users is karaoke-decide's dedicated collection (separate from karaoke-gen's gen_users)
+# Index #1: user_id ASC, created_at DESC - for user lookups with ordering
+decide_users_user_id_index = gcp.firestore.Index(
+    "decide-users-user-id-created-index",
+    project=project,
+    database="(default)",
+    collection="decide_users",
+    fields=[
+        {"field_path": "user_id", "order": "ASCENDING"},
+        {"field_path": "created_at", "order": "DESCENDING"},
+    ],
+)
+
+# Index #2: created_at DESC, user_id DESC - for pagination ordering
+decide_users_created_user_id_index = gcp.firestore.Index(
+    "decide-users-created-user-id-index",
+    project=project,
+    database="(default)",
+    collection="decide_users",
+    fields=[
+        {"field_path": "created_at", "order": "DESCENDING"},
+        {"field_path": "user_id", "order": "DESCENDING"},
+    ],
+)
+
 
 # NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
 # It was created manually/automatically and is required by GET /api/services/sync/status

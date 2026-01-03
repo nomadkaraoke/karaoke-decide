@@ -22,7 +22,7 @@ class AuthenticationError(Exception):
 class AuthService:
     """Service for authentication operations."""
 
-    USERS_COLLECTION = "users"
+    USERS_COLLECTION = "decide_users"
     MAGIC_LINKS_COLLECTION = "magic_links"
 
     def __init__(

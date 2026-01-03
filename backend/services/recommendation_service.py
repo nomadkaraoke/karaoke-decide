@@ -74,7 +74,7 @@ class RecommendationService:
     """
 
     USER_SONGS_COLLECTION = "user_songs"
-    USERS_COLLECTION = "users"
+    USERS_COLLECTION = "decide_users"
 
     # BigQuery config
     PROJECT_ID = "nomadkaraoke"

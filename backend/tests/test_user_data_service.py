@@ -157,7 +157,7 @@ class TestUpdatePreferences:
 
         mock_firestore.update_document.assert_called_once()
         call_args = mock_firestore.update_document.call_args
-        assert call_args[0][0] == "users"
+        assert call_args[0][0] == "decide_users"
         assert call_args[0][1] == "email_hash_123"  # Uses the doc ID from query
         assert call_args[0][2]["quiz_decade_pref"] == "2000s"
         assert call_args[0][2]["quiz_energy_pref"] == "medium"

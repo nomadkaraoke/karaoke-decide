@@ -31,14 +31,14 @@ class UserDataService:
         """
         # Guest users: doc ID = user_id
         if user_id.startswith("guest_"):
-            doc = await self.firestore.get_document("users", user_id)
+            doc = await self.firestore.get_document("decide_users", user_id)
             if doc:
                 return doc, user_id
             return None, None
 
         # Verified users: query by user_id field
         docs = await self.firestore.query_documents(
-            collection="users",
+            collection="decide_users",
             filters=[("user_id", "==", user_id)],
             limit=1,
         )
@@ -176,12 +176,12 @@ class UserDataService:
 
         if doc_id:
             # Update existing user document
-            await self.firestore.update_document("users", doc_id, update_data)
+            await self.firestore.update_document("decide_users", doc_id, update_data)
         else:
             # User document doesn't exist - create it with set+merge
             # This handles edge cases where user exists in JWT but not in Firestore
             update_data["user_id"] = user_id
-            await self.firestore.set_document("users", user_id, update_data, merge=True)
+            await self.firestore.set_document("decide_users", user_id, update_data, merge=True)
 
         return await self.get_preferences(user_id)
 
@@ -258,7 +258,7 @@ class UserDataService:
         if doc_id:
             # Use ArrayUnion to add without duplicates
             await (
-                self.firestore.collection("users")
+                self.firestore.collection("decide_users")
                 .document(doc_id)
                 .update(
                     {
@@ -270,7 +270,7 @@ class UserDataService:
         else:
             # Create user document if it doesn't exist
             await self.firestore.set_document(
-                "users",
+                "decide_users",
                 user_id,
                 {
                     "user_id": user_id,
@@ -306,7 +306,7 @@ class UserDataService:
             matching = [a for a in quiz_artists if a.lower() == artist_name.lower()]
             if matching:
                 await (
-                    self.firestore.collection("users")
+                    self.firestore.collection("decide_users")
                     .document(doc_id)
                     .update(
                         {

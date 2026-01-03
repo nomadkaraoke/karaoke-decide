@@ -43,7 +43,7 @@ class QuizService:
     - Creating UserSong records from quiz responses
     """
 
-    USERS_COLLECTION = "users"
+    USERS_COLLECTION = "decide_users"
     USER_SONGS_COLLECTION = "user_songs"
     QUIZ_SONGS_CACHE_COLLECTION = "quiz_songs_cache"
 
