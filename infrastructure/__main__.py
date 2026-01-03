@@ -290,7 +290,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
         }
     ],
     scaling={
-        "min_instance_count": 0,
+        "min_instance_count": 1,  # Keep one instance warm to avoid cold starts
     },
     opts=pulumi.ResourceOptions(protect=True),
 )
