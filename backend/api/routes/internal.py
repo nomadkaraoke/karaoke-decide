@@ -103,8 +103,8 @@ async def process_sync_task(
 
         job = SyncJob.from_dict(job_data)
 
-        # Check if already completed or failed
-        if job.status in (SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
+        # Check if already in progress, completed, or failed
+        if job.status in (SyncJobStatus.IN_PROGRESS, SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
             logger.info(f"Job already {job.status.value}: {job_id}")
             return SyncProcessResponse(
                 job_id=job_id,
