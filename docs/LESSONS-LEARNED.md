@@ -15,6 +15,40 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-02: In-Memory Sorting for Complex Firestore Queries
+
+**Context:** Needed to sort user songs by multiple fields (playcount desc, rank asc, sync_count desc) for the "how well user knows" ranking.
+
+**Lesson:** Firestore doesn't support complex multi-field sorting in queries. For user libraries (typically <1000 items), in-memory sorting after fetching is simpler and performant enough.
+
+**Recommendation:** For user-scoped data with reasonable limits:
+```python
+# Fetch more than needed for pagination
+docs = await firestore.query_documents(collection, filters=[...], limit=1000)
+
+# Sort in memory with custom key function
+def sort_key(doc):
+    return (-doc.get("playcount", 0), doc.get("rank", 9999))
+
+sorted_docs = sorted(docs, key=sort_key)
+paginated = sorted_docs[offset:offset+limit]
+```
+
+---
+
+### 2026-01-02: Distinguish Sync Count from Actual Play Count
+
+**Context:** The `play_count` field was misleadingly storing "times seen during sync" not actual plays.
+
+**Lesson:** Be explicit about what counts mean. "play_count" sounds like actual plays, but was really just how many times we saw the track during sync operations.
+
+**Recommendation:** Use clear field names:
+- `sync_count` - Times track appeared during sync (dedup counter)
+- `playcount` - Actual play count from Last.fm
+- `rank` - Position in user's top list from streaming service
+
+---
+
 ### 2026-01-02: Mock google.cloud Before Imports in conftest.py
 
 **Context:** Adding new API routes that triggered imports of modules using `google.cloud.tasks_v2`, which isn't available in the test environment.

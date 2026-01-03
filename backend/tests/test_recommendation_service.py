@@ -334,20 +334,38 @@ class TestGetUserSongs:
         recommendation_service: RecommendationService,
         mock_firestore: MagicMock,
     ) -> None:
-        """Supports pagination."""
-        mock_firestore.query_documents = AsyncMock(return_value=[])
-        mock_firestore.count_documents = AsyncMock(return_value=100)
+        """Supports pagination with in-memory sorting."""
+        # Create 5 mock song documents with playcounts for sorting
+        mock_docs = [
+            {
+                "id": f"user_123:song_{i}",
+                "user_id": "user_123",
+                "song_id": f"song_{i}",
+                "artist": f"Artist {i}",
+                "title": f"Title {i}",
+                "source": "lastfm",
+                "playcount": 100 - i * 10,  # Descending playcount
+                "rank": i + 1,
+                "created_at": "2024-01-01T00:00:00+00:00",
+                "updated_at": "2024-01-01T00:00:00+00:00",
+            }
+            for i in range(5)
+        ]
+        mock_firestore.query_documents = AsyncMock(return_value=mock_docs)
+        mock_firestore.count_documents = AsyncMock(return_value=5)
 
+        # Request page 2 with limit 2
         songs, total = await recommendation_service.get_user_songs(
             user_id="user_123",
-            limit=20,
-            offset=40,
+            limit=2,
+            offset=2,
         )
 
-        # Verify pagination params passed
-        call_args = mock_firestore.query_documents.call_args
-        assert call_args[1]["limit"] == 20
-        assert call_args[1]["offset"] == 40
+        assert len(songs) == 2
+        assert total == 5
+        # Should be songs at indices 2 and 3 (after sorting by playcount desc)
+        assert songs[0].song_id == "song_2"
+        assert songs[1].song_id == "song_3"
 
 
 class TestBuildUserContext:

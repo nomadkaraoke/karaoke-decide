@@ -290,24 +290,48 @@ export function ConnectedServicesSection({
     );
   }
 
+  const spotifyConnected = isConnected("spotify");
+  const lastfmConnected = isConnected("lastfm");
+
   return (
     <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
-      {/* Header */}
+      {/* Header - shows service logos when collapsed */}
       <button
         onClick={onToggle}
         aria-expanded={isExpanded}
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#00f5ff]/20 flex items-center justify-center">
-            <SpotifyIcon className="w-5 h-5 text-[#00f5ff]" />
-          </div>
+          {/* Show connected service logos or generic icon */}
+          {connectedCount > 0 ? (
+            <div className="flex items-center gap-1">
+              {spotifyConnected && (
+                <div className="w-9 h-9 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
+                  <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
+                </div>
+              )}
+              {lastfmConnected && (
+                <div className="w-9 h-9 rounded-full bg-[#D51007]/20 flex items-center justify-center">
+                  <LastfmIcon className="w-4 h-4 text-[#ff4444]" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+              <SpotifyIcon className="w-5 h-5 text-white/40" />
+            </div>
+          )}
           <div>
             <h2 className="font-semibold text-white">Connected Services</h2>
             <p className="text-sm text-white/60">
               {connectedCount === 0
                 ? "No services connected"
-                : `${connectedCount} service${connectedCount > 1 ? "s" : ""} connected`}
+                : [
+                    spotifyConnected && "Spotify",
+                    lastfmConnected && "Last.fm",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
             </p>
           </div>
         </div>

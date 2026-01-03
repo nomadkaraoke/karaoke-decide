@@ -51,11 +51,14 @@ class SyncService:
 
     # Limits for API fetching
     SPOTIFY_SAVED_TRACKS_LIMIT = 500
-    SPOTIFY_TOP_TRACKS_LIMIT = 100
+    SPOTIFY_TOP_TRACKS_LIMIT = 150  # 50 per time range × 3
     SPOTIFY_RECENT_TRACKS_LIMIT = 50
-    LASTFM_TOP_TRACKS_LIMIT = 500
-    LASTFM_LOVED_TRACKS_LIMIT = 200
-    LASTFM_RECENT_TRACKS_LIMIT = 200
+    # Last.fm has much richer data - fetch more!
+    LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
+    LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
+    LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
+    # Full scrobble history - fetches EVERY scrobble for complete coverage
+    LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching all scrobbles
 
     def __init__(
         self,
@@ -421,7 +424,10 @@ class SyncService:
         return stored
 
     async def _fetch_and_store_lastfm_artists(self, user_id: str, username: str) -> int:
-        """Fetch and store user's top artists from Last.fm.
+        """Fetch and store user's top artists from Last.fm with full pagination.
+
+        Fetches up to 1000 artists ranked by play count, providing comprehensive
+        data about which artists the user knows best.
 
         Args:
             user_id: User ID.
@@ -433,36 +439,50 @@ class SyncService:
         stored = 0
         now = datetime.now(UTC)
 
-        # Fetch top artists for different time periods
-        for period in ["overall", "12month", "6month"]:
-            try:
-                response = await self.lastfm.get_top_artists(username, period=period, limit=50)
-                artists = response.get("topartists", {}).get("artist", [])
+        try:
+            # Fetch top artists with pagination - up to 1000 artists!
+            artists = await self.lastfm.get_all_top_artists(
+                username=username,
+                period="overall",
+                max_artists=self.LASTFM_TOP_ARTISTS_LIMIT,
+            )
+            logger.info(f"Last.fm artists: fetched {len(artists)} artists with play counts")
 
-                for rank, artist in enumerate(artists, 1):
-                    artist_name = artist.get("name", "")
-                    # Create unique ID using normalized name
-                    safe_name = artist_name.lower().replace(" ", "_")[:50]
-                    artist_id = f"{user_id}:lastfm:{safe_name}:{period}"
+            for artist in artists:
+                artist_name = artist.get("name", "")
+                if not artist_name:
+                    continue
 
-                    artist_data = {
-                        "id": artist_id,
-                        "user_id": user_id,
-                        "source": "lastfm",
-                        "artist_name": artist_name,
-                        "rank": rank,
-                        "period": period,
-                        "playcount": int(artist.get("playcount", 0)),
-                        "updated_at": now.isoformat(),
-                    }
+                # Create unique ID using normalized name
+                safe_name = artist_name.lower().replace(" ", "_")[:50]
+                artist_id = f"{user_id}:lastfm:{safe_name}"
 
-                    await self.firestore.set_document("user_artists", artist_id, artist_data)
-                    stored += 1
+                # Get playcount (this is the real listen count!)
+                playcount = 0
+                if "playcount" in artist:
+                    try:
+                        playcount = int(artist["playcount"])
+                    except (ValueError, TypeError):
+                        pass
 
-            except Exception:
-                # Continue with other periods if one fails
-                continue
+                artist_data = {
+                    "id": artist_id,
+                    "user_id": user_id,
+                    "source": "lastfm",
+                    "artist_name": artist_name,
+                    "rank": artist.get("rank", stored + 1),
+                    "period": "overall",
+                    "playcount": playcount,
+                    "updated_at": now.isoformat(),
+                }
 
+                await self.firestore.set_document("user_artists", artist_id, artist_data)
+                stored += 1
+
+        except Exception as e:
+            logger.error(f"Error fetching Last.fm artists: {e}")
+
+        logger.info(f"Last.fm artists: stored {stored} artists")
         return stored
 
     async def sync_spotify(self, user_id: str, service: MusicService) -> SyncResult:
@@ -651,33 +671,23 @@ class SyncService:
 
         logger.info(f"Spotify saved tracks total: {saved_count} unique tracks")
 
-        # Fetch top tracks (medium term - ~6 months)
-        top_medium_count = 0
-        response = await self.spotify.get_top_tracks(access_token, time_range="medium_term", limit=50)
-        logger.info(f"Spotify top tracks (medium_term): {len(response.get('items', []))} items")
-        for track in response.get("items", []):
-            track_info = self._extract_spotify_track_info(track)
-            if track_info:
-                key = f"{track_info['artist']}:{track_info['title']}".lower()
-                if key not in seen:
-                    seen.add(key)
-                    tracks.append(track_info)
-                    top_medium_count += 1
-        logger.info(f"Spotify top tracks (medium_term): {top_medium_count} new unique tracks")
+        # Fetch top tracks for all time ranges with rank preservation
+        for time_range in ["short_term", "medium_term", "long_term"]:
+            top_count = 0
+            response = await self.spotify.get_top_tracks(access_token, time_range=time_range, limit=50)
+            items = response.get("items", [])
+            logger.info(f"Spotify top tracks ({time_range}): {len(items)} items")
 
-        # Fetch top tracks (long term - all time)
-        top_long_count = 0
-        response = await self.spotify.get_top_tracks(access_token, time_range="long_term", limit=50)
-        logger.info(f"Spotify top tracks (long_term): {len(response.get('items', []))} items")
-        for track in response.get("items", []):
-            track_info = self._extract_spotify_track_info(track)
-            if track_info:
-                key = f"{track_info['artist']}:{track_info['title']}".lower()
-                if key not in seen:
-                    seen.add(key)
-                    tracks.append(track_info)
-                    top_long_count += 1
-        logger.info(f"Spotify top tracks (long_term): {top_long_count} new unique tracks")
+            for rank, track in enumerate(items, 1):
+                track_info = self._extract_spotify_track_info(track, rank=rank, time_range=time_range)
+                if track_info:
+                    key = f"{track_info['artist']}:{track_info['title']}".lower()
+                    if key not in seen:
+                        seen.add(key)
+                        tracks.append(track_info)
+                        top_count += 1
+
+            logger.info(f"Spotify top tracks ({time_range}): {top_count} new unique tracks")
 
         # Fetch recently played
         recent_count = 0
@@ -697,11 +707,15 @@ class SyncService:
         logger.info(f"Spotify fetch complete: {len(tracks)} total unique tracks")
         return tracks
 
-    def _extract_spotify_track_info(self, track: dict[str, Any]) -> dict[str, Any] | None:
+    def _extract_spotify_track_info(
+        self, track: dict[str, Any], rank: int | None = None, time_range: str | None = None
+    ) -> dict[str, Any] | None:
         """Extract track info from Spotify track object.
 
         Args:
             track: Spotify track object.
+            rank: Optional rank in user's top list (1-50).
+            time_range: Optional time range for top tracks (short_term, medium_term, long_term).
 
         Returns:
             Dict with track info, or None if invalid.
@@ -726,55 +740,115 @@ class SyncService:
             "popularity": track.get("popularity", 0),
             "duration_ms": track.get("duration_ms"),
             "explicit": track.get("explicit", False),
+            "rank": rank,
+            "time_range": time_range,
         }
 
-    async def _fetch_lastfm_tracks(self, username: str) -> list[dict[str, str]]:
-        """Fetch tracks from Last.fm API.
+    async def _fetch_lastfm_tracks(self, username: str) -> list[dict[str, Any]]:
+        """Fetch tracks from Last.fm API with real play counts.
 
-        Combines top tracks, loved tracks, and recent tracks.
+        Fetches data in order of richness:
+        1. Top tracks (ranked by playcount, gives official aggregated counts)
+        2. Full scrobble history (gives complete coverage of ALL songs ever played)
+        3. Loved tracks (may include songs not scrobbled recently)
+
+        The full scrobble fetch ensures we capture every unique song the user
+        has ever listened to, not just their top 1000.
 
         Args:
             username: Last.fm username.
 
         Returns:
-            List of dicts with 'artist' and 'title' keys.
+            List of dicts with 'artist', 'title', 'playcount', 'rank' keys.
         """
-        tracks: list[dict[str, str]] = []
+        tracks: list[dict[str, Any]] = []
         seen: set[str] = set()
+        # Track play counts from scrobbles (for songs not in top tracks)
+        scrobble_counts: dict[str, int] = {}
 
         logger.info(f"Starting Last.fm track fetch for username: {username}")
 
-        # Fetch top tracks (overall)
-        page = 1
-        fetched = 0
-        top_count = 0
-        while fetched < self.LASTFM_TOP_TRACKS_LIMIT:
-            response = await self.lastfm.get_top_tracks(username, period="overall", limit=100, page=page)
-            items = response.get("toptracks", {}).get("track", [])
-            logger.info(f"Last.fm top tracks: page={page}, items returned={len(items)}")
-            if not items:
-                break
+        # Step 1: Fetch top tracks (overall) with pagination - up to 1000 tracks
+        # This gives us tracks ranked by actual play count with official aggregation
+        top_tracks = await self.lastfm.get_all_top_tracks(
+            username=username,
+            period="overall",
+            max_tracks=self.LASTFM_TOP_TRACKS_LIMIT,
+        )
+        logger.info(f"Last.fm top tracks: fetched {len(top_tracks)} tracks with play counts")
 
-            for item in items:
-                track_info = self._extract_lastfm_track_info(item)
-                if track_info:
-                    key = f"{track_info['artist']}:{track_info['title']}".lower()
-                    if key not in seen:
-                        seen.add(key)
-                        tracks.append(track_info)
-                        fetched += 1
-                        top_count += 1
+        for item in top_tracks:
+            track_info = self._extract_lastfm_track_info(item)
+            if track_info:
+                key = f"{track_info['artist']}:{track_info['title']}".lower()
+                if key not in seen:
+                    seen.add(key)
+                    tracks.append(track_info)
 
-            if len(items) < 100:
-                break
-            page += 1
-
+        top_count = len(tracks)
         logger.info(f"Last.fm top tracks total: {top_count} unique tracks")
 
-        # Fetch loved tracks
+        # Step 2: Fetch FULL scrobble history for complete coverage
+        if self.LASTFM_FULL_SCROBBLE_HISTORY:
+            logger.info("Fetching complete Last.fm scrobble history...")
+            scrobble_count = 0
+            new_from_scrobbles = 0
+
+            async for scrobble in self.lastfm.get_all_scrobbles(username):
+                scrobble_count += 1
+
+                # Log progress every 10k scrobbles
+                if scrobble_count % 10000 == 0:
+                    logger.info(
+                        f"Last.fm scrobbles: processed {scrobble_count}, "
+                        f"found {new_from_scrobbles} new unique tracks"
+                    )
+
+                # Extract artist and title from scrobble
+                title = scrobble.get("name", "")
+                artist_data = scrobble.get("artist", {})
+                if isinstance(artist_data, dict):
+                    artist = artist_data.get("name", "") or artist_data.get("#text", "")
+                else:
+                    artist = str(artist_data)
+
+                if not title or not artist:
+                    continue
+
+                key = f"{artist}:{title}".lower()
+
+                # Count this scrobble
+                scrobble_counts[key] = scrobble_counts.get(key, 0) + 1
+
+                # If not already seen from top tracks, add it
+                if key not in seen:
+                    seen.add(key)
+                    new_from_scrobbles += 1
+                    tracks.append(
+                        {
+                            "artist": artist,
+                            "title": title,
+                            "playcount": None,  # Will be set from scrobble_counts below
+                            "rank": None,  # Not in top tracks
+                            "from_scrobbles": True,
+                        }
+                    )
+
+            # Update playcount for tracks discovered via scrobbles
+            for track in tracks:
+                if track.get("from_scrobbles") and track.get("playcount") is None:
+                    key = f"{track['artist']}:{track['title']}".lower()
+                    track["playcount"] = scrobble_counts.get(key, 1)
+
+            logger.info(
+                f"Last.fm scrobble history complete: {scrobble_count} total scrobbles, "
+                f"{new_from_scrobbles} new unique tracks discovered"
+            )
+
+        # Step 3: Fetch loved tracks (may include tracks not scrobbled recently)
+        loved_count = 0
         page = 1
         fetched = 0
-        loved_count = 0
         while fetched < self.LASTFM_LOVED_TRACKS_LIMIT:
             response = await self.lastfm.get_loved_tracks(username, limit=100, page=page)
             items = response.get("lovedtracks", {}).get("track", [])
@@ -788,6 +862,8 @@ class SyncService:
                     key = f"{track_info['artist']}:{track_info['title']}".lower()
                     if key not in seen:
                         seen.add(key)
+                        # Loved tracks don't have playcount, mark as loved
+                        track_info["is_loved"] = True
                         tracks.append(track_info)
                         fetched += 1
                         loved_count += 1
@@ -797,38 +873,18 @@ class SyncService:
             page += 1
 
         logger.info(f"Last.fm loved tracks total: {loved_count} new unique tracks")
-
-        # Fetch recent tracks
-        recent_count = 0
-        response = await self.lastfm.get_recent_tracks(username, limit=200, page=1)
-        items = response.get("recenttracks", {}).get("track", [])
-        logger.info(f"Last.fm recent tracks: {len(items)} items returned")
-        for item in items:
-            # Skip currently playing track (has @attr with nowplaying)
-            if item.get("@attr", {}).get("nowplaying"):
-                continue
-
-            track_info = self._extract_lastfm_track_info(item)
-            if track_info:
-                key = f"{track_info['artist']}:{track_info['title']}".lower()
-                if key not in seen:
-                    seen.add(key)
-                    tracks.append(track_info)
-                    recent_count += 1
-
-        logger.info(f"Last.fm recent tracks: {recent_count} new unique tracks")
         logger.info(f"Last.fm fetch complete: {len(tracks)} total unique tracks")
 
         return tracks
 
-    def _extract_lastfm_track_info(self, track: dict[str, Any]) -> dict[str, str] | None:
-        """Extract artist and title from Last.fm track object.
+    def _extract_lastfm_track_info(self, track: dict[str, Any]) -> dict[str, Any] | None:
+        """Extract artist, title, and playcount from Last.fm track object.
 
         Args:
-            track: Last.fm track object.
+            track: Last.fm track object (from top tracks or recent tracks).
 
         Returns:
-            Dict with 'artist' and 'title', or None if invalid.
+            Dict with 'artist', 'title', 'playcount', 'rank', or None if invalid.
         """
         if not track:
             return None
@@ -845,7 +901,23 @@ class SyncService:
         if not title or not artist:
             return None
 
-        return {"artist": artist, "title": title}
+        # Extract playcount (available in top tracks, not in recent tracks)
+        playcount = None
+        if "playcount" in track:
+            try:
+                playcount = int(track["playcount"])
+            except (ValueError, TypeError):
+                pass
+
+        # Extract rank (we add this in get_all_top_tracks)
+        rank = track.get("rank")
+
+        return {
+            "artist": artist,
+            "title": title,
+            "playcount": playcount,
+            "rank": rank,
+        }
 
     async def _upsert_user_songs(
         self,
@@ -881,7 +953,7 @@ class SyncService:
                 title = catalog_song.title
             else:
                 # Unmatched track - use synthetic ID based on normalized values
-                song_id = f"spotify:{match.normalized_artist}:{match.normalized_title}"
+                song_id = f"{source}:{match.normalized_artist}:{match.normalized_title}"
                 artist = match.original_artist
                 title = match.original_title
 
@@ -891,29 +963,40 @@ class SyncService:
             existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
 
             if existing:
-                # Update existing - increment sync count
-                # NOTE: play_count here represents "times seen during sync", not actual plays.
-                # This is a known limitation - consider renaming to sync_count in future.
-                # See: https://github.com/nomadkaraoke/karaoke-decide/pull/5
-                current_play_count = existing.get("play_count", 0)
+                # Update existing record
+                update_data: dict[str, Any] = {
+                    "updated_at": now.isoformat(),
+                }
+
+                # Update playcount if we have new data from Last.fm
+                if match.playcount is not None:
+                    update_data["playcount"] = match.playcount
+                    update_data["last_played_at"] = now.isoformat()
+
+                # Update rank if available
+                if match.rank is not None:
+                    update_data["rank"] = match.rank
+
+                # Increment sync_count (tracks how many times we've seen this in sync)
+                current_sync_count = existing.get("sync_count", existing.get("play_count", 0))
+                update_data["sync_count"] = current_sync_count + 1
+
                 await self.firestore.update_document(
                     self.USER_SONGS_COLLECTION,
                     user_song_id,
-                    {
-                        "play_count": current_play_count + 1,
-                        "last_played_at": now.isoformat(),
-                        "updated_at": now.isoformat(),
-                    },
+                    update_data,
                 )
                 updated += 1
             else:
                 # Create new UserSong
-                user_song_data = {
+                user_song_data: dict[str, Any] = {
                     "id": user_song_id,
                     "user_id": user_id,
                     "song_id": song_id,
                     "source": source,
-                    "play_count": 1,
+                    "sync_count": 1,  # Times seen during sync (not actual plays)
+                    "playcount": match.playcount,  # Actual play count from Last.fm (if available)
+                    "rank": match.rank,  # Rank in user's top list (if available)
                     "last_played_at": now.isoformat(),
                     "is_saved": source == "spotify",  # Spotify saved tracks are "saved"
                     "times_sung": 0,

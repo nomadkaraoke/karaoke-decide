@@ -611,12 +611,11 @@ Get songs from user's listening history matched to karaoke catalog.
       "title": "Bohemian Rhapsody",
       "source": "spotify",
       "play_count": 10,
+      "playcount": 250,
+      "rank": 5,
+      "spotify_popularity": 85,
       "is_saved": true,
-      "times_sung": 2,
-      "last_played_at": "2024-01-15T12:00:00Z",
-      "last_sung_at": "2024-01-10T20:00:00Z",
-      "average_rating": 4.5,
-      "notes": "Great for warming up"
+      "times_sung": 2
     }
   ],
   "total": 150,
