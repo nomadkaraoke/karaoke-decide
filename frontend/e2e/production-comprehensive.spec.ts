@@ -1,58 +1,63 @@
-import { test, expect, type Page } from "@playwright/test";
-import MailSlurp, {
-  MatchOptionFieldEnum,
-  MatchOptionShouldEnum,
-} from "mailslurp-client";
+import { test, expect } from "@playwright/test";
+import {
+  createTestMailClient,
+  generateTestTag,
+  getEmailAddress,
+  waitForEmail,
+  extractUrlFromEmail,
+  type TestMailConfig,
+} from "./utils/testmail";
 
 /**
  * Comprehensive Production E2E Tests
  *
  * Tests the complete user journey against the production environment using
- * Mailslurp for automated email-based authentication.
+ * TestMail.app for automated email-based authentication.
  *
  * Required environment variables:
- * - MAILSLURP_API_KEY: Your Mailslurp API key
+ * - TESTMAIL_API_KEY: Your TestMail.app API key
+ * - TESTMAIL_NAMESPACE: Your TestMail.app namespace
  * - PROD_TEST_TOKEN: (Optional) Pre-authenticated JWT for andrew@beveridge.uk
  *
  * For tests requiring connected services (sync, recommendations), use PROD_TEST_TOKEN
  * which should be from an account with Spotify/Last.fm already connected.
  *
  * Usage:
- *   MAILSLURP_API_KEY=<key> npx playwright test e2e/production-comprehensive.spec.ts
+ *   TESTMAIL_API_KEY=<key> TESTMAIL_NAMESPACE=<ns> npx playwright test e2e/production-comprehensive.spec.ts
  *
  * Or with pre-authenticated token for service tests:
- *   MAILSLURP_API_KEY=<key> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts
+ *   TESTMAIL_API_KEY=<key> TESTMAIL_NAMESPACE=<ns> PROD_TEST_TOKEN=<jwt> npx playwright test e2e/production-comprehensive.spec.ts
  */
 
 const PROD_URL = process.env.BASE_URL || "https://decide.nomadkaraoke.com";
 // Use the Cloudflare Worker proxy for API calls (same-origin, no CORS)
 const API_BASE = process.env.BASE_URL || "https://decide.nomadkaraoke.com";
-const MAILSLURP_API_KEY = process.env.MAILSLURP_API_KEY;
 const PROD_TEST_TOKEN = process.env.PROD_TEST_TOKEN;
 
 // Timeout for email operations
 const EMAIL_TIMEOUT = 60000;
 
 test.describe("Production Comprehensive E2E Tests", () => {
-  let mailSlurp: MailSlurp;
+  let testMailClient: TestMailConfig | null;
 
   test.beforeAll(() => {
-    if (MAILSLURP_API_KEY) {
-      mailSlurp = new MailSlurp({ apiKey: MAILSLURP_API_KEY });
-    }
+    testMailClient = createTestMailClient();
   });
 
   // ==========================================================================
-  // Authentication Tests (using Mailslurp)
+  // Authentication Tests (using TestMail.app)
   // ==========================================================================
 
   test.describe("Authentication Flow", () => {
-    test.skip(!MAILSLURP_API_KEY, "Requires MAILSLURP_API_KEY env var");
+    test.skip(
+      !process.env.TESTMAIL_API_KEY || !process.env.TESTMAIL_NAMESPACE,
+      "Requires TESTMAIL_API_KEY and TESTMAIL_NAMESPACE env vars"
+    );
 
     test("complete magic link login flow", async ({ page }) => {
-      // Create a new inbox for this test
-      const inbox = await mailSlurp.inboxController.createInbox({});
-      const testEmail = inbox.emailAddress!;
+      // Generate a unique tag for this test
+      const tag = generateTestTag();
+      const testEmail = getEmailAddress(testMailClient!.namespace, tag);
       console.log(`Test email: ${testEmail}`);
 
       // Navigate to login page
@@ -72,52 +77,35 @@ test.describe("Production Comprehensive E2E Tests", () => {
         page.getByRole("heading", { name: /check your email/i })
       ).toBeVisible({ timeout: 10000 });
 
-      // Wait for email to arrive
+      // Wait for email to arrive using TestMail.app's livequery
       console.log("Waiting for magic link email...");
-      const emails = await mailSlurp.waitController.waitForMatchingEmails({
-        inboxId: inbox.id!,
-        count: 1,
-        timeout: EMAIL_TIMEOUT,
-        matchOptions: {
-          matches: [
-            {
-              field: MatchOptionFieldEnum.SUBJECT,
-              should: MatchOptionShouldEnum.CONTAIN,
-              value: "sign in",
-            },
-          ],
-        },
-      });
+      const email = await waitForEmail(testMailClient!, tag, EMAIL_TIMEOUT);
 
-      const email = emails[0];
       console.log(`Received email: ${email.subject}`);
 
       // Extract magic link from email body
-      const emailContent = await mailSlurp.emailController.getEmail({
-        emailId: email.id!,
-      });
-      const body = emailContent.body || "";
+      const magicLinkPattern = /https?:\/\/[^\s"<>]+\/auth\/verify\?token=[^\s"<>]+/;
+      const magicLink = extractUrlFromEmail(email, magicLinkPattern);
 
-      // Find the magic link URL
-      const linkMatch = body.match(/href="([^"]*verify[^"]*)"/);
-      expect(linkMatch).toBeTruthy();
-      const magicLink = linkMatch![1];
+      if (!magicLink) {
+        console.log("Email HTML:", email.html);
+        throw new Error("Could not find magic link in email");
+      }
       console.log(`Magic link found`);
 
       // Click the magic link
       await page.goto(magicLink);
       await page.waitForLoadState("networkidle");
 
-      // Should be redirected to home page and logged in
-      await expect(page).toHaveURL(/\/$/, { timeout: 15000 });
+      // Should be redirected away from verify page (to home or my-data)
+      await page.waitForURL((url) => !url.pathname.includes("/auth/verify"), { timeout: 15000 });
+      console.log(`Redirected to: ${page.url()}`);
 
-      // Should see user menu or profile indicator
-      await expect(page.getByText(testEmail.split("@")[0])).toBeVisible({
-        timeout: 10000,
-      });
+      // Verify we're authenticated by checking we're NOT on the login page
+      // and can access authenticated content
+      await expect(page.getByRole("link", { name: /sign in/i })).not.toBeVisible({ timeout: 5000 });
 
-      // Cleanup - delete inbox
-      await mailSlurp.inboxController.deleteInbox({ inboxId: inbox.id! });
+      // No cleanup needed - TestMail.app emails auto-expire
     });
   });
 

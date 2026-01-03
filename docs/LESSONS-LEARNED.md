@@ -554,7 +554,7 @@ gcloud secrets add-iam-policy-binding SECRET_NAME \
 
 ### 2025-12-31: Never Hardcode API Keys in Test Files
 
-**Context:** E2E test file committed with hardcoded Mailslurp API key.
+**Context:** E2E test file committed with hardcoded API key.
 
 **Lesson:** API keys in source code are a security risk and can be scraped by bots. Always use environment variables for secrets, even in test files.
 
@@ -564,7 +564,7 @@ gcloud secrets add-iam-policy-binding SECRET_NAME \
 const API_KEY = "sk_actual_key_value";
 
 // GOOD - read from environment
-const API_KEY = process.env.MAILSLURP_API_KEY || "";
+const API_KEY = process.env.TESTMAIL_API_KEY || "";
 ```
 
 ---
