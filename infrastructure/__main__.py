@@ -231,6 +231,7 @@ decide_users_created_user_id_index = gcp.firestore.Index(
     ],
 )
 
+
 # NOTE: Composite index for sync_jobs (user_id ASC, created_at DESC) already exists
 # It was created manually/automatically and is required by GET /api/services/sync/status
 # Not managed by Pulumi to avoid conflicts with existing index
