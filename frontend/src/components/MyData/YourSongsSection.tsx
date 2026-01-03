@@ -11,9 +11,12 @@ interface UserSong {
   artist: string;
   title: string;
   source: string;
-  play_count: number;
+  sync_count?: number;  // Times seen during sync (legacy)
+  playcount?: number;   // Actual play count from Last.fm
+  rank?: number;        // Rank in user's top list
   is_saved: boolean;
   times_sung: number;
+  spotify_popularity?: number;
 }
 
 interface Props {
@@ -89,7 +92,7 @@ export function YourSongsSection({
             <MusicIcon className="w-5 h-5 text-[#b347ff]" />
           </div>
           <div>
-            <h2 className="font-semibold text-white">Your Songs</h2>
+            <h2 className="font-semibold text-white">Songs You Know</h2>
             <p className="text-sm text-white/60">
               {total === 0
                 ? "No songs yet"
@@ -142,9 +145,14 @@ export function YourSongsSection({
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {song.play_count > 0 && (
-                        <span className="text-xs text-white/40">
-                          {song.play_count} plays
+                      {song.playcount && song.playcount > 0 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                          {song.playcount.toLocaleString()} plays
+                        </span>
+                      )}
+                      {song.rank && song.rank <= 50 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-[#b347ff]/20 text-[#b347ff]/80">
+                          #{song.rank}
                         </span>
                       )}
                       <SourceBadge source={song.source as "spotify" | "lastfm" | "quiz"} />

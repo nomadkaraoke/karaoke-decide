@@ -93,7 +93,9 @@ class UserSong(BaseModel):
     source: Literal["spotify", "lastfm", "quiz", "known_songs"] = "spotify"
 
     # From listening history
-    play_count: int = 0
+    play_count: int = 0  # Legacy: sync count (times seen during sync)
+    playcount: int | None = None  # Actual play count from Last.fm
+    rank: int | None = None  # Rank in user's top list
     last_played_at: datetime | None = None
     is_saved: bool = False
 

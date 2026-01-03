@@ -25,7 +25,10 @@ class UserSongResponse(BaseModel):
     artist: str
     title: str
     source: str
-    play_count: int
+    play_count: int  # Legacy: sync count
+    playcount: int | None = None  # Actual play count from Last.fm
+    rank: int | None = None  # Rank in user's top list
+    spotify_popularity: int | None = None  # Spotify popularity (0-100)
     is_saved: bool
     times_sung: int
 
@@ -126,6 +129,9 @@ async def get_my_songs(
                 title=song.title,
                 source=song.source,
                 play_count=song.play_count,
+                playcount=song.playcount,
+                rank=song.rank,
+                spotify_popularity=song.spotify_popularity,
                 is_saved=song.is_saved,
                 times_sung=song.times_sung,
             )

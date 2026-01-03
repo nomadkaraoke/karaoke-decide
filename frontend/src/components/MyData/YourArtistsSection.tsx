@@ -137,7 +137,7 @@ export function YourArtistsSection({
             <span className="text-lg">*</span>
           </div>
           <div>
-            <h2 className="font-semibold text-white">Your Artists</h2>
+            <h2 className="font-semibold text-white">Artists You Know</h2>
             <p className="text-sm text-white/60">
               {artists.length === 0
                 ? "No artists yet"
@@ -235,12 +235,25 @@ export function YourArtistsSection({
                                 className="group flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 text-sm text-white/80 hover:bg-white/20 transition-colors"
                               >
                                 <span>{artist.artist_name}</span>
+                                {/* Show rank for top 10 */}
                                 {artist.rank && artist.rank <= 10 && (
                                   <span
                                     className="text-xs"
                                     style={{ color: config.color }}
                                   >
                                     #{artist.rank}
+                                  </span>
+                                )}
+                                {/* Show playcount pill (primarily Last.fm data) */}
+                                {artist.playcount && artist.playcount > 0 && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                                    {artist.playcount.toLocaleString()} plays
+                                  </span>
+                                )}
+                                {/* Show popularity pill for Spotify artists */}
+                                {source === "spotify" && artist.popularity !== null && artist.popularity > 0 && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-[#1DB954]/20 text-[#1DB954]/80">
+                                    Pop: {artist.popularity}
                                   </span>
                                 )}
                                 <button

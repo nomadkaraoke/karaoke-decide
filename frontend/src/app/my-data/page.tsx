@@ -46,9 +46,9 @@ export default function MyDataPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Expanded sections
+  // Expanded sections - preferences expanded by default, services collapsed
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["services"])
+    new Set(["preferences"])
   );
 
   // Refresh trigger for child components
@@ -162,33 +162,33 @@ export default function MyDataPage() {
                 </div>
               )}
 
-              {/* Sections */}
+              {/* Sections - Reordered with Preferences first */}
               <div className="space-y-4">
-                {/* Connected Services */}
-                <ConnectedServicesSection
-                  isExpanded={expandedSections.has("services")}
-                  onToggle={() => toggleSection("services")}
-                  onSyncComplete={handleSyncComplete}
+                {/* Preferences (most actionable, first) */}
+                <PreferencesSection
+                  isExpanded={expandedSections.has("preferences")}
+                  onToggle={() => toggleSection("preferences")}
                 />
 
-                {/* Your Artists */}
+                {/* Artists You Know */}
                 <YourArtistsSection
                   isExpanded={expandedSections.has("artists")}
                   onToggle={() => toggleSection("artists")}
                   refreshTrigger={refreshTrigger}
                 />
 
-                {/* Your Songs */}
+                {/* Songs You Know */}
                 <YourSongsSection
                   isExpanded={expandedSections.has("songs")}
                   onToggle={() => toggleSection("songs")}
                   refreshTrigger={refreshTrigger}
                 />
 
-                {/* Preferences */}
-                <PreferencesSection
-                  isExpanded={expandedSections.has("preferences")}
-                  onToggle={() => toggleSection("preferences")}
+                {/* Connected Services (collapsed by default, at bottom) */}
+                <ConnectedServicesSection
+                  isExpanded={expandedSections.has("services")}
+                  onToggle={() => toggleSection("services")}
+                  onSyncComplete={handleSyncComplete}
                 />
 
                 {/* Feedback section (future placeholder) */}

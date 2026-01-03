@@ -26,6 +26,10 @@ class MatchedTrack:
     duration_ms: int | None = None
     explicit: bool = False
 
+    # Last.fm specific metadata
+    playcount: int | None = None  # Actual play count from Last.fm (real listens!)
+    rank: int | None = None  # Rank in user's top tracks/artists list
+
 
 class TrackMatcher:
     """Service for matching listening history tracks to karaoke catalog.
@@ -220,7 +224,7 @@ class TrackMatcher:
 
         Args:
             tracks: List of dicts with 'artist', 'title', and optionally
-                   'popularity', 'duration_ms', 'explicit' keys.
+                   'popularity', 'duration_ms', 'explicit', 'playcount', 'rank' keys.
 
         Returns:
             List of MatchedTrack results in same order as input.
@@ -231,14 +235,17 @@ class TrackMatcher:
         logger.info(f"Track matcher: received {len(tracks)} tracks to match")
 
         # First, normalize all tracks and build lookup structures
-        # (orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit)
-        normalized_tracks: list[tuple[str, str, str, str, int | None, int | None, bool]] = []
+        # Track info tuple: (orig_artist, orig_title, norm_artist, norm_title,
+        #                    popularity, duration_ms, explicit, playcount, rank)
+        normalized_tracks: list[tuple[str, str, str, str, int | None, int | None, bool, int | None, int | None]] = []
         for track in tracks:
             artist = track.get("artist", "")
             title = track.get("title", "")
             popularity = track.get("popularity")
             duration_ms = track.get("duration_ms")
             explicit = track.get("explicit", False)
+            playcount = track.get("playcount")
+            rank = track.get("rank")
             normalized_tracks.append(
                 (
                     artist,
@@ -248,6 +255,8 @@ class TrackMatcher:
                     popularity,
                     duration_ms,
                     explicit,
+                    playcount,
+                    rank,
                 )
             )
 
@@ -267,7 +276,17 @@ class TrackMatcher:
 
         # Build results maintaining original order
         results: list[MatchedTrack] = []
-        for orig_artist, orig_title, norm_artist, norm_title, popularity, duration_ms, explicit in normalized_tracks:
+        for (
+            orig_artist,
+            orig_title,
+            norm_artist,
+            norm_title,
+            popularity,
+            duration_ms,
+            explicit,
+            playcount,
+            rank,
+        ) in normalized_tracks:
             # Look up match using normalized values
             key = (norm_artist, norm_title)
             catalog_song = matched_songs.get(key)
@@ -283,6 +302,8 @@ class TrackMatcher:
                     spotify_popularity=popularity,
                     duration_ms=duration_ms,
                     explicit=explicit,
+                    playcount=playcount,
+                    rank=rank,
                 )
             )
 

@@ -195,6 +195,17 @@ class UserDataService:
                         }
                     )
 
+        # Sort by "how well user knows the artist":
+        # 1. playcount (actual plays from Last.fm) - higher is better
+        # 2. rank (position in top list) - lower is better
+        # 3. source priority (lastfm > spotify > quiz)
+        def sort_key(a: dict) -> tuple[int, int, int]:
+            playcount = a.get("playcount") or 0
+            rank = a.get("rank") or 9999
+            source_order = {"lastfm": 0, "spotify": 1, "quiz": 2}.get(a.get("source", "quiz"), 3)
+            return (-playcount, rank, source_order)
+
+        artists.sort(key=sort_key)
         return artists
 
     async def add_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
