@@ -191,26 +191,42 @@ class UserDataService:
         Combines:
         - user_artists collection (from Spotify/Last.fm sync)
         - quiz_artists_known from user profile (from quiz + manual additions)
-        """
-        artists: list[dict[str, Any]] = []
 
+        Deduplicates by artist name (case-insensitive), keeping the record
+        with the highest playcount for each artist.
+        """
         # Get synced artists from user_artists collection
         synced_artists = await self.firestore.query_documents(
             collection="user_artists",
             filters=[("user_id", "==", user_id)],
         )
+
+        # Deduplicate synced artists by name, keeping highest playcount
+        # This handles historical data where same artist may have multiple records
+        # (e.g., from different time periods or sync code changes)
+        seen_artists: dict[str, dict[str, Any]] = {}
         for artist in synced_artists:
-            artists.append(
-                {
-                    "artist_name": artist.get("artist_name"),
+            artist_name = artist.get("artist_name", "")
+            if not artist_name:
+                continue
+
+            key = artist_name.lower()
+            playcount = artist.get("playcount") or 0
+            existing = seen_artists.get(key)
+
+            # Keep the record with higher playcount, or first one if equal
+            if existing is None or playcount > (existing.get("playcount") or 0):
+                seen_artists[key] = {
+                    "artist_name": artist_name,
                     "source": artist.get("source"),
                     "rank": artist.get("rank", 0),
                     "time_range": artist.get("time_range") or artist.get("period", ""),
                     "popularity": artist.get("popularity"),
                     "genres": artist.get("genres", []),
-                    "playcount": artist.get("playcount"),
+                    "playcount": playcount,
                 }
-            )
+
+        artists: list[dict[str, Any]] = list(seen_artists.values())
 
         # Get quiz/manual artists from user profile
         user_doc, _ = await self._get_user_document(user_id)
