@@ -1,30 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { SongCard } from "@/components/SongCard";
-import { SearchIcon, SparklesIcon } from "@/components/icons";
-import { LoadingPulse, Button } from "@/components/ui";
-
-interface Song {
-  id: number;
-  artist: string;
-  title: string;
-  brandCount: number;
-}
+import { SparklesIcon, MicrophoneIcon, ClockIcon, MusicNoteIcon } from "@/components/icons";
+import { LoadingOverlay, Button } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isStartingSession, setIsStartingSession] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Redirect authenticated users to recommendations
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push("/recommendations");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   const handleGetStarted = async () => {
     if (isAuthenticated) {
@@ -33,6 +26,7 @@ export default function Home() {
     }
 
     setIsStartingSession(true);
+    setError(null);
     try {
       await startGuestSession();
       router.push("/quiz");
@@ -44,196 +38,154 @@ export default function Home() {
     }
   };
 
-  // Load popular songs on mount
-  useEffect(() => {
-    const loadPopular = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const popularSongs = await api.catalog.getPopularSongs(20);
-        setSongs(
-          popularSongs.map((s) => ({
-            id: s.id,
-            artist: s.artist,
-            title: s.title,
-            brandCount: s.brand_count,
-          }))
-        );
-      } catch (err) {
-        setError("Failed to load songs. Please try again.");
-        console.error("Error loading popular songs:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadPopular();
-  }, []);
-
-  // Search handler
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      // Reset to popular songs
-      try {
-        setIsSearching(true);
-        const popularSongs = await api.catalog.getPopularSongs(20);
-        setSongs(
-          popularSongs.map((s) => ({
-            id: s.id,
-            artist: s.artist,
-            title: s.title,
-            brandCount: s.brand_count,
-          }))
-        );
-        setHasSearched(false);
-      } catch (err) {
-        console.error("Error loading popular songs:", err);
-      } finally {
-        setIsSearching(false);
-      }
-      return;
-    }
-
-    setIsSearching(true);
-    setHasSearched(true);
-    setError(null);
-
-    try {
-      const results = await api.catalog.searchSongs(query, 30);
-      setSongs(
-        results.songs.map((s) => ({
-          id: s.id,
-          artist: s.artist,
-          title: s.title,
-          brandCount: s.brand_count,
-        }))
-      );
-    } catch (err) {
-      setError("Search failed. Please try again.");
-      console.error("Error searching songs:", err);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, handleSearch]);
+  // Show loading while checking auth or redirecting
+  if (authLoading || isAuthenticated) {
+    return <LoadingOverlay message="Loading..." />;
+  }
 
   return (
-    <main className="relative min-h-screen pb-safe">
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        {/* Welcome Banner - shown to non-authenticated users */}
-        {!authLoading && !isAuthenticated && (
-          <div className="mb-8 p-6 rounded-2xl bg-gradient-to-br from-[#ff2d92]/20 via-[#b347ff]/20 to-[#00f5ff]/20 border border-white/10">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#ff2d92] to-[#b347ff] flex items-center justify-center mb-4">
-                <SparklesIcon className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-white mb-2">
-                Find Your Next Karaoke Song
-              </h1>
-              <p className="text-white/70 mb-6 max-w-md">
-                Take a quick quiz to discover songs you already know. No sign-up required.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleGetStarted}
-                isLoading={isStartingSession}
-                leftIcon={<SparklesIcon className="w-5 h-5" />}
-              >
-                Get Started
-              </Button>
+    <main className="relative min-h-screen pb-safe flex flex-col">
+      <div className="flex-1 flex flex-col justify-center max-w-2xl mx-auto px-4 py-8">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          {/* App Icon */}
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-[#ff2d92] via-[#b347ff] to-[#00f5ff] p-0.5 shadow-lg shadow-[#ff2d92]/20">
+            <div className="w-full h-full rounded-3xl bg-[#0a0a0f] flex items-center justify-center">
+              <MicrophoneIcon className="w-12 h-12 text-white" />
             </div>
           </div>
-        )}
 
-        {/* Search bar */}
-        <div className="relative group mb-6">
-          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] opacity-30 blur-sm group-focus-within:opacity-60 transition-opacity" />
-          <div className="relative flex items-center">
-            <SearchIcon className="absolute left-4 w-5 h-5 text-white/40 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search songs or artists..."
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-[rgba(20,20,30,0.95)] border border-white/10 text-white placeholder-white/40 text-base focus:outline-none focus:border-white/20 transition-colors"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-4 w-6 h-6 flex items-center justify-center rounded-full bg-white/10 text-white/60 hover:bg-white/20 hover:text-white transition-colors"
-              >
-                <span className="text-sm">×</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Section title */}
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-lg font-semibold text-white/80">
-            {hasSearched
-              ? songs.length > 0
-                ? `Results for "${searchQuery}"`
-                : "No songs found"
-              : "Popular Karaoke Songs"}
-          </h2>
-          {!hasSearched && (
-            <span className="px-2 py-0.5 rounded-full bg-[#ff2d92]/20 text-[#ff2d92] text-xs font-medium">
-              HOT
+          {/* Headline */}
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+            Find Your Perfect
+            <span className="block bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] bg-clip-text text-transparent">
+              Karaoke Song
             </span>
+          </h1>
+
+          {/* Subheadline */}
+          <p className="text-lg text-white/60 max-w-md mx-auto mb-8">
+            Tell us what you like. We&apos;ll find songs you know and can actually sing.
+          </p>
+
+          {/* Primary CTA */}
+          <div className="mb-4">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleGetStarted}
+              isLoading={isStartingSession}
+              leftIcon={<SparklesIcon className="w-5 h-5" />}
+              className="px-8 py-4 text-lg"
+            >
+              Get Started
+            </Button>
+          </div>
+
+          {/* Trust signal */}
+          <p className="text-white/40 text-sm">
+            No sign-up required • Takes 30 seconds
+          </p>
+
+          {/* Error message */}
+          {error && (
+            <div className="mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {error}
+            </div>
           )}
         </div>
 
-        {/* Song list */}
-        {isLoading || isSearching ? (
-          <LoadingPulse />
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
-              <span className="text-2xl">⚠️</span>
-            </div>
-            <p className="text-white/60 mb-2">{error}</p>
-            <button
-              onClick={() => handleSearch(searchQuery)}
-              className="mt-2 px-4 py-2 rounded-full bg-white/10 text-white/80 text-sm hover:bg-white/20 transition-colors"
-            >
-              Try again
-            </button>
-          </div>
-        ) : songs.length > 0 ? (
-          <div className="flex flex-col gap-3">
-            {songs.map((song, index) => (
-              <SongCard key={song.id} song={song} index={index} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-              <SearchIcon className="w-8 h-8 text-white/20" />
-            </div>
-            <p className="text-white/40 mb-2">No songs found</p>
-            <p className="text-white/20 text-sm">Try a different search term</p>
-          </div>
-        )}
+        {/* Feature Pills */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
+          <FeaturePill
+            icon={<MusicNoteIcon className="w-5 h-5 text-[#ff2d92]" />}
+            title="275K+ Songs"
+            description="Massive karaoke catalog"
+          />
+          <FeaturePill
+            icon={<SparklesIcon className="w-5 h-5 text-[#b347ff]" />}
+            title="Personalized"
+            description="Matches your taste"
+          />
+          <FeaturePill
+            icon={<ClockIcon className="w-5 h-5 text-[#00f5ff]" />}
+            title="Instant Results"
+            description="Find songs in seconds"
+          />
+        </div>
 
-        {/* Footer hint */}
-        <div className="mt-8 text-center">
-          <p className="text-white/30 text-sm">
-            275,000+ karaoke songs available
-          </p>
-          <p className="text-white/20 text-xs mt-1">
-            Powered by KaraokeNerds + Spotify data
-          </p>
+        {/* How it works */}
+        <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 text-center">
+            How it works
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <Step number={1} title="Quick Quiz" description="Tell us your favorite genres and decades" />
+            <Step number={2} title="Get Matches" description="See songs personalized to your taste" />
+            <Step number={3} title="Sing!" description="Find karaoke links for any song" />
+          </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="text-center py-6 border-t border-white/5">
+        <p className="text-white/30 text-sm">
+          Powered by KaraokeNerds + Spotify data
+        </p>
+        <p className="text-white/20 text-xs mt-1">
+          From the creators of{" "}
+          <a
+            href="https://karaokenerds.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#ff2d92]/60 hover:text-[#ff2d92] transition-colors"
+          >
+            KaraokeNerds
+          </a>
+        </p>
+      </footer>
     </main>
+  );
+}
+
+function FeaturePill({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <p className="font-medium text-white text-sm">{title}</p>
+        <p className="text-white/50 text-xs">{description}</p>
+      </div>
+    </div>
+  );
+}
+
+function Step({
+  number,
+  title,
+  description,
+}: {
+  number: number;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="text-center">
+      <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-gradient-to-br from-[#ff2d92]/20 to-[#b347ff]/20 border border-[#ff2d92]/30 flex items-center justify-center">
+        <span className="text-[#ff2d92] font-bold">{number}</span>
+      </div>
+      <h3 className="font-semibold text-white text-sm mb-1">{title}</h3>
+      <p className="text-white/50 text-xs">{description}</p>
+    </div>
   );
 }

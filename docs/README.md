@@ -15,6 +15,11 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL
 
 ### ✅ What's Working
+- **UX Refresh:** Streamlined navigation (Recommendations | Music I Know | Playlists | Settings)
+- **Landing Page:** Clean value prop + CTA, auto-redirect for authenticated users
+- **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
+- **Settings Page:** Profile, preferences, services link, logout, danger zone
+- **Quiz Flow:** Streamlined 3-step quiz (Genres → Preferences → Artists) with skip links
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
@@ -23,12 +28,8 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Async Music Sync:** Background sync via Cloud Tasks with progress tracking
 - **Quiz & Recommendations:** Quiz onboarding + recommendation algorithm v1 (Phase 4 complete)
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
-- **Frontend Auth & Discovery:** Full auth flow, Recommendations, Quiz UI (Phase 5 complete)
-- **My Data Page:** Unified data management (replaces My Songs + Services) with editable preferences
-- **Known Songs:** Manual song entry for users to add songs they know they like singing
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **User Profile:** Profile settings page with display name management (Phase 6 Part 3)
 - **Data:** 275K karaoke songs + 256M Spotify tracks loaded
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
@@ -176,6 +177,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-03 | UX Refresh (landing page, navigation, quiz streamlining, Music I Know, Settings) | [archive/2026-01-03-ux-refresh.md](archive/2026-01-03-ux-refresh.md) |
 | 2026-01-03 | Admin Dashboard (user management, sync job monitoring, system stats) | [archive/2026-01-03-admin-dashboard.md](archive/2026-01-03-admin-dashboard.md) |
 | 2026-01-02 | User Data UX (My Data page reorg, playcount pills, "Artists/Songs You Know", improved sorting) | [archive/2026-01-02-user-data-ux-improvements.md](archive/2026-01-02-user-data-ux-improvements.md) |
 | 2026-01-02 | Cloudflare API Proxy (eliminates CORS, same-origin /api/* requests via Worker) | [archive/2026-01-02-cloudflare-api-proxy.md](archive/2026-01-02-cloudflare-api-proxy.md) |

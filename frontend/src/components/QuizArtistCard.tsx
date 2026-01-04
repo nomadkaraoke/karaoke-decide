@@ -39,6 +39,7 @@ export function QuizArtistCard({
 
   return (
     <button
+      data-testid={`artist-card-${index}`}
       onClick={onToggle}
       className={`
         relative w-full p-4 rounded-xl text-left transition-all duration-200

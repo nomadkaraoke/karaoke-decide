@@ -10,21 +10,19 @@ import {
   LogOutIcon,
   MenuIcon,
   XIcon,
-  MicrophoneIcon,
+  MusicIcon,
   SparklesIcon,
   PlaylistIcon,
   SettingsIcon,
-  DatabaseIcon,
   ShieldIcon,
 } from "./icons";
 import { Button } from "./ui";
 
 const navLinks = [
-  { href: "/", label: "Search", icon: null },
-  { href: "/my-data", label: "My Data", icon: DatabaseIcon, authRequired: true },
-  { href: "/known-songs", label: "Add Songs", icon: MicrophoneIcon, authRequired: true },
+  { href: "/recommendations", label: "Recommendations", icon: SparklesIcon, authRequired: true },
+  { href: "/music-i-know", label: "Music I Know", icon: MusicIcon, authRequired: true },
   { href: "/playlists", label: "Playlists", icon: PlaylistIcon, authRequired: true },
-  { href: "/recommendations", label: "Discover", icon: SparklesIcon, authRequired: true },
+  { href: "/settings", label: "Settings", icon: SettingsIcon, authRequired: true },
 ];
 
 export function Navigation() {
