@@ -8,19 +8,30 @@ import { LoadingOverlay, Button } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    hasCompletedQuiz,
+    quizStatusLoading,
+    startGuestSession,
+  } = useAuth();
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect authenticated users to recommendations
+  // Redirect authenticated users based on quiz completion status
   useEffect(() => {
-    if (!authLoading && isAuthenticated) {
-      router.push("/recommendations");
+    if (!authLoading && !quizStatusLoading && isAuthenticated) {
+      if (hasCompletedQuiz) {
+        router.push("/recommendations");
+      } else {
+        router.push("/quiz");
+      }
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
 
   const handleGetStarted = async () => {
     if (isAuthenticated) {
+      // Already authenticated - go to quiz (quiz page will handle if already completed)
       router.push("/quiz");
       return;
     }
@@ -29,6 +40,7 @@ export default function Home() {
     setError(null);
     try {
       await startGuestSession();
+      // After creating session, go to quiz
       router.push("/quiz");
     } catch (err) {
       console.error("Failed to start session:", err);
@@ -38,8 +50,8 @@ export default function Home() {
     }
   };
 
-  // Show loading while checking auth or redirecting
-  if (authLoading || isAuthenticated) {
+  // Show loading while checking auth/quiz status or redirecting
+  if (authLoading || quizStatusLoading || isAuthenticated) {
     return <LoadingOverlay message="Loading..." />;
   }
 

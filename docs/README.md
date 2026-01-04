@@ -10,13 +10,13 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-03)
+## Current Status (2026-01-04)
 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL
 
 ### ✅ What's Working
 - **UX Refresh:** Streamlined navigation (Recommendations | Music I Know | Playlists | Settings)
-- **Landing Page:** Clean value prop + CTA, auto-redirect for authenticated users
+- **Landing Page:** Clean value prop + CTA, smart redirect (quiz if not completed, recommendations if completed)
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
 - **Quiz Flow:** Streamlined 3-step quiz (Genres → Preferences → Artists) with skip links
@@ -177,6 +177,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-04 | Onboarding Flow Fix (quiz bypass bug, quiz completion tracking, quiz prompt banner) | [archive/2026-01-04-onboarding-flow-fix.md](archive/2026-01-04-onboarding-flow-fix.md) |
 | 2026-01-03 | UX Refresh (landing page, navigation, quiz streamlining, Music I Know, Settings) | [archive/2026-01-03-ux-refresh.md](archive/2026-01-03-ux-refresh.md) |
 | 2026-01-03 | Admin Dashboard (user management, sync job monitoring, system stats) | [archive/2026-01-03-admin-dashboard.md](archive/2026-01-03-admin-dashboard.md) |
 | 2026-01-02 | User Data UX (My Data page reorg, playcount pills, "Artists/Songs You Know", improved sorting) | [archive/2026-01-02-user-data-ux-improvements.md](archive/2026-01-02-user-data-ux-improvements.md) |

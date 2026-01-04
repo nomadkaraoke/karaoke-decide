@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Recommendation } from "@/types";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { RecommendationCard } from "@/components/RecommendationCard";
@@ -36,6 +37,7 @@ interface CategorizedData {
 
 export default function RecommendationsPage() {
   const router = useRouter();
+  const { hasCompletedQuiz, quizStatusLoading } = useAuth();
   const [data, setData] = useState<CategorizedData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +223,31 @@ export default function RecommendationsPage() {
             </p>
           </div>
 
+          {/* Quiz Prompt Banner - show if quiz not completed */}
+          {!quizStatusLoading && !hasCompletedQuiz && (
+            <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-[#ff2d92]/10 to-[#b347ff]/10 border border-[#ff2d92]/30">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-white font-semibold flex items-center gap-2">
+                    <span className="text-xl">✨</span>
+                    Get personalized recommendations
+                  </h3>
+                  <p className="text-white/60 text-sm mt-1">
+                    Take a quick 30-second quiz to tell us your music taste
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => router.push("/quiz")}
+                  className="whitespace-nowrap"
+                >
+                  Take Quiz
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Filters */}
           <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
             <div className="flex items-center justify-between mb-3">
@@ -339,7 +366,11 @@ export default function RecommendationsPage() {
                 "Karaoke songs by artists in your library",
                 data.from_artists_you_know,
                 "artists",
-                "No karaoke songs from your artists match the current filters"
+                !hasCompletedQuiz
+                  ? "Take the quiz above to tell us your favorite artists"
+                  : hasActiveFilters
+                    ? "No karaoke songs from your artists match the current filters"
+                    : "Connect Spotify or Last.fm to see songs from artists you know"
               )}
 
               {renderSection(
@@ -347,7 +378,11 @@ export default function RecommendationsPage() {
                 "Songs from your library - generate with AI",
                 data.create_your_own,
                 "create",
-                "Re-sync your services to see songs you can generate karaoke for"
+                !hasCompletedQuiz
+                  ? "Take the quiz to unlock personalized song suggestions"
+                  : hasActiveFilters
+                    ? "No songs match the current filters"
+                    : "Connect your music services to see songs you can generate karaoke for"
               )}
 
               {renderSection(

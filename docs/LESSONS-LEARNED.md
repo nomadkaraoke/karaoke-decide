@@ -1084,3 +1084,47 @@ await expect(page.getByRole("heading", { name: /music services/i })).toBeVisible
 await page.goto(`${PROD_URL}/my-data`);
 await expect(page.getByRole("heading", { name: /my data/i })).toBeVisible();
 ```
+
+---
+
+### 2026-01-04: useEffect Race Conditions with State Changes
+
+**Context:** Landing page was supposed to redirect new users to quiz after creating guest session, but users ended up on recommendations instead.
+
+**Lesson:** When `router.push()` is called after an async state change, a `useEffect` watching that same state can trigger a competing navigation. The `useEffect` runs synchronously on re-render, winning the race against the original navigation.
+
+**The Bug:**
+```typescript
+// handleGetStarted click handler
+await startGuestSession(); // Sets isAuthenticated = true
+router.push("/quiz");      // This loses the race!
+
+// useEffect watching isAuthenticated
+useEffect(() => {
+  if (isAuthenticated) {
+    router.push("/recommendations"); // This wins!
+  }
+}, [isAuthenticated]);
+```
+
+**Recommendation:** When redirecting based on authentication state, include ALL conditions that affect where the user should go:
+
+```typescript
+// BAD - only checks auth
+useEffect(() => {
+  if (isAuthenticated) router.push("/recommendations");
+}, [isAuthenticated]);
+
+// GOOD - checks auth AND onboarding status
+useEffect(() => {
+  if (!authLoading && !quizStatusLoading && isAuthenticated) {
+    if (hasCompletedQuiz) {
+      router.push("/recommendations");
+    } else {
+      router.push("/quiz"); // New users go to quiz
+    }
+  }
+}, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz]);
+```
+
+**Key insight:** State changes during async operations can trigger multiple useEffects. Consider all state that affects routing decisions and handle them in a single, comprehensive redirect useEffect.
