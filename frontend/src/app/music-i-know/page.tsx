@@ -89,6 +89,20 @@ export default function MusicIKnowPage() {
     loadStats();
   }, []);
 
+  // Stable callbacks for child components to avoid infinite re-render loops
+  // (inline arrow functions create new references on every render)
+  const handleArtistsCountChange = useCallback((count: number) => {
+    setStats(s => ({ ...s, artists: count }));
+  }, []);
+
+  const handleSongsCountChange = useCallback((count: number) => {
+    setStats(s => ({ ...s, songs: count }));
+  }, []);
+
+  const handleServicesCountChange = useCallback((count: number) => {
+    setStats(s => ({ ...s, services: count }));
+  }, []);
+
   const tabs = [
     { id: "artists" as Tab, label: "Artists", count: stats.artists },
     { id: "songs" as Tab, label: "Songs", count: stats.songs },
@@ -147,15 +161,15 @@ export default function MusicIKnowPage() {
 
           {/* Tab Content */}
           {activeTab === "artists" && (
-            <ArtistsTab onCountChange={(count) => setStats(s => ({ ...s, artists: count }))} />
+            <ArtistsTab onCountChange={handleArtistsCountChange} />
           )}
           {activeTab === "songs" && (
-            <SongsTab onCountChange={(count) => setStats(s => ({ ...s, songs: count }))} />
+            <SongsTab onCountChange={handleSongsCountChange} />
           )}
           {activeTab === "services" && (
             <ServicesTab
               isGuest={isGuest}
-              onCountChange={(count) => setStats(s => ({ ...s, services: count }))}
+              onCountChange={handleServicesCountChange}
             />
           )}
 
