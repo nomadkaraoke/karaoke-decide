@@ -25,11 +25,14 @@ interface AuthContextType {
   isGuest: boolean;
   isVerified: boolean;
   isAdmin: boolean;
+  hasCompletedQuiz: boolean;
+  quizStatusLoading: boolean;
   login: (token: string) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   startGuestSession: () => Promise<void>;
   requestUpgrade: (email: string) => Promise<void>;
+  refreshQuizStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,11 +40,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasCompletedQuiz, setHasCompletedQuiz] = useState(false);
+  const [quizStatusLoading, setQuizStatusLoading] = useState(true);
+
+  const refreshQuizStatus = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setHasCompletedQuiz(false);
+      setQuizStatusLoading(false);
+      return;
+    }
+
+    try {
+      setQuizStatusLoading(true);
+      const status = await api.quiz.getStatus();
+      setHasCompletedQuiz(status.completed);
+    } catch {
+      // If we can't get status, assume not completed
+      setHasCompletedQuiz(false);
+    } finally {
+      setQuizStatusLoading(false);
+    }
+  }, []);
 
   const checkAuth = useCallback(async () => {
     const token = getAuthToken();
     if (!token) {
       setUser(null);
+      setHasCompletedQuiz(false);
+      setQuizStatusLoading(false);
       setIsLoading(false);
       return;
     }
@@ -49,14 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userData = await api.auth.getMe();
       setUser(userData);
+      // Also check quiz status
+      await refreshQuizStatus();
     } catch {
       // Token is invalid or expired
       clearAuthToken();
       setUser(null);
+      setHasCompletedQuiz(false);
+      setQuizStatusLoading(false);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [refreshQuizStatus]);
 
   const login = useCallback((token: string) => {
     setAuthToken(token);
@@ -71,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearAuthToken();
       setUser(null);
+      setHasCompletedQuiz(false);
     }
   }, []);
 
@@ -120,11 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isGuest,
         isVerified,
         isAdmin,
+        hasCompletedQuiz,
+        quizStatusLoading,
         login,
         logout,
         checkAuth,
         startGuestSession,
         requestUpgrade,
+        refreshQuizStatus,
       }}
     >
       {children}
