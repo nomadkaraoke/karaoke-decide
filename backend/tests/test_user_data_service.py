@@ -242,6 +242,38 @@ class TestGetAllArtists:
         queen_entries = [a for a in result if a["artist_name"].lower() == "queen"]
         assert len(queen_entries) == 1
 
+    @pytest.mark.asyncio
+    async def test_deduplicates_synced_artists_keeps_highest_playcount(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        """Should deduplicate synced artists from same source, keeping highest playcount."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": [],
+        }
+        # Simulate duplicate artists from different time periods (historical data)
+        mock_firestore.query_documents.side_effect = [
+            [
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 5, "playcount": 100},
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 10, "playcount": 500},  # Higher
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 15, "playcount": 200},
+                {"artist_name": "Queen", "source": "lastfm", "rank": 1, "playcount": 1000},
+            ],
+            [user_doc],
+        ]
+
+        result = await user_data_service.get_all_artists("user123")
+
+        # Should only have one ABBA entry with highest playcount (500)
+        abba_entries = [a for a in result if a["artist_name"].lower() == "abba"]
+        assert len(abba_entries) == 1
+        assert abba_entries[0]["playcount"] == 500
+
+        # Queen should also be present
+        queen_entries = [a for a in result if a["artist_name"].lower() == "queen"]
+        assert len(queen_entries) == 1
+
 
 class TestAddArtist:
     """Tests for add_artist method."""
