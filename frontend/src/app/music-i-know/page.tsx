@@ -12,7 +12,6 @@ import {
   PlusIcon,
   CheckIcon,
   TrashIcon,
-  XIcon,
   SpotifyIcon,
   LastfmIcon,
   RefreshIcon,

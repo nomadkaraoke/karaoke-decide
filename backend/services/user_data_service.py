@@ -521,7 +521,8 @@ class UserDataService:
         user_doc, _ = await self._get_user_document(user_id)
         if not user_doc:
             return []
-        return user_doc.get("excluded_artists", [])
+        excluded: list[str] = user_doc.get("excluded_artists", [])
+        return excluded
 
 
 # Singleton pattern with lazy initialization

@@ -9,7 +9,7 @@ import {
   XIcon,
   PlusIcon,
 } from "@/components/icons";
-import { Button, Input, Badge, LoadingPulse } from "@/components/ui";
+import { Button, Input, LoadingPulse } from "@/components/ui";
 
 interface UserArtist {
   artist_name: string;
