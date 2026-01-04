@@ -151,6 +151,7 @@ cd frontend && npm run dev
 - `GET /api/admin/users/{id}` - Get user detail (admin only)
 - `GET /api/admin/sync-jobs` - List sync jobs (admin only)
 - `GET /api/admin/sync-jobs/{id}` - Get sync job detail (admin only)
+- `POST /api/admin/impersonate` - Generate JWT to impersonate a user (admin only)
 
 ## For AI Agents
 
