@@ -11,10 +11,15 @@ import { test, expect } from "@playwright/test";
  * 5. Returning users who completed quiz go to /recommendations
  */
 test.describe("Onboarding Flow", () => {
-  test.beforeEach(async ({ context }) => {
+  test.beforeEach(async ({ context, page }) => {
     // Clear all cookies and storage to simulate a fresh user
     await context.clearCookies();
-    await context.storageState({ path: undefined }); // Clear storage
+    // Clear localStorage and sessionStorage
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
   });
 
   test("new user clicking Get Started goes to quiz", async ({ page }) => {
@@ -43,7 +48,6 @@ test.describe("Onboarding Flow", () => {
     // Go directly to quiz
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000); // Wait for guest session
 
     // Verify genre selection is visible
     const genreGrid = page.locator("[data-testid='genre-grid']");
@@ -67,7 +71,6 @@ test.describe("Onboarding Flow", () => {
   test("quiz progress through all steps", async ({ page }) => {
     await page.goto("/quiz");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
 
     // Step 1: Select genres
     await page.locator("[data-testid='genre-rock']").click();
@@ -143,12 +146,12 @@ test.describe("Returning User Flow", () => {
     await page.locator("button").filter({ hasText: /get started/i }).click();
     await page.waitForURL(/\/quiz/, { timeout: 10000 });
 
-    // Complete quiz quickly
+    // Complete quiz quickly - wait for each step to be visible
     await page.locator("[data-testid='genre-rock']").click();
     await page.locator("button").filter({ hasText: /continue/i }).click();
-    await page.waitForTimeout(500);
+    await expect(page.locator("[data-testid='preferences-heading'], h1")).toContainText(/preferences/i, { timeout: 5000 });
     await page.locator("button").filter({ hasText: /continue/i }).click();
-    await page.waitForTimeout(500);
+    await expect(page.locator("[data-testid='artist-heading'], h1")).toContainText(/know any of these artists/i, { timeout: 5000 });
     await page.locator("button").filter({ hasText: /see recommendations/i }).click();
 
     // Wait to land on recommendations
@@ -156,10 +159,10 @@ test.describe("Returning User Flow", () => {
 
     // Now go back to landing page
     await page.goto("/");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle");
 
     // Should redirect to recommendations (quiz already completed)
-    await expect(page).toHaveURL(/\/recommendations/);
+    await expect(page).toHaveURL(/\/recommendations/, { timeout: 10000 });
   });
 
   test("recommendations page has no quiz banner after quiz completed", async ({ page }) => {
@@ -171,9 +174,9 @@ test.describe("Returning User Flow", () => {
 
     await page.locator("[data-testid='genre-rock']").click();
     await page.locator("button").filter({ hasText: /continue/i }).click();
-    await page.waitForTimeout(500);
+    await expect(page.locator("[data-testid='preferences-heading'], h1")).toContainText(/preferences/i, { timeout: 5000 });
     await page.locator("button").filter({ hasText: /continue/i }).click();
-    await page.waitForTimeout(500);
+    await expect(page.locator("[data-testid='artist-heading'], h1")).toContainText(/know any of these artists/i, { timeout: 5000 });
     await page.locator("button").filter({ hasText: /see recommendations/i }).click();
     await page.waitForURL(/\/recommendations/, { timeout: 10000 });
 
