@@ -1376,6 +1376,43 @@ Get detailed sync job information.
 - `403` - Admin access required
 - `404` - Job not found
 
+### POST /api/admin/impersonate
+
+Generate a JWT token to impersonate a specific user. Useful for debugging user-reported issues by viewing the UI as they see it.
+
+**Requires:** Bearer token (admin)
+
+**Request:**
+```json
+{
+  "user_id": "user_abc123",  // OR
+  "email": "user@example.com"
+}
+```
+
+At least one of `user_id` or `email` must be provided.
+
+**Response:**
+```json
+{
+  "token": "eyJ...",
+  "expires_in": 604800,
+  "user_id": "user_abc123",
+  "user_email": "user@example.com",
+  "user_display_name": "John Doe"
+}
+```
+
+**Notes:**
+- Guest users receive a guest token (30-day expiry)
+- Verified users receive a standard token (7-day expiry)
+- Impersonation is logged for audit purposes
+
+**Error Responses:**
+- `400` - Must provide either user_id or email
+- `403` - Admin access required
+- `404` - User not found
+
 ---
 
 ## Error Responses
