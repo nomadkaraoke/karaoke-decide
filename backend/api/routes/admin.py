@@ -4,6 +4,7 @@ Provides endpoints for:
 - Dashboard statistics
 - User management
 - Sync job monitoring
+- User impersonation (for debugging)
 """
 
 import logging
@@ -12,10 +13,12 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from backend.api.deps import AdminUser, FirestoreServiceDep
+from backend.api.deps import AdminUser, AuthServiceDep, FirestoreServiceDep
 from backend.models.admin import (
     AdminStats,
     DataSummary,
+    ImpersonateRequest,
+    ImpersonateResponse,
     ServiceStats,
     ServiceSummary,
     SyncJobDetail,
@@ -430,3 +433,75 @@ def _parse_datetime(value: str | datetime | None) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         return None
+
+
+# -----------------------------------------------------------------------------
+# User Impersonation (Admin Debug Feature)
+# -----------------------------------------------------------------------------
+
+
+@router.post("/impersonate", response_model=ImpersonateResponse)
+async def impersonate_user(
+    request: ImpersonateRequest,
+    admin: AdminUser,
+    auth_service: AuthServiceDep,
+    firestore: FirestoreServiceDep,
+) -> ImpersonateResponse:
+    """Generate a JWT token to impersonate a specific user.
+
+    This is an admin-only feature for debugging user-reported issues.
+    Requires either user_id or email to identify the target user.
+
+    Args:
+        request: Contains user_id or email to impersonate
+
+    Returns:
+        JWT token that can be used to authenticate as the target user
+    """
+    if not request.user_id and not request.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Must provide either user_id or email",
+        )
+
+    target_user = None
+
+    # Look up user by ID
+    if request.user_id:
+        target_user = await auth_service.get_user_by_id(request.user_id)
+
+    # Look up user by email
+    elif request.email:
+        # Use auth service to get or find user by email
+        email_lower = request.email.lower()
+        # Query by email field
+        user_docs = await firestore.query_documents(
+            "decide_users",
+            filters=[("email", "==", email_lower)],
+            limit=1,
+        )
+        if user_docs:
+            doc = user_docs[0]
+            target_user = await auth_service.get_user_by_id(doc.get("user_id", ""))
+
+    if target_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Generate JWT for the target user
+    if target_user.is_guest:
+        token, expires_in = auth_service.generate_guest_jwt(target_user)
+    else:
+        token, expires_in = auth_service.generate_jwt(target_user)
+
+    logger.info(f"Admin {admin.email} impersonating user {target_user.id} ({target_user.email})")
+
+    return ImpersonateResponse(
+        token=token,
+        expires_in=expires_in,
+        user_id=target_user.id,
+        user_email=target_user.email,
+        user_display_name=target_user.display_name,
+    )

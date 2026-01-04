@@ -148,3 +148,20 @@ class SyncJobDetail(SyncJobListItem):
 
     progress: SyncJobProgress | None
     results: list[SyncJobResultItem]
+
+
+class ImpersonateRequest(BaseModel):
+    """Request to impersonate a user."""
+
+    user_id: str | None = None
+    email: str | None = None
+
+
+class ImpersonateResponse(BaseModel):
+    """Response containing impersonation token."""
+
+    token: str
+    expires_in: int
+    user_id: str
+    user_email: str | None
+    user_display_name: str | None

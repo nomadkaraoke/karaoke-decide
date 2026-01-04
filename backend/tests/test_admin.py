@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.services.auth_service import AuthService
 from karaoke_decide.core.models import User
 
 
@@ -43,6 +44,33 @@ def sample_non_admin_user() -> User:
         total_songs_sung=5,
         last_sync_at=None,
     )
+
+
+@pytest.fixture
+def sample_target_user() -> User:
+    """Create a sample target user for impersonation testing."""
+    return User(
+        id="target_user_789",
+        email="target@example.com",
+        display_name="Target User",
+        is_admin=False,
+        is_guest=False,
+        created_at=datetime(2024, 1, 10, 12, 0, 0, tzinfo=UTC),
+        updated_at=datetime(2024, 1, 10, 12, 0, 0, tzinfo=UTC),
+        total_songs_known=30,
+        total_songs_sung=8,
+        last_sync_at=None,
+    )
+
+
+@pytest.fixture
+def mock_auth_service(sample_target_user: User) -> MagicMock:
+    """Create a mock auth service for impersonation testing."""
+    mock = MagicMock(spec=AuthService)
+    mock.get_user_by_id = AsyncMock(return_value=sample_target_user)
+    mock.generate_jwt = MagicMock(return_value=("test-token-123", 604800))
+    mock.generate_guest_jwt = MagicMock(return_value=("guest-token-123", 2592000))
+    return mock
 
 
 @pytest.fixture
@@ -636,3 +664,178 @@ class TestAdminSyncJobDetail:
         data = response.json()
         assert data["status"] == "failed"
         assert data["error"] == "Spotify API rate limit exceeded"
+
+
+class TestAdminImpersonate:
+    """Test POST /api/admin/impersonate endpoint."""
+
+    @pytest.fixture
+    def admin_client_with_auth(
+        self,
+        mock_admin_firestore_service: MagicMock,
+        mock_auth_service: MagicMock,
+        sample_admin_user: User,
+        mock_catalog_service: MagicMock,
+    ) -> Generator[TestClient, None, None]:
+        """Create test client with admin user and auth service mock."""
+        with patch(
+            "backend.api.routes.catalog.get_catalog_service",
+            return_value=mock_catalog_service,
+        ):
+            from backend.api.deps import get_auth_service_dep, get_current_user, get_firestore
+            from backend.main import app
+
+            async def override_get_current_user() -> User:
+                return sample_admin_user
+
+            async def override_get_firestore() -> MagicMock:
+                return mock_admin_firestore_service
+
+            async def override_get_auth_service() -> MagicMock:
+                return mock_auth_service
+
+            app.dependency_overrides[get_current_user] = override_get_current_user
+            app.dependency_overrides[get_firestore] = override_get_firestore
+            app.dependency_overrides[get_auth_service_dep] = override_get_auth_service
+
+            yield TestClient(app)
+
+            app.dependency_overrides.clear()
+
+    def test_impersonate_requires_admin(self, non_admin_client: TestClient) -> None:
+        """Non-admin users should get 403 for impersonate endpoint."""
+        response = non_admin_client.post(
+            "/api/admin/impersonate",
+            json={"email": "target@example.com"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 403
+        assert "Admin access required" in response.json()["detail"]
+
+    def test_impersonate_by_user_id(
+        self,
+        admin_client_with_auth: TestClient,
+        mock_auth_service: MagicMock,
+        sample_target_user: User,
+    ) -> None:
+        """Admin should be able to impersonate by user_id."""
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={"user_id": "target_user_789"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["token"] == "test-token-123"
+        assert data["expires_in"] == 604800
+        assert data["user_id"] == "target_user_789"
+        assert data["user_email"] == "target@example.com"
+        assert data["user_display_name"] == "Target User"
+
+        # Verify auth service was called correctly
+        mock_auth_service.get_user_by_id.assert_called_once_with("target_user_789")
+        mock_auth_service.generate_jwt.assert_called_once_with(sample_target_user)
+
+    def test_impersonate_by_email(
+        self,
+        admin_client_with_auth: TestClient,
+        mock_admin_firestore_service: MagicMock,
+        mock_auth_service: MagicMock,
+        sample_target_user: User,
+    ) -> None:
+        """Admin should be able to impersonate by email."""
+        # Mock email lookup
+        mock_admin_firestore_service.query_documents = AsyncMock(
+            return_value=[{"user_id": "target_user_789", "email": "target@example.com"}]
+        )
+
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={"email": "target@example.com"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["token"] == "test-token-123"
+        assert data["user_id"] == "target_user_789"
+        assert data["user_email"] == "target@example.com"
+
+    def test_impersonate_guest_user(
+        self,
+        admin_client_with_auth: TestClient,
+        mock_auth_service: MagicMock,
+    ) -> None:
+        """Impersonating a guest user should use guest JWT."""
+        guest_user = User(
+            id="guest_abc123",
+            email=None,
+            display_name=None,
+            is_admin=False,
+            is_guest=True,
+            created_at=datetime(2024, 1, 15, tzinfo=UTC),
+            updated_at=datetime(2024, 1, 15, tzinfo=UTC),
+        )
+        mock_auth_service.get_user_by_id = AsyncMock(return_value=guest_user)
+
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={"user_id": "guest_abc123"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["token"] == "guest-token-123"
+        assert data["expires_in"] == 2592000  # 30 days
+        assert data["user_id"] == "guest_abc123"
+        assert data["user_email"] is None
+
+        # Verify guest JWT was generated
+        mock_auth_service.generate_guest_jwt.assert_called_once_with(guest_user)
+
+    def test_impersonate_user_not_found(
+        self,
+        admin_client_with_auth: TestClient,
+        mock_auth_service: MagicMock,
+    ) -> None:
+        """Should return 404 if user is not found."""
+        mock_auth_service.get_user_by_id = AsyncMock(return_value=None)
+
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={"user_id": "nonexistent_user"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 404
+        assert "User not found" in response.json()["detail"]
+
+    def test_impersonate_email_not_found(
+        self,
+        admin_client_with_auth: TestClient,
+        mock_admin_firestore_service: MagicMock,
+    ) -> None:
+        """Should return 404 if email is not found."""
+        mock_admin_firestore_service.query_documents = AsyncMock(return_value=[])
+
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={"email": "nonexistent@example.com"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 404
+        assert "User not found" in response.json()["detail"]
+
+    def test_impersonate_requires_user_id_or_email(
+        self,
+        admin_client_with_auth: TestClient,
+    ) -> None:
+        """Should return 400 if neither user_id nor email is provided."""
+        response = admin_client_with_auth.post(
+            "/api/admin/impersonate",
+            json={},
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 400
+        assert "Must provide either user_id or email" in response.json()["detail"]
