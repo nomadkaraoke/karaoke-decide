@@ -496,7 +496,7 @@ async def impersonate_user(
     else:
         token, expires_in = auth_service.generate_jwt(target_user)
 
-    logger.info(f"Admin {admin.email} impersonating user {target_user.id} ({target_user.email})")
+    logger.info(f"Admin {admin.id} impersonating user {target_user.id}")
 
     return ImpersonateResponse(
         token=token,

@@ -60,7 +60,14 @@ type QuizStep = 1 | 2 | 3;
 
 export default function QuizPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    hasCompletedQuiz,
+    quizStatusLoading,
+    startGuestSession,
+    refreshQuizStatus,
+  } = useAuth();
   const [step, setStep] = useState<QuizStep>(1);
   const [quizArtists, setQuizArtists] = useState<QuizArtist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +111,13 @@ export default function QuizPage() {
     };
     initSession();
   }, [authLoading, isAuthenticated, startGuestSession]);
+
+  // Redirect users who have already completed the quiz
+  useEffect(() => {
+    if (!authLoading && !quizStatusLoading && isAuthenticated && hasCompletedQuiz) {
+      router.push("/recommendations");
+    }
+  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
 
   // Load quiz artists when entering step 3
   useEffect(() => {
@@ -165,7 +179,9 @@ export default function QuizPage() {
         decade_preference: decadePreference,
         energy_preference: energyPreference,
       });
-      // Go directly to recommendations
+      // Refresh quiz status so other components know quiz is completed
+      await refreshQuizStatus();
+      // Go to recommendations
       router.push("/recommendations");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
@@ -178,8 +194,8 @@ export default function QuizPage() {
     await handleSubmit();
   };
 
-  // Show loading while auth is being checked
-  if (authLoading || !isAuthenticated) {
+  // Show loading while auth is being checked or redirecting
+  if (authLoading || quizStatusLoading || !isAuthenticated || hasCompletedQuiz) {
     return <LoadingOverlay message="Starting quiz..." />;
   }
 
