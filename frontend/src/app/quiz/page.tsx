@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { QuizArtistCard } from "@/components/QuizArtistCard";
-import { SparklesIcon, CheckIcon, ChevronRightIcon, RefreshIcon, SpotifyIcon } from "@/components/icons";
+import { SparklesIcon, CheckIcon, ChevronRightIcon, RefreshIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 
 interface QuizArtist {
@@ -18,23 +18,13 @@ interface QuizArtist {
   image_url: string | null;
 }
 
-interface DecadeArtist {
-  name: string;
-  top_song: string;
-}
-
-interface DecadeInfo {
-  decade: string;
-  artists: DecadeArtist[];
-}
-
 type EnergyPreference = "chill" | "medium" | "high" | null;
 
 const DECADES = ["1970s", "1980s", "1990s", "2000s", "2010s", "2020s"];
-const ENERGY_OPTIONS: { value: EnergyPreference; label: string; description: string }[] = [
-  { value: "chill", label: "Chill", description: "Slow ballads, easy listening" },
-  { value: "medium", label: "Medium", description: "Classic sing-alongs" },
-  { value: "high", label: "High Energy", description: "Dance hits, rock anthems" },
+const ENERGY_OPTIONS: { value: EnergyPreference; label: string; emoji: string }[] = [
+  { value: "chill", label: "Chill", emoji: "🎵" },
+  { value: "medium", label: "Medium", emoji: "🎶" },
+  { value: "high", label: "High Energy", emoji: "🔥" },
 ];
 
 interface Genre {
@@ -62,10 +52,16 @@ const GENRES: Genre[] = [
   { id: "reggae", label: "Reggae / Ska", exampleArtists: ["Bob Marley", "UB40", "Sean Paul"], emoji: "🇯🇲" },
 ];
 
+// Streamlined 3-step quiz:
+// Step 1: Genres (required)
+// Step 2: Preferences - combined decade + energy (optional)
+// Step 3: Artists (optional)
+type QuizStep = 1 | 2 | 3;
+
 export default function QuizPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, startGuestSession, isGuest } = useAuth();
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const { isAuthenticated, isLoading: authLoading, startGuestSession } = useAuth();
+  const [step, setStep] = useState<QuizStep>(1);
   const [quizArtists, setQuizArtists] = useState<QuizArtist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,39 +71,22 @@ export default function QuizPage() {
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set());
   const [decadePreference, setDecadePreference] = useState<string | null>(null);
   const [energyPreference, setEnergyPreference] = useState<EnergyPreference>(null);
-  const [skipArtists, setSkipArtists] = useState(false);
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [showConnectCTA, setShowConnectCTA] = useState(true);
-  const [submitResult, setSubmitResult] = useState<{
-    songs_added: number;
-    recommendations_ready: boolean;
-  } | null>(null);
-
-  // Decade artists for preference section
-  const [decadeArtists, setDecadeArtists] = useState<DecadeInfo[]>([]);
 
   const loadQuizArtists = useCallback(async (genres?: string[]) => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.quiz.getArtists(25, genres);
+      // Load only 10 artists for a faster quiz
+      const response = await api.quiz.getArtists(10, genres);
       setQuizArtists(response.artists);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load quiz");
     } finally {
       setIsLoading(false);
-    }
-  }, []);
-
-  const loadDecadeArtists = useCallback(async () => {
-    try {
-      const response = await api.quiz.getDecadeArtists(5);
-      setDecadeArtists(response.decades);
-    } catch (err) {
-      console.error("Failed to load decade artists:", err);
     }
   }, []);
 
@@ -126,20 +105,13 @@ export default function QuizPage() {
     initSession();
   }, [authLoading, isAuthenticated, startGuestSession]);
 
-  // Load quiz artists once authenticated (initial load, then reload when genres change on step 2)
+  // Load quiz artists when entering step 3
   useEffect(() => {
-    if (isAuthenticated && step === 2) {
+    if (isAuthenticated && step === 3) {
       const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres) : undefined;
       loadQuizArtists(genresArray);
     }
   }, [isAuthenticated, step, selectedGenres, loadQuizArtists]);
-
-  // Load decade artists for the preferences section
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadDecadeArtists();
-    }
-  }, [isAuthenticated, loadDecadeArtists]);
 
   const toggleArtist = (artistName: string) => {
     setSelectedArtists((prev) => {
@@ -151,18 +123,6 @@ export default function QuizPage() {
       }
       return next;
     });
-    // If user selects something, uncheck the skip option
-    if (!selectedArtists.has(artistName)) {
-      setSkipArtists(false);
-    }
-  };
-
-  const handleSkipToggle = () => {
-    setSkipArtists(!skipArtists);
-    if (!skipArtists) {
-      // If enabling skip, clear selections
-      setSelectedArtists(new Set());
-    }
   };
 
   const toggleGenre = (genreId: string) => {
@@ -180,12 +140,10 @@ export default function QuizPage() {
   const handleLoadMoreArtists = async () => {
     try {
       setIsLoadingMore(true);
-      // Pass current artist names as exclusions to get different artists
       const currentArtistNames = quizArtists.map((a) => a.name);
       const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres) : undefined;
-      const response = await api.quiz.getArtists(25, genresArray, currentArtistNames);
+      const response = await api.quiz.getArtists(10, genresArray, currentArtistNames);
 
-      // Append new artists to existing list (keeping selections intact)
       const existingNames = new Set(quizArtists.map((a) => a.name));
       const newArtists = response.artists.filter((a) => !existingNames.has(a.name));
 
@@ -199,35 +157,25 @@ export default function QuizPage() {
     }
   };
 
-  const handleConnectSpotify = async () => {
-    if (isGuest) {
-      // Redirect to services page which will show upgrade prompt for guests
-      router.push("/services");
-      return;
-    }
-    try {
-      const response = await api.services.connectSpotify();
-      window.location.href = response.auth_url;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect Spotify");
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      const response = await api.quiz.submit({
+      await api.quiz.submit({
         known_artists: Array.from(selectedArtists),
         decade_preference: decadePreference,
         energy_preference: energyPreference,
       });
-      setSubmitResult(response);
-      setStep(4);
+      // Go directly to recommendations
+      router.push("/recommendations");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
-    } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSkipToRecommendations = async () => {
+    // Submit with current selections and go to recommendations
+    await handleSubmit();
   };
 
   // Show loading while auth is being checked
@@ -238,429 +186,306 @@ export default function QuizPage() {
   return (
     <main className="min-h-screen pb-safe">
       <div className="max-w-2xl mx-auto px-4 py-6">
-          {/* Progress indicator */}
-          <div data-testid="progress-indicator" className="flex items-center justify-center gap-2 mb-8">
-            {[1, 2, 3, 4].map((s) => (
-              <div
-                key={s}
-                data-testid={`progress-dot-${s}`}
-                className={`w-3 h-3 rounded-full transition-colors ${
-                  s === step
-                    ? "bg-[#ff2d92]"
-                    : s < step
+        {/* Progress indicator */}
+        <div data-testid="progress-indicator" className="flex items-center justify-center gap-2 mb-8">
+          {[1, 2, 3].map((s) => (
+            <div
+              key={s}
+              data-testid={`progress-dot-${s}`}
+              className={`w-3 h-3 rounded-full transition-colors ${
+                s === step
+                  ? "bg-[#ff2d92]"
+                  : s < step
                     ? "bg-[#ff2d92]/50"
                     : "bg-white/20"
-                }`}
-              />
-            ))}
-          </div>
+              }`}
+            />
+          ))}
+        </div>
 
-          {/* Step 1: Genre Selection */}
-          {step === 1 && (
-            <>
-              <div className="text-center mb-8">
-                <h1 data-testid="quiz-heading" className="text-2xl font-bold text-white mb-2">
-                  What music do you like?
-                </h1>
-                <p className="text-white/60">
-                  Select your favorite genres to help us find karaoke songs you&apos;ll love.
-                </p>
-              </div>
+        {/* Step 1: Genre Selection */}
+        {step === 1 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 data-testid="quiz-heading" className="text-2xl font-bold text-white mb-2">
+                What music do you like?
+              </h1>
+              <p className="text-white/60">
+                Select your favorite genres to get personalized recommendations.
+              </p>
+            </div>
 
-              {/* Genre grid */}
-              <div data-testid="genre-grid" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                {GENRES.map((genre) => (
+            {/* Genre grid */}
+            <div data-testid="genre-grid" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              {GENRES.map((genre) => (
+                <button
+                  key={genre.id}
+                  data-testid={`genre-${genre.id}`}
+                  onClick={() => toggleGenre(genre.id)}
+                  className={`
+                    p-4 rounded-xl text-left transition-all duration-200
+                    ${
+                      selectedGenres.has(genre.id)
+                        ? "bg-gradient-to-r from-[#ff2d92]/20 to-[#b347ff]/20 border-[#ff2d92]/50 border-2 scale-[1.02]"
+                        : "bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10"
+                    }
+                  `}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{genre.emoji}</span>
+                      <div>
+                        <h3 className="font-semibold text-white">{genre.label}</h3>
+                        <p className="text-xs text-white/50 mt-0.5">
+                          {genre.exampleArtists.join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedGenres.has(genre.id) && (
+                      <div className="w-6 h-6 rounded-full bg-[#ff2d92] flex items-center justify-center flex-shrink-0">
+                        <CheckIcon className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Selection count */}
+            <div className="text-center mb-4">
+              <span data-testid="genre-selection-count" className="text-white/40 text-sm">
+                {selectedGenres.size === 0
+                  ? "Select at least one genre"
+                  : `${selectedGenres.size} genre${selectedGenres.size > 1 ? "s" : ""} selected`}
+              </span>
+            </div>
+
+            {/* Navigation */}
+            <div className="sticky bottom-4">
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                onClick={() => setStep(2)}
+                disabled={selectedGenres.size === 0}
+                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
+              >
+                Continue
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 2: Combined Preferences (Decade + Energy) */}
+        {step === 2 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 data-testid="preferences-heading" className="text-2xl font-bold text-white mb-2">
+                Quick preferences
+              </h1>
+              <p className="text-white/60">
+                Optional: Help us fine-tune your recommendations.
+              </p>
+            </div>
+
+            {/* Decade preference */}
+            <div data-testid="decade-section" className="mb-6">
+              <h2 className="text-sm font-medium text-white/70 mb-3 uppercase tracking-wide">
+                Favorite Era
+              </h2>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {DECADES.map((d) => (
                   <button
-                    key={genre.id}
-                    data-testid={`genre-${genre.id}`}
-                    onClick={() => toggleGenre(genre.id)}
+                    key={d}
+                    data-testid={`decade-${d}`}
+                    onClick={() =>
+                      setDecadePreference(decadePreference === d ? null : d)
+                    }
                     className={`
-                      p-4 rounded-xl text-left transition-all duration-200
+                      py-3 px-2 rounded-xl text-center transition-all
                       ${
-                        selectedGenres.has(genre.id)
-                          ? "bg-gradient-to-r from-[#ff2d92]/20 to-[#b347ff]/20 border-[#ff2d92]/50 border-2 scale-[1.02]"
-                          : "bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10"
+                        decadePreference === d
+                          ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
+                          : "bg-white/5 border border-white/10 hover:border-white/20"
                       }
                     `}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{genre.emoji}</span>
-                        <div>
-                          <h3 className="font-semibold text-white">{genre.label}</h3>
-                          <p className="text-xs text-white/50 mt-0.5">
-                            {genre.exampleArtists.join(", ")}
-                          </p>
-                        </div>
-                      </div>
-                      {selectedGenres.has(genre.id) && (
-                        <div className="w-6 h-6 rounded-full bg-[#ff2d92] flex items-center justify-center flex-shrink-0">
-                          <CheckIcon className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                    </div>
+                    <span className="text-sm font-medium text-white">{d}</span>
                   </button>
                 ))}
               </div>
+            </div>
 
-              {/* Selection count */}
-              <div className="text-center mb-4">
-                <span data-testid="genre-selection-count" className="text-white/40 text-sm">
-                  {selectedGenres.size === 0
-                    ? "Select genres or skip to continue"
-                    : `${selectedGenres.size} genre${selectedGenres.size > 1 ? "s" : ""} selected`}
-                </span>
+            {/* Energy preference */}
+            <div data-testid="energy-section" className="mb-8">
+              <h2 className="text-sm font-medium text-white/70 mb-3 uppercase tracking-wide">
+                Energy Level
+              </h2>
+              <div className="grid grid-cols-3 gap-3">
+                {ENERGY_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    data-testid={`energy-${option.value}`}
+                    onClick={() =>
+                      setEnergyPreference(
+                        energyPreference === option.value ? null : option.value
+                      )
+                    }
+                    className={`
+                      py-4 px-3 rounded-xl text-center transition-all
+                      ${
+                        energyPreference === option.value
+                          ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
+                          : "bg-white/5 border border-white/10 hover:border-white/20"
+                      }
+                    `}
+                  >
+                    <span className="text-2xl block mb-1">{option.emoji}</span>
+                    <span className="text-sm font-medium text-white">{option.label}</span>
+                  </button>
+                ))}
               </div>
+            </div>
 
-              {/* Navigation */}
-              <div className="sticky bottom-4">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  onClick={() => setStep(2)}
-                  rightIcon={<ChevronRightIcon className="w-5 h-5" />}
-                >
-                  {selectedGenres.size === 0 ? "Skip" : "Continue"}
+            {/* Navigation */}
+            <div className="flex gap-3 sticky bottom-4">
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                onClick={() => setStep(1)}
+              >
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1"
+                onClick={() => setStep(3)}
+                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
+              >
+                Continue
+              </Button>
+            </div>
+
+            {/* Skip link */}
+            <div className="text-center mt-4">
+              <button
+                onClick={handleSkipToRecommendations}
+                disabled={isSubmitting}
+                className="text-sm text-white/40 hover:text-white/60 transition-colors"
+              >
+                {isSubmitting ? "Loading..." : "Skip to recommendations →"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3: Artist Selection */}
+        {step === 3 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 data-testid="artist-heading" className="text-2xl font-bold text-white mb-2">
+                Know any of these artists?
+              </h1>
+              <p className="text-white/60">
+                Optional: Select artists you know for better recommendations.
+              </p>
+            </div>
+
+            {isLoading ? (
+              <LoadingPulse count={4} />
+            ) : error ? (
+              <div className="text-center py-8">
+                <p className="text-white/60 mb-4">{error}</p>
+                <Button onClick={() => loadQuizArtists()} variant="secondary">
+                  Try again
                 </Button>
               </div>
-            </>
-          )}
-
-          {/* Step 2: Artist Selection */}
-          {step === 2 && (
-            <>
-              <div className="text-center mb-8">
-                <h1 data-testid="artist-heading" className="text-2xl font-bold text-white mb-2">
-                  Which artists do you know?
-                </h1>
-                <p className="text-white/60">
-                  Select artists you listen to or recognize. This helps us find
-                  karaoke songs you&apos;ll love.
-                </p>
-              </div>
-
-              {isLoading ? (
-                <LoadingPulse count={6} />
-              ) : error ? (
-                <div className="text-center py-8">
-                  <p className="text-white/60 mb-4">{error}</p>
-                  <Button onClick={() => loadQuizArtists()} variant="secondary">
-                    Try again
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {/* Selection count */}
-                  <div className="flex items-center justify-between mb-4">
-                    <span data-testid="artist-selection-count" className="text-white/60 text-sm">
-                      {selectedArtists.size} selected
-                    </span>
-                    {selectedArtists.size > 0 && (
-                      <button
-                        onClick={() => setSelectedArtists(new Set())}
-                        className="text-sm text-white/40 hover:text-white transition-colors"
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Artist grid */}
-                  <div data-testid="artist-grid" className="grid grid-cols-1 gap-3 mb-4">
-                    {quizArtists.map((artist, index) => (
-                      <QuizArtistCard
-                        key={artist.name}
-                        artist={artist}
-                        isSelected={selectedArtists.has(artist.name)}
-                        onToggle={() => toggleArtist(artist.name)}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Load more artists button - at bottom */}
-                  <div className="mb-6">
-                    <Button
-                      data-testid="load-more-artists-btn"
-                      variant="ghost"
-                      size="md"
-                      className="w-full"
-                      onClick={handleLoadMoreArtists}
-                      isLoading={isLoadingMore}
-                      leftIcon={<RefreshIcon className="w-4 h-4" />}
-                    >
-                      Show More Artists
-                    </Button>
-                  </div>
-
-                  {/* Skip option */}
-                  <div className="mb-8">
+            ) : (
+              <>
+                {/* Selection count */}
+                <div className="flex items-center justify-between mb-4">
+                  <span data-testid="artist-selection-count" className="text-white/60 text-sm">
+                    {selectedArtists.size} selected
+                  </span>
+                  {selectedArtists.size > 0 && (
                     <button
-                      data-testid="skip-artists-btn"
-                      onClick={handleSkipToggle}
-                      className={`
-                        w-full p-4 rounded-xl text-left transition-all
-                        ${
-                          skipArtists
-                            ? "bg-white/10 border-white/30 border"
-                            : "bg-white/5 border border-white/10 hover:border-white/20"
-                        }
-                      `}
+                      onClick={() => setSelectedArtists(new Set())}
+                      className="text-sm text-white/40 hover:text-white transition-colors"
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`
-                            w-5 h-5 rounded-full border-2 flex items-center justify-center
-                            ${skipArtists ? "border-[#00f5ff] bg-[#00f5ff]/20" : "border-white/30"}
-                          `}
-                        >
-                          {skipArtists && <CheckIcon className="w-3 h-3 text-[#00f5ff]" />}
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">I don&apos;t know any of these</p>
-                          <p className="text-white/50 text-sm">
-                            We&apos;ll show you popular crowd-pleasers instead
-                          </p>
-                        </div>
-                      </div>
+                      Clear all
                     </button>
-                  </div>
-
-                  {/* Navigation */}
-                  <div className="flex gap-3 sticky bottom-4">
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      className="flex-1"
-                      onClick={() => setStep(1)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="lg"
-                      className="flex-1"
-                      onClick={() => setStep(3)}
-                      rightIcon={<ChevronRightIcon className="w-5 h-5" />}
-                    >
-                      Continue
-                    </Button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Step 3: Preferences */}
-          {step === 3 && (
-            <>
-              <div className="text-center mb-8">
-                <h1 data-testid="preferences-heading" className="text-2xl font-bold text-white mb-2">
-                  Your preferences
-                </h1>
-                <p className="text-white/60">
-                  Optional: Help us fine-tune your recommendations.
-                </p>
-              </div>
-
-              {/* Decade preference */}
-              <div data-testid="decade-section" className="mb-8">
-                <h2 className="text-lg font-semibold text-white mb-3">
-                  Favorite decade?
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {DECADES.map((d) => {
-                    const decadeInfo = decadeArtists.find((da) => da.decade === d);
-                    const exampleArtists = decadeInfo?.artists.slice(0, 3) || [];
-
-                    return (
-                      <button
-                        key={d}
-                        data-testid={`decade-${d}`}
-                        onClick={() =>
-                          setDecadePreference(decadePreference === d ? null : d)
-                        }
-                        className={`
-                          p-4 rounded-xl text-left transition-all
-                          ${
-                            decadePreference === d
-                              ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
-                              : "bg-white/5 border border-white/10 hover:border-white/20"
-                          }
-                        `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg font-semibold text-white">{d}</span>
-                          {decadePreference === d && (
-                            <CheckIcon className="w-5 h-5 text-[#ff2d92]" />
-                          )}
-                        </div>
-                        {exampleArtists.length > 0 && (
-                          <p className="text-xs text-white/50 mt-1">
-                            {exampleArtists.map((a) => a.name).join(", ")}
-                          </p>
-                        )}
-                      </button>
-                    );
-                  })}
+                  )}
                 </div>
-              </div>
 
-              {/* Energy preference */}
-              <div data-testid="energy-section" className="mb-8">
-                <h2 className="text-lg font-semibold text-white mb-3">
-                  What energy level?
-                </h2>
-                <div className="grid grid-cols-1 gap-3">
-                  {ENERGY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      data-testid={`energy-${option.value}`}
-                      onClick={() =>
-                        setEnergyPreference(
-                          energyPreference === option.value ? null : option.value
-                        )
-                      }
-                      className={`
-                        p-4 rounded-xl text-left transition-all
-                        ${
-                          energyPreference === option.value
-                            ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border"
-                            : "bg-white/5 border border-white/10 hover:border-white/20"
-                        }
-                      `}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-white">
-                            {option.label}
-                          </h3>
-                          <p className="text-sm text-white/60">
-                            {option.description}
-                          </p>
-                        </div>
-                        {energyPreference === option.value && (
-                          <CheckIcon className="w-5 h-5 text-[#ff2d92]" />
-                        )}
-                      </div>
-                    </button>
+                {/* Artist grid */}
+                <div data-testid="artist-grid" className="grid grid-cols-1 gap-3 mb-4">
+                  {quizArtists.map((artist, index) => (
+                    <QuizArtistCard
+                      key={artist.name}
+                      artist={artist}
+                      isSelected={selectedArtists.has(artist.name)}
+                      onToggle={() => toggleArtist(artist.name)}
+                      index={index}
+                    />
                   ))}
                 </div>
-              </div>
 
-              {/* Navigation */}
-              <div className="flex gap-3 sticky bottom-4">
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  className="flex-1"
-                  onClick={() => setStep(2)}
-                >
-                  Back
-                </Button>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="flex-1"
-                  onClick={handleSubmit}
-                  isLoading={isSubmitting}
-                >
-                  Finish Quiz
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 4: Results */}
-          {step === 4 && submitResult && (
-            <div data-testid="results-section" className="py-8">
-              {/* Success indicator */}
-              <div className="text-center">
-                <div className="relative w-20 h-20 mx-auto mb-6">
-                  <div className="absolute inset-0 bg-green-500/20 rounded-full animate-pulse" />
-                  <div className="relative w-full h-full rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/30">
-                    <CheckIcon className="w-10 h-10 text-green-400" />
-                  </div>
-                </div>
-
-                <h1 data-testid="results-heading" className="text-2xl font-bold text-white mb-2">
-                  Quiz Complete!
-                </h1>
-                <p data-testid="results-message" className="text-white/60 mb-8">
-                  {submitResult.songs_added > 0
-                    ? `We found ${submitResult.songs_added} karaoke songs based on your selections.`
-                    : "We'll show you popular crowd-pleasers to get you started."}
-                  {submitResult.recommendations_ready &&
-                    " Your personalized recommendations are ready!"}
-                </p>
-
-                {/* Primary action */}
-                <div className="mb-8">
+                {/* Load more artists button */}
+                <div className="mb-6">
                   <Button
-                    data-testid="view-recommendations-btn"
-                    variant="primary"
-                    size="lg"
+                    data-testid="load-more-artists-btn"
+                    variant="ghost"
+                    size="md"
                     className="w-full"
-                    onClick={() => router.push("/recommendations")}
-                    leftIcon={<SparklesIcon className="w-5 h-5" />}
+                    onClick={handleLoadMoreArtists}
+                    isLoading={isLoadingMore}
+                    leftIcon={<RefreshIcon className="w-4 h-4" />}
                   >
-                    View Recommendations
+                    Show More Artists
                   </Button>
                 </div>
-              </div>
 
-              {/* Connect Services CTA */}
-              {showConnectCTA && (
-                <div data-testid="connect-cta" className="p-6 rounded-2xl bg-gradient-to-br from-[#ff2d92]/10 via-[#b347ff]/5 to-[#00f5ff]/10 border border-white/10">
-                  <div className="text-center mb-4">
-                    <h2 data-testid="connect-cta-heading" className="text-lg font-semibold text-white mb-2">
-                      Want even better recommendations?
-                    </h2>
-                    <p className="text-white/60 text-sm">
-                      {isGuest
-                        ? "Create an account and connect your music services for personalized suggestions based on your actual listening history."
-                        : "Connect your music services to get personalized suggestions based on your actual listening history."}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <Button
-                      data-testid="connect-spotify-btn"
-                      variant="secondary"
-                      size="md"
-                      className="w-full justify-center"
-                      onClick={handleConnectSpotify}
-                      leftIcon={<SpotifyIcon className="w-5 h-5 text-[#1DB954]" />}
-                    >
-                      {isGuest ? "Create Account & Connect Spotify" : "Connect Spotify"}
-                    </Button>
-
-                    {/* Apple Music - placeholder for future */}
-                    <Button
-                      data-testid="connect-apple-music-btn"
-                      variant="secondary"
-                      size="md"
-                      className="w-full justify-center opacity-50"
-                      disabled
-                      leftIcon={<span className="text-lg">🎵</span>}
-                    >
-                      Apple Music (Coming Soon)
-                    </Button>
-                  </div>
-
-                  <button
-                    data-testid="connect-cta-dismiss"
-                    onClick={() => setShowConnectCTA(false)}
-                    className="w-full mt-4 text-sm text-white/40 hover:text-white/60 transition-colors"
+                {/* Navigation */}
+                <div className="flex gap-3 sticky bottom-4">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => setStep(2)}
                   >
-                    Maybe later
-                  </button>
+                    Back
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="flex-1"
+                    onClick={handleSubmit}
+                    isLoading={isSubmitting}
+                    leftIcon={<SparklesIcon className="w-5 h-5" />}
+                  >
+                    See Recommendations
+                  </Button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
+
+                {/* Skip link */}
+                {selectedArtists.size === 0 && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting}
+                      className="text-sm text-white/40 hover:text-white/60 transition-colors"
+                    >
+                      {isSubmitting ? "Loading..." : "Skip, I don't know any →"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </main>
   );
 }

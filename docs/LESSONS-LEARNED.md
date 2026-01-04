@@ -15,6 +15,28 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-03: React State Closures in Event Handlers
+
+**Context:** Building a song removal function that updates both local state and a parent callback with the new count.
+
+**Lesson:** Using `onCountChange(total - 1)` after `setTotal(prev => prev - 1)` creates a stale closure bug. The `total` variable captured by the event handler closure holds the old value, not the updated one.
+
+**Recommendation:** Move callbacks inside the state updater function:
+```tsx
+// Bad - stale closure
+setTotal(prev => prev - 1);
+onCountChange(total - 1);  // total is stale!
+
+// Good - use value from updater
+setTotal(prev => {
+  const newTotal = prev - 1;
+  onCountChange(newTotal);  // fresh value
+  return newTotal;
+});
+```
+
+---
+
 ### 2026-01-03: Next.js Static Export Cannot Use Dynamic Route Segments
 
 **Context:** Building admin detail pages with URLs like `/admin/users/[id]` for a Next.js app using `output: export` (static export for GitHub Pages).
