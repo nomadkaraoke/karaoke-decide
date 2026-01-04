@@ -271,28 +271,44 @@ export const api = {
       }>("/api/my/data/summary"),
 
     // My Data artists
-    getDataArtists: () =>
+    getDataArtists: (page: number = 1, perPage: number = 100) =>
       api.get<{
         artists: Array<{
           artist_name: string;
-          source: string;
-          rank: number;
-          time_range: string;
+          sources: string[];
+          spotify_rank: number | null;
+          spotify_time_range: string | null;
+          lastfm_rank: number | null;
+          lastfm_playcount: number | null;
           popularity: number | null;
           genres: string[];
-          playcount: number | null;
+          is_excluded: boolean;
+          is_manual: boolean;
         }>;
         total: number;
-      }>("/api/my/data/artists"),
+        page: number;
+        per_page: number;
+        has_more: boolean;
+      }>(`/api/my/data/artists?page=${page}&per_page=${perPage}`),
 
     addDataArtist: (artistName: string) =>
-      api.post<{ message: string; artist_name: string }>("/api/my/data/artists", {
+      api.post<{ artists: string[]; added: string }>("/api/my/data/artists", {
         artist_name: artistName,
       }),
 
     removeDataArtist: (artistName: string) =>
-      api.delete<{ message: string }>(
+      api.delete<{ removed: string; removed_from: string[]; success: boolean }>(
         `/api/my/data/artists/${encodeURIComponent(artistName)}`
+      ),
+
+    excludeArtist: (artistName: string) =>
+      api.post<{ artist_name: string; excluded: boolean; success: boolean }>(
+        `/api/my/data/artists/exclude?artist_name=${encodeURIComponent(artistName)}`
+      ),
+
+    includeArtist: (artistName: string) =>
+      api.delete<{ artist_name: string; excluded: boolean; success: boolean }>(
+        `/api/my/data/artists/exclude?artist_name=${encodeURIComponent(artistName)}`
       ),
 
     // My Data preferences

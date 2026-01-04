@@ -132,9 +132,11 @@ cd frontend && npm run dev
 - `POST /api/known-songs/bulk` - Bulk add songs to known songs
 - `DELETE /api/known-songs/{id}` - Remove a known song
 - `GET /api/my/data/summary` - Get aggregated data summary
-- `GET /api/my/data/artists` - Get user's artists from all sources
+- `GET /api/my/data/artists` - Get user's artists from all sources (merged, paginated)
 - `POST /api/my/data/artists` - Add artist manually
-- `DELETE /api/my/data/artists/{name}` - Remove artist
+- `DELETE /api/my/data/artists/{name}` - Remove artist from all sources
+- `POST /api/my/data/artists/exclude` - Exclude artist from recommendations
+- `DELETE /api/my/data/artists/exclude` - Include artist in recommendations
 - `GET /api/my/data/preferences` - Get user preferences
 - `PUT /api/my/data/preferences` - Update user preferences
 - `GET /api/my/recommendations` - Get personalized recommendations
@@ -178,6 +180,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-04 | Enhanced Artists Tab (merged sources, pagination, exclusions, compact UI) | [archive/2026-01-04-enhanced-artists-tab.md](archive/2026-01-04-enhanced-artists-tab.md) |
 | 2026-01-04 | Onboarding Flow Fix (quiz bypass bug, quiz completion tracking, quiz prompt banner) | [archive/2026-01-04-onboarding-flow-fix.md](archive/2026-01-04-onboarding-flow-fix.md) |
 | 2026-01-03 | UX Refresh (landing page, navigation, quiz streamlining, Music I Know, Settings) | [archive/2026-01-03-ux-refresh.md](archive/2026-01-03-ux-refresh.md) |
 | 2026-01-03 | Admin Dashboard (user management, sync job monitoring, system stats) | [archive/2026-01-03-admin-dashboard.md](archive/2026-01-03-admin-dashboard.md) |

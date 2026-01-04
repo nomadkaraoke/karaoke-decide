@@ -507,10 +507,38 @@ def mock_user_data_service() -> MagicMock:
         }
     )
     mock.get_all_artists = AsyncMock(
-        return_value=[
-            {"artist_name": "Queen", "source": "spotify", "rank": 1, "time_range": "medium_term"},
-            {"artist_name": "The Beatles", "source": "quiz", "rank": 1, "time_range": ""},
-        ]
+        return_value={
+            "artists": [
+                {
+                    "artist_name": "Queen",
+                    "sources": ["spotify"],
+                    "spotify_rank": 1,
+                    "spotify_time_range": "medium_term",
+                    "lastfm_rank": None,
+                    "lastfm_playcount": None,
+                    "popularity": 80,
+                    "genres": ["rock"],
+                    "is_excluded": False,
+                    "is_manual": False,
+                },
+                {
+                    "artist_name": "The Beatles",
+                    "sources": ["quiz"],
+                    "spotify_rank": None,
+                    "spotify_time_range": None,
+                    "lastfm_rank": None,
+                    "lastfm_playcount": None,
+                    "popularity": None,
+                    "genres": [],
+                    "is_excluded": False,
+                    "is_manual": True,
+                },
+            ],
+            "total": 2,
+            "page": 1,
+            "per_page": 100,
+            "has_more": False,
+        }
     )
     mock.add_artist = AsyncMock(
         return_value={

@@ -8,7 +8,7 @@ Provides endpoints for the My Data page, allowing users to:
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import CurrentUser, UserDataServiceDep
@@ -63,22 +63,36 @@ class DataSummaryResponse(BaseModel):
 
 
 class UserArtistResponse(BaseModel):
-    """An artist from user's data."""
+    """An artist from user's data with merged source information."""
 
     artist_name: str
-    source: str
-    rank: int = 0
-    time_range: str = ""
-    popularity: int | None = None
-    genres: list[str] = []
-    playcount: int | None = None
+    sources: list[str]  # All sources where this artist appears: spotify, lastfm, quiz
+    spotify_rank: int | None = None  # Position in Spotify top artists (1-50)
+    spotify_time_range: str | None = None  # short_term, medium_term, long_term
+    lastfm_rank: int | None = None  # Position in Last.fm top artists
+    lastfm_playcount: int | None = None  # Actual listen count from Last.fm
+    popularity: int | None = None  # Spotify global popularity score (0-100)
+    genres: list[str] = []  # Artist genres from Spotify
+    is_excluded: bool = False  # Whether hidden from recommendations
+    is_manual: bool = False  # Whether added manually (vs synced)
 
 
 class AllArtistsResponse(BaseModel):
-    """Response containing all user's artists."""
+    """Response containing paginated list of user's artists."""
 
     artists: list[UserArtistResponse]
     total: int
+    page: int
+    per_page: int
+    has_more: bool
+
+
+class ExcludeArtistResponse(BaseModel):
+    """Response after excluding/including an artist."""
+
+    artist_name: str
+    excluded: bool
+    success: bool
 
 
 class AddArtistRequest(BaseModel):
@@ -155,19 +169,32 @@ async def get_data_summary(
 async def get_all_artists(
     user: CurrentUser,
     user_data_service: UserDataServiceDep,
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    per_page: int = Query(100, ge=1, le=500, description="Artists per page"),
 ) -> AllArtistsResponse:
-    """Get all artists for user from all sources.
+    """Get all artists for user from all sources with pagination.
 
-    Returns combined list from:
-    - Synced artists (Spotify, Last.fm)
+    Returns combined and merged list from:
+    - Synced artists (Spotify, Last.fm) - merged when same artist appears in both
     - Quiz-selected artists
     - Manually added artists
+
+    Each artist includes:
+    - sources: List of where this artist was found (spotify, lastfm, quiz)
+    - Source-specific stats (Spotify rank/popularity, Last.fm playcount)
+    - is_excluded: Whether hidden from recommendations
+    - is_manual: Whether added manually (can be deleted)
+
+    Sorted by: playcount (desc), best rank (asc), number of sources (desc)
     """
-    artists = await user_data_service.get_all_artists(user.id)
+    result = await user_data_service.get_all_artists(user.id, page=page, per_page=per_page)
 
     return AllArtistsResponse(
-        artists=[UserArtistResponse(**a) for a in artists],
-        total=len(artists),
+        artists=[UserArtistResponse(**a) for a in result["artists"]],
+        total=result["total"],
+        page=result["page"],
+        per_page=result["per_page"],
+        has_more=result["has_more"],
     )
 
 
@@ -248,3 +275,40 @@ async def update_preferences(
         genres=request.genres,
     )
     return PreferencesResponse(**updated)
+
+
+# -----------------------------------------------------------------------------
+# Artist Exclusions (Hide from Recommendations)
+# -----------------------------------------------------------------------------
+
+
+@router.post("/artists/exclude", response_model=ExcludeArtistResponse)
+async def exclude_artist(
+    user: CurrentUser,
+    user_data_service: UserDataServiceDep,
+    artist_name: str = Query(..., description="Artist name to exclude"),
+) -> ExcludeArtistResponse:
+    """Exclude an artist from recommendations.
+
+    This is a soft hide - the artist remains in your data but won't
+    be used when generating recommendations. This persists through
+    re-syncs from Spotify/Last.fm.
+
+    Use this when you like an artist but don't want to sing their songs.
+    """
+    result = await user_data_service.exclude_artist(user.id, artist_name)
+    return ExcludeArtistResponse(**result)
+
+
+@router.delete("/artists/exclude", response_model=ExcludeArtistResponse)
+async def include_artist(
+    user: CurrentUser,
+    user_data_service: UserDataServiceDep,
+    artist_name: str = Query(..., description="Artist name to include"),
+) -> ExcludeArtistResponse:
+    """Remove an artist from exclusions (un-hide).
+
+    The artist will again be used when generating recommendations.
+    """
+    result = await user_data_service.include_artist(user.id, artist_name)
+    return ExcludeArtistResponse(**result)

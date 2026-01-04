@@ -798,9 +798,15 @@ Get aggregated summary of user's data.
 
 ### GET /api/my/data/artists
 
-Get user's artists from all sources (sync + quiz + manual).
+Get user's artists from all sources (sync + quiz + manual), merged when same artist appears in multiple sources.
 
 **Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| page | int | 1 | Page number (1-indexed) |
+| per_page | int | 100 | Artists per page (max 500) |
 
 **Response:**
 ```json
@@ -808,24 +814,33 @@ Get user's artists from all sources (sync + quiz + manual).
   "artists": [
     {
       "artist_name": "Queen",
-      "source": "spotify",
-      "rank": 1,
-      "time_range": "medium_term",
+      "sources": ["spotify", "lastfm"],
+      "spotify_rank": 1,
+      "spotify_time_range": "medium_term",
+      "lastfm_rank": 5,
+      "lastfm_playcount": 847,
       "popularity": 90,
       "genres": ["rock", "glam rock"],
-      "playcount": null
+      "is_excluded": false,
+      "is_manual": false
     },
     {
       "artist_name": "ABBA",
-      "source": "quiz",
-      "rank": 0,
-      "time_range": "",
+      "sources": ["quiz"],
+      "spotify_rank": null,
+      "spotify_time_range": null,
+      "lastfm_rank": null,
+      "lastfm_playcount": null,
       "popularity": null,
       "genres": [],
-      "playcount": null
+      "is_excluded": false,
+      "is_manual": true
     }
   ],
-  "total": 2
+  "total": 150,
+  "page": 1,
+  "per_page": 100,
+  "has_more": true
 }
 ```
 
@@ -845,8 +860,8 @@ Add an artist manually.
 **Response:**
 ```json
 {
-  "message": "Artist added successfully",
-  "artist_name": "Elton John"
+  "artists": ["Existing Artist", "Elton John"],
+  "added": "Elton John"
 }
 ```
 
@@ -855,7 +870,7 @@ Add an artist manually.
 
 ### DELETE /api/my/data/artists/{artist_name}
 
-Remove an artist from user's data.
+Remove an artist from user's data (from all sources).
 
 **Requires:** Bearer token
 
@@ -867,7 +882,49 @@ Remove an artist from user's data.
 **Response:**
 ```json
 {
-  "message": "Artist removed successfully"
+  "removed": "Queen",
+  "removed_from": ["quiz", "spotify"],
+  "success": true
+}
+```
+
+### POST /api/my/data/artists/exclude
+
+Exclude an artist from recommendations (soft hide). The artist remains in your data but won't be used when generating recommendations. Persists through re-syncs.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| artist_name | string | Artist name to exclude |
+
+**Response:**
+```json
+{
+  "artist_name": "Taylor Swift",
+  "excluded": true,
+  "success": true
+}
+```
+
+### DELETE /api/my/data/artists/exclude
+
+Remove an artist from exclusions (un-hide). The artist will again be used when generating recommendations.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| artist_name | string | Artist name to include |
+
+**Response:**
+```json
+{
+  "artist_name": "Taylor Swift",
+  "excluded": false,
+  "success": true
 }
 ```
 
