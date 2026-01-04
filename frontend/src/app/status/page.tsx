@@ -122,6 +122,8 @@ export default function StatusPage() {
   }, []);
 
   useEffect(() => {
+    // Data fetching on mount is a valid use case for setState in useEffect
+    // eslint-disable-next-line
     runAllChecks();
     // Auto-refresh every 60 seconds
     const interval = setInterval(runAllChecks, 60000);

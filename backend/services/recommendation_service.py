@@ -548,7 +548,7 @@ class RecommendationService:
             known_artists.add(doc["artist"].lower())
             known_song_ids.add(doc["song_id"])
 
-        # Get user preferences from quiz
+        # Get user preferences from quiz and excluded artists
         user_docs = await self.firestore.query_documents(
             self.USERS_COLLECTION,
             filters=[("user_id", "==", user_id)],
@@ -557,11 +557,18 @@ class RecommendationService:
 
         quiz_decade_pref = None
         quiz_energy_pref = None
+        excluded_artists: set[str] = set()
 
         if user_docs:
             user_doc = user_docs[0]
             quiz_decade_pref = user_doc.get("quiz_decade_pref")
             quiz_energy_pref = user_doc.get("quiz_energy_pref")
+            # Get excluded artists (stored as lowercase)
+            excluded_artists = set(user_doc.get("excluded_artists", []))
+
+        # Remove excluded artists from known_artists
+        # They won't contribute to "Artists You Know" recommendations
+        known_artists = known_artists - excluded_artists
 
         return UserContext(
             user_id=user_id,

@@ -12,10 +12,11 @@ import {
   PlusIcon,
   CheckIcon,
   TrashIcon,
-  XIcon,
   SpotifyIcon,
   LastfmIcon,
   RefreshIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from "@/components/icons";
 import { Button, Input, Badge, LoadingPulse, EmptyState } from "@/components/ui";
 import { PopularityStars } from "@/components/SongCard";
@@ -25,12 +26,15 @@ type Tab = "artists" | "songs" | "services";
 
 interface UserArtist {
   artist_name: string;
-  source: string;
-  rank: number;
-  time_range: string;
+  sources: string[];
+  spotify_rank: number | null;
+  spotify_time_range: string | null;
+  lastfm_rank: number | null;
+  lastfm_playcount: number | null;
   popularity: number | null;
   genres: string[];
-  playcount: number | null;
+  is_excluded: boolean;
+  is_manual: boolean;
 }
 
 interface CatalogSong {
@@ -201,28 +205,45 @@ export default function MusicIKnowPage() {
 // ============ ARTISTS TAB ============
 function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void }) {
   const [artists, setArtists] = useState<UserArtist[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newArtist, setNewArtist] = useState("");
   const [isAdding, setIsAdding] = useState(false);
-  const [removingArtist, setRemovingArtist] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
-  const loadArtists = useCallback(async () => {
+  const PER_PAGE = 100;
+
+  const loadArtists = useCallback(async (pageNum: number, append: boolean = false) => {
     try {
-      setIsLoading(true);
+      if (append) setIsLoadingMore(true);
+      else setIsLoading(true);
       setError(null);
-      const response = await api.my.getDataArtists();
-      setArtists(response.artists);
-      onCountChange(response.artists.length);
+
+      const response = await api.my.getDataArtists(pageNum, PER_PAGE);
+
+      if (append) {
+        setArtists((prev) => [...prev, ...response.artists]);
+      } else {
+        setArtists(response.artists);
+      }
+      setTotal(response.total);
+      setPage(response.page);
+      setHasMore(response.has_more);
+      onCountChange(response.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load artists");
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }, [onCountChange]);
 
   useEffect(() => {
-    loadArtists();
+    loadArtists(1);
   }, [loadArtists]);
 
   const handleAddArtist = async (e: React.FormEvent) => {
@@ -233,7 +254,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       setIsAdding(true);
       await api.my.addDataArtist(newArtist.trim());
       setNewArtist("");
-      await loadArtists();
+      await loadArtists(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add artist");
     } finally {
@@ -243,28 +264,71 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
 
   const handleRemoveArtist = async (artistName: string) => {
     try {
-      setRemovingArtist(artistName);
+      setActionInProgress(artistName);
       await api.my.removeDataArtist(artistName);
-      await loadArtists();
+      // Optimistically update local state
+      setArtists((prev) => prev.filter((a) => a.artist_name !== artistName));
+      setTotal((prev) => {
+        const newTotal = prev - 1;
+        onCountChange(newTotal);
+        return newTotal;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove artist");
     } finally {
-      setRemovingArtist(null);
+      setActionInProgress(null);
     }
   };
 
-  // Group artists by source
-  const artistsBySource = artists.reduce((acc, artist) => {
-    const source = artist.source;
-    if (!acc[source]) acc[source] = [];
-    acc[source].push(artist);
-    return acc;
-  }, {} as Record<string, UserArtist[]>);
+  const handleExcludeArtist = async (artistName: string) => {
+    try {
+      setActionInProgress(artistName);
+      await api.my.excludeArtist(artistName);
+      // Optimistically update local state
+      setArtists((prev) =>
+        prev.map((a) =>
+          a.artist_name === artistName ? { ...a, is_excluded: true } : a
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to exclude artist");
+    } finally {
+      setActionInProgress(null);
+    }
+  };
 
-  const sourceConfig: Record<string, { icon: React.ReactNode; color: string; label: string }> = {
-    spotify: { icon: <SpotifyIcon className="w-3 h-3" />, color: "#1DB954", label: "From Spotify" },
-    lastfm: { icon: <LastfmIcon className="w-3 h-3" />, color: "#ff4444", label: "From Last.fm" },
-    quiz: { icon: <span className="text-xs">✓</span>, color: "#ff2d92", label: "From Quiz" },
+  const handleIncludeArtist = async (artistName: string) => {
+    try {
+      setActionInProgress(artistName);
+      await api.my.includeArtist(artistName);
+      // Optimistically update local state
+      setArtists((prev) =>
+        prev.map((a) =>
+          a.artist_name === artistName ? { ...a, is_excluded: false } : a
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to include artist");
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  // Format playcount for display
+  const formatPlaycount = (count: number) => {
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return count.toString();
+  };
+
+  // Get time range display name
+  const getTimeRangeLabel = (range: string | null) => {
+    if (!range) return null;
+    switch (range) {
+      case "short_term": return "4 weeks";
+      case "medium_term": return "6 months";
+      case "long_term": return "all time";
+      default: return range;
+    }
   };
 
   if (isLoading) {
@@ -272,7 +336,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Add Artist Form */}
       <form onSubmit={handleAddArtist} className="flex gap-2">
         <div className="flex-1 relative">
@@ -313,54 +377,167 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
           action={{ label: "Take Quiz", onClick: () => window.location.href = "/quiz" }}
         />
       ) : (
-        <div className="space-y-6">
-          {Object.entries(artistsBySource).map(([source, sourceArtists]) => {
-            const config = sourceConfig[source] || { icon: null, color: "#999", label: source };
+        <>
+          {/* Header with count */}
+          <div className="flex items-center justify-between text-sm text-white/60">
+            <span>Showing {artists.length} of {total} artists</span>
+          </div>
 
-            return (
-              <div key={source}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-6 h-6 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: `${config.color}20` }}
-                  >
-                    <span style={{ color: config.color }}>{config.icon}</span>
-                  </div>
-                  <span className="text-sm font-medium text-white/70">{config.label}</span>
-                  <Badge variant="default">{sourceArtists.length}</Badge>
-                </div>
+          {/* Artist Rows */}
+          <div className="space-y-2">
+            {artists.map((artist) => {
+              const isProcessing = actionInProgress === artist.artist_name;
+              const isExcluded = artist.is_excluded;
 
-                <div className="flex flex-wrap gap-2">
-                  {sourceArtists.map((artist) => (
-                    <div
-                      key={`${source}-${artist.artist_name}`}
-                      className="group flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-sm text-white/80 hover:bg-white/15 transition-colors"
-                    >
-                      <span>{artist.artist_name}</span>
-                      {artist.rank && artist.rank <= 10 && (
-                        <span className="text-xs opacity-60" style={{ color: config.color }}>
-                          #{artist.rank}
+              return (
+                <div
+                  key={artist.artist_name}
+                  className={`p-3 rounded-xl border transition-all ${
+                    isExcluded
+                      ? "bg-white/[0.02] border-white/5 opacity-60"
+                      : "bg-white/5 border-white/10"
+                  } ${isProcessing ? "opacity-50" : ""}`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Artist Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Name row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`font-medium ${isExcluded ? "text-white/50" : "text-white"}`}>
+                          {artist.artist_name}
                         </span>
-                      )}
-                      <button
-                        onClick={() => handleRemoveArtist(artist.artist_name)}
-                        disabled={removingArtist === artist.artist_name}
-                        className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all"
-                        title="Remove artist"
-                      >
-                        {removingArtist === artist.artist_name ? (
-                          <span className="animate-pulse">...</span>
-                        ) : (
-                          <XIcon className="w-3.5 h-3.5" />
+                        {isExcluded && (
+                          <span className="text-xs text-orange-400/80 bg-orange-400/10 px-1.5 py-0.5 rounded">
+                            Hidden
+                          </span>
                         )}
-                      </button>
+                      </div>
+
+                      {/* Stats row */}
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {/* Source badges */}
+                        {artist.sources.map((source) => {
+                          const config: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+                            spotify: { icon: <SpotifyIcon className="w-3 h-3" />, color: "#1DB954", bg: "bg-[#1DB954]/20" },
+                            lastfm: { icon: <LastfmIcon className="w-3 h-3" />, color: "#ff4444", bg: "bg-[#ff4444]/20" },
+                            quiz: { icon: <CheckIcon className="w-3 h-3" />, color: "#ff2d92", bg: "bg-[#ff2d92]/20" },
+                          };
+                          const sourceConfig = config[source] || { icon: null, color: "#999", bg: "bg-white/10" };
+                          return (
+                            <span
+                              key={source}
+                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${sourceConfig.bg}`}
+                              style={{ color: sourceConfig.color }}
+                            >
+                              {sourceConfig.icon}
+                              <span className="capitalize">{source === "lastfm" ? "Last.fm" : source}</span>
+                            </span>
+                          );
+                        })}
+
+                        {/* Stats separator */}
+                        {(artist.spotify_rank || artist.lastfm_playcount || artist.genres.length > 0) && (
+                          <span className="text-white/20">·</span>
+                        )}
+
+                        {/* Spotify rank */}
+                        {artist.spotify_rank && (
+                          <span className="text-xs text-white/50">
+                            #{artist.spotify_rank} on Spotify
+                            {artist.spotify_time_range && (
+                              <span className="text-white/30"> ({getTimeRangeLabel(artist.spotify_time_range)})</span>
+                            )}
+                          </span>
+                        )}
+
+                        {/* Last.fm playcount */}
+                        {artist.lastfm_playcount && artist.lastfm_playcount > 0 && (
+                          <span className="text-xs text-white/50">
+                            {formatPlaycount(artist.lastfm_playcount)} plays
+                          </span>
+                        )}
+
+                        {/* Primary genre */}
+                        {artist.genres.length > 0 && (
+                          <span className="text-xs text-white/40 capitalize">
+                            {artist.genres[0]}
+                          </span>
+                        )}
+
+                        {/* Popularity */}
+                        {artist.popularity !== null && artist.popularity > 0 && (
+                          <span className="text-xs text-white/30">
+                            Pop: {artist.popularity}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  ))}
+
+                    {/* Action button */}
+                    <div className="flex-shrink-0">
+                      {artist.is_manual ? (
+                        // Manual artists can be removed
+                        <button
+                          onClick={() => handleRemoveArtist(artist.artist_name)}
+                          disabled={isProcessing}
+                          className="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                          title="Remove artist"
+                        >
+                          {isProcessing ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <TrashIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      ) : isExcluded ? (
+                        // Excluded synced artists can be unhidden
+                        <button
+                          onClick={() => handleIncludeArtist(artist.artist_name)}
+                          disabled={isProcessing}
+                          className="p-2 rounded-lg text-white/40 hover:text-green-400 hover:bg-green-400/10 transition-colors"
+                          title="Unhide from recommendations"
+                        >
+                          {isProcessing ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      ) : (
+                        // Synced artists can be hidden
+                        <button
+                          onClick={() => handleExcludeArtist(artist.artist_name)}
+                          disabled={isProcessing}
+                          className="p-2 rounded-lg text-white/40 hover:text-orange-400 hover:bg-orange-400/10 transition-colors"
+                          title="Hide from recommendations"
+                        >
+                          {isProcessing ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <EyeOffIcon className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+
+          {/* Load More */}
+          {hasMore && (
+            <div className="text-center pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => loadArtists(page + 1, true)}
+                isLoading={isLoadingMore}
+              >
+                Load More ({artists.length} of {total})
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

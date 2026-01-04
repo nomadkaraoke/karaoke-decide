@@ -100,9 +100,9 @@ export interface PaginatedResponse<T> {
   has_more: boolean;
 }
 
-export interface CatalogSearchResponse extends PaginatedResponse<CatalogSong> {}
+export type CatalogSearchResponse = PaginatedResponse<CatalogSong>;
 
-export interface UserSongsResponse extends PaginatedResponse<UserSong> {}
+export type UserSongsResponse = PaginatedResponse<UserSong>;
 
 export interface RecommendationsResponse {
   recommendations: Recommendation[];

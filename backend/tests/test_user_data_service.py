@@ -192,14 +192,16 @@ class TestGetAllArtists:
 
     @pytest.mark.asyncio
     async def test_combines_all_sources(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
-        """Should combine artists from all sources."""
+        """Should combine artists from all sources and merge when same artist in multiple."""
         user_doc = {
             "id": "email_hash_123",
             "user_id": "user123",
             "quiz_artists_known": ["Quiz Artist", "Manual Artist"],
         }
-        # First: user_artists query, second: _get_user_document query
+        # First: _get_user_document query (for exclusions), second: user_artists query
         mock_firestore.query_documents.side_effect = [
+            # _get_user_document query
+            [user_doc],
             # user_artists query
             [
                 {
@@ -211,68 +213,145 @@ class TestGetAllArtists:
                     "genres": ["rock"],
                 },
             ],
-            # _get_user_document query
-            [user_doc],
         ]
 
         result = await user_data_service.get_all_artists("user123")
 
-        assert len(result) == 3
-        sources = [a["source"] for a in result]
-        assert "spotify" in sources
-        assert "quiz" in sources
+        # Now returns dict with pagination info
+        assert result["total"] == 3
+        artists = result["artists"]
+        assert len(artists) == 3
+        # Check sources are tracked as lists
+        all_sources = [src for a in artists for src in a["sources"]]
+        assert "spotify" in all_sources
+        assert "quiz" in all_sources
 
     @pytest.mark.asyncio
-    async def test_deduplicates_artists(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
-        """Should not duplicate artists that appear in both synced and quiz."""
+    async def test_merges_artists_from_multiple_sources(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        """Should merge when same artist appears in both synced and quiz."""
         user_doc = {
             "id": "email_hash_123",
             "user_id": "user123",
             "quiz_artists_known": ["queen"],  # Same artist, different case
         }
-        # First: user_artists query, second: _get_user_document query
+        # First: _get_user_document query, second: user_artists query
         mock_firestore.query_documents.side_effect = [
-            [{"artist_name": "Queen", "source": "spotify", "rank": 1}],
             [user_doc],
+            [{"artist_name": "Queen", "source": "spotify", "rank": 1}],
         ]
 
         result = await user_data_service.get_all_artists("user123")
+        artists = result["artists"]
 
-        # Should only have one Queen entry (the synced one takes precedence)
-        queen_entries = [a for a in result if a["artist_name"].lower() == "queen"]
+        # Should only have one Queen entry (merged, with both sources)
+        queen_entries = [a for a in artists if a["artist_name"].lower() == "queen"]
         assert len(queen_entries) == 1
+        # Should have both sources
+        assert "spotify" in queen_entries[0]["sources"]
+        assert "quiz" in queen_entries[0]["sources"]
+        # Should be marked as manual since it was in quiz
+        assert queen_entries[0]["is_manual"] is True
 
     @pytest.mark.asyncio
-    async def test_deduplicates_synced_artists_keeps_highest_playcount(
+    async def test_merges_spotify_and_lastfm_keeps_best_stats(
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:
-        """Should deduplicate synced artists from same source, keeping highest playcount."""
+        """Should merge Spotify and Last.fm data for same artist, keeping best stats."""
         user_doc = {
             "id": "email_hash_123",
             "user_id": "user123",
             "quiz_artists_known": [],
         }
-        # Simulate duplicate artists from different time periods (historical data)
+        # Simulate same artist from both sources + duplicate lastfm entries
         mock_firestore.query_documents.side_effect = [
+            [user_doc],
             [
-                {"artist_name": "ABBA", "source": "lastfm", "rank": 5, "playcount": 100},
-                {"artist_name": "ABBA", "source": "lastfm", "rank": 10, "playcount": 500},  # Higher
-                {"artist_name": "ABBA", "source": "lastfm", "rank": 15, "playcount": 200},
+                {
+                    "artist_name": "ABBA",
+                    "source": "spotify",
+                    "rank": 5,
+                    "time_range": "medium_term",
+                    "popularity": 85,
+                    "genres": ["pop", "disco"],
+                },
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 12, "playcount": 100},
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 10, "playcount": 500},  # Higher playcount
                 {"artist_name": "Queen", "source": "lastfm", "rank": 1, "playcount": 1000},
             ],
-            [user_doc],
         ]
 
         result = await user_data_service.get_all_artists("user123")
+        artists = result["artists"]
 
-        # Should only have one ABBA entry with highest playcount (500)
-        abba_entries = [a for a in result if a["artist_name"].lower() == "abba"]
-        assert len(abba_entries) == 1
-        assert abba_entries[0]["playcount"] == 500
+        # Should have 2 artists (ABBA merged, Queen separate)
+        assert len(artists) == 2
 
-        # Queen should also be present
-        queen_entries = [a for a in result if a["artist_name"].lower() == "queen"]
-        assert len(queen_entries) == 1
+        # ABBA should have data from both sources, with best stats
+        abba = [a for a in artists if a["artist_name"].lower() == "abba"][0]
+        assert set(abba["sources"]) == {"spotify", "lastfm"}
+        assert abba["spotify_rank"] == 5
+        assert abba["lastfm_playcount"] == 500  # Highest from duplicates
+        assert abba["popularity"] == 85
+        assert abba["genres"] == ["pop", "disco"]
+
+        # Queen should only have lastfm
+        queen = [a for a in artists if a["artist_name"].lower() == "queen"][0]
+        assert queen["sources"] == ["lastfm"]
+        assert queen["lastfm_playcount"] == 1000
+
+    @pytest.mark.asyncio
+    async def test_respects_exclusions(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
+        """Should mark excluded artists with is_excluded flag."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": [],
+            "excluded_artists": ["abba"],  # ABBA is excluded
+        }
+        mock_firestore.query_documents.side_effect = [
+            [user_doc],
+            [
+                {"artist_name": "ABBA", "source": "lastfm", "rank": 5, "playcount": 500},
+                {"artist_name": "Queen", "source": "lastfm", "rank": 1, "playcount": 1000},
+            ],
+        ]
+
+        result = await user_data_service.get_all_artists("user123")
+        artists = result["artists"]
+
+        abba = [a for a in artists if a["artist_name"].lower() == "abba"][0]
+        queen = [a for a in artists if a["artist_name"].lower() == "queen"][0]
+
+        assert abba["is_excluded"] is True
+        assert queen["is_excluded"] is False
+
+    @pytest.mark.asyncio
+    async def test_pagination(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
+        """Should paginate results correctly."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": [],
+        }
+        # Create 5 artists
+        artists_data = [
+            {"artist_name": f"Artist {i}", "source": "lastfm", "rank": i, "playcount": 100 - i} for i in range(1, 6)
+        ]
+        mock_firestore.query_documents.side_effect = [
+            [user_doc],
+            artists_data,
+        ]
+
+        # Get page 1 with per_page=2
+        result = await user_data_service.get_all_artists("user123", page=1, per_page=2)
+
+        assert result["total"] == 5
+        assert result["page"] == 1
+        assert result["per_page"] == 2
+        assert result["has_more"] is True
+        assert len(result["artists"]) == 2
 
 
 class TestAddArtist:

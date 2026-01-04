@@ -75,6 +75,8 @@ function VerifyContent() {
   }, [searchParams, checkAuth, router]);
 
   useEffect(() => {
+    // Data fetching on mount is a valid use case for setState in useEffect
+    // eslint-disable-next-line
     verifyToken();
   }, [verifyToken]);
 

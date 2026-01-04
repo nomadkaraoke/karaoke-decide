@@ -185,80 +185,146 @@ class UserDataService:
 
         return await self.get_preferences(user_id)
 
-    async def get_all_artists(self, user_id: str) -> list[dict[str, Any]]:
-        """Get all artists for user from all sources.
+    async def get_all_artists(
+        self,
+        user_id: str,
+        page: int = 1,
+        per_page: int = 100,
+    ) -> dict[str, Any]:
+        """Get all artists for user from all sources with pagination.
 
         Combines:
         - user_artists collection (from Spotify/Last.fm sync)
         - quiz_artists_known from user profile (from quiz + manual additions)
 
-        Deduplicates by artist name (case-insensitive), keeping the record
-        with the highest playcount for each artist.
+        Merges data when same artist exists in multiple sources, preserving
+        metadata from all sources (e.g., Spotify genres + Last.fm playcount).
+
+        Args:
+            user_id: User ID
+            page: Page number (1-indexed)
+            per_page: Number of artists per page
+
+        Returns:
+            Dict with artists list, pagination info, and total count
         """
+        # Get user document for quiz artists and exclusions
+        user_doc, _ = await self._get_user_document(user_id)
+        excluded_artists = set(name.lower() for name in (user_doc or {}).get("excluded_artists", []))
+
         # Get synced artists from user_artists collection
         synced_artists = await self.firestore.query_documents(
             collection="user_artists",
             filters=[("user_id", "==", user_id)],
         )
 
-        # Deduplicate synced artists by name, keeping highest playcount
-        # This handles historical data where same artist may have multiple records
-        # (e.g., from different time periods or sync code changes)
-        seen_artists: dict[str, dict[str, Any]] = {}
+        # Merge artists by name, combining data from multiple sources
+        merged_artists: dict[str, dict[str, Any]] = {}
         for artist in synced_artists:
             artist_name = artist.get("artist_name", "")
             if not artist_name:
                 continue
 
             key = artist_name.lower()
-            playcount = artist.get("playcount") or 0
-            existing = seen_artists.get(key)
+            source = artist.get("source", "unknown")
 
-            # Keep the record with higher playcount, or first one if equal
-            if existing is None or playcount > (existing.get("playcount") or 0):
-                seen_artists[key] = {
+            if key not in merged_artists:
+                # First time seeing this artist - initialize
+                merged_artists[key] = {
                     "artist_name": artist_name,
-                    "source": artist.get("source"),
-                    "rank": artist.get("rank", 0),
-                    "time_range": artist.get("time_range") or artist.get("period", ""),
-                    "popularity": artist.get("popularity"),
-                    "genres": artist.get("genres", []),
-                    "playcount": playcount,
+                    "sources": [],
+                    "spotify_rank": None,
+                    "spotify_time_range": None,
+                    "lastfm_rank": None,
+                    "lastfm_playcount": None,
+                    "popularity": None,
+                    "genres": [],
+                    "is_excluded": key in excluded_artists,
+                    "is_manual": False,
                 }
 
-        artists: list[dict[str, Any]] = list(seen_artists.values())
+            existing = merged_artists[key]
 
-        # Get quiz/manual artists from user profile
-        user_doc, _ = await self._get_user_document(user_id)
+            # Add source if not already tracked
+            if source not in existing["sources"]:
+                existing["sources"].append(source)
+
+            # Merge source-specific data
+            if source == "spotify":
+                rank = artist.get("rank")
+                # Keep best (lowest) Spotify rank across time ranges
+                if rank and (existing["spotify_rank"] is None or rank < existing["spotify_rank"]):
+                    existing["spotify_rank"] = rank
+                    existing["spotify_time_range"] = artist.get("time_range", "")
+                # Always take Spotify's popularity and genres (they're global, not per-sync)
+                if artist.get("popularity") is not None:
+                    existing["popularity"] = artist.get("popularity")
+                genres = artist.get("genres", [])
+                if genres and not existing["genres"]:
+                    existing["genres"] = genres
+
+            elif source == "lastfm":
+                rank = artist.get("rank")
+                playcount = artist.get("playcount") or 0
+                # Keep best (highest playcount) Last.fm data
+                if existing["lastfm_playcount"] is None or playcount > existing["lastfm_playcount"]:
+                    existing["lastfm_rank"] = rank
+                    existing["lastfm_playcount"] = playcount
+
+        # Add quiz/manual artists from user profile
         if user_doc:
             quiz_artists = user_doc.get("quiz_artists_known", [])
             for idx, artist_name in enumerate(quiz_artists):
-                # Check if already in synced artists to avoid duplicates
-                if not any(a["artist_name"].lower() == artist_name.lower() for a in artists):
-                    artists.append(
-                        {
-                            "artist_name": artist_name,
-                            "source": "quiz",  # Could be quiz or manual, stored together
-                            "rank": idx + 1,
-                            "time_range": "",
-                            "popularity": None,
-                            "genres": [],
-                            "playcount": None,
-                        }
-                    )
+                key = artist_name.lower()
+                if key not in merged_artists:
+                    # New artist from quiz/manual
+                    merged_artists[key] = {
+                        "artist_name": artist_name,
+                        "sources": ["quiz"],
+                        "spotify_rank": None,
+                        "spotify_time_range": None,
+                        "lastfm_rank": None,
+                        "lastfm_playcount": None,
+                        "popularity": None,
+                        "genres": [],
+                        "is_excluded": key in excluded_artists,
+                        "is_manual": True,
+                    }
+                else:
+                    # Artist exists from sync but also in quiz - mark as manual too
+                    if "quiz" not in merged_artists[key]["sources"]:
+                        merged_artists[key]["sources"].append("quiz")
+                    merged_artists[key]["is_manual"] = True
+
+        artists = list(merged_artists.values())
 
         # Sort by "how well user knows the artist":
-        # 1. playcount (actual plays from Last.fm) - higher is better
-        # 2. rank (position in top list) - lower is better
-        # 3. source priority (lastfm > spotify > quiz)
+        # 1. lastfm_playcount (actual plays) - higher is better
+        # 2. Best rank across sources - lower is better
+        # 3. Number of sources - more sources = more confident
         def sort_key(a: dict) -> tuple[int, int, int]:
-            playcount = a.get("playcount") or 0
-            rank = a.get("rank") or 9999
-            source_order = {"lastfm": 0, "spotify": 1, "quiz": 2}.get(a.get("source", "quiz"), 3)
-            return (-playcount, rank, source_order)
+            playcount = a.get("lastfm_playcount") or 0
+            # Use best rank from any source
+            ranks = [r for r in [a.get("spotify_rank"), a.get("lastfm_rank")] if r]
+            best_rank = min(ranks) if ranks else 9999
+            num_sources = len(a.get("sources", []))
+            return (-playcount, best_rank, -num_sources)
 
         artists.sort(key=sort_key)
-        return artists
+
+        # Pagination
+        total = len(artists)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_artists = artists[start_idx:end_idx]
+
+        return {
+            "artists": paginated_artists,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "has_more": end_idx < total,
+        }
 
     async def add_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
         """Add an artist manually to user's preferences.
@@ -350,6 +416,113 @@ class UserDataService:
             "removed_from": removed_from,
             "success": len(removed_from) > 0,
         }
+
+    async def exclude_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
+        """Exclude an artist from recommendations.
+
+        Adds artist name to excluded_artists array in user document.
+        This is a soft hide - the artist data is preserved but won't
+        be used for recommendations. Persists through re-syncs.
+
+        Args:
+            user_id: User ID
+            artist_name: Artist name to exclude (case-insensitive storage)
+
+        Returns:
+            Success status and artist name
+        """
+        user_doc, doc_id = await self._get_user_document(user_id)
+
+        # Normalize for consistent storage
+        artist_lower = artist_name.lower()
+
+        if doc_id:
+            # Check if already excluded
+            excluded = user_doc.get("excluded_artists", []) if user_doc else []
+            if artist_lower not in [a.lower() for a in excluded]:
+                await (
+                    self.firestore.collection("decide_users")
+                    .document(doc_id)
+                    .update(
+                        {
+                            "excluded_artists": ArrayUnion([artist_lower]),
+                            "updated_at": datetime.now(UTC).isoformat(),
+                        }
+                    )
+                )
+        else:
+            # Create user document with exclusion
+            await self.firestore.set_document(
+                "decide_users",
+                user_id,
+                {
+                    "user_id": user_id,
+                    "excluded_artists": [artist_lower],
+                    "updated_at": datetime.now(UTC).isoformat(),
+                },
+                merge=True,
+            )
+
+        return {
+            "artist_name": artist_name,
+            "excluded": True,
+            "success": True,
+        }
+
+    async def include_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
+        """Remove an artist from exclusions (un-hide).
+
+        Removes artist name from excluded_artists array in user document.
+
+        Args:
+            user_id: User ID
+            artist_name: Artist name to include (case-insensitive matching)
+
+        Returns:
+            Success status and artist name
+        """
+        user_doc, doc_id = await self._get_user_document(user_id)
+
+        if not user_doc or not doc_id:
+            return {
+                "artist_name": artist_name,
+                "excluded": False,
+                "success": True,  # Already not excluded
+            }
+
+        # Find matching exclusion (case-insensitive)
+        excluded = user_doc.get("excluded_artists", [])
+        matching = [a for a in excluded if a.lower() == artist_name.lower()]
+
+        if matching:
+            await (
+                self.firestore.collection("decide_users")
+                .document(doc_id)
+                .update(
+                    {
+                        "excluded_artists": ArrayRemove(matching),
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    }
+                )
+            )
+
+        return {
+            "artist_name": artist_name,
+            "excluded": False,
+            "success": True,
+        }
+
+    async def get_excluded_artists(self, user_id: str) -> list[str]:
+        """Get list of excluded artist names for a user.
+
+        Returns:
+            List of excluded artist names (lowercase)
+        """
+        user_doc, _ = await self._get_user_document(user_id)
+        if not user_doc:
+            return []
+        excluded: list[str] = user_doc.get("excluded_artists", [])
+        return excluded
 
 
 # Singleton pattern with lazy initialization

@@ -9,16 +9,19 @@ import {
   XIcon,
   PlusIcon,
 } from "@/components/icons";
-import { Button, Input, Badge, LoadingPulse } from "@/components/ui";
+import { Button, Input, LoadingPulse } from "@/components/ui";
 
 interface UserArtist {
   artist_name: string;
-  source: string;
-  rank: number;
-  time_range: string;
+  sources: string[];
+  spotify_rank: number | null;
+  spotify_time_range: string | null;
+  lastfm_rank: number | null;
+  lastfm_playcount: number | null;
   popularity: number | null;
   genres: string[];
-  playcount: number | null;
+  is_excluded: boolean;
+  is_manual: boolean;
 }
 
 interface Props {
@@ -92,36 +95,30 @@ export function YourArtistsSection({
     }
   };
 
-  // Group artists by source
-  const artistsBySource = artists.reduce(
-    (acc, artist) => {
-      const source = artist.source;
-      if (!acc[source]) acc[source] = [];
-      acc[source].push(artist);
-      return acc;
-    },
-    {} as Record<string, UserArtist[]>
-  );
-
   const sourceConfig: Record<
     string,
-    { icon: React.ReactNode; color: string; label: string }
+    { icon: React.ReactNode; color: string; bg: string }
   > = {
     spotify: {
       icon: <SpotifyIcon className="w-3 h-3" />,
       color: "#1DB954",
-      label: "Spotify",
+      bg: "bg-[#1DB954]/20",
     },
     lastfm: {
       icon: <LastfmIcon className="w-3 h-3" />,
       color: "#ff4444",
-      label: "Last.fm",
+      bg: "bg-[#ff4444]/20",
     },
     quiz: {
-      icon: <span className="text-xs">Q</span>,
+      icon: <span className="text-xs">✓</span>,
       color: "#ff2d92",
-      label: "Quiz / Manual",
+      bg: "bg-[#ff2d92]/20",
     },
+  };
+
+  const formatPlaycount = (count: number) => {
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
+    return count.toString();
   };
 
   return (
@@ -192,7 +189,7 @@ export function YourArtistsSection({
                 </Button>
               </form>
 
-              {/* Artist list by source */}
+              {/* Artist list */}
               {artists.length === 0 ? (
                 <div className="text-center py-8 text-white/40 text-sm">
                   <p>No artists yet.</p>
@@ -202,85 +199,75 @@ export function YourArtistsSection({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {Object.entries(artistsBySource).map(
-                    ([source, sourceArtists]) => {
-                      const config = sourceConfig[source] || {
-                        icon: null,
-                        color: "#999",
-                        label: source,
-                      };
-
-                      return (
-                        <div key={source}>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div
-                              className="w-5 h-5 rounded-full flex items-center justify-center"
-                              style={{ backgroundColor: `${config.color}20` }}
-                            >
-                              <span style={{ color: config.color }}>
+                <div className="space-y-2">
+                  {artists.slice(0, 30).map((artist) => (
+                    <div
+                      key={artist.artist_name}
+                      className={`group flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
+                        artist.is_excluded
+                          ? "bg-white/[0.02] opacity-60"
+                          : "bg-white/5 hover:bg-white/10"
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-white truncate">
+                            {artist.artist_name}
+                          </span>
+                          {/* Source badges */}
+                          {artist.sources.map((source) => {
+                            const config = sourceConfig[source] || {
+                              icon: null,
+                              color: "#999",
+                              bg: "bg-white/10",
+                            };
+                            return (
+                              <span
+                                key={source}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${config.bg}`}
+                                style={{ color: config.color }}
+                              >
                                 {config.icon}
                               </span>
-                            </div>
-                            <span className="text-sm font-medium text-white/70">
-                              {config.label}
+                            );
+                          })}
+                          {artist.is_excluded && (
+                            <span className="text-xs text-orange-400/80 bg-orange-400/10 px-1.5 py-0.5 rounded">
+                              Hidden
                             </span>
-                            <Badge variant="default">{sourceArtists.length}</Badge>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            {sourceArtists.slice(0, 30).map((artist) => (
-                              <div
-                                key={`${source}-${artist.artist_name}`}
-                                className="group flex items-center gap-1 px-2 py-1 rounded-full bg-white/10 text-sm text-white/80 hover:bg-white/20 transition-colors"
-                              >
-                                <span>{artist.artist_name}</span>
-                                {/* Show rank for top 10 */}
-                                {artist.rank && artist.rank <= 10 && (
-                                  <span
-                                    className="text-xs"
-                                    style={{ color: config.color }}
-                                  >
-                                    #{artist.rank}
-                                  </span>
-                                )}
-                                {/* Show playcount pill (primarily Last.fm data) */}
-                                {artist.playcount && artist.playcount > 0 && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
-                                    {artist.playcount.toLocaleString()} plays
-                                  </span>
-                                )}
-                                {/* Show popularity pill for Spotify artists */}
-                                {source === "spotify" && artist.popularity !== null && artist.popularity > 0 && (
-                                  <span className="text-xs px-1.5 py-0.5 rounded bg-[#1DB954]/20 text-[#1DB954]/80">
-                                    Pop: {artist.popularity}
-                                  </span>
-                                )}
-                                <button
-                                  onClick={() =>
-                                    handleRemoveArtist(artist.artist_name)
-                                  }
-                                  disabled={removingArtist === artist.artist_name}
-                                  className="ml-1 opacity-0 group-hover:opacity-100 text-white/40 hover:text-red-400 transition-all"
-                                  title="Remove artist"
-                                >
-                                  {removingArtist === artist.artist_name ? (
-                                    <span className="animate-pulse">...</span>
-                                  ) : (
-                                    <XIcon className="w-3 h-3" />
-                                  )}
-                                </button>
-                              </div>
-                            ))}
-                            {sourceArtists.length > 30 && (
-                              <span className="px-2 py-1 text-sm text-white/40">
-                                +{sourceArtists.length - 30} more
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                      );
-                    }
+                        {/* Stats line */}
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-white/40">
+                          {artist.spotify_rank && (
+                            <span>#{artist.spotify_rank} Spotify</span>
+                          )}
+                          {artist.lastfm_playcount && artist.lastfm_playcount > 0 && (
+                            <span>{formatPlaycount(artist.lastfm_playcount)} plays</span>
+                          )}
+                          {artist.genres.length > 0 && (
+                            <span className="capitalize">{artist.genres[0]}</span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveArtist(artist.artist_name)}
+                        disabled={removingArtist === artist.artist_name}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-white/40 hover:text-red-400 transition-all"
+                        title="Remove artist"
+                      >
+                        {removingArtist === artist.artist_name ? (
+                          <span className="animate-pulse">...</span>
+                        ) : (
+                          <XIcon className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                  {artists.length > 30 && (
+                    <div className="text-center py-2 text-sm text-white/40">
+                      +{artists.length - 30} more artists
+                    </div>
                   )}
                 </div>
               )}

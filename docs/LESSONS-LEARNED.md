@@ -15,6 +15,46 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-04: Use Query Parameters for Identifiers with Special Characters
+
+**Context:** Building exclude/include artist endpoints with artist name in the path like `/artists/{name}/exclude`.
+
+**Lesson:** Artist names can contain slashes (e.g., "AC/DC") which breaks path parameter routing - the slash is interpreted as a path separator.
+
+**Recommendation:** Use query parameters instead of path parameters for user-provided identifiers:
+```python
+# Bad - breaks for "AC/DC"
+@router.post("/artists/{artist_name}/exclude")
+
+# Good - handles all characters
+@router.post("/artists/exclude")
+async def exclude_artist(
+    artist_name: str = Query(..., description="Artist name to exclude"),
+):
+```
+
+---
+
+### 2026-01-04: Merge Don't Replace When Deduplicating Multi-Source Data
+
+**Context:** Combining artist data from Spotify and Last.fm where the same artist appears in both sources.
+
+**Lesson:** If you deduplicate by picking one record (e.g., the one with highest playcount), you lose metadata from the other source. Spotify has popularity/genres, Last.fm has playcount - keeping just one loses valuable data.
+
+**Recommendation:** When merging records from multiple sources, create a combined record that preserves data from all sources:
+```python
+# Bad - loses data
+if existing["playcount"] < new["playcount"]:
+    merged[key] = new  # Loses existing source's unique data
+
+# Good - merges data
+merged[key]["sources"].append(new_source)
+merged[key]["spotify_rank"] = spotify_rank or merged[key]["spotify_rank"]
+merged[key]["lastfm_playcount"] = max(new_playcount, existing_playcount)
+```
+
+---
+
 ### 2026-01-03: React State Closures in Event Handlers
 
 **Context:** Building a song removal function that updates both local state and a parent callback with the new count.

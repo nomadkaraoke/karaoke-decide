@@ -100,8 +100,6 @@ test.describe("Production API Tests", () => {
 
   test("CORS headers are present", async ({ request }) => {
     const response = await request.get(`${API_BASE}/api/health`);
-    // Production should allow the frontend origin
-    const headers = response.headers();
     // CORS is handled by preflight, but health should work cross-origin
     expect(response.ok()).toBeTruthy();
   });
