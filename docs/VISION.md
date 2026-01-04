@@ -33,6 +33,33 @@ With [Nomad Karaoke Generator](https://gen.nomadkaraoke.com), we can create a ka
 - If a perfect song doesn't have a karaoke version, we link to one-click generation
 - The focus shifts from "what's available" to "what would be great for YOU to sing"
 
+## UX Philosophy
+
+### Navigation Design
+
+The app uses action-oriented, user-focused navigation:
+
+| Tab | Purpose | Rationale |
+|-----|---------|-----------|
+| **Recommendations** | Core value - personalized song suggestions | This is why users come; make it the primary destination |
+| **Music I Know** | All music data in one place | Consolidates artists, songs, and service connections |
+| **Playlists** | Saved karaoke lists | Quick access to curated sets |
+| **Settings** | Profile and preferences | Standard location for account management |
+
+### Key Principles
+
+1. **Get to value fast** - Authenticated users skip the landing page and go straight to recommendations
+2. **Streamlined onboarding** - Quiz is 3 steps max (Genres → Preferences → Artists), with skip options
+3. **Transparency over magic** - "Music I Know" shows exactly what data influences recommendations
+4. **Action-oriented naming** - "Recommendations" not "Discover", "Music I Know" not "My Data"
+
+### Flow Philosophy
+
+- **Landing page** exists only for first-time/logged-out users - explains value prop, single CTA
+- **Quiz** captures enough to make recommendations useful, then gets out of the way
+- **Recommendations** is the home base - where users return to find their next song
+- **Settings** consolidates profile, preferences, and account actions in one place
+
 ## Target Users
 
 We serve two user types **equally from day one**:
@@ -121,13 +148,66 @@ We serve two user types **equally from day one**:
 
 ## Vocal Range Feature
 
-### User Experience
+### Phased Rollout Strategy
+
+Vocal range matching is complex and expensive to do well. We're taking a phased approach that builds data incrementally while delivering value at each stage.
+
+#### Phase 1: Crowd-Source Singability Data (Free)
+
+**Goal:** Build a database of song singability ratings from real karaoke performances.
+
+**How it works:**
+1. After a user sings a song (or marks it as sung), prompt: *"How comfortable was this to sing?"*
+2. Collect ratings: Easy / Just Right / Challenging / Too Hard
+3. Aggregate across users to build singability profiles per song
+4. Factor in user demographics if available (age, gender as vocal range proxy)
+
+**Benefits:**
+- Zero cost to implement (just UI + storage)
+- Real-world data beats theoretical analysis
+- Builds community engagement
+- Works immediately with existing catalog
+
+**Data model:**
+```
+song_singability_ratings
+├── song_id
+├── user_id
+├── rating: "easy" | "just_right" | "challenging" | "too_hard"
+├── user_vocal_type (optional, self-reported)
+└── created_at
+```
+
+#### Phase 2: Personalized Vocal Analysis (Paid Feature)
+
+**Goal:** Let serious karaoke fans get personalized singability predictions.
+
+**How it works:**
+1. User selects up to **1,000 songs they know well** from their library
+2. User records a short vocal sample (60 seconds singing a scale or known song)
+3. We analyze their vocal range from the recording
+4. We cross-reference their known songs with our crowd-sourced singability data
+5. For songs with audio analysis data, we calculate a personalized singability score
+
+**Pricing consideration:** This is compute-intensive and provides high value. Could be:
+- One-time analysis fee ($5-10)
+- Part of a premium subscription
+- Free for first 100 songs, paid for full 1,000
+
+**Why this approach works:**
+- Users who've sung 1,000+ songs at karaoke are serious about it (willing to pay)
+- Their personal history tells us more than generic vocal type labels
+- Combines crowd wisdom with individual calibration
+
+### Technical Implementation
+
+#### User Vocal Detection
 - Optional enhancement, not required for onboarding
 - "Sing into your phone for 60 seconds" (scale or free singing)
 - Works in browser using Web Audio API
 - Returns: "You're likely a Baritone (C2-G4)"
 
-### Technical Approach (Research Needed)
+#### Technical Approach (Research Needed)
 1. **Research existing APIs first** - Cyanite.ai, other music analysis services
 2. **If we build it ourselves:**
    - Pitch detection using Web Audio API or server-side with librosa
@@ -135,10 +215,11 @@ We serve two user types **equally from day one**:
    - Only show classification if confidence is high
    - Be honest: "We're not 100% sure, but based on your recording..."
 
-### Song Matching
+#### Song Matching
 - Store vocal range data per song (min/max pitch, tessitura)
 - Match user range to song range with configurable tolerance
 - "Show me songs within 2 semitones of my range"
+- Combine with crowd-sourced singability ratings for best results
 
 ## Music Service Data Capabilities
 
@@ -408,8 +489,9 @@ See [docs/REQUIREMENTS-QA.md](docs/REQUIREMENTS-QA.md) for the full Q&A that sha
 - **Target users:** Both data-rich and casual, equally from day one
 - **Core problem:** Discovery first, then singability and crowd-pleasing
 - **Karaoke-gen integration:** Standalone with one-click handoff
-- **Vocal range:** Optional but marketed if it works well
+- **Vocal range:** Phased approach - crowd-source singability first, then paid personalized analysis
 - **Data-light approach:** Quiz-based onboarding
 - **Platform:** CLI + API first, then responsive web
+- **UX philosophy:** Action-oriented navigation, streamlined 3-step quiz, get users to recommendations fast
 - **MLP excludes:** Vocal range, post-song tracking, social features, venue filtering
-- **User data transparency:** "My Data" tab instead of misleading "My Songs" - show all recommendation inputs, not fake library (see "User Data & Profile" section)
+- **User data transparency:** "Music I Know" consolidates all music data with source attribution
