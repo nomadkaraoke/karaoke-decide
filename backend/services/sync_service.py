@@ -755,7 +755,8 @@ class SyncService:
                     continue
 
                 # Create unique ID using normalized name
-                safe_name = artist_name.lower().replace(" ", "_")[:50]
+                # Remove slashes and special chars that break Firestore paths
+                safe_name = re.sub(r"[^a-z0-9_]", "_", artist_name.lower())[:50]
                 artist_id = f"{user_id}:lastfm:{safe_name}"
 
                 # Get playcount (this is the real listen count!)
