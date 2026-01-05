@@ -66,13 +66,14 @@ class TestGetDataSummary:
             ],
         ]
 
-        # Mock song counts
-        mock_firestore.count_documents.side_effect = [100, 80]
+        # Mock song counts: total, with_karaoke, known_songs
+        mock_firestore.count_documents.side_effect = [100, 80, 5]
 
         result = await user_data_service.get_data_summary("user123")
 
         assert result["services"]["spotify"]["connected"] is True
         assert result["services"]["spotify"]["tracks_synced"] == 50
+        assert result["services"]["spotify"]["artists_synced"] == 2
         assert result["services"]["lastfm"]["connected"] is False
         assert result["artists"]["total"] == 5  # 2 spotify + 1 lastfm + 2 quiz
         assert result["artists"]["by_source"]["spotify"] == 2
@@ -80,6 +81,7 @@ class TestGetDataSummary:
         assert result["artists"]["by_source"]["quiz"] == 2
         assert result["songs"]["total"] == 100
         assert result["songs"]["with_karaoke"] == 80
+        assert result["songs"]["known_songs"] == 5
         assert result["preferences"]["completed"] is True
         assert result["preferences"]["decade"] == "1990s"
 
@@ -88,12 +90,14 @@ class TestGetDataSummary:
         """Should handle user with no data."""
         # Mock query_documents: first call for _get_user_document (empty), then user_artists, then music_services
         mock_firestore.query_documents.side_effect = [[], [], []]
-        mock_firestore.count_documents.side_effect = [0, 0]
+        # Mock song counts: total, with_karaoke, known_songs
+        mock_firestore.count_documents.side_effect = [0, 0, 0]
 
         result = await user_data_service.get_data_summary("user123")
 
         assert result["artists"]["total"] == 0
         assert result["songs"]["total"] == 0
+        assert result["songs"]["known_songs"] == 0
         assert result["preferences"]["completed"] is False
 
 

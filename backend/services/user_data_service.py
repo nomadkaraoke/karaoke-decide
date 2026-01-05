@@ -117,6 +117,11 @@ class UserDataService:
             collection="user_songs",
             filters=[("user_id", "==", user_id), ("has_karaoke_version", "==", True)],
         )
+        # Count manually added known songs (for Songs tab)
+        known_songs_count = await self.firestore.count_documents(
+            collection="user_songs",
+            filters=[("user_id", "==", user_id), ("source", "==", "known_songs")],
+        )
 
         # Get connected services
         services = await self.firestore.query_documents(
@@ -130,14 +135,15 @@ class UserDataService:
                 "connected": True,
                 "username": service.get("service_username"),
                 "tracks_synced": service.get("tracks_synced", 0),
+                "artists_synced": artists_by_source.get(service_type, 0),
                 "last_sync_at": service.get("last_sync_at"),
             }
 
         # Ensure spotify and lastfm keys exist even if not connected
         if "spotify" not in services_summary:
-            services_summary["spotify"] = {"connected": False}
+            services_summary["spotify"] = {"connected": False, "artists_synced": 0}
         if "lastfm" not in services_summary:
-            services_summary["lastfm"] = {"connected": False}
+            services_summary["lastfm"] = {"connected": False, "artists_synced": 0}
 
         # Quiz status
         quiz_completed = user_data.get("quiz_completed_at") is not None
@@ -156,6 +162,7 @@ class UserDataService:
             "songs": {
                 "total": songs_total,
                 "with_karaoke": songs_with_karaoke,
+                "known_songs": known_songs_count,
             },
             "preferences": {
                 "completed": quiz_completed,

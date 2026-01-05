@@ -27,6 +27,7 @@ class ServiceSummary(BaseModel):
     connected: bool
     username: str | None = None
     tracks_synced: int | None = None
+    artists_synced: int | None = None
     last_sync_at: str | None = None
 
 
@@ -42,6 +43,7 @@ class SongsSummary(BaseModel):
 
     total: int
     with_karaoke: int
+    known_songs: int
 
 
 class PreferencesSummary(BaseModel):

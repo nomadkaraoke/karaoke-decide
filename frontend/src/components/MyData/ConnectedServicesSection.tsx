@@ -19,6 +19,7 @@ interface ConnectedService {
   sync_status: string;
   sync_error: string | null;
   tracks_synced: number;
+  artists_synced?: number;
 }
 
 interface SyncProgress {
@@ -388,6 +389,9 @@ export function ConnectedServicesSection({
                       <span>
                         {getService("spotify")?.tracks_synced || 0} tracks
                       </span>
+                      <span>
+                        {getService("spotify")?.artists_synced || 0} artists
+                      </span>
                       {getService("spotify")?.last_sync_at && (
                         <span>
                           Last sync:{" "}
@@ -442,6 +446,9 @@ export function ConnectedServicesSection({
                     <div className="flex items-center gap-4 text-xs text-white/50">
                       <span>
                         {getService("lastfm")?.tracks_synced || 0} tracks
+                      </span>
+                      <span>
+                        {getService("lastfm")?.artists_synced || 0} artists
                       </span>
                       {getService("lastfm")?.last_sync_at && (
                         <span>
