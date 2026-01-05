@@ -115,6 +115,15 @@ export function YourArtistsSection({
     }, 200);
   };
 
+  // Cleanup debounced search on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Handle suggestion selection
   const selectSuggestion = (suggestion: ArtistSuggestion) => {
     setSelectedSuggestion(suggestion);
