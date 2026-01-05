@@ -38,6 +38,15 @@ class SongResult:
     brand_count: int  # Derived from brands
 
 
+@dataclass
+class ArtistMetadata:
+    """Artist metadata from Spotify catalog."""
+
+    artist_name: str
+    popularity: int
+    genres: list[str]
+
+
 class BigQueryCatalogService:
     """Service for querying song catalog from BigQuery."""
 
@@ -363,4 +372,87 @@ class BigQueryCatalogService:
             logger.info(f"BigQuery: chunk returned {chunk_matches} matches")
 
         logger.info(f"BigQuery batch_match_tracks: total {len(all_results)} unique matches")
+        return all_results
+
+    def get_artists_metadata(
+        self,
+        artist_names: list[str],
+    ) -> dict[str, ArtistMetadata]:
+        """Look up metadata for artists by name from Spotify artist catalog.
+
+        Args:
+            artist_names: List of artist names to look up
+
+        Returns:
+            Dict mapping normalized artist name -> ArtistMetadata
+            Only includes artists that were found in the catalog.
+        """
+        if not artist_names:
+            return {}
+
+        logger.info(f"Looking up metadata for {len(artist_names)} artists")
+
+        # Normalize names for matching
+        normalized_names = {_normalize_for_matching(name): name for name in artist_names if name}
+        if not normalized_names:
+            return {}
+
+        # Build query to find matching artists
+        # First get artist IDs and metadata, then join with genres
+        chunk_size = 100
+        all_results: dict[str, ArtistMetadata] = {}
+
+        normalized_list = list(normalized_names.keys())
+        for i in range(0, len(normalized_list), chunk_size):
+            chunk = normalized_list[i : i + chunk_size]
+
+            # Build OR conditions for name matching
+            conditions = []
+            for name in chunk:
+                safe_name = name.replace("'", "''")
+                # Same normalization as we use for songs
+                normalize_sql = (
+                    "TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(artist_name), r'[^a-z0-9 ]', ' '), r' +', ' '))"
+                )
+                conditions.append(f"{normalize_sql} = '{safe_name}'")
+
+            where_clause = " OR ".join(conditions)
+
+            # Query to get artists with their genres aggregated
+            sql = f"""
+                WITH matched_artists AS (
+                    SELECT
+                        artist_id,
+                        artist_name,
+                        popularity,
+                        TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(artist_name), r'[^a-z0-9 ]', ' '), r' +', ' ')) as normalized_name
+                    FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists`
+                    WHERE {where_clause}
+                )
+                SELECT
+                    ma.artist_id,
+                    ma.artist_name,
+                    ma.popularity,
+                    ma.normalized_name,
+                    ARRAY_AGG(DISTINCT g.genre IGNORE NULLS) as genres
+                FROM matched_artists ma
+                LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artist_genres` g
+                    ON ma.artist_id = g.artist_id
+                GROUP BY ma.artist_id, ma.artist_name, ma.popularity, ma.normalized_name
+            """
+
+            logger.info(f"BigQuery: querying artist metadata for chunk of {len(chunk)} artists")
+            results = self.client.query(sql).result()
+
+            for row in results:
+                # Use normalized name as key for matching
+                key = row.normalized_name
+                genres = list(row.genres) if row.genres else []
+                all_results[key] = ArtistMetadata(
+                    artist_name=row.artist_name,
+                    popularity=row.popularity or 0,
+                    genres=genres[:5],  # Limit to 5 genres like Spotify API does
+                )
+
+        logger.info(f"BigQuery: found metadata for {len(all_results)} artists")
         return all_results

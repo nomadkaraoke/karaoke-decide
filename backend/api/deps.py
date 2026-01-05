@@ -16,6 +16,7 @@ from backend.services.recommendation_service import RecommendationService, get_r
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
 from karaoke_decide.core.models import User
+from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 # Security scheme
 security = HTTPBearer(auto_error=False)
@@ -185,11 +186,17 @@ async def get_known_songs_service_dep(
     return get_known_songs_service(settings, firestore)
 
 
+def get_bigquery_catalog() -> BigQueryCatalogService:
+    """Get BigQuery catalog service instance (singleton)."""
+    return BigQueryCatalogService()
+
+
 async def get_user_data_service_dep(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    bigquery_catalog: Annotated[BigQueryCatalogService, Depends(get_bigquery_catalog)],
 ) -> UserDataService:
     """Get user data service instance."""
-    return get_user_data_service(firestore)
+    return get_user_data_service(firestore, bigquery_catalog)
 
 
 # Type aliases for cleaner route signatures
