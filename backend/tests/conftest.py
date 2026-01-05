@@ -484,11 +484,11 @@ def mock_user_data_service() -> MagicMock:
     mock.get_data_summary = AsyncMock(
         return_value={
             "services": {
-                "spotify": {"connected": True, "username": "testuser", "tracks_synced": 50},
-                "lastfm": {"connected": False},
+                "spotify": {"connected": True, "username": "testuser", "tracks_synced": 50, "artists_synced": 5},
+                "lastfm": {"connected": False, "artists_synced": 0},
             },
             "artists": {"total": 10, "by_source": {"spotify": 5, "lastfm": 3, "quiz": 2, "manual": 0}},
-            "songs": {"total": 100, "with_karaoke": 80},
+            "songs": {"total": 100, "with_karaoke": 80, "known_songs": 5},
             "preferences": {"completed": True, "decade": "1990s", "energy": "high", "genres": ["rock"]},
         }
     )
