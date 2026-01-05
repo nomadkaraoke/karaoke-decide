@@ -42,6 +42,17 @@ class SongResult:
 class ArtistMetadata:
     """Artist metadata from Spotify catalog."""
 
+    artist_id: str
+    artist_name: str
+    popularity: int
+    genres: list[str]
+
+
+@dataclass
+class ArtistSearchResult:
+    """Artist search result for autocomplete."""
+
+    artist_id: str
     artist_name: str
     popularity: int
     genres: list[str]
@@ -449,6 +460,7 @@ class BigQueryCatalogService:
                 key = row.normalized_name
                 genres = list(row.genres) if row.genres else []
                 all_results[key] = ArtistMetadata(
+                    artist_id=row.artist_id,
                     artist_name=row.artist_name,
                     popularity=row.popularity or 0,
                     genres=genres[:5],  # Limit to 5 genres like Spotify API does
@@ -456,3 +468,191 @@ class BigQueryCatalogService:
 
         logger.info(f"BigQuery: found metadata for {len(all_results)} artists")
         return all_results
+
+    def lookup_artist_by_name(self, artist_name: str) -> ArtistMetadata | None:
+        """Fast single-artist lookup using pre-normalized table.
+
+        Uses the pre-computed spotify_artists_normalized table for O(1) lookups
+        instead of runtime regex normalization on 500K+ rows.
+
+        Args:
+            artist_name: Artist name to look up
+
+        Returns:
+            ArtistMetadata if found, None otherwise
+        """
+        if not artist_name:
+            return None
+
+        normalized = _normalize_for_matching(artist_name)
+        if not normalized:
+            return None
+
+        sql = f"""
+            SELECT
+                artist_id,
+                artist_name,
+                popularity,
+                genres
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists_normalized`
+            WHERE normalized_name = @normalized_name
+            ORDER BY popularity DESC
+            LIMIT 1
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("normalized_name", "STRING", normalized),
+            ]
+        )
+
+        results = list(self.client.query(sql, job_config=job_config).result())
+        if not results:
+            return None
+
+        row = results[0]
+        genres = list(row.genres) if row.genres else []
+        return ArtistMetadata(
+            artist_id=row.artist_id,
+            artist_name=row.artist_name,
+            popularity=row.popularity or 0,
+            genres=genres[:5],
+        )
+
+    def batch_lookup_artists_by_name(
+        self,
+        artist_names: list[str],
+    ) -> dict[str, ArtistMetadata]:
+        """Fast batch artist lookup using pre-normalized table.
+
+        Uses the pre-computed spotify_artists_normalized table for fast lookups.
+        Much faster than get_artists_metadata() which does runtime normalization.
+
+        Args:
+            artist_names: List of artist names to look up
+
+        Returns:
+            Dict mapping normalized artist name -> ArtistMetadata
+        """
+        if not artist_names:
+            return {}
+
+        # Normalize names for matching
+        normalized_to_original = {}
+        for name in artist_names:
+            if name:
+                normalized = _normalize_for_matching(name)
+                if normalized:
+                    normalized_to_original[normalized] = name
+
+        if not normalized_to_original:
+            return {}
+
+        logger.info(f"Looking up metadata for {len(normalized_to_original)} artists (fast)")
+
+        # Process in chunks
+        chunk_size = 100
+        all_results: dict[str, ArtistMetadata] = {}
+        normalized_list = list(normalized_to_original.keys())
+
+        for i in range(0, len(normalized_list), chunk_size):
+            chunk = normalized_list[i : i + chunk_size]
+
+            # Use parameterized IN clause (BigQuery supports UNNEST for arrays)
+            sql = f"""
+                SELECT
+                    artist_id,
+                    artist_name,
+                    normalized_name,
+                    popularity,
+                    genres
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists_normalized`
+                WHERE normalized_name IN UNNEST(@names)
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter("names", "STRING", chunk),
+                ]
+            )
+
+            results = self.client.query(sql, job_config=job_config).result()
+
+            # Group by normalized name and pick highest popularity
+            best_match: dict[str, tuple[int, ArtistMetadata]] = {}
+            for row in results:
+                key = row.normalized_name
+                pop = row.popularity or 0
+                if key not in best_match or pop > best_match[key][0]:
+                    genres = list(row.genres) if row.genres else []
+                    best_match[key] = (
+                        pop,
+                        ArtistMetadata(
+                            artist_id=row.artist_id,
+                            artist_name=row.artist_name,
+                            popularity=pop,
+                            genres=genres[:5],
+                        ),
+                    )
+
+            for key, (_, metadata) in best_match.items():
+                all_results[key] = metadata
+
+        logger.info(f"BigQuery: found metadata for {len(all_results)} artists (fast)")
+        return all_results
+
+    def search_artists(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[ArtistSearchResult]:
+        """Search artists by name prefix for autocomplete.
+
+        Uses the pre-computed normalized table for fast prefix matching.
+        Results are sorted by popularity (highest first).
+
+        Args:
+            query: Search query (will be normalized)
+            limit: Maximum results to return (default 10)
+
+        Returns:
+            List of ArtistSearchResult sorted by popularity
+        """
+        if not query or len(query) < 2:
+            return []
+
+        normalized = _normalize_for_matching(query)
+        if not normalized:
+            return []
+
+        # Use prefix matching on normalized name
+        sql = f"""
+            SELECT
+                artist_id,
+                artist_name,
+                popularity,
+                genres
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists_normalized`
+            WHERE normalized_name LIKE @query_prefix
+            ORDER BY popularity DESC
+            LIMIT @limit
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+        results = self.client.query(sql, job_config=job_config).result()
+
+        return [
+            ArtistSearchResult(
+                artist_id=row.artist_id,
+                artist_name=row.artist_name,
+                popularity=row.popularity or 0,
+                genres=list(row.genres)[:5] if row.genres else [],
+            )
+            for row in results
+        ]

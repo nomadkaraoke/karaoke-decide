@@ -100,6 +100,7 @@ cd frontend && npm run dev
 | `karaoke_decide.spotify_audio_features` | 200M | Audio features (energy, tempo, etc.) |
 | `karaoke_decide.spotify_audio_analysis_tracks` | ~36M (pending) | Audio analysis track summaries (tempo, key, mode with confidence) |
 | `karaoke_decide.spotify_audio_analysis_sections` | ~360M (pending) | Song sections (intro, verse, chorus, etc.) with tempo/key changes |
+| `karaoke_decide.spotify_artists_normalized` | 15.4M | Pre-normalized artists with aggregated genres (for fast lookups) |
 
 ### Live Endpoints
 - `GET /api/health` - Basic health check
@@ -113,6 +114,7 @@ cd frontend && npm run dev
 - `GET /api/catalog/songs?q=<query>` - Search songs
 - `GET /api/catalog/songs/popular?limit=20` - Popular songs
 - `GET /api/catalog/songs/{id}/links` - Get karaoke links for a song
+- `GET /api/catalog/artists?q=<query>` - Search artists (for autocomplete)
 - `GET /api/catalog/stats` - Catalog statistics
 - `GET /api/services` - List connected music services
 - `POST /api/services/spotify/connect` - Start Spotify OAuth

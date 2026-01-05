@@ -2,7 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
+from karaoke_decide.services.bigquery_catalog import (
+    ArtistMetadata,
+    ArtistSearchResult,
+    BigQueryCatalogService,
+    SongResult,
+)
 
 
 class TestSongResult:
@@ -206,3 +211,150 @@ class TestBigQueryCatalogService:
         assert stats["unique_artists"] == 50000
         assert stats["max_brand_count"] == 10
         assert stats["avg_brand_count"] == 2.57  # Rounded to 2 decimal places
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_artist_by_name_found(self, mock_client_class: MagicMock) -> None:
+        """Test looking up an artist by name when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.artist_id = "0oSGxfWSnnOXhD2fKuz2Gy"
+        mock_row.artist_name = "Queen"
+        mock_row.popularity = 88
+        mock_row.genres = ["rock", "classic rock"]
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_artist_by_name("Queen")
+
+        assert result is not None
+        assert isinstance(result, ArtistMetadata)
+        assert result.artist_id == "0oSGxfWSnnOXhD2fKuz2Gy"
+        assert result.artist_name == "Queen"
+        assert result.popularity == 88
+        assert result.genres == ["rock", "classic rock"]
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_artist_by_name_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test looking up an artist by name when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.lookup_artist_by_name("NonexistentArtist123")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_artist_by_name_empty_input(self, mock_client_class: MagicMock) -> None:
+        """Test looking up with empty or None input."""
+        service = BigQueryCatalogService()
+
+        assert service.lookup_artist_by_name("") is None
+        assert service.lookup_artist_by_name(None) is None  # type: ignore
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_batch_lookup_artists_by_name(self, mock_client_class: MagicMock) -> None:
+        """Test batch lookup of artists by name."""
+        mock_client = mock_client_class.return_value
+
+        mock_row1 = MagicMock()
+        mock_row1.artist_id = "id1"
+        mock_row1.artist_name = "Queen"
+        mock_row1.normalized_name = "queen"
+        mock_row1.popularity = 88
+        mock_row1.genres = ["rock"]
+
+        mock_row2 = MagicMock()
+        mock_row2.artist_id = "id2"
+        mock_row2.artist_name = "Radiohead"
+        mock_row2.normalized_name = "radiohead"
+        mock_row2.popularity = 82
+        mock_row2.genres = ["alternative rock"]
+
+        mock_client.query.return_value.result.return_value = [mock_row1, mock_row2]
+
+        service = BigQueryCatalogService()
+        results = service.batch_lookup_artists_by_name(["Queen", "Radiohead"])
+
+        assert len(results) == 2
+        assert "queen" in results
+        assert "radiohead" in results
+        assert results["queen"].artist_name == "Queen"
+        assert results["radiohead"].artist_name == "Radiohead"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_batch_lookup_artists_empty_input(self, mock_client_class: MagicMock) -> None:
+        """Test batch lookup with empty list."""
+        service = BigQueryCatalogService()
+        results = service.batch_lookup_artists_by_name([])
+        assert results == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_artists(self, mock_client_class: MagicMock) -> None:
+        """Test artist search for autocomplete."""
+        mock_client = mock_client_class.return_value
+
+        mock_row1 = MagicMock()
+        mock_row1.artist_id = "id1"
+        mock_row1.artist_name = "Queen"
+        mock_row1.popularity = 88
+        mock_row1.genres = ["rock", "classic rock"]
+
+        mock_row2 = MagicMock()
+        mock_row2.artist_id = "id2"
+        mock_row2.artist_name = "Queens of the Stone Age"
+        mock_row2.popularity = 75
+        mock_row2.genres = ["alternative rock"]
+
+        mock_client.query.return_value.result.return_value = [mock_row1, mock_row2]
+
+        service = BigQueryCatalogService()
+        results = service.search_artists("queen")
+
+        assert len(results) == 2
+        assert all(isinstance(r, ArtistSearchResult) for r in results)
+        assert results[0].artist_name == "Queen"
+        assert results[0].popularity == 88
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_artists_short_query(self, mock_client_class: MagicMock) -> None:
+        """Test artist search with too short query."""
+        service = BigQueryCatalogService()
+
+        # Single character should return empty
+        results = service.search_artists("q")
+        assert results == []
+
+        # Empty string should return empty
+        results = service.search_artists("")
+        assert results == []
+
+
+class TestArtistDataclasses:
+    """Tests for Artist dataclasses."""
+
+    def test_artist_metadata(self) -> None:
+        """Test ArtistMetadata dataclass."""
+        metadata = ArtistMetadata(
+            artist_id="123",
+            artist_name="Queen",
+            popularity=88,
+            genres=["rock", "classic rock"],
+        )
+        assert metadata.artist_id == "123"
+        assert metadata.artist_name == "Queen"
+        assert metadata.popularity == 88
+        assert len(metadata.genres) == 2
+
+    def test_artist_search_result(self) -> None:
+        """Test ArtistSearchResult dataclass."""
+        result = ArtistSearchResult(
+            artist_id="456",
+            artist_name="Radiohead",
+            popularity=82,
+            genres=["alternative rock", "art rock"],
+        )
+        assert result.artist_id == "456"
+        assert result.artist_name == "Radiohead"
+        assert result.popularity == 82
+        assert result.genres[0] == "alternative rock"
