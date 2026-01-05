@@ -59,22 +59,43 @@ class UserDataService:
         user_doc, _ = await self._get_user_document(user_id)
         user_data = user_doc or {}
 
-        # Count artists by source
-        artists_by_source: dict[str, int] = {"spotify": 0, "lastfm": 0, "quiz": 0, "manual": 0}
+        # Count artists by source (deduplicated)
+        # Track unique artist names to get accurate total
+        unique_artists: set[str] = set()
+        artists_by_source: dict[str, int] = {"spotify": 0, "lastfm": 0, "quiz": 0}
 
         # Count from user_artists collection (synced from services)
         synced_artists = await self.firestore.query_documents(
             collection="user_artists",
             filters=[("user_id", "==", user_id)],
         )
+        # Group by artist name to deduplicate within each source
+        artists_by_name_source: dict[str, set[str]] = {}
         for artist in synced_artists:
+            artist_name = artist.get("artist_name", "").lower()
             source = artist.get("source", "unknown")
-            if source in artists_by_source:
-                artists_by_source[source] += 1
+            if artist_name:
+                unique_artists.add(artist_name)
+                if artist_name not in artists_by_name_source:
+                    artists_by_name_source[artist_name] = set()
+                artists_by_name_source[artist_name].add(source)
+
+        # Count unique artists per source
+        for sources in artists_by_name_source.values():
+            for source in sources:
+                if source in artists_by_source:
+                    artists_by_source[source] += 1
 
         # Count from quiz_artists_known (quiz + manual additions)
         quiz_artists = user_data.get("quiz_artists_known", [])
-        artists_by_source["quiz"] = len(quiz_artists)
+        quiz_unique = 0
+        for artist_name in quiz_artists:
+            key = artist_name.lower()
+            unique_artists.add(key)
+            # Only count as quiz if not already counted from synced sources
+            if key not in artists_by_name_source:
+                quiz_unique += 1
+        artists_by_source["quiz"] = quiz_unique
 
         # Count songs
         songs_total = await self.firestore.count_documents(
@@ -118,7 +139,7 @@ class UserDataService:
         return {
             "services": services_summary,
             "artists": {
-                "total": sum(artists_by_source.values()),
+                "total": len(unique_artists),  # Deduplicated count
                 "by_source": artists_by_source,
             },
             "songs": {
@@ -298,17 +319,20 @@ class UserDataService:
 
         artists = list(merged_artists.values())
 
-        # Sort by "how well user knows the artist":
-        # 1. lastfm_playcount (actual plays) - higher is better
-        # 2. Best rank across sources - lower is better
-        # 3. Number of sources - more sources = more confident
-        def sort_key(a: dict) -> tuple[int, int, int]:
+        # Sort priority:
+        # 1. User-entered (manual) artists first - they explicitly added these
+        # 2. By playcount (actual plays from Last.fm) - higher is better
+        # 3. By best rank across sources - lower is better
+        # 4. By number of sources - more sources = more confident
+        def sort_key(a: dict) -> tuple[int, int, int, int]:
+            # Manual artists come first (0 = manual, 1 = synced)
+            is_manual = 0 if a.get("is_manual") else 1
             playcount = a.get("lastfm_playcount") or 0
             # Use best rank from any source
             ranks = [r for r in [a.get("spotify_rank"), a.get("lastfm_rank")] if r]
             best_rank = min(ranks) if ranks else 9999
             num_sources = len(a.get("sources", []))
-            return (-playcount, best_rank, -num_sources)
+            return (is_manual, -playcount, best_rank, -num_sources)
 
         artists.sort(key=sort_key)
 
