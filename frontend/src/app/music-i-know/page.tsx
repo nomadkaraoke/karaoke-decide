@@ -383,8 +383,8 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
             <span>Showing {artists.length} of {total} artists</span>
           </div>
 
-          {/* Artist Rows */}
-          <div className="space-y-2">
+          {/* Artist Rows - Compact single-line layout */}
+          <div className="space-y-1">
             {artists.map((artist) => {
               const isProcessing = actionInProgress === artist.artist_name;
               const isExcluded = artist.is_excluded;
@@ -392,133 +392,119 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
               return (
                 <div
                   key={artist.artist_name}
-                  className={`p-3 rounded-xl border transition-all ${
+                  className={`py-2 px-3 rounded-lg border transition-all ${
                     isExcluded
                       ? "bg-white/[0.02] border-white/5 opacity-60"
                       : "bg-white/5 border-white/10"
                   } ${isProcessing ? "opacity-50" : ""}`}
                 >
-                  <div className="flex items-start gap-3">
-                    {/* Artist Info */}
-                    <div className="flex-1 min-w-0">
-                      {/* Name row */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`font-medium ${isExcluded ? "text-white/50" : "text-white"}`}>
-                          {artist.artist_name}
-                        </span>
-                        {isExcluded && (
-                          <span className="text-xs text-orange-400/80 bg-orange-400/10 px-1.5 py-0.5 rounded">
-                            Hidden
+                  <div className="flex items-center gap-2">
+                    {/* Artist Name */}
+                    <span className={`font-medium truncate ${isExcluded ? "text-white/50" : "text-white"}`}>
+                      {artist.artist_name}
+                    </span>
+
+                    {/* Hidden badge */}
+                    {isExcluded && (
+                      <span className="text-[10px] text-orange-400/80 bg-orange-400/10 px-1 py-0.5 rounded shrink-0">
+                        Hidden
+                      </span>
+                    )}
+
+                    {/* Source badges - compact icons only */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {artist.sources.map((source) => {
+                        const config: Record<string, { icon: React.ReactNode; color: string; title: string }> = {
+                          spotify: { icon: <SpotifyIcon className="w-3.5 h-3.5" />, color: "#1DB954", title: "Spotify" },
+                          lastfm: { icon: <LastfmIcon className="w-3.5 h-3.5" />, color: "#ff4444", title: "Last.fm" },
+                          quiz: { icon: <CheckIcon className="w-3.5 h-3.5" />, color: "#ff2d92", title: "Quiz/Manual" },
+                        };
+                        const sourceConfig = config[source];
+                        if (!sourceConfig) return null;
+                        return (
+                          <span
+                            key={source}
+                            style={{ color: sourceConfig.color }}
+                            title={sourceConfig.title}
+                          >
+                            {sourceConfig.icon}
                           </span>
-                        )}
-                      </div>
-
-                      {/* Stats row */}
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {/* Source badges */}
-                        {artist.sources.map((source) => {
-                          const config: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-                            spotify: { icon: <SpotifyIcon className="w-3 h-3" />, color: "#1DB954", bg: "bg-[#1DB954]/20" },
-                            lastfm: { icon: <LastfmIcon className="w-3 h-3" />, color: "#ff4444", bg: "bg-[#ff4444]/20" },
-                            quiz: { icon: <CheckIcon className="w-3 h-3" />, color: "#ff2d92", bg: "bg-[#ff2d92]/20" },
-                          };
-                          const sourceConfig = config[source] || { icon: null, color: "#999", bg: "bg-white/10" };
-                          return (
-                            <span
-                              key={source}
-                              className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${sourceConfig.bg}`}
-                              style={{ color: sourceConfig.color }}
-                            >
-                              {sourceConfig.icon}
-                              <span className="capitalize">{source === "lastfm" ? "Last.fm" : source}</span>
-                            </span>
-                          );
-                        })}
-
-                        {/* Stats separator */}
-                        {(artist.spotify_rank || artist.lastfm_playcount || artist.genres.length > 0) && (
-                          <span className="text-white/20">·</span>
-                        )}
-
-                        {/* Spotify rank */}
-                        {artist.spotify_rank && (
-                          <span className="text-xs text-white/50">
-                            #{artist.spotify_rank} on Spotify
-                            {artist.spotify_time_range && (
-                              <span className="text-white/30"> ({getTimeRangeLabel(artist.spotify_time_range)})</span>
-                            )}
-                          </span>
-                        )}
-
-                        {/* Last.fm playcount */}
-                        {artist.lastfm_playcount && artist.lastfm_playcount > 0 && (
-                          <span className="text-xs text-white/50">
-                            {formatPlaycount(artist.lastfm_playcount)} plays
-                          </span>
-                        )}
-
-                        {/* Primary genre */}
-                        {artist.genres.length > 0 && (
-                          <span className="text-xs text-white/40 capitalize">
-                            {artist.genres[0]}
-                          </span>
-                        )}
-
-                        {/* Popularity */}
-                        {artist.popularity !== null && artist.popularity > 0 && (
-                          <span className="text-xs text-white/30">
-                            Pop: {artist.popularity}
-                          </span>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
 
-                    {/* Action button */}
-                    <div className="flex-shrink-0">
-                      {artist.is_manual ? (
-                        // Manual artists can be removed
-                        <button
-                          onClick={() => handleRemoveArtist(artist.artist_name)}
-                          disabled={isProcessing}
-                          className="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                          title="Remove artist"
-                        >
-                          {isProcessing ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <TrashIcon className="w-4 h-4" />
-                          )}
-                        </button>
-                      ) : isExcluded ? (
-                        // Excluded synced artists can be unhidden
-                        <button
-                          onClick={() => handleIncludeArtist(artist.artist_name)}
-                          disabled={isProcessing}
-                          className="p-2 rounded-lg text-white/40 hover:text-green-400 hover:bg-green-400/10 transition-colors"
-                          title="Unhide from recommendations"
-                        >
-                          {isProcessing ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <EyeIcon className="w-4 h-4" />
-                          )}
-                        </button>
-                      ) : (
-                        // Synced artists can be hidden
-                        <button
-                          onClick={() => handleExcludeArtist(artist.artist_name)}
-                          disabled={isProcessing}
-                          className="p-2 rounded-lg text-white/40 hover:text-orange-400 hover:bg-orange-400/10 transition-colors"
-                          title="Hide from recommendations"
-                        >
-                          {isProcessing ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <EyeOffIcon className="w-4 h-4" />
-                          )}
-                        </button>
+                    {/* Stats - inline, text only */}
+                    <div className="flex items-center gap-1.5 text-xs text-white/40 shrink-0 ml-auto">
+                      {/* Spotify rank */}
+                      {artist.spotify_rank && (
+                        <span title={`Spotify Top ${artist.spotify_rank}${artist.spotify_time_range ? ` (${getTimeRangeLabel(artist.spotify_time_range)})` : ""}`}>
+                          #{artist.spotify_rank}
+                        </span>
+                      )}
+
+                      {/* Last.fm playcount */}
+                      {artist.lastfm_playcount && artist.lastfm_playcount > 0 && (
+                        <span title="Last.fm plays">
+                          {formatPlaycount(artist.lastfm_playcount)}
+                        </span>
+                      )}
+
+                      {/* Primary genre */}
+                      {artist.genres.length > 0 && (
+                        <span className="capitalize hidden sm:inline" title="Genre">
+                          {artist.genres[0]}
+                        </span>
+                      )}
+
+                      {/* Popularity - only show on larger screens */}
+                      {artist.popularity !== null && artist.popularity > 0 && (
+                        <span className="hidden md:inline" title="Spotify Popularity">
+                          {artist.popularity}%
+                        </span>
                       )}
                     </div>
+
+                    {/* Action button - compact */}
+                    {artist.is_manual ? (
+                      <button
+                        onClick={() => handleRemoveArtist(artist.artist_name)}
+                        disabled={isProcessing}
+                        className="p-1.5 rounded text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+                        title="Remove artist"
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <TrashIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    ) : isExcluded ? (
+                      <button
+                        onClick={() => handleIncludeArtist(artist.artist_name)}
+                        disabled={isProcessing}
+                        className="p-1.5 rounded text-white/30 hover:text-green-400 hover:bg-green-400/10 transition-colors shrink-0"
+                        title="Unhide from recommendations"
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <EyeIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleExcludeArtist(artist.artist_name)}
+                        disabled={isProcessing}
+                        className="p-1.5 rounded text-white/30 hover:text-orange-400 hover:bg-orange-400/10 transition-colors shrink-0"
+                        title="Hide from recommendations"
+                      >
+                        {isProcessing ? (
+                          <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <EyeOffIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

@@ -213,6 +213,40 @@ async def add_artist(
     return AddArtistResponse(**result)
 
 
+# NOTE: Exclude routes MUST be defined BEFORE /artists/{artist_name} to avoid
+# FastAPI matching "exclude" as a path parameter
+@router.post("/artists/exclude", response_model=ExcludeArtistResponse)
+async def exclude_artist(
+    user: CurrentUser,
+    user_data_service: UserDataServiceDep,
+    artist_name: str = Query(..., description="Artist name to exclude"),
+) -> ExcludeArtistResponse:
+    """Exclude an artist from recommendations.
+
+    This is a soft hide - the artist remains in your data but won't
+    be used when generating recommendations. This persists through
+    re-syncs from Spotify/Last.fm.
+
+    Use this when you like an artist but don't want to sing their songs.
+    """
+    result = await user_data_service.exclude_artist(user.id, artist_name)
+    return ExcludeArtistResponse(**result)
+
+
+@router.delete("/artists/exclude", response_model=ExcludeArtistResponse)
+async def include_artist(
+    user: CurrentUser,
+    user_data_service: UserDataServiceDep,
+    artist_name: str = Query(..., description="Artist name to include"),
+) -> ExcludeArtistResponse:
+    """Remove an artist from exclusions (un-hide).
+
+    The artist will again be used when generating recommendations.
+    """
+    result = await user_data_service.include_artist(user.id, artist_name)
+    return ExcludeArtistResponse(**result)
+
+
 @router.delete("/artists/{artist_name}", response_model=RemoveArtistResponse)
 async def remove_artist(
     user: CurrentUser,
@@ -275,40 +309,3 @@ async def update_preferences(
         genres=request.genres,
     )
     return PreferencesResponse(**updated)
-
-
-# -----------------------------------------------------------------------------
-# Artist Exclusions (Hide from Recommendations)
-# -----------------------------------------------------------------------------
-
-
-@router.post("/artists/exclude", response_model=ExcludeArtistResponse)
-async def exclude_artist(
-    user: CurrentUser,
-    user_data_service: UserDataServiceDep,
-    artist_name: str = Query(..., description="Artist name to exclude"),
-) -> ExcludeArtistResponse:
-    """Exclude an artist from recommendations.
-
-    This is a soft hide - the artist remains in your data but won't
-    be used when generating recommendations. This persists through
-    re-syncs from Spotify/Last.fm.
-
-    Use this when you like an artist but don't want to sing their songs.
-    """
-    result = await user_data_service.exclude_artist(user.id, artist_name)
-    return ExcludeArtistResponse(**result)
-
-
-@router.delete("/artists/exclude", response_model=ExcludeArtistResponse)
-async def include_artist(
-    user: CurrentUser,
-    user_data_service: UserDataServiceDep,
-    artist_name: str = Query(..., description="Artist name to include"),
-) -> ExcludeArtistResponse:
-    """Remove an artist from exclusions (un-hide).
-
-    The artist will again be used when generating recommendations.
-    """
-    result = await user_data_service.include_artist(user.id, artist_name)
-    return ExcludeArtistResponse(**result)
