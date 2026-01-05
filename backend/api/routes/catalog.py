@@ -96,6 +96,25 @@ class ArtistSearchResponse(BaseModel):
     total: int
 
 
+class TrackSearchResult(BaseModel):
+    """Track search result for autocomplete."""
+
+    track_id: str
+    track_name: str
+    artist_name: str
+    artist_id: str
+    popularity: int
+    duration_ms: int
+    explicit: bool
+
+
+class TrackSearchResponse(BaseModel):
+    """Response containing track search results."""
+
+    tracks: list[TrackSearchResult]
+    total: int
+
+
 @router.get("/songs", response_model=CatalogSearchResponse)
 async def search_catalog(
     q: str | None = Query(None, description="Search query (artist or title)"),
@@ -249,6 +268,36 @@ async def search_artists(
                 artist_name=r.artist_name,
                 popularity=r.popularity,
                 genres=r.genres,
+            )
+            for r in results
+        ],
+        total=len(results),
+    )
+
+
+@router.get("/tracks", response_model=TrackSearchResponse)
+async def search_tracks(
+    q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum results"),
+) -> TrackSearchResponse:
+    """Search tracks for autocomplete.
+
+    Returns tracks matching the query prefix (title or artist), sorted by popularity.
+    Uses the Spotify track catalog for comprehensive track data.
+
+    This endpoint is public (no auth required) for quick autocomplete.
+    """
+    results = get_catalog_service().search_tracks(q, limit=limit)
+    return TrackSearchResponse(
+        tracks=[
+            TrackSearchResult(
+                track_id=r.track_id,
+                track_name=r.track_name,
+                artist_name=r.artist_name,
+                artist_id=r.artist_id,
+                popularity=r.popularity,
+                duration_ms=r.duration_ms,
+                explicit=r.explicit,
             )
             for r in results
         ],

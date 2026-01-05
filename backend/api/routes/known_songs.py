@@ -55,6 +55,26 @@ class AddKnownSongResponse(BaseModel):
     already_existed: bool
 
 
+class AddSpotifyTrackRequest(BaseModel):
+    """Request to add a song via Spotify track ID."""
+
+    track_id: str = Field(..., description="Spotify track ID")
+
+
+class AddSpotifyTrackResponse(BaseModel):
+    """Response after adding a Spotify track."""
+
+    added: bool
+    track_id: str
+    track_name: str
+    artist_name: str
+    artist_id: str
+    popularity: int
+    duration_ms: int
+    explicit: bool
+    already_existed: bool
+
+
 class BulkAddKnownSongsRequest(BaseModel):
     """Request to add multiple known songs."""
 
@@ -191,7 +211,78 @@ async def bulk_add_known_songs(
 
 
 # -----------------------------------------------------------------------------
-# Remove Known Song
+# Add Spotify Track
+# -----------------------------------------------------------------------------
+
+
+@router.post("/spotify", response_model=AddSpotifyTrackResponse, status_code=status.HTTP_201_CREATED)
+async def add_spotify_track(
+    request: AddSpotifyTrackRequest,
+    user: CurrentUser,
+    known_songs_service: KnownSongsServiceDep,
+) -> AddSpotifyTrackResponse:
+    """Add a song to user's known songs via Spotify track ID.
+
+    Adds a track from the Spotify catalog to the user's library as a
+    known song. Use the catalog track search endpoint to find track IDs.
+
+    Note: These tracks may not have karaoke versions available in the
+    karaoke catalog, but can be used for "Create Your Own Karaoke".
+    """
+    try:
+        result = await known_songs_service.add_spotify_track(
+            user_id=user.id,
+            track_id=request.track_id,
+        )
+
+        return AddSpotifyTrackResponse(
+            added=result.added,
+            track_id=result.track_id,
+            track_name=result.track_name,
+            artist_name=result.artist_name,
+            artist_id=result.artist_id,
+            popularity=result.popularity,
+            duration_ms=result.duration_ms,
+            explicit=result.explicit,
+            already_existed=result.already_existed,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+
+# -----------------------------------------------------------------------------
+# Remove Spotify Track
+# -----------------------------------------------------------------------------
+
+
+@router.delete("/spotify/{track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_spotify_track(
+    track_id: str,
+    user: CurrentUser,
+    known_songs_service: KnownSongsServiceDep,
+) -> None:
+    """Remove a Spotify track from user's known songs.
+
+    Only removes tracks that were manually added (source='known_songs').
+    Tracks from music services sync cannot be removed this way.
+    """
+    removed = await known_songs_service.remove_spotify_track(
+        user_id=user.id,
+        track_id=track_id,
+    )
+
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Track not found in known songs or cannot be removed",
+        )
+
+
+# -----------------------------------------------------------------------------
+# Remove Known Song (Karaoke Catalog)
 # -----------------------------------------------------------------------------
 
 

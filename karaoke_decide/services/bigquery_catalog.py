@@ -58,6 +58,19 @@ class ArtistSearchResult:
     genres: list[str]
 
 
+@dataclass
+class TrackSearchResult:
+    """Track search result for autocomplete."""
+
+    track_id: str
+    track_name: str
+    artist_name: str
+    artist_id: str
+    popularity: int
+    duration_ms: int
+    explicit: bool
+
+
 class BigQueryCatalogService:
     """Service for querying song catalog from BigQuery."""
 
@@ -653,6 +666,70 @@ class BigQueryCatalogService:
                 artist_name=row.artist_name,
                 popularity=row.popularity or 0,
                 genres=list(row.genres)[:5] if row.genres else [],
+            )
+            for row in results
+        ]
+
+    def search_tracks(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> list[TrackSearchResult]:
+        """Search tracks by title or artist for autocomplete.
+
+        Uses the pre-computed spotify_tracks_normalized table for fast
+        prefix matching. Searches both track title and artist name.
+        Results are sorted by popularity (highest first).
+
+        Args:
+            query: Search query (will be normalized)
+            limit: Maximum results to return (default 10)
+
+        Returns:
+            List of TrackSearchResult sorted by popularity
+        """
+        if not query or len(query) < 2:
+            return []
+
+        normalized = _normalize_for_matching(query)
+        if not normalized:
+            return []
+
+        # Search both title and artist, deduplicate by track_id
+        sql = f"""
+            SELECT DISTINCT
+                track_id,
+                track_name,
+                artist_name,
+                artist_id,
+                popularity,
+                duration_ms,
+                explicit
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
+            WHERE normalized_title LIKE @query_prefix
+               OR normalized_artist LIKE @query_prefix
+            ORDER BY popularity DESC
+            LIMIT @limit
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+        results = self.client.query(sql, job_config=job_config).result()
+
+        return [
+            TrackSearchResult(
+                track_id=row.track_id,
+                track_name=row.track_name,
+                artist_name=row.artist_name,
+                artist_id=row.artist_id or "",
+                popularity=row.popularity or 0,
+                duration_ms=row.duration_ms or 0,
+                explicit=row.explicit or False,
             )
             for row in results
         ]
