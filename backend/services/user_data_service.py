@@ -6,19 +6,41 @@ Provides functionality for the My Data page, including:
 - Data aggregation for summary view
 """
 
+import logging
+import re
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from google.cloud.firestore_v1 import ArrayRemove, ArrayUnion
 
 from backend.services.firestore_service import FirestoreService
 
+if TYPE_CHECKING:
+    from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+
+logger = logging.getLogger(__name__)
+
+
+def _normalize_for_matching(text: str) -> str:
+    """Normalize text for matching against BigQuery catalog."""
+    if not text:
+        return ""
+    result = text.lower()
+    result = re.sub(r"[^a-z0-9 ]", " ", result)
+    result = re.sub(r"\s+", " ", result)
+    return result.strip()
+
 
 class UserDataService:
     """Service for managing user data and preferences."""
 
-    def __init__(self, firestore: FirestoreService):
+    def __init__(
+        self,
+        firestore: FirestoreService,
+        bigquery_catalog: "BigQueryCatalogService | None" = None,
+    ):
         self.firestore = firestore
+        self._bigquery_catalog = bigquery_catalog
 
     async def _get_user_document(self, user_id: str) -> tuple[dict[str, Any] | None, str | None]:
         """Find a user document by user_id.
@@ -206,6 +228,55 @@ class UserDataService:
 
         return await self.get_preferences(user_id)
 
+    async def _enrich_artists_metadata(
+        self,
+        merged_artists: dict[str, dict[str, Any]],
+    ) -> None:
+        """Enrich artists missing metadata with BigQuery lookup.
+
+        This looks up artist metadata (genres, popularity) from the Spotify
+        artist catalog in BigQuery for artists that don't have this data
+        from their sync source (e.g., Last.fm artists or manual additions).
+
+        Modifies merged_artists dict in place.
+        """
+        if not self._bigquery_catalog:
+            return
+
+        # Find artists missing genres (main indicator of missing Spotify metadata)
+        artists_needing_enrichment = [
+            artist_data["artist_name"]
+            for artist_data in merged_artists.values()
+            if not artist_data.get("genres")  # Empty list or None
+        ]
+
+        if not artists_needing_enrichment:
+            logger.debug("No artists need metadata enrichment")
+            return
+
+        logger.info(f"Enriching metadata for {len(artists_needing_enrichment)} artists")
+
+        # Look up metadata from BigQuery
+        metadata_lookup = self._bigquery_catalog.get_artists_metadata(artists_needing_enrichment)
+
+        # Merge metadata into artists
+        enriched_count = 0
+        for artist_data in merged_artists.values():
+            if artist_data.get("genres"):  # Already has genres, skip
+                continue
+
+            # Look up by normalized name
+            normalized_name = _normalize_for_matching(artist_data["artist_name"])
+            if normalized_name in metadata_lookup:
+                metadata = metadata_lookup[normalized_name]
+                artist_data["genres"] = metadata.genres
+                # Only set popularity if not already set (Spotify sync takes precedence)
+                if artist_data.get("popularity") is None:
+                    artist_data["popularity"] = metadata.popularity
+                enriched_count += 1
+
+        logger.info(f"Enriched {enriched_count} artists with BigQuery metadata")
+
     async def get_all_artists(
         self,
         user_id: str,
@@ -316,6 +387,10 @@ class UserDataService:
                     if "quiz" not in merged_artists[key]["sources"]:
                         merged_artists[key]["sources"].append("quiz")
                     merged_artists[key]["is_manual"] = True
+
+        # Enrich artists missing metadata with BigQuery lookup
+        if self._bigquery_catalog:
+            await self._enrich_artists_metadata(merged_artists)
 
         artists = list(merged_artists.values())
 
@@ -553,9 +628,12 @@ class UserDataService:
 _user_data_service: UserDataService | None = None
 
 
-def get_user_data_service(firestore: FirestoreService) -> UserDataService:
+def get_user_data_service(
+    firestore: FirestoreService,
+    bigquery_catalog: "BigQueryCatalogService | None" = None,
+) -> UserDataService:
     """Get or create UserDataService instance."""
     global _user_data_service
     if _user_data_service is None:
-        _user_data_service = UserDataService(firestore)
+        _user_data_service = UserDataService(firestore, bigquery_catalog)
     return _user_data_service
