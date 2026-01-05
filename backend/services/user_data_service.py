@@ -302,6 +302,12 @@ class UserDataService:
                 if existing["lastfm_playcount"] is None or playcount > existing["lastfm_playcount"]:
                     existing["lastfm_rank"] = rank
                     existing["lastfm_playcount"] = playcount
+                # Also read enriched Spotify metadata if present (added during sync)
+                if artist.get("popularity") is not None and existing["popularity"] is None:
+                    existing["popularity"] = artist.get("popularity")
+                enriched_genres = artist.get("genres", [])
+                if enriched_genres and not existing["genres"]:
+                    existing["genres"] = enriched_genres
 
         # Add quiz/manual artists from user profile
         if user_doc:
