@@ -231,7 +231,14 @@ export function YourSongsSection({
       // Check if it's a Spotify track or karaoke catalog song
       if (song.spotify_track_id) {
         await api.knownSongs.removeSpotifyTrack(song.spotify_track_id);
-      } else if (song.song_id && !song.song_id.startsWith("spotify:")) {
+      } else if (song.song_id?.startsWith("spotify:")) {
+        // Handle spotify-prefixed song_id (e.g., "spotify:trackId")
+        const trackId = song.song_id.split(":").pop();
+        if (trackId) {
+          await api.knownSongs.removeSpotifyTrack(trackId);
+        }
+      } else if (song.song_id) {
+        // Karaoke catalog song with numeric ID
         await api.knownSongs.remove(parseInt(song.song_id, 10));
       }
       await loadSongs(1);
