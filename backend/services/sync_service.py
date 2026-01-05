@@ -246,7 +246,7 @@ class SyncService:
             artists_stored = await self._fetch_and_store_spotify_artists(user_id, access_token)
 
             await self.music_service_service.update_sync_status(
-                user_id, "spotify", "idle", tracks_synced=tracks_matched
+                user_id, "spotify", "idle", tracks_synced=tracks_matched, songs_synced=created + updated
             )
 
             return SyncResult(
@@ -418,7 +418,11 @@ class SyncService:
             artists_stored = await self._fetch_and_store_lastfm_artists(user_id, username)
 
             await self.music_service_service.update_sync_status(
-                user_id, "lastfm", "idle", tracks_synced=total_tracks_matched
+                user_id,
+                "lastfm",
+                "idle",
+                tracks_synced=total_tracks_matched,
+                songs_synced=total_created + total_updated,
             )
 
             return SyncResult(
@@ -866,7 +870,7 @@ class SyncService:
 
             # Mark as complete
             await self.music_service_service.update_sync_status(
-                user_id, "spotify", "idle", tracks_synced=tracks_matched
+                user_id, "spotify", "idle", tracks_synced=tracks_matched, songs_synced=created + updated
             )
 
             return SyncResult(

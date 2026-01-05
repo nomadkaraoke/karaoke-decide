@@ -135,6 +135,7 @@ class UserDataService:
                 "connected": True,
                 "username": service.get("service_username"),
                 "tracks_synced": service.get("tracks_synced", 0),
+                "songs_synced": service.get("songs_synced", 0),
                 "artists_synced": artists_by_source.get(service_type, 0),
                 "last_sync_at": service.get("last_sync_at"),
             }

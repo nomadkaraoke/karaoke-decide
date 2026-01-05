@@ -57,6 +57,7 @@ def sample_spotify_service() -> MusicService:
         sync_status="idle",
         sync_error=None,
         tracks_synced=150,
+        songs_synced=500,
         created_at=now,
         updated_at=now,
     )
@@ -79,6 +80,7 @@ def sample_lastfm_service() -> MusicService:
         sync_status="idle",
         sync_error=None,
         tracks_synced=200,
+        songs_synced=1000,
         created_at=now,
         updated_at=now,
     )

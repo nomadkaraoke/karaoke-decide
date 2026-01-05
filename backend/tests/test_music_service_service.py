@@ -112,6 +112,7 @@ def sample_spotify_service() -> MusicService:
         sync_status="idle",
         sync_error=None,
         tracks_synced=0,
+        songs_synced=0,
         created_at=now,
         updated_at=now,
     )

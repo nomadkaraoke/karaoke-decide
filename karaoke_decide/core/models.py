@@ -47,7 +47,8 @@ class MusicService(BaseModel):
     last_sync_at: datetime | None = None
     sync_status: Literal["idle", "syncing", "error"] = "idle"
     sync_error: str | None = None
-    tracks_synced: int = 0
+    tracks_synced: int = 0  # Karaoke-matched tracks only
+    songs_synced: int = 0  # Total unique songs synced (all tracks)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
