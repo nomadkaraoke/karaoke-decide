@@ -388,9 +388,10 @@ class UserDataService:
                         merged_artists[key]["sources"].append("quiz")
                     merged_artists[key]["is_manual"] = True
 
-        # Enrich artists missing metadata with BigQuery lookup
-        if self._bigquery_catalog:
-            await self._enrich_artists_metadata(merged_artists)
+        # NOTE: BigQuery enrichment disabled - query too slow (75s+ per 100 artists)
+        # TODO: Pre-compute normalized artist names in BigQuery for fast lookups
+        # if self._bigquery_catalog:
+        #     await self._enrich_artists_metadata(merged_artists)
 
         artists = list(merged_artists.values())
 
