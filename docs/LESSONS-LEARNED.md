@@ -35,6 +35,34 @@ async def exclude_artist(
 
 ---
 
+### 2026-01-04: Pre-Normalize BigQuery Data for Fast Lookups
+
+**Context:** Enriching Last.fm artists with Spotify metadata. Initial implementation used runtime regex normalization (REGEXP_REPLACE) on 500K+ rows during query time.
+
+**Lesson:** Runtime regex transformations on large tables cause catastrophic query times. A simple fuzzy match query that normalized artist names at query time took 75+ seconds and caused production timeouts.
+
+**Recommendation:** Pre-compute normalized values as a BigQuery table at ETL time:
+```sql
+-- Create once at ETL time (takes ~30s)
+CREATE TABLE spotify_artists_normalized AS
+SELECT
+  artist_id,
+  artist_name,
+  TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(artist_name), r'[^a-z0-9 ]', ' '), r' +', ' ')) as normalized_name,
+  popularity,
+  ARRAY_AGG(DISTINCT g.genre) as genres
+FROM spotify_artists a
+LEFT JOIN spotify_artist_genres g ON a.artist_id = g.artist_id
+GROUP BY 1, 2, 4
+
+-- Query-time lookups are now O(1) with index
+SELECT * FROM spotify_artists_normalized WHERE normalized_name = @name
+```
+
+This reduced lookup time from 75s to <100ms (750x improvement).
+
+---
+
 ### 2026-01-04: Merge Don't Replace When Deduplicating Multi-Source Data
 
 **Context:** Combining artist data from Spotify and Last.fm where the same artist appears in both sources.

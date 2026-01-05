@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import {
   SpotifyIcon,
@@ -24,6 +24,13 @@ interface UserArtist {
   is_manual: boolean;
 }
 
+interface ArtistSuggestion {
+  artist_id: string;
+  artist_name: string;
+  popularity: number;
+  genres: string[];
+}
+
 interface Props {
   isExpanded: boolean;
   onToggle: () => void;
@@ -43,6 +50,16 @@ export function YourArtistsSection({
   const [newArtist, setNewArtist] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<ArtistSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestion, setSelectedSuggestion] =
+    useState<ArtistSuggestion | null>(null);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Remove artist state
   const [removingArtist, setRemovingArtist] = useState<string | null>(null);
@@ -64,6 +81,93 @@ export function YourArtistsSection({
     loadArtists();
   }, [loadArtists, refreshTrigger]);
 
+  // Search for artist suggestions
+  const searchArtists = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      const response = await api.catalog.searchArtists(query, 8);
+      setSuggestions(response.artists);
+      setShowSuggestions(response.artists.length > 0);
+      setHighlightedIndex(-1);
+    } catch (err) {
+      console.error("Artist search failed:", err);
+      setSuggestions([]);
+    }
+  }, []);
+
+  // Handle input change with debounced search
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewArtist(value);
+    setSelectedSuggestion(null);
+
+    // Debounce search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      searchArtists(value);
+    }, 200);
+  };
+
+  // Handle suggestion selection
+  const selectSuggestion = (suggestion: ArtistSuggestion) => {
+    setSelectedSuggestion(suggestion);
+    setNewArtist(suggestion.artist_name);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    inputRef.current?.focus();
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0) {
+          selectSuggestion(suggestions[highlightedIndex]);
+        }
+        break;
+      case "Escape":
+        setShowSuggestions(false);
+        break;
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleAddArtist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newArtist.trim()) return;
@@ -71,8 +175,14 @@ export function YourArtistsSection({
     try {
       setIsAdding(true);
       setAddError(null);
-      await api.my.addDataArtist(newArtist.trim());
+      // Pass spotify_artist_id if we selected from autocomplete
+      await api.my.addDataArtist(
+        newArtist.trim(),
+        selectedSuggestion?.artist_id
+      );
       setNewArtist("");
+      setSelectedSuggestion(null);
+      setSuggestions([]);
       await loadArtists();
     } catch (err) {
       setAddError(err instanceof Error ? err.message : "Failed to add artist");
@@ -167,15 +277,63 @@ export function YourArtistsSection({
             <LoadingPulse count={3} />
           ) : (
             <>
-              {/* Add artist form */}
+              {/* Add artist form with autocomplete */}
               <form onSubmit={handleAddArtist} className="flex gap-2">
-                <div className="flex-1">
+                <div className="flex-1 relative">
                   <Input
-                    placeholder="Add an artist..."
+                    ref={inputRef}
+                    placeholder="Search for an artist..."
                     value={newArtist}
-                    onChange={(e) => setNewArtist(e.target.value)}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    onFocus={() => {
+                      if (suggestions.length > 0) setShowSuggestions(true);
+                    }}
                     error={addError || undefined}
+                    autoComplete="off"
                   />
+                  {/* Autocomplete dropdown */}
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div
+                      ref={suggestionsRef}
+                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/20 rounded-xl shadow-xl overflow-hidden"
+                    >
+                      {suggestions.map((suggestion, index) => (
+                        <button
+                          key={suggestion.artist_id}
+                          type="button"
+                          onClick={() => selectSuggestion(suggestion)}
+                          className={`w-full px-3 py-2 text-left transition-colors ${
+                            index === highlightedIndex
+                              ? "bg-[#ff2d92]/20"
+                              : "hover:bg-white/5"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-white">
+                              {suggestion.artist_name}
+                            </span>
+                            {suggestion.popularity > 0 && (
+                              <span className="text-xs text-white/40">
+                                {suggestion.popularity}%
+                              </span>
+                            )}
+                          </div>
+                          {suggestion.genres.length > 0 && (
+                            <div className="text-xs text-white/50 mt-0.5 capitalize">
+                              {suggestion.genres.slice(0, 2).join(", ")}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Selected indicator */}
+                  {selectedSuggestion && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
+                    </div>
+                  )}
                 </div>
                 <Button
                   type="submit"

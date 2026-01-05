@@ -235,6 +235,17 @@ export const api = {
           description: string;
         }>;
       }>(`/api/catalog/songs/${songId}/links`),
+
+    searchArtists: (query: string, limit: number = 10) =>
+      api.get<{
+        artists: Array<{
+          artist_id: string;
+          artist_name: string;
+          popularity: number;
+          genres: string[];
+        }>;
+        total: number;
+      }>(`/api/catalog/artists?q=${encodeURIComponent(query)}&limit=${limit}`),
   },
 
   // ============================================================================
@@ -291,9 +302,10 @@ export const api = {
         has_more: boolean;
       }>(`/api/my/data/artists?page=${page}&per_page=${perPage}`),
 
-    addDataArtist: (artistName: string) =>
+    addDataArtist: (artistName: string, spotifyArtistId?: string) =>
       api.post<{ artists: string[]; added: string }>("/api/my/data/artists", {
         artist_name: artistName,
+        spotify_artist_id: spotifyArtistId,
       }),
 
     removeDataArtist: (artistName: string) =>

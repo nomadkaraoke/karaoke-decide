@@ -99,6 +99,7 @@ class AddArtistRequest(BaseModel):
     """Request to add an artist manually."""
 
     artist_name: str = Field(..., min_length=1, max_length=200)
+    spotify_artist_id: str | None = Field(None, description="Spotify artist ID for metadata enrichment")
 
 
 class AddArtistResponse(BaseModel):
@@ -208,8 +209,15 @@ async def add_artist(
 
     The artist will be stored in the same list as quiz-selected artists
     and used in the recommendation engine.
+
+    If spotify_artist_id is provided (from autocomplete), the artist will
+    be stored with Spotify metadata (genres, popularity).
     """
-    result = await user_data_service.add_artist(user.id, request.artist_name)
+    result = await user_data_service.add_artist(
+        user.id,
+        request.artist_name,
+        spotify_artist_id=request.spotify_artist_id,
+    )
     return AddArtistResponse(**result)
 
 

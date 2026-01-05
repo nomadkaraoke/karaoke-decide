@@ -80,6 +80,22 @@ class SongLinksResponse(BaseModel):
     links: list[KaraokeLinkResponse]
 
 
+class ArtistSearchResult(BaseModel):
+    """Artist search result for autocomplete."""
+
+    artist_id: str
+    artist_name: str
+    popularity: int
+    genres: list[str] = []
+
+
+class ArtistSearchResponse(BaseModel):
+    """Response containing artist search results."""
+
+    artists: list[ArtistSearchResult]
+    total: int
+
+
 @router.get("/songs", response_model=CatalogSearchResponse)
 async def search_catalog(
     q: str | None = Query(None, description="Search query (artist or title)"),
@@ -211,3 +227,30 @@ async def get_catalog_stats() -> CatalogStatsResponse:
     """Get catalog statistics."""
     stats = get_catalog_service().get_stats()
     return CatalogStatsResponse(**stats)
+
+
+@router.get("/artists", response_model=ArtistSearchResponse)
+async def search_artists(
+    q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum results"),
+) -> ArtistSearchResponse:
+    """Search artists for autocomplete.
+
+    Returns artists matching the query prefix, sorted by popularity.
+    Uses the Spotify artist catalog for comprehensive artist data.
+
+    This endpoint is public (no auth required) for quick autocomplete.
+    """
+    results = get_catalog_service().search_artists(q, limit=limit)
+    return ArtistSearchResponse(
+        artists=[
+            ArtistSearchResult(
+                artist_id=r.artist_id,
+                artist_name=r.artist_name,
+                popularity=r.popularity,
+                genres=r.genres,
+            )
+            for r in results
+        ],
+        total=len(results),
+    )

@@ -7,7 +7,6 @@ Provides functionality for the My Data page, including:
 """
 
 import logging
-import re
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -19,16 +18,6 @@ if TYPE_CHECKING:
     from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 logger = logging.getLogger(__name__)
-
-
-def _normalize_for_matching(text: str) -> str:
-    """Normalize text for matching against BigQuery catalog."""
-    if not text:
-        return ""
-    result = text.lower()
-    result = re.sub(r"[^a-z0-9 ]", " ", result)
-    result = re.sub(r"\s+", " ", result)
-    return result.strip()
 
 
 class UserDataService:
@@ -228,55 +217,6 @@ class UserDataService:
 
         return await self.get_preferences(user_id)
 
-    async def _enrich_artists_metadata(
-        self,
-        merged_artists: dict[str, dict[str, Any]],
-    ) -> None:
-        """Enrich artists missing metadata with BigQuery lookup.
-
-        This looks up artist metadata (genres, popularity) from the Spotify
-        artist catalog in BigQuery for artists that don't have this data
-        from their sync source (e.g., Last.fm artists or manual additions).
-
-        Modifies merged_artists dict in place.
-        """
-        if not self._bigquery_catalog:
-            return
-
-        # Find artists missing genres (main indicator of missing Spotify metadata)
-        artists_needing_enrichment = [
-            artist_data["artist_name"]
-            for artist_data in merged_artists.values()
-            if not artist_data.get("genres")  # Empty list or None
-        ]
-
-        if not artists_needing_enrichment:
-            logger.debug("No artists need metadata enrichment")
-            return
-
-        logger.info(f"Enriching metadata for {len(artists_needing_enrichment)} artists")
-
-        # Look up metadata from BigQuery
-        metadata_lookup = self._bigquery_catalog.get_artists_metadata(artists_needing_enrichment)
-
-        # Merge metadata into artists
-        enriched_count = 0
-        for artist_data in merged_artists.values():
-            if artist_data.get("genres"):  # Already has genres, skip
-                continue
-
-            # Look up by normalized name
-            normalized_name = _normalize_for_matching(artist_data["artist_name"])
-            if normalized_name in metadata_lookup:
-                metadata = metadata_lookup[normalized_name]
-                artist_data["genres"] = metadata.genres
-                # Only set popularity if not already set (Spotify sync takes precedence)
-                if artist_data.get("popularity") is None:
-                    artist_data["popularity"] = metadata.popularity
-                enriched_count += 1
-
-        logger.info(f"Enriched {enriched_count} artists with BigQuery metadata")
-
     async def get_all_artists(
         self,
         user_id: str,
@@ -388,10 +328,8 @@ class UserDataService:
                         merged_artists[key]["sources"].append("quiz")
                     merged_artists[key]["is_manual"] = True
 
-        # NOTE: BigQuery enrichment disabled - query too slow (75s+ per 100 artists)
-        # TODO: Pre-compute normalized artist names in BigQuery for fast lookups
-        # if self._bigquery_catalog:
-        #     await self._enrich_artists_metadata(merged_artists)
+        # NOTE: Artists are now enriched at sync time (see sync_service.py)
+        # using the pre-normalized spotify_artists_normalized BigQuery table
 
         artists = list(merged_artists.values())
 
@@ -426,10 +364,22 @@ class UserDataService:
             "has_more": end_idx < total,
         }
 
-    async def add_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
+    async def add_artist(
+        self,
+        user_id: str,
+        artist_name: str,
+        spotify_artist_id: str | None = None,
+    ) -> dict[str, Any]:
         """Add an artist manually to user's preferences.
 
         Stores in quiz_artists_known array in user document.
+        If spotify_artist_id is provided, also stores enriched artist data
+        in user_artists collection with Spotify metadata.
+
+        Args:
+            user_id: User ID
+            artist_name: Artist name to add
+            spotify_artist_id: Optional Spotify artist ID for metadata enrichment
 
         Returns:
             Updated list of quiz/manual artists
@@ -462,12 +412,59 @@ class UserDataService:
                 merge=True,
             )
 
+        # If spotify_artist_id provided, store enriched data in user_artists
+        if spotify_artist_id:
+            await self._store_artist_with_metadata(user_id, artist_name, spotify_artist_id)
+
         # Return updated artist list
         user_doc, _ = await self._get_user_document(user_id)
         return {
             "artists": user_doc.get("quiz_artists_known", []) if user_doc else [],
             "added": artist_name,
         }
+
+    async def _store_artist_with_metadata(
+        self,
+        user_id: str,
+        artist_name: str,
+        spotify_artist_id: str,
+    ) -> None:
+        """Store artist with Spotify metadata in user_artists collection.
+
+        Looks up the artist in the normalized BigQuery table to get genres
+        and popularity, then stores in Firestore.
+
+        Args:
+            user_id: User ID
+            artist_name: Artist name
+            spotify_artist_id: Spotify artist ID
+        """
+        now = datetime.now(UTC)
+
+        # Create unique ID for manual artists
+        safe_name = artist_name.lower().replace(" ", "_")[:50]
+        doc_id = f"{user_id}:manual:{safe_name}"
+
+        artist_data: dict[str, Any] = {
+            "id": doc_id,
+            "user_id": user_id,
+            "source": "manual",
+            "artist_name": artist_name,
+            "spotify_artist_id": spotify_artist_id,
+            "updated_at": now.isoformat(),
+        }
+
+        # Look up metadata from BigQuery
+        if self._bigquery_catalog:
+            try:
+                metadata = self._bigquery_catalog.lookup_artist_by_name(artist_name)
+                if metadata:
+                    artist_data["genres"] = metadata.genres
+                    artist_data["popularity"] = metadata.popularity
+            except Exception as e:
+                logger.warning(f"Could not look up artist metadata: {e}")
+
+        await self.firestore.set_document("user_artists", doc_id, artist_data)
 
     async def remove_artist(self, user_id: str, artist_name: str) -> dict[str, Any]:
         """Remove an artist from user's preferences.

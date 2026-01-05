@@ -5,6 +5,7 @@ karaoke catalog, and creates UserSong records.
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -721,7 +722,8 @@ class SyncService:
         """Fetch and store user's top artists from Last.fm with full pagination.
 
         Fetches up to 1000 artists ranked by play count, providing comprehensive
-        data about which artists the user knows best.
+        data about which artists the user knows best. Enriches with Spotify metadata
+        (genres, popularity) using the pre-computed normalized artists table.
 
         Args:
             user_id: User ID.
@@ -742,6 +744,11 @@ class SyncService:
             )
             logger.info(f"Last.fm artists: fetched {len(artists)} artists with play counts")
 
+            # Batch lookup Spotify metadata for all artists
+            artist_names = [a.get("name", "") for a in artists if a.get("name")]
+            spotify_metadata = self._get_spotify_metadata_for_artists(artist_names)
+            logger.info(f"Last.fm artists: found Spotify metadata for {len(spotify_metadata)} artists")
+
             for artist in artists:
                 artist_name = artist.get("name", "")
                 if not artist_name:
@@ -759,7 +766,7 @@ class SyncService:
                     except (ValueError, TypeError):
                         pass
 
-                artist_data = {
+                artist_data: dict[str, Any] = {
                     "id": artist_id,
                     "user_id": user_id,
                     "source": "lastfm",
@@ -770,6 +777,18 @@ class SyncService:
                     "updated_at": now.isoformat(),
                 }
 
+                # Enrich with Spotify metadata if available
+                # Normalize name to match BigQuery lookup key
+                normalized_name = artist_name.lower()
+                normalized_name = re.sub(r"[^a-z0-9 ]", " ", normalized_name)
+                normalized_name = re.sub(r"\s+", " ", normalized_name).strip()
+
+                if normalized_name in spotify_metadata:
+                    metadata = spotify_metadata[normalized_name]
+                    artist_data["spotify_artist_id"] = metadata.artist_id
+                    artist_data["genres"] = metadata.genres
+                    artist_data["popularity"] = metadata.popularity
+
                 await self.firestore.set_document("user_artists", artist_id, artist_data)
                 stored += 1
 
@@ -778,6 +797,29 @@ class SyncService:
 
         logger.info(f"Last.fm artists: stored {stored} artists")
         return stored
+
+    def _get_spotify_metadata_for_artists(
+        self,
+        artist_names: list[str],
+    ) -> dict[str, Any]:
+        """Get Spotify metadata for a list of artist names.
+
+        Uses the fast batch lookup method on the pre-normalized BigQuery table.
+
+        Args:
+            artist_names: List of artist names
+
+        Returns:
+            Dict mapping normalized name -> ArtistMetadata
+        """
+        try:
+            from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+
+            catalog = BigQueryCatalogService()
+            return catalog.batch_lookup_artists_by_name(artist_names)
+        except Exception as e:
+            logger.warning(f"Could not enrich artists with Spotify metadata: {e}")
+            return {}
 
     async def sync_spotify(self, user_id: str, service: MusicService) -> SyncResult:
         """Sync Spotify listening history.

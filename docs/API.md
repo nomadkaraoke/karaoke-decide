@@ -283,6 +283,31 @@ Get karaoke links for a specific song. Returns URLs to find or create karaoke vi
 - `youtube_search` - YouTube search results for karaoke videos
 - `karaoke_generator` - Link to Nomad Karaoke Generator to create custom videos
 
+### GET /api/catalog/artists
+
+Search artists by name for autocomplete. Returns artists sorted by popularity.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| q | string | Search query (min 2 characters) |
+| limit | int | Max results (default: 10, max: 50) |
+
+**Response:**
+```json
+{
+  "artists": [
+    {
+      "artist_id": "1dfeR4HaWDbWqFHLkxsg1d",
+      "artist_name": "Queen",
+      "popularity": 88,
+      "genres": ["rock", "classic rock", "glam rock"]
+    }
+  ],
+  "total": 1
+}
+```
+
 ### GET /api/catalog/stats
 
 Get catalog statistics.
@@ -846,16 +871,19 @@ Get user's artists from all sources (sync + quiz + manual), merged when same art
 
 ### POST /api/my/data/artists
 
-Add an artist manually.
+Add an artist manually. If `spotify_artist_id` is provided (from autocomplete), the artist will be stored with Spotify metadata (genres, popularity).
 
 **Requires:** Bearer token
 
 **Request:**
 ```json
 {
-  "artist_name": "Elton John"
+  "artist_name": "Elton John",
+  "spotify_artist_id": "3PhoLpVuITZKcymswpck5b"
 }
 ```
+
+The `spotify_artist_id` field is optional. If provided, the artist will be enriched with Spotify metadata during storage.
 
 **Response:**
 ```json
