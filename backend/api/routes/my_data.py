@@ -26,8 +26,9 @@ class ServiceSummary(BaseModel):
 
     connected: bool
     username: str | None = None
-    tracks_synced: int | None = None
-    artists_synced: int | None = None
+    tracks_synced: int | None = None  # Karaoke-matched tracks only
+    songs_synced: int | None = None  # Total unique songs synced (all tracks)
+    artists_synced: int | None = None  # Total artists synced
     last_sync_at: str | None = None
 
 

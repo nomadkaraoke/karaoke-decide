@@ -390,6 +390,7 @@ class MusicServiceService:
         status: str,
         error: str | None = None,
         tracks_synced: int | None = None,
+        songs_synced: int | None = None,
     ) -> None:
         """Update sync status for a service.
 
@@ -398,7 +399,8 @@ class MusicServiceService:
             service_type: Service type.
             status: New sync status (idle, syncing, error).
             error: Error message if status is error.
-            tracks_synced: Updated track count if sync completed.
+            tracks_synced: Karaoke-matched track count if sync completed.
+            songs_synced: Total unique songs synced (all tracks).
         """
         service_id = self._get_service_id(user_id, service_type)
         now = datetime.now(UTC)
@@ -416,6 +418,9 @@ class MusicServiceService:
         if status == "idle" and tracks_synced is not None:
             update_data["tracks_synced"] = tracks_synced
             update_data["last_sync_at"] = now.isoformat()
+
+        if status == "idle" and songs_synced is not None:
+            update_data["songs_synced"] = songs_synced
 
         await self.firestore.update_document(
             self.SERVICES_COLLECTION,
@@ -609,6 +614,7 @@ class MusicServiceService:
             sync_status=doc.get("sync_status", "idle"),
             sync_error=doc.get("sync_error"),
             tracks_synced=doc.get("tracks_synced", 0),
+            songs_synced=doc.get("songs_synced", 0),
             created_at=(datetime.fromisoformat(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
             updated_at=(datetime.fromisoformat(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
         )

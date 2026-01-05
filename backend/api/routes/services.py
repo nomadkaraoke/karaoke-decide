@@ -44,7 +44,8 @@ class ConnectedServiceResponse(BaseModel):
     last_sync_at: str | None
     sync_status: str
     sync_error: str | None
-    tracks_synced: int
+    tracks_synced: int  # Karaoke-matched tracks
+    songs_synced: int  # Total unique songs synced
 
 
 class SpotifyConnectResponse(BaseModel):
@@ -146,6 +147,7 @@ async def list_services(
             sync_status=svc.sync_status,
             sync_error=svc.sync_error,
             tracks_synced=svc.tracks_synced,
+            songs_synced=svc.songs_synced,
         )
         for svc in services
     ]
@@ -270,6 +272,7 @@ async def connect_lastfm(
             sync_status=service.sync_status,
             sync_error=service.sync_error,
             tracks_synced=service.tracks_synced,
+            songs_synced=service.songs_synced,
         )
 
     except ValidationError as e:
@@ -475,6 +478,7 @@ async def get_sync_status(
                 sync_status=svc.sync_status,
                 sync_error=svc.sync_error,
                 tracks_synced=svc.tracks_synced,
+                songs_synced=svc.songs_synced,
             )
             for svc in services
         ],

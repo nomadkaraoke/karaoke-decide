@@ -18,7 +18,8 @@ interface ConnectedService {
   last_sync_at: string | null;
   sync_status: string;
   sync_error: string | null;
-  tracks_synced: number;
+  tracks_synced: number;  // Karaoke-matched tracks
+  songs_synced: number;   // Total unique songs synced
   artists_synced?: number;
 }
 
@@ -387,7 +388,7 @@ export function ConnectedServicesSection({
                   <div className="space-y-2">
                     <div className="flex items-center gap-4 text-xs text-white/50">
                       <span>
-                        {getService("spotify")?.tracks_synced || 0} tracks
+                        {getService("spotify")?.songs_synced || getService("spotify")?.tracks_synced || 0} songs
                       </span>
                       <span>
                         {getService("spotify")?.artists_synced || 0} artists
@@ -445,7 +446,7 @@ export function ConnectedServicesSection({
                   <div className="space-y-2">
                     <div className="flex items-center gap-4 text-xs text-white/50">
                       <span>
-                        {getService("lastfm")?.tracks_synced || 0} tracks
+                        {getService("lastfm")?.songs_synced || getService("lastfm")?.tracks_synced || 0} songs
                       </span>
                       <span>
                         {getService("lastfm")?.artists_synced || 0} artists

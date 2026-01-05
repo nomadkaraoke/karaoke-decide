@@ -262,6 +262,7 @@ export const api = {
             connected: boolean;
             username?: string;
             tracks_synced?: number;
+            songs_synced?: number;
             artists_synced?: number;
             last_sync_at?: string;
           }
@@ -585,6 +586,7 @@ export const api = {
           sync_status: string;
           sync_error: string | null;
           tracks_synced: number;
+          songs_synced: number;
         }>
       >("/api/services"),
 
@@ -599,6 +601,7 @@ export const api = {
         sync_status: string;
         sync_error: string | null;
         tracks_synced: number;
+        songs_synced: number;
       }>("/api/services/lastfm/connect", { username }),
 
     disconnect: (serviceType: string) =>
@@ -620,6 +623,7 @@ export const api = {
           sync_status: string;
           sync_error: string | null;
           tracks_synced: number;
+          songs_synced: number;
         }>;
         active_job: {
           job_id: string;
@@ -837,6 +841,7 @@ export const api = {
           sync_status: string;
           last_sync_at: string | null;
           tracks_synced: number;
+          songs_synced: number;
           sync_error: string | null;
         }>;
         sync_jobs: Array<{
