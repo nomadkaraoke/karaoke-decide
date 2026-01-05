@@ -186,14 +186,27 @@ async def get_known_songs_service_dep(
     return get_known_songs_service(settings, firestore)
 
 
-def get_bigquery_catalog() -> BigQueryCatalogService:
-    """Get BigQuery catalog service instance (singleton)."""
-    return BigQueryCatalogService()
+_bigquery_catalog_instance: BigQueryCatalogService | None = None
+
+
+def get_bigquery_catalog() -> BigQueryCatalogService | None:
+    """Get BigQuery catalog service instance (singleton).
+
+    Returns None if BigQuery credentials are not available (e.g., in tests).
+    """
+    global _bigquery_catalog_instance
+    if _bigquery_catalog_instance is None:
+        try:
+            _bigquery_catalog_instance = BigQueryCatalogService()
+        except Exception:
+            # Credentials not available (e.g., in CI tests)
+            return None
+    return _bigquery_catalog_instance
 
 
 async def get_user_data_service_dep(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
-    bigquery_catalog: Annotated[BigQueryCatalogService, Depends(get_bigquery_catalog)],
+    bigquery_catalog: Annotated[BigQueryCatalogService | None, Depends(get_bigquery_catalog)],
 ) -> UserDataService:
     """Get user data service instance."""
     return get_user_data_service(firestore, bigquery_catalog)
