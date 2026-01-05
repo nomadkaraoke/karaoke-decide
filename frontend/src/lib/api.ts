@@ -246,6 +246,20 @@ export const api = {
         }>;
         total: number;
       }>(`/api/catalog/artists?q=${encodeURIComponent(query)}&limit=${limit}`),
+
+    searchTracks: (query: string, limit: number = 10) =>
+      api.get<{
+        tracks: Array<{
+          track_id: string;
+          track_name: string;
+          artist_name: string;
+          artist_id: string;
+          popularity: number;
+          duration_ms: number;
+          explicit: boolean;
+        }>;
+        total: number;
+      }>(`/api/catalog/tracks?q=${encodeURIComponent(query)}&limit=${limit}`),
   },
 
   // ============================================================================
@@ -766,6 +780,22 @@ export const api = {
 
     remove: (songId: number) =>
       api.delete<Record<string, never>>(`/api/known-songs/${songId}`),
+
+    addSpotifyTrack: (trackId: string) =>
+      api.post<{
+        added: boolean;
+        track_id: string;
+        track_name: string;
+        artist_name: string;
+        artist_id: string;
+        popularity: number;
+        duration_ms: number;
+        explicit: boolean;
+        already_existed: boolean;
+      }>("/api/known-songs/spotify", { track_id: trackId }),
+
+    removeSpotifyTrack: (trackId: string) =>
+      api.delete<Record<string, never>>(`/api/known-songs/spotify/${trackId}`),
   },
 
   // ============================================================================

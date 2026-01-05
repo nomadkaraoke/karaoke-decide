@@ -23,6 +23,22 @@ class AddKnownSongResult:
     artist: str
     title: str
     already_existed: bool = False
+    has_karaoke_version: bool = True
+
+
+@dataclass
+class AddSpotifyTrackResult:
+    """Result of adding a song via Spotify track ID."""
+
+    added: bool
+    track_id: str
+    track_name: str
+    artist_name: str
+    artist_id: str
+    popularity: int
+    duration_ms: int
+    explicit: bool
+    already_existed: bool = False
 
 
 @dataclass
@@ -276,6 +292,123 @@ class KnownSongsService:
             "total_requested": len(song_ids),
         }
 
+    async def add_spotify_track(
+        self,
+        user_id: str,
+        track_id: str,
+    ) -> AddSpotifyTrackResult:
+        """Add a song to user's known songs via Spotify track ID.
+
+        Args:
+            user_id: User's ID.
+            track_id: Spotify track ID.
+
+        Returns:
+            AddSpotifyTrackResult with track details.
+
+        Raises:
+            ValueError: If track not found in Spotify catalog.
+        """
+        # Get track details from BigQuery (run in executor to avoid blocking)
+        loop = asyncio.get_running_loop()
+        track = await loop.run_in_executor(None, self._get_spotify_track, track_id)
+        if not track:
+            raise ValueError(f"Track with ID {track_id} not found in Spotify catalog")
+
+        now = datetime.now(UTC)
+        # Use spotify: prefix to differentiate from karaoke catalog IDs
+        user_song_id = f"{user_id}:spotify:{track_id}"
+
+        # Check if already exists first
+        existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
+
+        if existing is not None:
+            # Song already in user's library
+            return AddSpotifyTrackResult(
+                added=False,
+                track_id=track_id,
+                track_name=track["track_name"],
+                artist_name=track["artist_name"],
+                artist_id=track["artist_id"],
+                popularity=track["popularity"],
+                duration_ms=track["duration_ms"],
+                explicit=track["explicit"],
+                already_existed=True,
+            )
+
+        # Create new UserSong record
+        user_song_data = {
+            "id": user_song_id,
+            "user_id": user_id,
+            "song_id": f"spotify:{track_id}",  # Prefixed to indicate Spotify source
+            "source": "known_songs",
+            "play_count": 1,  # User selected it, counts as one "play"
+            "last_played_at": None,
+            "is_saved": True,  # User explicitly saved this
+            "times_sung": 0,
+            "last_sung_at": None,
+            "average_rating": None,
+            "notes": None,
+            "artist": track["artist_name"],
+            "title": track["track_name"],
+            "has_karaoke_version": False,  # Spotify track, not from karaoke catalog
+            "spotify_track_id": track_id,  # Reference to Spotify
+            "spotify_artist_id": track["artist_id"],
+            "spotify_popularity": track["popularity"],
+            "duration_ms": track["duration_ms"],
+            "explicit": track["explicit"],
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+
+        await self.firestore.set_document(
+            self.USER_SONGS_COLLECTION,
+            user_song_id,
+            user_song_data,
+            merge=True,
+        )
+
+        return AddSpotifyTrackResult(
+            added=True,
+            track_id=track_id,
+            track_name=track["track_name"],
+            artist_name=track["artist_name"],
+            artist_id=track["artist_id"],
+            popularity=track["popularity"],
+            duration_ms=track["duration_ms"],
+            explicit=track["explicit"],
+            already_existed=False,
+        )
+
+    async def remove_spotify_track(
+        self,
+        user_id: str,
+        track_id: str,
+    ) -> bool:
+        """Remove a Spotify track from user's known songs.
+
+        Args:
+            user_id: User's ID.
+            track_id: Spotify track ID.
+
+        Returns:
+            True if removed, False if not found or wrong source.
+        """
+        user_song_id = f"{user_id}:spotify:{track_id}"
+
+        # Check if exists and is from known_songs source
+        existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
+
+        if existing is None:
+            return False
+
+        # Only remove if source is known_songs
+        if existing.get("source") != "known_songs":
+            return False
+
+        await self.firestore.delete_document(self.USER_SONGS_COLLECTION, user_song_id)
+        return True
+
     def _get_song_by_id(self, song_id: int) -> dict | None:
         """Get song details from BigQuery.
 
@@ -310,6 +443,51 @@ class KnownSongsService:
             "id": row.id,
             "artist": row.artist,
             "title": row.title,
+        }
+
+    def _get_spotify_track(self, track_id: str) -> dict | None:
+        """Get Spotify track details from BigQuery.
+
+        Args:
+            track_id: Spotify track ID.
+
+        Returns:
+            Dict with track details or None if not found.
+        """
+        sql = f"""
+            SELECT
+                track_id,
+                track_name,
+                artist_name,
+                artist_id,
+                popularity,
+                duration_ms,
+                explicit
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
+            WHERE track_id = @track_id
+            LIMIT 1
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("track_id", "STRING", track_id),
+            ]
+        )
+
+        results = list(self.bigquery.query(sql, job_config=job_config).result())
+
+        if not results:
+            return None
+
+        row = results[0]
+        return {
+            "track_id": row.track_id,
+            "track_name": row.track_name,
+            "artist_name": row.artist_name,
+            "artist_id": row.artist_id or "",
+            "popularity": row.popularity or 0,
+            "duration_ms": row.duration_ms or 0,
+            "explicit": row.explicit or False,
         }
 
 
