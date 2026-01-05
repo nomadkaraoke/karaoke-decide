@@ -563,6 +563,7 @@ def my_data_client(
     mock_user_data_service: MagicMock,
 ) -> Generator[TestClient, None, None]:
     """Create test client with mocked user data service."""
+    mock_bigquery_catalog = MagicMock()
     with (
         patch(
             "backend.api.routes.catalog.get_catalog_service",
@@ -575,6 +576,10 @@ def my_data_client(
         patch(
             "backend.api.deps.get_user_data_service",
             return_value=mock_user_data_service,
+        ),
+        patch(
+            "backend.api.deps.get_bigquery_catalog",
+            return_value=mock_bigquery_catalog,
         ),
     ):
         from backend.main import app
