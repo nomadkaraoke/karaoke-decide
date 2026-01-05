@@ -81,7 +81,7 @@ export default function MusicIKnowPage() {
         const response = await api.my.getDataSummary();
         setStats({
           artists: response.artists.total,
-          songs: response.songs.total,
+          songs: response.songs.known_songs,
           services: Object.values(response.services).filter((s) => s.connected).length,
         });
       } catch (err) {

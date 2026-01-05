@@ -262,6 +262,7 @@ export const api = {
             connected: boolean;
             username?: string;
             tracks_synced?: number;
+            artists_synced?: number;
             last_sync_at?: string;
           }
         >;
@@ -272,6 +273,7 @@ export const api = {
         songs: {
           total: number;
           with_karaoke: number;
+          known_songs: number;
         };
         preferences: {
           completed: boolean;
