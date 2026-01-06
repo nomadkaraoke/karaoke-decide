@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-04)
+## Current Status (2026-01-06)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL (54% complete)
 
 ### ✅ What's Working
 - **UX Refresh:** Streamlined navigation (Recommendations | Music I Know | Playlists | Settings)
@@ -30,17 +30,18 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **Data:** 275K karaoke songs + 256M Spotify tracks loaded
+- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 18M audio analysis tracks
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
+- **GCS Backup:** Complete backup of 3.88TB audio analysis torrent (484 files, 6.97 TiB)
 
 ### 🔄 In Progress
-- **Full Spotify Audio Analysis ETL** - Extracting track summaries + sections from 3.88TB torrent
-  - VM seeding metadata torrent (100%, ratio 4.4)
-  - Audio analysis torrent downloading (84.7%, ~600GB missing from GCS backup)
-  - 108/484 files ready for partial ETL (~8M tracks)
-  - See [archive/2026-01-02-full-spotify-etl.md](archive/2026-01-02-full-spotify-etl.md) for details
+- **Full Spotify Audio Analysis ETL** - 54% complete (262/484 files)
+  - 18.4M tracks + 179M sections loaded to BigQuery
+  - ETA: ~37 hours remaining
+  - Both torrents seeding (audio ratio 2.6x, metadata ratio 18.4x)
+  - See [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) for available data
 
 ### 🚧 Next Up (Post-MLP)
 1. **Energy/Tempo Filters** - Use audio analysis data for "high energy karaoke" / "chill karaoke" filtering
@@ -60,6 +61,7 @@ See [PLAN.md](PLAN.md) for complete implementation phases.
 | [PLAN.md](PLAN.md) | Implementation plan with phases and data models |
 | [VISION.md](VISION.md) | Product goals and user stories |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data schemas, BigQuery setup |
+| [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) | **Spotify data reference** - All tables, schemas, queries for LLM agents |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup, testing, deployment |
 | [API.md](API.md) | Backend endpoint documentation |
 | [TESTING.md](TESTING.md) | **Testing guide** - SOLID, test types, coverage, Playwright |
@@ -91,16 +93,17 @@ cd frontend && npm run dev
 | Table | Rows | Description |
 |-------|------|-------------|
 | `karaoke_decide.karaokenerds_raw` | 275,809 | Karaoke songs with brand counts |
-| `karaoke_decide.spotify_tracks` | 256M | Spotify track metadata (original ETL) |
-| `karaoke_decide.spotify_artists` | 500K | Artist metadata (followers, popularity) |
-| `karaoke_decide.spotify_artist_genres` | 2-3M | Artist-genre associations |
-| `karaoke_decide.spotify_albums` | 50M | Album metadata with release dates |
-| `karaoke_decide.spotify_tracks_full` | 256M | Full track metadata with ISRC |
-| `karaoke_decide.spotify_track_artists` | 300M | Track-artist junction (multi-artist) |
-| `karaoke_decide.spotify_audio_features` | 200M | Audio features (energy, tempo, etc.) |
-| `karaoke_decide.spotify_audio_analysis_tracks` | ~36M (pending) | Audio analysis track summaries (tempo, key, mode with confidence) |
-| `karaoke_decide.spotify_audio_analysis_sections` | ~360M (pending) | Song sections (intro, verse, chorus, etc.) with tempo/key changes |
-| `karaoke_decide.spotify_artists_normalized` | 15.4M | Pre-normalized artists with aggregated genres (for fast lookups) |
+| `karaoke_decide.spotify_track_artists` | 348M | Track-artist junction (multi-artist) |
+| `karaoke_decide.spotify_tracks` | 256M | Spotify track metadata |
+| `karaoke_decide.spotify_audio_features` | 230M | Audio features (danceability, energy, tempo, key, valence, etc.) |
+| `karaoke_decide.spotify_audio_analysis_sections` | 179M+ | Song sections with timing, tempo, key changes (ETL in progress) |
+| `karaoke_decide.spotify_albums` | 59M | Album metadata with release dates |
+| `karaoke_decide.spotify_audio_analysis_tracks` | 18M+ | Track-level audio analysis (tempo, key, confidence) (ETL in progress) |
+| `karaoke_decide.spotify_artists` | 15M | Artist metadata (followers, popularity) |
+| `karaoke_decide.spotify_artist_genres` | 2.2M | Artist-genre associations (768 unique genres) |
+| `karaoke_decide.spotify_artists_normalized` | 15.4M | Pre-normalized artists with aggregated genres |
+
+> See [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) for detailed schemas, queries, and feature ideas.
 
 ### Live Endpoints
 - `GET /api/health` - Basic health check
