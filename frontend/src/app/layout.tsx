@@ -47,7 +47,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="antialiased" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+      <body className="font-sans antialiased" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -56,6 +56,8 @@ export default function RootLayout({
         >
           <AuthProvider>
             <Navigation />
+            {/* Spacer for fixed navigation - nav is ~72px (py-4 + content) */}
+            <div className="h-[72px]" />
             {children}
           </AuthProvider>
         </ThemeProvider>

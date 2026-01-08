@@ -178,6 +178,11 @@
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
   }
 
+  /* Animated gradient background - uses body::after radial gradient */
+  .animated-gradient {
+    background: transparent;
+  }
+
   /* Theme-aware color utilities - use CSS variables for theme switching */
   .text-dark-300 { color: var(--text); }
   .text-dark-400 { color: var(--text-muted); }
