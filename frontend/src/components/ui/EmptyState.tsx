@@ -35,7 +35,7 @@ export function EmptyState({
           {icon}
         </div>
       )}
-      <h3 className="text-lg font-semibold text-white/80 mb-2">{title}</h3>
+      <h3 className="text-lg font-semibold text-[var(--text)] mb-2">{title}</h3>
       {description && (
         <p className="text-[var(--text-subtle)] text-sm max-w-sm mb-6">{description}</p>
       )}

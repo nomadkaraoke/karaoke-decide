@@ -142,7 +142,7 @@ function VerifyContent() {
         {/* Network error troubleshooting tips */}
         {errorType === "network" && (
           <div className="bg-[var(--card)] rounded-lg p-4 mb-6 text-left">
-            <p className="text-white/80 text-sm font-medium mb-2">Troubleshooting tips:</p>
+            <p className="text-[var(--text)] text-sm font-medium mb-2">Troubleshooting tips:</p>
             <ul className="text-[var(--text-muted)] text-sm space-y-1 list-disc list-inside">
               <li>Try using mobile data instead of WiFi</li>
               <li>Disable VPN or ad-blocker extensions</li>

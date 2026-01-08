@@ -204,7 +204,7 @@ export default function StatusPage() {
             <button
               onClick={runAllChecks}
               disabled={isChecking}
-              className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--secondary)] rounded-lg text-white/80 text-sm transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--secondary)] rounded-lg text-[var(--text)] text-sm transition-colors disabled:opacity-50"
             >
               {isChecking ? "Checking..." : "Refresh"}
             </button>
@@ -213,7 +213,7 @@ export default function StatusPage() {
 
         {/* Individual Endpoints */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-white/80">Services</h3>
+          <h3 className="text-lg font-medium text-[var(--text)]">Services</h3>
           {endpoints.map((endpoint) => (
             <div
               key={endpoint.name}

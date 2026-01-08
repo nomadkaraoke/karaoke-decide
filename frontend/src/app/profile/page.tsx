@@ -73,11 +73,11 @@ export default function ProfilePage() {
           )}
 
           {/* Profile form */}
-          <div className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]">
+          <div className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Account info (read-only) */}
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">
+                <label className="block text-sm font-medium text-[var(--text)] mb-2">
                   Email Address
                 </label>
                 <div className="px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)]">
@@ -92,7 +92,7 @@ export default function ProfilePage() {
               <div>
                 <label
                   htmlFor="displayName"
-                  className="block text-sm font-medium text-white/80 mb-2"
+                  className="block text-sm font-medium text-[var(--text)] mb-2"
                 >
                   Display Name
                 </label>

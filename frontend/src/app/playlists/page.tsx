@@ -215,7 +215,7 @@ function PlaylistsContent() {
             </div>
           ) : !selectedPlaylist ? (
             <EmptyState
-              icon={<PlaylistIcon className="w-8 h-8 text-white/20" />}
+              icon={<PlaylistIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
               title="Playlist not found"
               description="This playlist may have been deleted."
               action={{
@@ -229,7 +229,7 @@ function PlaylistsContent() {
               <div className="mb-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[var(--brand-pink)]/30 to-[#00d4ff]/30 flex items-center justify-center flex-shrink-0">
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[var(--brand-pink)]/30 to-[var(--brand-blue)]/30 flex items-center justify-center flex-shrink-0">
                       <PlaylistIcon className="w-8 h-8 text-[var(--text-muted)]" />
                     </div>
                     <div>
@@ -273,7 +273,7 @@ function PlaylistsContent() {
               {/* Songs */}
               {selectedPlaylist.song_ids.length === 0 ? (
                 <EmptyState
-                  icon={<MusicIcon className="w-8 h-8 text-white/20" />}
+                  icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
                   title="No songs yet"
                   description="Add songs from your library or recommendations."
                   action={{
@@ -356,7 +356,7 @@ function PlaylistsContent() {
         {/* Edit Modal */}
         {showEditModal && selectedPlaylist && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
+            <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
               <h2 className="text-xl font-bold text-[var(--text)] mb-4">
                 Edit Playlist
               </h2>
@@ -457,7 +457,7 @@ function PlaylistsContent() {
           </div>
         ) : playlists.length === 0 ? (
           <EmptyState
-            icon={<PlaylistIcon className="w-8 h-8 text-white/20" />}
+            icon={<PlaylistIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
             title="No playlists yet"
             description="Create your first playlist to organize your favorite karaoke songs."
             action={{
@@ -477,7 +477,7 @@ function PlaylistsContent() {
                     href={`/playlists?id=${playlist.id}`}
                     className="flex-1 flex items-center gap-4"
                   >
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[var(--brand-pink)]/30 to-[#00d4ff]/30 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[var(--brand-pink)]/30 to-[var(--brand-blue)]/30 flex items-center justify-center">
                       <MusicIcon className="w-6 h-6 text-[var(--text-muted)]" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -548,7 +548,7 @@ function PlaylistsContent() {
       {/* Create Playlist Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
+          <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
             <h2 className="text-xl font-bold text-[var(--text)] mb-4">
               Create New Playlist
             </h2>

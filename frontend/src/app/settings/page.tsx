@@ -135,7 +135,7 @@ export default function SettingsPage() {
 
           <div className="space-y-6">
             {/* Profile Section */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full bg-[var(--brand-pink)]/20 flex items-center justify-center">
                   <UserIcon className="w-5 h-5 text-[var(--brand-pink)]" />
@@ -202,7 +202,7 @@ export default function SettingsPage() {
             </section>
 
             {/* Preferences Section */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[var(--brand-blue)]/20 flex items-center justify-center">
@@ -240,12 +240,12 @@ export default function SettingsPage() {
                   {/* Decade & Energy */}
                   <div className="flex items-center gap-3 text-sm">
                     {preferences.decade ? (
-                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-white/70">
+                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-[var(--text-muted)]">
                         {preferences.decade}
                       </span>
                     ) : null}
                     {preferences.energy ? (
-                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-white/70">
+                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-[var(--text-muted)]">
                         {preferences.energy} energy
                       </span>
                     ) : null}
@@ -265,7 +265,7 @@ export default function SettingsPage() {
 
             {/* Connected Services Quick View */}
             <Link href="/music-i-know" className="block">
-              <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)] hover:border-[var(--card-border)] transition-colors">
+              <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--card-border)] transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {/* Service icons */}
@@ -301,7 +301,7 @@ export default function SettingsPage() {
             </Link>
 
             {/* Log Out */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
@@ -349,7 +349,7 @@ export default function SettingsPage() {
                   </Button>
                 ) : (
                   <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-                    <p className="text-sm text-white/80 mb-4">
+                    <p className="text-sm text-[var(--text)] mb-4">
                       Are you sure? This will permanently delete your account and all your data.
                       This action cannot be undone.
                     </p>

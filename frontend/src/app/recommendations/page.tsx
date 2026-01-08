@@ -215,7 +215,7 @@ export default function RecommendationsPage() {
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
-              <SparklesIcon className="w-7 h-7 text-[#ffeb3b]" />
+              <SparklesIcon className="w-7 h-7 text-[var(--brand-gold)]" />
               Recommendations
             </h1>
             <p className="text-[var(--text-muted)] text-sm mt-1">
@@ -251,7 +251,7 @@ export default function RecommendationsPage() {
           {/* Filters */}
           <div className="bg-[var(--card)] rounded-xl p-4 mb-6 border border-[var(--card-border)]">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-white/80">Filters</span>
+              <span className="text-sm font-medium text-[var(--text)]">Filters</span>
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
                   Clear all
@@ -310,7 +310,7 @@ export default function RecommendationsPage() {
 
             {/* Toggle filters */}
             <div className="flex flex-wrap gap-3 mt-3">
-              <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={excludeExplicit}
@@ -319,7 +319,7 @@ export default function RecommendationsPage() {
                 />
                 Hide explicit
               </label>
-              <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={classicsOnly}
@@ -346,7 +346,7 @@ export default function RecommendationsPage() {
             </div>
           ) : !data || data.total_count === 0 ? (
             <EmptyState
-              icon={<SparklesIcon className="w-8 h-8 text-white/20" />}
+              icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
               title="No recommendations yet"
               description="Connect your music services or take the quiz to get personalized recommendations."
               action={{

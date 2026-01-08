@@ -276,7 +276,7 @@ export default function KnownSongsPage() {
                       return (
                         <div
                           key={song.id}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]"
+                          className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)]"
                           data-testid="search-result-item"
                         >
                           <div className="flex-1 min-w-0">
@@ -356,7 +356,7 @@ export default function KnownSongsPage() {
               </div>
             ) : knownSongs.length === 0 ? (
               <EmptyState
-                icon={<MicrophoneIcon className="w-8 h-8 text-white/20" />}
+                icon={<MicrophoneIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
                 title="No known songs yet"
                 description="Search above to add songs you know and love to sing!"
                 action={{
@@ -373,7 +373,7 @@ export default function KnownSongsPage() {
                     return (
                       <div
                         key={song.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)] transition-opacity ${
+                        className={`flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] transition-opacity ${
                           isRemoving ? "opacity-50" : ""
                         }`}
                         data-testid="known-song-item"

@@ -162,7 +162,7 @@ export default function AdminSyncJobsPage() {
                   className="hover:bg-[var(--card)] transition-colors"
                 >
                   <td className="px-4 py-3">
-                    <code className="text-sm text-white/80 font-mono">
+                    <code className="text-sm text-[var(--text)] font-mono">
                       {job.id.slice(0, 8)}...
                     </code>
                   </td>

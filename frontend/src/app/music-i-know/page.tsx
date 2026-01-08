@@ -146,7 +146,7 @@ export default function MusicIKnowPage() {
                   flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all
                   ${activeTab === tab.id
                     ? "bg-[var(--secondary)] text-[var(--text)]"
-                    : "text-[var(--text-subtle)] hover:text-white/70 hover:bg-[var(--card)]"
+                    : "text-[var(--text-subtle)] hover:text-[var(--text-muted)] hover:bg-[var(--card)]"
                   }
                 `}
               >
@@ -371,7 +371,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       {/* Artists List */}
       {artists.length === 0 ? (
         <EmptyState
-          icon={<MusicIcon className="w-8 h-8 text-white/20" />}
+          icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
           title="No artists yet"
           description="Add artists you like or take the quiz to get started"
           action={{ label: "Take Quiz", onClick: () => window.location.href = "/quiz" }}
@@ -740,14 +740,14 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
       {/* Known Songs List */}
       {knownSongs.length === 0 && !searchQuery ? (
         <EmptyState
-          icon={<MusicIcon className="w-8 h-8 text-white/20" />}
+          icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
           title="No songs yet"
           description="Search above to add songs you know and love to sing!"
         />
       ) : knownSongs.length > 0 && (
         <>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-white/70">My Songs</h2>
+            <h2 className="text-sm font-medium text-[var(--text-muted)]">My Songs</h2>
             <span className="text-[var(--text-subtle)] text-sm">{total} songs</span>
           </div>
 
@@ -918,7 +918,7 @@ function ServicesTab({
     return (
       <div className="text-center py-12">
         <div className="w-16 h-16 rounded-full bg-[var(--card)] flex items-center justify-center mx-auto mb-4">
-          <SpotifyIcon className="w-8 h-8 text-white/20" />
+          <SpotifyIcon className="w-8 h-8 text-[var(--text-subtle)]" />
         </div>
         <h3 className="text-lg font-medium text-[var(--text)] mb-2">Connect Your Music Services</h3>
         <p className="text-[var(--text-muted)] text-sm mb-6 max-w-sm mx-auto">
@@ -1068,7 +1068,7 @@ function ServicesTab({
       {/* Tip for Spotify-only users */}
       {isConnected("spotify") && !isConnected("lastfm") && (
         <div className="p-3 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
-          <p className="text-xs text-white/70">
+          <p className="text-xs text-[var(--text-muted)]">
             <strong className="text-[#ff4444]">Tip:</strong> Connect Last.fm for better recommendations based on your full listening history.
           </p>
         </div>
