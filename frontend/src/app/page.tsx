@@ -9,7 +9,6 @@ import {
   MicrophoneIcon,
   MusicIcon,
   SearchIcon,
-  UsersIcon,
   ChevronRightIcon,
   SpotifyIcon,
   LastfmIcon,
@@ -66,27 +65,19 @@ export default function Home() {
 
   return (
     <main className="min-h-screen animated-gradient">
-      {/* Hero Section - Problem Focused */}
-      <section className="pt-16 pb-12 px-4">
+      {/* Hero Section - Clean, Generator-style */}
+      <section className="pt-20 pb-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          {/* App Icon */}
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[var(--brand-pink)] via-[var(--brand-purple)] to-[var(--brand-blue)] p-0.5 shadow-lg shadow-[var(--brand-pink)]/20">
-            <div className="w-full h-full rounded-2xl bg-[var(--bg)] flex items-center justify-center">
-              <MicrophoneIcon className="w-10 h-10 text-[var(--text)]" />
-            </div>
-          </div>
-
-          {/* Problem-focused headline */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-[var(--text)] mb-4 leading-tight">
-            Choosing karaoke songs
-            <span className="block gradient-text">
-              shouldn&apos;t be this hard
-            </span>
+          {/* Large headline matching Generator style */}
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[var(--text)] mb-6 leading-tight">
+            Easily Choose{" "}
+            <span className="gradient-text">Karaoke Songs</span>
+            {" "}to Sing
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg text-[var(--text-muted)] max-w-2xl mx-auto mb-8">
-            We help you find songs you actually know, can actually sing, and the crowd will actually enjoy.
+          <p className="text-lg md:text-xl text-[var(--text-muted)] max-w-2xl mx-auto mb-10">
+            Find songs you know, can actually sing, and that the crowd will love. Personalized recommendations in 30 seconds.
           </p>
 
           {/* Primary CTA */}
@@ -222,7 +213,7 @@ export default function Home() {
                   Any song can be karaoke
                 </h2>
                 <p className="text-[var(--text-muted)] mb-6">
-                  Found the perfect song but no karaoke version exists? No problem. Our Generator can create a karaoke track for almost any song in under 10 minutes.
+                  Found the perfect song but no karaoke version exists? No problem. Our Generator can create a karaoke track for almost any song in under 30 minutes—so you can sing it the same night.
                 </p>
                 <a
                   href="https://gen.nomadkaraoke.com"
@@ -288,8 +279,8 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6">
             <FeatureCard
               icon={<MusicIcon className="w-7 h-7 text-[var(--brand-pink)]" />}
-              title="275K+ Songs"
-              description="Massive karaoke catalog from KaraokeNerds"
+              title="275K+ Existing Tracks"
+              description="Database of all existing karaoke songs"
             />
             <FeatureCard
               icon={<SparklesIcon className="w-7 h-7 text-[var(--brand-purple)]" />}
@@ -333,9 +324,6 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Image src="/nomad-karaoke-logo.svg" alt="Nomad Karaoke" width={140} height={50} className="h-8 w-auto" />
-          </div>
-          <div className="text-sm text-[var(--text-subtle)]">
-            Powered by KaraokeNerds + Spotify data
           </div>
           <div className="flex gap-6 text-sm text-[var(--text-muted)]">
             <a href="https://karaokenerds.com" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">
@@ -400,12 +388,12 @@ function ScreenshotCard({
 }) {
   return (
     <div className="group">
-      <div className="relative aspect-video rounded-xl overflow-hidden mb-4 border border-[var(--card-border)] bg-[var(--card)]">
+      <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-4 border border-[var(--card-border)] bg-[var(--card)]">
         <Image
           src={src}
           alt={alt}
           fill
-          className="object-cover object-top group-hover:scale-105 transition-transform duration-300"
+          className="object-cover object-[center_15%] scale-125 group-hover:scale-130 transition-transform duration-300"
         />
       </div>
       <h3 className="font-semibold mb-1">{title}</h3>
