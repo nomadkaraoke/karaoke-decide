@@ -16,7 +16,7 @@ export function LoadingSpinner({ size = "md", className = "" }: LoadingSpinnerPr
 
   return (
     <LoaderIcon
-      className={`animate-spin text-[#ff2d92] ${sizeClasses[size]} ${className}`}
+      className={`animate-spin text-[var(--brand-pink)] ${sizeClasses[size]} ${className}`}
     />
   );
 }
@@ -32,7 +32,7 @@ export function LoadingPulse({ count = 4, className = "" }: LoadingPulseProps) {
       {[...Array(count)].map((_, i) => (
         <div
           key={i}
-          className="h-28 rounded-2xl bg-white/5 animate-pulse"
+          className="h-28 rounded-2xl bg-[var(--secondary)] animate-pulse"
           style={{ animationDelay: `${i * 100}ms` }}
         />
       ))}
@@ -46,10 +46,10 @@ interface LoadingOverlayProps {
 
 export function LoadingOverlay({ message = "Loading..." }: LoadingOverlayProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0f]/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg)]/80 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-4">
         <LoadingSpinner size="lg" />
-        <p className="text-white/60 text-sm">{message}</p>
+        <p className="text-[var(--text-muted)] text-sm">{message}</p>
       </div>
     </div>
   );

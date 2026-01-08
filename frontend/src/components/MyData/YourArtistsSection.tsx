@@ -230,8 +230,8 @@ export function YourArtistsSection({
     },
     quiz: {
       icon: <span className="text-xs">✓</span>,
-      color: "#ff2d92",
-      bg: "bg-[#ff2d92]/20",
+      color: "var(--brand-pink)",
+      bg: "bg-[var(--brand-pink)]/20",
     },
   };
 
@@ -241,7 +241,7 @@ export function YourArtistsSection({
   };
 
   return (
-    <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
+    <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}
@@ -249,12 +249,12 @@ export function YourArtistsSection({
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#ff2d92]/20 flex items-center justify-center">
-            <span className="text-lg">*</span>
+          <div className="w-10 h-10 rounded-full bg-[var(--brand-pink)]/20 flex items-center justify-center">
+            <span className="text-lg text-[var(--brand-pink)]">★</span>
           </div>
           <div>
-            <h2 className="font-semibold text-white">Artists You Know</h2>
-            <p className="text-sm text-white/60">
+            <h2 className="font-semibold text-[var(--text)]">Artists You Know</h2>
+            <p className="text-sm text-[var(--text-muted)]">
               {artists.length === 0
                 ? "No artists yet"
                 : `${artists.length} artist${artists.length !== 1 ? "s" : ""}`}
@@ -262,7 +262,7 @@ export function YourArtistsSection({
           </div>
         </div>
         <ChevronDownIcon
-          className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -271,7 +271,7 @@ export function YourArtistsSection({
         <div className="px-5 pb-5 space-y-4">
           {/* Error message */}
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm">
               {error}
               <button
                 onClick={() => setError(null)}
@@ -305,7 +305,7 @@ export function YourArtistsSection({
                   {showSuggestions && suggestions.length > 0 && (
                     <div
                       ref={suggestionsRef}
-                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/20 rounded-xl shadow-xl overflow-hidden"
+                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden"
                     >
                       {suggestions.map((suggestion, index) => (
                         <button
@@ -314,22 +314,22 @@ export function YourArtistsSection({
                           onClick={() => selectSuggestion(suggestion)}
                           className={`w-full px-3 py-2 text-left transition-colors ${
                             index === highlightedIndex
-                              ? "bg-[#ff2d92]/20"
-                              : "hover:bg-white/5"
+                              ? "bg-[var(--brand-pink)]/20"
+                              : "hover:bg-[var(--secondary)]"
                           }`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-white">
+                            <span className="text-sm font-medium text-[var(--text)]">
                               {suggestion.artist_name}
                             </span>
                             {suggestion.popularity > 0 && (
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs text-[var(--text-subtle)]">
                                 {suggestion.popularity}%
                               </span>
                             )}
                           </div>
                           {suggestion.genres.length > 0 && (
-                            <div className="text-xs text-white/50 mt-0.5 capitalize">
+                            <div className="text-xs text-[var(--text-muted)] mt-0.5 capitalize">
                               {suggestion.genres.slice(0, 2).join(", ")}
                             </div>
                           )}
@@ -358,7 +358,7 @@ export function YourArtistsSection({
 
               {/* Artist list */}
               {artists.length === 0 ? (
-                <div className="text-center py-8 text-white/40 text-sm">
+                <div className="text-center py-8 text-[var(--text-subtle)] text-sm">
                   <p>No artists yet.</p>
                   <p className="mt-1">
                     Add artists manually, take the quiz, or sync your music
@@ -372,13 +372,13 @@ export function YourArtistsSection({
                       key={artist.artist_name}
                       className={`group flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${
                         artist.is_excluded
-                          ? "bg-white/[0.02] opacity-60"
-                          : "bg-white/5 hover:bg-white/10"
+                          ? "bg-[var(--secondary)]/50 opacity-60"
+                          : "bg-[var(--secondary)] hover:bg-[var(--secondary)]/80"
                       }`}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-medium text-white truncate">
+                          <span className="text-sm font-medium text-[var(--text)] truncate">
                             {artist.artist_name}
                           </span>
                           {/* Source badges */}
@@ -386,7 +386,7 @@ export function YourArtistsSection({
                             const config = sourceConfig[source] || {
                               icon: null,
                               color: "#999",
-                              bg: "bg-white/10",
+                              bg: "bg-[var(--secondary)]",
                             };
                             return (
                               <span
@@ -399,13 +399,13 @@ export function YourArtistsSection({
                             );
                           })}
                           {artist.is_excluded && (
-                            <span className="text-xs text-orange-400/80 bg-orange-400/10 px-1.5 py-0.5 rounded">
+                            <span className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 px-1.5 py-0.5 rounded">
                               Hidden
                             </span>
                           )}
                         </div>
                         {/* Stats line */}
-                        <div className="flex items-center gap-2 mt-0.5 text-xs text-white/40">
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--text-subtle)]">
                           {artist.spotify_rank && (
                             <span>#{artist.spotify_rank} Spotify</span>
                           )}
@@ -420,7 +420,7 @@ export function YourArtistsSection({
                       <button
                         onClick={() => handleRemoveArtist(artist.artist_name)}
                         disabled={removingArtist === artist.artist_name}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-white/40 hover:text-red-400 transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-subtle)] hover:text-[var(--error)] transition-all"
                         title="Remove artist"
                       >
                         {removingArtist === artist.artist_name ? (
@@ -432,7 +432,7 @@ export function YourArtistsSection({
                     </div>
                   ))}
                   {artists.length > 30 && (
-                    <div className="text-center py-2 text-sm text-white/40">
+                    <div className="text-center py-2 text-sm text-[var(--text-subtle)]">
                       +{artists.length - 30} more artists
                     </div>
                   )}

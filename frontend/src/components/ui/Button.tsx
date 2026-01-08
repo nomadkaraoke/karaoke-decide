@@ -27,15 +27,15 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseClasses =
-      "inline-flex items-center justify-center font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00f5ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0f] disabled:opacity-50 disabled:cursor-not-allowed";
+      "inline-flex items-center justify-center font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-pink)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed";
 
     const variantClasses = {
       primary:
-        "bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95",
+        "bg-[var(--brand-pink)] text-white hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95",
       secondary:
-        "bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:border-white/30 active:bg-white/15",
+        "bg-[var(--secondary)] text-[var(--text)] border border-[var(--card-border)] hover:bg-[var(--secondary-hover)] hover:border-[var(--text-subtle)] active:bg-[var(--secondary)]",
       ghost:
-        "text-white/70 hover:text-white hover:bg-white/10 active:bg-white/5",
+        "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] active:bg-[var(--secondary-hover)]",
       danger:
         "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 active:bg-red-500/20",
     };

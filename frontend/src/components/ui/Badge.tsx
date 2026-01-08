@@ -16,16 +16,16 @@ export function Badge({
   className = "",
 }: BadgeProps) {
   const variantClasses = {
-    default: "bg-white/10 text-white/70 border-white/20",
+    default: "bg-[var(--secondary)] text-[var(--text-muted)] border-[var(--card-border)]",
     spotify: "bg-[#1DB954]/20 text-[#1DB954] border-[#1DB954]/30",
     lastfm: "bg-[#D51007]/20 text-[#ff4444] border-[#D51007]/30",
-    quiz: "bg-[#b347ff]/20 text-[#b347ff] border-[#b347ff]/30",
+    quiz: "bg-[var(--brand-purple)]/20 text-[var(--brand-purple)] border-[var(--brand-purple)]/30",
     success: "bg-green-500/20 text-green-400 border-green-500/30",
     warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
     error: "bg-red-500/20 text-red-400 border-red-500/30",
     danger: "bg-red-500/20 text-red-400 border-red-500/30",
-    primary: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    secondary: "bg-white/10 text-white/60 border-white/20",
+    primary: "bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] border-[var(--brand-pink)]/30",
+    secondary: "bg-[var(--secondary)] text-[var(--text-muted)] border-[var(--card-border)]",
   };
 
   const sizeClasses = {

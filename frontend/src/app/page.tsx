@@ -61,22 +61,22 @@ export default function Home() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           {/* App Icon */}
-          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-[#ff2d92] via-[#b347ff] to-[#00f5ff] p-0.5 shadow-lg shadow-[#ff2d92]/20">
-            <div className="w-full h-full rounded-3xl bg-[#0a0a0f] flex items-center justify-center">
-              <MicrophoneIcon className="w-12 h-12 text-white" />
+          <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-[var(--brand-pink)] via-[var(--brand-purple)] to-[var(--brand-blue)] p-0.5 shadow-lg shadow-[var(--brand-pink)]/20">
+            <div className="w-full h-full rounded-3xl bg-[var(--bg)] flex items-center justify-center">
+              <MicrophoneIcon className="w-12 h-12 text-[var(--text)]" />
             </div>
           </div>
 
           {/* Headline */}
-          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-bold text-[var(--text)] mb-4 leading-tight">
             Find Your Perfect
-            <span className="block bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] bg-clip-text text-transparent">
+            <span className="block bg-gradient-to-r from-[var(--brand-pink)] via-[var(--brand-purple)] to-[var(--brand-blue)] bg-clip-text text-transparent">
               Karaoke Song
             </span>
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg text-white/60 max-w-md mx-auto mb-8">
+          <p className="text-lg text-[var(--text-muted)] max-w-md mx-auto mb-8">
             Tell us what you like. We&apos;ll find songs you know and can actually sing.
           </p>
 
@@ -95,13 +95,13 @@ export default function Home() {
           </div>
 
           {/* Trust signal */}
-          <p className="text-white/40 text-sm">
+          <p className="text-[var(--text-subtle)] text-sm">
             No sign-up required • Takes 30 seconds
           </p>
 
           {/* Error message */}
           {error && (
-            <div className="mt-4 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <div className="mt-4 px-4 py-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/20 text-[var(--error)] text-sm">
               {error}
             </div>
           )}
@@ -110,25 +110,25 @@ export default function Home() {
         {/* Feature Pills */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
           <FeaturePill
-            icon={<MusicNoteIcon className="w-5 h-5 text-[#ff2d92]" />}
+            icon={<MusicNoteIcon className="w-5 h-5 text-[var(--brand-pink)]" />}
             title="275K+ Songs"
             description="Massive karaoke catalog"
           />
           <FeaturePill
-            icon={<SparklesIcon className="w-5 h-5 text-[#b347ff]" />}
+            icon={<SparklesIcon className="w-5 h-5 text-[var(--brand-purple)]" />}
             title="Personalized"
             description="Matches your taste"
           />
           <FeaturePill
-            icon={<ClockIcon className="w-5 h-5 text-[#00f5ff]" />}
+            icon={<ClockIcon className="w-5 h-5 text-[var(--brand-blue)]" />}
             title="Instant Results"
             description="Find songs in seconds"
           />
         </div>
 
         {/* How it works */}
-        <div className="rounded-2xl bg-white/5 border border-white/10 p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 text-center">
+        <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] p-6">
+          <h2 className="text-lg font-semibold text-[var(--text)] mb-4 text-center">
             How it works
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -140,17 +140,17 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <footer className="text-center py-6 border-t border-white/5">
-        <p className="text-white/30 text-sm">
+      <footer className="text-center py-6 border-t border-[var(--card-border)]">
+        <p className="text-[var(--text-subtle)] text-sm">
           Powered by KaraokeNerds + Spotify data
         </p>
-        <p className="text-white/20 text-xs mt-1">
+        <p className="text-[var(--text-subtle)]/60 text-xs mt-1">
           From the creators of{" "}
           <a
             href="https://karaokenerds.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#ff2d92]/60 hover:text-[#ff2d92] transition-colors"
+            className="text-[var(--brand-pink)]/60 hover:text-[var(--brand-pink)] transition-colors"
           >
             KaraokeNerds
           </a>
@@ -170,13 +170,13 @@ function FeaturePill({
   description: string;
 }) {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
-      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+    <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
         {icon}
       </div>
       <div>
-        <p className="font-medium text-white text-sm">{title}</p>
-        <p className="text-white/50 text-xs">{description}</p>
+        <p className="font-medium text-[var(--text)] text-sm">{title}</p>
+        <p className="text-[var(--text-muted)] text-xs">{description}</p>
       </div>
     </div>
   );
@@ -193,11 +193,11 @@ function Step({
 }) {
   return (
     <div className="text-center">
-      <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-gradient-to-br from-[#ff2d92]/20 to-[#b347ff]/20 border border-[#ff2d92]/30 flex items-center justify-center">
-        <span className="text-[#ff2d92] font-bold">{number}</span>
+      <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-gradient-to-br from-[var(--brand-pink)]/20 to-[var(--brand-purple)]/20 border border-[var(--brand-pink)]/30 flex items-center justify-center">
+        <span className="text-[var(--brand-pink)] font-bold">{number}</span>
       </div>
-      <h3 className="font-semibold text-white text-sm mb-1">{title}</h3>
-      <p className="text-white/50 text-xs">{description}</p>
+      <h3 className="font-semibold text-[var(--text)] text-sm mb-1">{title}</h3>
+      <p className="text-[var(--text-muted)] text-xs">{description}</p>
     </div>
   );
 }

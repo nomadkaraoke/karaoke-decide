@@ -1,141 +1,248 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #0a0a0f;
-  --foreground: #f0f0f5;
-  --neon-pink: #ff2d92;
-  --neon-cyan: #00f5ff;
-  --neon-purple: #b347ff;
-  --neon-yellow: #ffeb3b;
-  --card-bg: rgba(20, 20, 30, 0.8);
-  --card-border: rgba(255, 255, 255, 0.08);
+  /* ===========================================
+     Nomad Karaoke Brand Colors
+     See docs/BRAND-STYLE-GUIDE.md for details
+     =========================================== */
+
+  /* Brand Primary Colors */
+  --brand-pink: #ff7acc;
+  --brand-pink-hover: #ff5bb8;
+  --brand-pink-glow: rgba(255, 122, 204, 0.4);
+  --brand-gold: #ffdf6b;
+  --brand-purple: #8b5cf6;
+  --brand-blue: #3b82f6;
+  --brand-soft-pink: #ec4899;
+
+  /* Dark theme (default) */
+  --bg: #0f0f0f;
+  --card: #1a1a1a;
+  --card-border: #2a2a2a;
+  --text: #e5e5e5;
+  --text-muted: #888888;
+  --text-subtle: #666666;
+
+  /* Primary now uses brand pink */
+  --primary: var(--brand-pink);
+  --primary-hover: var(--brand-pink-hover);
+
+  --secondary: #252525;
+  --secondary-hover: #333333;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --pink: var(--brand-pink);
+  --blue: var(--brand-blue);
+
+  /* Tailwind compatibility mappings */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card-foreground: var(--text);
+  --popover: var(--card);
+  --popover-foreground: var(--text);
+  --primary-foreground: #ffffff;
+  --secondary-foreground: var(--text);
+  --muted: var(--secondary);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--primary);
+  --accent-foreground: #ffffff;
+  --destructive: var(--danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--card-border);
+  --input: var(--secondary);
+  --ring: var(--primary);
+  --radius: 0.75rem;
+}
+
+.light {
+  /* Light theme - applied via next-themes class on html element */
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --card-border: #e2e8f0;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --primary: var(--brand-pink);
+  --primary-hover: var(--brand-pink-hover);
+  --secondary: #f1f5f9;
+  --secondary-hover: #e2e8f0;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --pink: var(--brand-pink);
+  --blue: var(--brand-blue);
+
+  /* Tailwind compatibility - light mode adjustments */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card-foreground: var(--text);
+  --popover: var(--card);
+  --popover-foreground: var(--text);
+  --muted: var(--secondary);
+  --muted-foreground: var(--text-muted);
+  --border: var(--card-border);
+  --input: var(--secondary);
 }
 
 @theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Outfit', system-ui, sans-serif;
-  --font-mono: 'Space Mono', monospace;
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
-* {
-  box-sizing: border-box;
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Outfit', system-ui, sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Noise texture overlay */
-body::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 1000;
-}
-
-/* Gradient background */
-body::after {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(ellipse at 20% 0%, rgba(179, 71, 255, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(255, 45, 146, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(0, 245, 255, 0.05) 0%, transparent 70%);
-  pointer-events: none;
-  z-index: -1;
-}
-
-/* Neon glow effects */
-.neon-glow-pink {
-  box-shadow:
-    0 0 5px var(--neon-pink),
-    0 0 10px var(--neon-pink),
-    0 0 20px rgba(255, 45, 146, 0.5),
-    0 0 40px rgba(255, 45, 146, 0.3);
-}
-
-.neon-glow-cyan {
-  box-shadow:
-    0 0 5px var(--neon-cyan),
-    0 0 10px var(--neon-cyan),
-    0 0 20px rgba(0, 245, 255, 0.5),
-    0 0 40px rgba(0, 245, 255, 0.3);
-}
-
-.neon-text-pink {
-  text-shadow:
-    0 0 5px var(--neon-pink),
-    0 0 10px var(--neon-pink),
-    0 0 20px rgba(255, 45, 146, 0.8);
-}
-
-.neon-text-cyan {
-  text-shadow:
-    0 0 5px var(--neon-cyan),
-    0 0 10px var(--neon-cyan),
-    0 0 20px rgba(0, 245, 255, 0.8);
-}
-
-/* Animations */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Radial gradient background overlay (brand colors) */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(255, 122, 204, 0.1) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255, 223, 107, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Light mode uses subtle tints */
+  .light body::after {
+    background:
+      radial-gradient(ellipse at 20% 0%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 100%, rgba(255, 122, 204, 0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255, 223, 107, 0.02) 0%, transparent 70%);
   }
 }
 
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
+/* Utility classes */
+@layer utilities {
+  /* Glow effect for primary buttons - uses brand pink */
+  .btn-glow {
+    box-shadow: 0 0 20px var(--brand-pink-glow);
   }
-  to {
-    opacity: 1;
-    transform: scale(1);
+  .btn-glow:hover {
+    box-shadow: 0 0 30px rgba(255, 122, 204, 0.6);
   }
-}
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.5s ease-out forwards;
-}
+  /* Gradient text - flows to brand pink */
+  .gradient-text {
+    background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ff7acc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
-.animate-scale-in {
-  animation: scaleIn 0.3s ease-out forwards;
+  /* Card hover effect */
+  .card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Theme-aware color utilities - use CSS variables for theme switching */
+  .text-dark-300 { color: var(--text); }
+  .text-dark-400 { color: var(--text-muted); }
+  .text-dark-500 { color: var(--text-subtle); }
+  .bg-dark-700 { background-color: var(--secondary); }
+  .bg-dark-800 { background-color: var(--card); }
+  .bg-dark-900 { background-color: var(--bg); }
+  .border-dark-600 { border-color: var(--card-border); }
+  .border-dark-700 { border-color: var(--card-border); }
+
+  /* Primary color utilities - now brand pink */
+  .text-primary-400 { color: #ff8fd4; } /* Lighter pink */
+  .text-primary-500 { color: var(--brand-pink); }
+  .bg-primary-500 { background-color: var(--brand-pink); }
+  .hover\:bg-primary-600:hover { background-color: var(--brand-pink-hover); }
+
+  /* Brand accent utilities */
+  .text-brand-pink { color: var(--brand-pink); }
+  .text-brand-gold { color: var(--brand-gold); }
+  .text-brand-purple { color: var(--brand-purple); }
+  .text-brand-blue { color: var(--brand-blue); }
+  .bg-brand-pink { background-color: var(--brand-pink); }
+  .bg-brand-gold { background-color: var(--brand-gold); }
+  .bg-brand-purple { background-color: var(--brand-purple); }
+  .border-brand-pink { border-color: var(--brand-pink); }
+
+  /* Fade in animation */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+  }
+
+  /* Additional animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.3s ease-out forwards;
+  }
 }
 
 /* Scrollbar styling */
@@ -148,22 +255,40 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 45, 146, 0.5);
+  background: rgba(255, 122, 204, 0.5);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 45, 146, 0.7);
+  background: rgba(255, 122, 204, 0.7);
+}
+
+/* Light mode scrollbar */
+.light ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(255, 122, 204, 0.4);
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 122, 204, 0.6);
 }
 
 /* Focus styles */
 *:focus-visible {
-  outline: 2px solid var(--neon-cyan);
+  outline: 2px solid var(--brand-pink);
   outline-offset: 2px;
 }
 
 /* Selection */
 ::selection {
-  background: rgba(255, 45, 146, 0.4);
+  background: rgba(255, 122, 204, 0.4);
   color: white;
+}
+
+.light ::selection {
+  background: rgba(255, 122, 204, 0.3);
+  color: #1e293b;
 }

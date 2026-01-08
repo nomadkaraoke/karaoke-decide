@@ -27,7 +27,7 @@ function PopularityStars({ count }: { count: number }) {
         <StarIcon
           key={i}
           filled={i < stars}
-          className={`w-3 h-3 ${i < stars ? "text-[#ffeb3b]" : "text-white/20"}`}
+          className={`w-3 h-3 ${i < stars ? "text-[var(--brand-gold)]" : "text-[var(--text-subtle)]"}`}
         />
       ))}
     </div>
@@ -38,13 +38,13 @@ function ScoreBar({ score }: { score: number }) {
   const percentage = Math.round(score * 100);
   return (
     <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
+      <div className="w-16 h-1.5 rounded-full bg-[var(--secondary)] overflow-hidden">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff]"
+          className="h-full rounded-full bg-gradient-to-r from-[var(--brand-pink)] to-[var(--brand-purple)]"
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <span className="text-xs text-white/40 font-mono">{percentage}%</span>
+      <span className="text-xs text-[var(--text-subtle)] font-mono">{percentage}%</span>
     </div>
   );
 }
@@ -135,16 +135,16 @@ export function RecommendationCard({
           isHovered ? "opacity-60" : ""
         } ${
           isGenerateOnly
-            ? "bg-gradient-to-r from-[#00f5ff] via-[#00c8ff] to-[#00f5ff]"
-            : "bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff]"
+            ? "bg-gradient-to-r from-[var(--brand-blue)] via-[var(--brand-blue)] to-[var(--brand-purple)]"
+            : "bg-gradient-to-r from-[var(--brand-blue)] via-[var(--brand-purple)] to-[var(--brand-pink)]"
         }`}
       />
 
       <div
         className={`relative flex flex-col gap-3 p-4 rounded-2xl backdrop-blur-sm transition-all duration-300 ${
           isGenerateOnly
-            ? "bg-[rgba(0,40,50,0.9)] border border-[#00f5ff]/30 hover:border-[#00f5ff]/50"
-            : "bg-[rgba(20,20,30,0.9)] border border-white/10 hover:border-white/20"
+            ? "bg-[var(--card)] border border-[var(--brand-blue)]/30 hover:border-[var(--brand-blue)]/50"
+            : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--text-subtle)]"
         }`}
       >
         {/* Top row: Title and score */}
@@ -154,28 +154,28 @@ export function RecommendationCard({
               <h3
                 className={`text-lg font-semibold truncate transition-colors ${
                   isGenerateOnly
-                    ? "text-white group-hover:text-[#00f5ff]"
-                    : "text-white group-hover:text-[#00f5ff]"
+                    ? "text-[var(--text)] group-hover:text-[var(--brand-blue)]"
+                    : "text-[var(--text)] group-hover:text-[var(--brand-pink)]"
                 }`}
               >
                 {recommendation.title}
               </h3>
               {/* Badges next to title */}
               {recommendation.explicit && (
-                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-white/20 text-white/70 rounded">
+                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[var(--secondary)] text-[var(--text-muted)] rounded">
                   E
                 </span>
               )}
               {recommendation.is_classic && (
-                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[#ffeb3b]/20 text-[#ffeb3b] rounded">
+                <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[var(--brand-gold)]/20 text-[var(--brand-gold)] rounded">
                   CLASSIC
                 </span>
               )}
             </div>
-            <p className="text-sm text-white/60 truncate mt-0.5">{recommendation.artist}</p>
+            <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">{recommendation.artist}</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <SparklesIcon className="w-4 h-4 text-[#ffeb3b]" />
+            <SparklesIcon className="w-4 h-4 text-[var(--brand-gold)]" />
             <ScoreBar score={recommendation.score} />
           </div>
         </div>
@@ -199,18 +199,18 @@ export function RecommendationCard({
             {recommendation.has_karaoke_version && recommendation.brand_count > 0 && (
               <div className="flex items-center gap-2">
                 <PopularityStars count={recommendation.brand_count} />
-                <span className="text-xs text-white/40">{recommendation.brand_count} brands</span>
+                <span className="text-xs text-[var(--text-subtle)]">{recommendation.brand_count} brands</span>
               </div>
             )}
 
             {/* Duration */}
             {duration && (
-              <span className="text-xs text-white/30">{duration}</span>
+              <span className="text-xs text-[var(--text-subtle)]">{duration}</span>
             )}
 
             {/* Spotify popularity */}
             {recommendation.popularity > 0 && (
-              <span className="text-xs text-white/30">Pop: {recommendation.popularity}</span>
+              <span className="text-xs text-[var(--text-subtle)]">Pop: {recommendation.popularity}</span>
             )}
           </div>
 
@@ -222,7 +222,7 @@ export function RecommendationCard({
                 href={links.generator}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#00c8ff] to-[#00f5ff] text-[#001820] text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(0,245,255,0.5)] active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-blue)] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] active:scale-95"
               >
                 <VideoIcon className="w-4 h-4" />
                 <span>Generate</span>
@@ -231,7 +231,7 @@ export function RecommendationCard({
               /* Dropdown for karaoke-ready songs */
               <>
                 <button
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-white text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <MicrophoneIcon className="w-4 h-4" />
@@ -243,19 +243,19 @@ export function RecommendationCard({
 
                 {/* Dropdown menu */}
                 {isDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[rgba(30,30,40,0.98)] border border-white/20 shadow-xl overflow-hidden z-50 animate-fade-in">
+                  <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[var(--card)] border border-[var(--card-border)] shadow-xl overflow-hidden z-50 animate-fade-in">
                     <div className="p-1">
                       <a
                         href={links.youtube}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--secondary)] transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <YouTubeIcon className="w-5 h-5 text-red-500" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white">Search YouTube</div>
-                          <div className="text-xs text-white/50 truncate">
+                          <div className="text-sm font-medium text-[var(--text)]">Search YouTube</div>
+                          <div className="text-xs text-[var(--text-subtle)] truncate">
                             Find existing karaoke videos
                           </div>
                         </div>
@@ -265,13 +265,13 @@ export function RecommendationCard({
                         href={links.generator}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                        className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--secondary)] transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >
-                        <VideoIcon className="w-5 h-5 text-[#00f5ff]" />
+                        <VideoIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white">Create with Generator</div>
-                          <div className="text-xs text-white/50 truncate">
+                          <div className="text-sm font-medium text-[var(--text)]">Create with Generator</div>
+                          <div className="text-xs text-[var(--text-subtle)] truncate">
                             Generate custom karaoke video
                           </div>
                         </div>
