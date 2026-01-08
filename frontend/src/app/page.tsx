@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { SparklesIcon, MicrophoneIcon, ClockIcon, MusicNoteIcon } from "@/components/icons";
-import { LoadingOverlay } from "@/components/ui";
+import { LoadingOverlay, Button } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
@@ -81,20 +81,17 @@ export default function Home() {
           </p>
 
           {/* Primary CTA */}
-          <a
-            href="#"
-            onClick={(e) => { e.preventDefault(); handleGetStarted(); }}
-            className="inline-flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold px-8 py-4 rounded-xl transition-all btn-glow"
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleGetStarted}
+            isLoading={isStartingSession}
+            disabled={isStartingSession}
+            className="px-8 py-4 text-lg btn-glow"
           >
-            {isStartingSession ? (
-              "Starting..."
-            ) : (
-              <>
-                Get Started
-                <SparklesIcon className="w-5 h-5" />
-              </>
-            )}
-          </a>
+            Get Started
+            <SparklesIcon className="w-5 h-5 ml-2" />
+          </Button>
 
           {/* Trust signal */}
           <p className="text-[var(--text-subtle)] text-sm mt-4">

@@ -44,7 +44,7 @@ export function Navigation() {
   });
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--card-border)]">
+    <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md border-b border-[var(--card-border)]">
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}

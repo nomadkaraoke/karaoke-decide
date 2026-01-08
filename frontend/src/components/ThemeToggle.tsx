@@ -10,7 +10,7 @@ export function ThemeToggle() {
   if (!mounted) {
     return (
       <button
-        className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
+        className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
         aria-label="Toggle theme"
       >
         <span className="sr-only">Toggle theme</span>
