@@ -66,7 +66,7 @@ export default function Home() {
   return (
     <main className="min-h-screen animated-gradient">
       {/* Hero Section - Clean, Generator-style */}
-      <section className="pt-20 pb-16 px-4">
+      <section className="pt-16 pb-16 px-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* Large headline matching Generator style */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[var(--text)] mb-6 leading-tight">
@@ -76,7 +76,7 @@ export default function Home() {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg md:text-xl text-[var(--text-muted)] max-w-2xl mx-auto mb-10">
+          <p className="text-lg md:text-xl max-w-2xl mx-auto mb-10">
             Find songs you know, can actually sing, and that the crowd will love. Personalized recommendations in 30 seconds.
           </p>
 
@@ -95,7 +95,7 @@ export default function Home() {
 
           {/* Trust signal */}
           <p className="text-[var(--text-subtle)] text-sm mt-4">
-            No sign-up required • Takes 30 seconds
+            Free • No sign-up required • Takes 30 seconds
           </p>
 
           {/* Error message */}
@@ -179,7 +179,7 @@ export default function Home() {
               </div>
               <h3 className="text-xl font-bold mb-2">Connect Your Music</h3>
               <p className="text-[var(--text-muted)] mb-6">
-                Already have Spotify or Last.fm? Connect them for personalized recommendations based on what you actually listen to.
+                Already use Spotify or Last.fm? Connect them for personalized recommendations based on what you actually listen to.
               </p>
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--secondary)]">
@@ -213,7 +213,7 @@ export default function Home() {
                   Any song can be karaoke
                 </h2>
                 <p className="text-[var(--text-muted)] mb-6">
-                  Found the perfect song but no karaoke version exists? No problem. Our Generator can create a karaoke track for almost any song in under 30 minutes—so you can sing it the same night.
+                  Found the perfect song but no karaoke version exists? No problem. Our Generator can create a karaoke track for almost any song in under 30 minutes - so you can sing it the same night.
                 </p>
                 <a
                   href="https://gen.nomadkaraoke.com"
