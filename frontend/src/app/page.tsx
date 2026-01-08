@@ -249,19 +249,19 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8">
             <ScreenshotCard
-              src="/screenshots/quiz-genres.png"
+              src="/screenshots/quiz.avif"
               alt="Quiz - Select your favorite genres"
               title="1. Quick Quiz"
               description="Tell us what genres and decades you love"
             />
             <ScreenshotCard
-              src="/screenshots/recommendations.png"
+              src="/screenshots/recommendations.avif"
               alt="Personalized song recommendations"
               title="2. Get Matches"
               description="See songs matched to your taste"
             />
             <ScreenshotCard
-              src="/screenshots/my-data.png"
+              src="/screenshots/my-data.avif"
               alt="Your music data overview"
               title="3. Your Data"
               description="Full transparency on what we know about you"
@@ -393,7 +393,7 @@ function ScreenshotCard({
           src={src}
           alt={alt}
           fill
-          className="object-cover object-[center_15%] scale-125 group-hover:scale-130 transition-transform duration-300"
+          className="object-cover object-top group-hover:scale-105 transition-transform duration-300"
         />
       </div>
       <h3 className="font-semibold mb-1">{title}</h3>
