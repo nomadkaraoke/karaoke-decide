@@ -6,6 +6,16 @@ const THEME_STORAGE_KEY = "nomad-karaoke-theme"
 
 export type Theme = "dark" | "light"
 
+// Apply theme class to document root (extracted to module level to avoid stale closure)
+function applyTheme(newTheme: Theme) {
+  const root = document.documentElement
+  if (newTheme === "light") {
+    root.classList.add("light")
+  } else {
+    root.classList.remove("light")
+  }
+}
+
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>("dark")
   const [mounted, setMounted] = useState(false)
@@ -22,15 +32,6 @@ export function useTheme() {
       applyTheme("dark")
     }
   }, [])
-
-  const applyTheme = (newTheme: Theme) => {
-    const root = document.documentElement
-    if (newTheme === "light") {
-      root.classList.add("light")
-    } else {
-      root.classList.remove("light")
-    }
-  }
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme)

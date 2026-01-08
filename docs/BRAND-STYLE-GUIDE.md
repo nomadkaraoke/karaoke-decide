@@ -493,38 +493,72 @@ All Nomad Karaoke web application screens must support both light and dark theme
    - Background, card, and text colors adapt per theme tables above
    - Ensure sufficient contrast in both modes
 
-### next-themes Setup (Next.js)
+### Theme Implementation (Custom Hook)
+
+We use a custom `useTheme` hook with localStorage persistence:
 
 ```tsx
-// app/layout.tsx or _app.tsx
-import { ThemeProvider } from 'next-themes'
+// lib/theme.ts - Custom theme hook
+"use client"
+import { useState, useEffect, useCallback } from "react"
 
-export default function RootLayout({ children }) {
-  return (
-    <html suppressHydrationWarning>
-      <body>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  )
+const THEME_STORAGE_KEY = "nomad-karaoke-theme"
+export type Theme = "dark" | "light"
+
+function applyTheme(newTheme: Theme) {
+  const root = document.documentElement
+  if (newTheme === "light") {
+    root.classList.add("light")
+  } else {
+    root.classList.remove("light")
+  }
 }
 
-// Theme toggle component
-import { useTheme } from 'next-themes'
-import { Sun, Moon } from 'lucide-react'
+export function useTheme() {
+  const [theme, setThemeState] = useState<Theme>("dark")
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
+    if (stored === "light" || stored === "dark") {
+      setThemeState(stored)
+      applyTheme(stored)
+    } else {
+      applyTheme("dark")
+    }
+  }, [])
+
+  const setTheme = useCallback((newTheme: Theme) => {
+    setThemeState(newTheme)
+    localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    applyTheme(newTheme)
+  }, [])
+
+  const toggleTheme = useCallback(() => {
+    const newTheme = theme === "dark" ? "light" : "dark"
+    setTheme(newTheme)
+  }, [theme, setTheme])
+
+  return { theme, setTheme, toggleTheme, mounted }
+}
+
+// components/ThemeToggle.tsx - Theme toggle component
+import { Moon, Sun } from "lucide-react"
+import { useTheme } from "@/lib/theme"
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { theme, toggleTheme, mounted } = useTheme()
+
+  if (!mounted) return <button className="w-9 h-9" aria-label="Toggle theme" />
 
   return (
     <button
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="p-2 rounded-lg hover:bg-white/10"
+      onClick={toggleTheme}
+      className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10"
       aria-label="Toggle theme"
     >
-      {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+      {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
     </button>
   )
 }
