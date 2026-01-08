@@ -9,8 +9,9 @@
      =========================================== */
 
   /* Brand Primary Colors */
-  --brand-pink: #ff7acc;
-  --brand-pink-hover: #ff5bb8;
+  /* Note: darker pink (#ff5bb8) as default for better white text contrast */
+  --brand-pink: #ff5bb8;
+  --brand-pink-hover: #ff7acc;  /* Lighter pink for hover states */
   --brand-pink-glow: rgba(255, 122, 204, 0.4);
   --brand-gold: #ffdf6b;
   --brand-purple: #8b5cf6;

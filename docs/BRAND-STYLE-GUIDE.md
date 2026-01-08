@@ -1,7 +1,7 @@
 # Nomad Karaoke Brand Style Guide
 
-> **Version**: 1.1
-> **Last Updated**: 2026-01-07
+> **Version**: 1.2
+> **Last Updated**: 2026-01-08
 > **Purpose**: Unified brand identity for all Nomad Karaoke products and communications
 
 This style guide is designed for both human designers and LLM agents implementing the Nomad Karaoke brand across web applications, emails, marketing materials, and other touchpoints.
@@ -46,8 +46,11 @@ Nomad Karaoke is **approachable**, **professional**, and **modern**. We make sop
 
 | Name | Hex | RGB | Usage |
 |------|-----|-----|-------|
-| **Hot Pink** | `#ff7acc` | rgb(255, 122, 204) | Primary brand color, logo, primary buttons, key accents |
+| **Hot Pink** | `#ff5bb8` | rgb(255, 91, 184) | Primary brand color, buttons with white text (better contrast) |
+| **Hot Pink Light** | `#ff7acc` | rgb(255, 122, 204) | Logo, hover states, accents where contrast is less critical |
 | **Gold** | `#ffdf6b` | rgb(255, 223, 107) | Secondary accent, highlights, success states, premium feel |
+
+> **Accessibility Note**: We use the darker pink (`#ff5bb8`) as the default for UI elements with white text because it provides better contrast ratio (WCAG compliance). The lighter pink (`#ff7acc`) is used for hover states and decorative accents where white text contrast is less critical.
 
 ### Supporting Colors
 
@@ -250,7 +253,8 @@ Use [Lucide Icons](https://lucide.dev/) for UI icons. They are:
 
 #### Primary Button (CTA)
 ```css
-background-color: #ff7acc;
+/* Default state uses darker pink for better white text contrast */
+background-color: #ff5bb8;
 color: #ffffff;
 padding: 14px 28px;
 border-radius: 12px;
@@ -258,8 +262,8 @@ font-weight: 600;
 box-shadow: 0 0 20px rgba(255, 122, 204, 0.4);
 transition: all 0.2s ease;
 
-/* Hover */
-background-color: #ff5bb8;
+/* Hover - lightens to original brand pink */
+background-color: #ff7acc;
 box-shadow: 0 0 30px rgba(255, 122, 204, 0.6);
 ```
 
@@ -585,9 +589,10 @@ export function ThemeToggle() {
   --text-muted: #64748b;
 }
 
-/* Brand colors stay consistent */
+/* Brand colors stay consistent across themes */
 :root {
-  --brand-pink: #ff7acc;
+  --brand-pink: #ff5bb8;        /* Darker - better white text contrast */
+  --brand-pink-hover: #ff7acc;  /* Lighter - for hover states */
   --brand-gold: #ffdf6b;
   --brand-purple: #8b5cf6;
 }
@@ -610,8 +615,9 @@ export function ThemeToggle() {
 ```css
 :root {
   /* Brand Colors */
-  --brand-pink: #ff7acc;
-  --brand-pink-hover: #ff5bb8;
+  /* Note: darker pink used as default for better white text contrast */
+  --brand-pink: #ff5bb8;        /* Default - better contrast with white text */
+  --brand-pink-hover: #ff7acc;  /* Hover - lighter, original brand pink */
   --brand-gold: #ffdf6b;
   --brand-purple: #8b5cf6;
   --brand-blue: #3b82f6;
@@ -652,8 +658,9 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          pink: '#ff7acc',
-          'pink-hover': '#ff5bb8',
+          // Darker pink as default for better white text contrast
+          pink: '#ff5bb8',
+          'pink-hover': '#ff7acc',  // Lighter for hover states
           gold: '#ffdf6b',
           purple: '#8b5cf6',
           blue: '#3b82f6',
@@ -685,7 +692,7 @@ export function PrimaryButton({ children, ...props }) {
 ## Checklist for Brand Compliance
 
 ### Landing Pages
-- [ ] Uses brand pink (#ff7acc) for primary CTAs
+- [ ] Uses brand pink (#ff5bb8) for primary CTAs with white text
 - [ ] Logo displayed correctly
 - [ ] Dark theme as default
 - [ ] Gradient text on hero headlines
@@ -718,6 +725,7 @@ export function PrimaryButton({ children, ...props }) {
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | 2026-01-08 | **Accessibility improvement**: Swapped brand pink colors for better white text contrast. Default `--brand-pink` is now `#ff5bb8` (darker) for buttons/CTAs, hover state `--brand-pink-hover` is now `#ff7acc` (lighter). The original lighter pink had insufficient contrast ratio with white text. |
 | 1.1 | 2026-01-07 | Updated radial background gradient (now uses layered radial gradients with optional animation); Updated logo usage (SVG preferred, hosted GIF URL for emails only); Updated email header (use logo image, not emoji); Added Light/Dark Theme Requirements section; Fixed success color consistency (#22c55e) |
 | 1.0 | 2026-01-07 | Initial brand guide created |
 
