@@ -195,7 +195,7 @@ function PlaylistsContent() {
           {/* Back link */}
           <Link
             href="/playlists"
-            className="inline-flex items-center gap-2 text-white/60 hover:text-white mb-4 transition-colors"
+            className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] mb-4 transition-colors"
           >
             <ChevronRightIcon className="w-4 h-4 rotate-180" />
             Back to Playlists
@@ -208,7 +208,7 @@ function PlaylistsContent() {
               <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                 <span className="text-2xl">!</span>
               </div>
-              <p className="text-white/60 mb-4">{error}</p>
+              <p className="text-[var(--text-muted)] mb-4">{error}</p>
               <Button onClick={() => loadPlaylistDetail(selectedId)} variant="secondary">
                 Try again
               </Button>
@@ -229,19 +229,19 @@ function PlaylistsContent() {
               <div className="mb-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#ff2d92]/30 to-[#00d4ff]/30 flex items-center justify-center flex-shrink-0">
-                      <PlaylistIcon className="w-8 h-8 text-white/60" />
+                    <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[var(--brand-pink)]/30 to-[#00d4ff]/30 flex items-center justify-center flex-shrink-0">
+                      <PlaylistIcon className="w-8 h-8 text-[var(--text-muted)]" />
                     </div>
                     <div>
-                      <h1 className="text-2xl font-bold text-white">
+                      <h1 className="text-2xl font-bold text-[var(--text)]">
                         {selectedPlaylist.name}
                       </h1>
-                      <p className="text-white/60 text-sm mt-1">
+                      <p className="text-[var(--text-muted)] text-sm mt-1">
                         {selectedPlaylist.song_count} song
                         {selectedPlaylist.song_count !== 1 ? "s" : ""}
                       </p>
                       {selectedPlaylist.description && (
-                        <p className="text-white/40 text-sm mt-2">
+                        <p className="text-[var(--text-subtle)] text-sm mt-2">
                           {selectedPlaylist.description}
                         </p>
                       )}
@@ -250,7 +250,7 @@ function PlaylistsContent() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowEditModal(true)}
-                      className="p-2 text-white/40 hover:text-white transition-colors"
+                      className="p-2 text-[var(--text-subtle)] hover:text-[var(--text)] transition-colors"
                       title="Edit playlist"
                     >
                       <EditIcon className="w-5 h-5" />
@@ -261,7 +261,7 @@ function PlaylistsContent() {
                           handleDeletePlaylist(selectedPlaylist.id);
                         }
                       }}
-                      className="p-2 text-white/40 hover:text-red-400 transition-colors"
+                      className="p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
                       title="Delete playlist"
                     >
                       <TrashIcon className="w-5 h-5" />
@@ -290,17 +290,17 @@ function PlaylistsContent() {
                   {selectedPlaylist.song_ids.map((songId, index) => (
                     <div
                       key={songId}
-                      className="group bg-white/5 hover:bg-white/10 rounded-xl p-3 transition-all border border-white/10 flex items-center justify-between"
+                      className="group bg-[var(--card)] hover:bg-[var(--secondary)] rounded-xl p-3 transition-all border border-[var(--card-border)] flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="text-white/40 text-sm w-6 text-center">
+                        <span className="text-[var(--text-subtle)] text-sm w-6 text-center">
                           {index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-medium truncate">
+                          <p className="text-[var(--text)] font-medium truncate">
                             Song ID: {songId}
                           </p>
-                          <p className="text-white/60 text-sm">
+                          <p className="text-[var(--text-muted)] text-sm">
                             Song details will be loaded from catalog
                           </p>
                         </div>
@@ -315,7 +315,7 @@ function PlaylistsContent() {
                         </Button>
                         <button
                           onClick={() => handleRemoveSong(songId)}
-                          className="p-2 text-white/40 hover:text-red-400 transition-colors"
+                          className="p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
                           disabled={removingSongId === songId}
                           title="Remove from playlist"
                         >
@@ -332,18 +332,18 @@ function PlaylistsContent() {
               )}
 
               {/* Footer navigation */}
-              <div className="mt-8 pt-6 border-t border-white/10">
+              <div className="mt-8 pt-6 border-t border-[var(--card-border)]">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
                   <Link
                     href="/my-songs"
-                    className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                    className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <MusicIcon className="w-4 h-4" />
                     Add from My Songs
                   </Link>
                   <Link
                     href="/recommendations"
-                    className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                    className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     Add from Recommendations
                   </Link>
@@ -356,14 +356,14 @@ function PlaylistsContent() {
         {/* Edit Modal */}
         {showEditModal && selectedPlaylist && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-white/10">
-              <h2 className="text-xl font-bold text-white mb-4">
+            <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
+              <h2 className="text-xl font-bold text-[var(--text)] mb-4">
                 Edit Playlist
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-white/60 mb-2">Name</label>
+                  <label className="block text-sm text-[var(--text-muted)] mb-2">Name</label>
                   <Input
                     type="text"
                     value={editName}
@@ -374,7 +374,7 @@ function PlaylistsContent() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-white/60 mb-2">
+                  <label className="block text-sm text-[var(--text-muted)] mb-2">
                     Description (optional)
                   </label>
                   <Input
@@ -422,12 +422,12 @@ function PlaylistsContent() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <PlaylistIcon className="w-7 h-7 text-[#ff2d92]" />
+            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+              <PlaylistIcon className="w-7 h-7 text-[var(--brand-pink)]" />
               My Playlists
             </h1>
             {playlists.length > 0 && (
-              <p className="text-white/60 text-sm mt-1">
+              <p className="text-[var(--text-muted)] text-sm mt-1">
                 {playlists.length} playlist{playlists.length !== 1 ? "s" : ""}
               </p>
             )}
@@ -450,7 +450,7 @@ function PlaylistsContent() {
             <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
               <span className="text-2xl">!</span>
             </div>
-            <p className="text-white/60 mb-4">{error}</p>
+            <p className="text-[var(--text-muted)] mb-4">{error}</p>
             <Button onClick={loadPlaylists} variant="secondary">
               Try again
             </Button>
@@ -470,32 +470,32 @@ function PlaylistsContent() {
             {playlists.map((playlist) => (
               <div
                 key={playlist.id}
-                className="group bg-white/5 hover:bg-white/10 rounded-xl p-4 transition-all border border-white/10"
+                className="group bg-[var(--card)] hover:bg-[var(--secondary)] rounded-xl p-4 transition-all border border-[var(--card-border)]"
               >
                 <div className="flex items-center justify-between">
                   <Link
                     href={`/playlists?id=${playlist.id}`}
                     className="flex-1 flex items-center gap-4"
                   >
-                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#ff2d92]/30 to-[#00d4ff]/30 flex items-center justify-center">
-                      <MusicIcon className="w-6 h-6 text-white/60" />
+                    <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[var(--brand-pink)]/30 to-[#00d4ff]/30 flex items-center justify-center">
+                      <MusicIcon className="w-6 h-6 text-[var(--text-muted)]" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white truncate">
+                      <h3 className="font-semibold text-[var(--text)] truncate">
                         {playlist.name}
                       </h3>
-                      <p className="text-sm text-white/60">
+                      <p className="text-sm text-[var(--text-muted)]">
                         {playlist.song_count} song
                         {playlist.song_count !== 1 ? "s" : ""} &bull; Updated{" "}
                         {formatDate(playlist.updated_at)}
                       </p>
                       {playlist.description && (
-                        <p className="text-sm text-white/40 truncate mt-1">
+                        <p className="text-sm text-[var(--text-subtle)] truncate mt-1">
                           {playlist.description}
                         </p>
                       )}
                     </div>
-                    <ChevronRightIcon className="w-5 h-5 text-white/40 group-hover:text-white/60 transition-colors" />
+                    <ChevronRightIcon className="w-5 h-5 text-[var(--text-subtle)] group-hover:text-[var(--text-muted)] transition-colors" />
                   </Link>
                   <button
                     onClick={(e) => {
@@ -508,7 +508,7 @@ function PlaylistsContent() {
                         handleDeletePlaylist(playlist.id);
                       }
                     }}
-                    className="ml-2 p-2 text-white/40 hover:text-red-400 transition-colors"
+                    className="ml-2 p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
                     disabled={deletingId === playlist.id}
                   >
                     {deletingId === playlist.id ? (
@@ -525,18 +525,18 @@ function PlaylistsContent() {
 
         {/* Footer navigation */}
         {playlists.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-white/10">
+          <div className="mt-8 pt-6 border-t border-[var(--card-border)]">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
               <Link
                 href="/my-songs"
-                className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 <MusicIcon className="w-4 h-4" />
                 My Songs
               </Link>
               <Link
                 href="/recommendations"
-                className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 Discover Songs
               </Link>
@@ -548,14 +548,14 @@ function PlaylistsContent() {
       {/* Create Playlist Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-white/10">
-            <h2 className="text-xl font-bold text-white mb-4">
+          <div className="bg-[#1a1a2e] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
+            <h2 className="text-xl font-bold text-[var(--text)] mb-4">
               Create New Playlist
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-white/60 mb-2">Name</label>
+                <label className="block text-sm text-[var(--text-muted)] mb-2">Name</label>
                 <Input
                   type="text"
                   value={newPlaylistName}
@@ -566,7 +566,7 @@ function PlaylistsContent() {
               </div>
 
               <div>
-                <label className="block text-sm text-white/60 mb-2">
+                <label className="block text-sm text-[var(--text-muted)] mb-2">
                   Description (optional)
                 </label>
                 <Input
@@ -614,8 +614,8 @@ export default function PlaylistsPage() {
         fallback={
           <main className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <LoaderIcon className="w-10 h-10 text-[#ff2d92] animate-spin mx-auto" />
-              <p className="text-white/60 mt-4">Loading playlists...</p>
+              <LoaderIcon className="w-10 h-10 text-[var(--brand-pink)] animate-spin mx-auto" />
+              <p className="text-[var(--text-muted)] mt-4">Loading playlists...</p>
             </div>
           </main>
         }

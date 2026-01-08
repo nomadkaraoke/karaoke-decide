@@ -69,20 +69,20 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-white">Users</h2>
+      <h2 className="text-2xl font-bold text-[var(--text)]">Users</h2>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         {/* Search */}
         <form onSubmit={handleSearch} className="flex-1">
           <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-subtle)]" />
             <input
               type="text"
               placeholder="Search by email..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-white/20"
+              className="w-full pl-10 pr-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] placeholder-white/40 focus:outline-none focus:border-[var(--card-border)]"
             />
           </div>
         </form>
@@ -98,8 +98,8 @@ export default function AdminUsersPage() {
               }}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 filter === f
-                  ? "bg-white/10 text-white"
-                  : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                  ? "bg-[var(--secondary)] text-[var(--text)]"
+                  : "bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)]"
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -109,7 +109,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-[var(--text-muted)]">
         {total} user{total !== 1 ? "s" : ""} found
       </p>
 
@@ -120,7 +120,7 @@ export default function AdminUsersPage() {
           <p className="text-red-400">{error}</p>
           <button
             onClick={loadUsers}
-            className="mt-3 px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="mt-3 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
             Retry
           </button>
@@ -136,23 +136,23 @@ export default function AdminUsersPage() {
 
       {/* Users list */}
       {!isLoading && !error && (
-        <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+        <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+              <tr className="border-b border-[var(--card-border)]">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
                   Created
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
                   Last Sync
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60 hidden lg:table-cell">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden lg:table-cell">
                   Songs
                 </th>
                 <th className="px-4 py-3 w-10"></th>
@@ -162,14 +162,14 @@ export default function AdminUsersPage() {
               {users.map((user) => (
                 <tr
                   key={user.id}
-                  className="hover:bg-white/5 transition-colors"
+                  className="hover:bg-[var(--card)] transition-colors"
                 >
                   <td className="px-4 py-3">
                     <div>
-                      <p className="text-white font-medium truncate max-w-[200px]">
+                      <p className="text-[var(--text)] font-medium truncate max-w-[200px]">
                         {user.display_name || user.email || "No name"}
                       </p>
-                      <p className="text-sm text-white/40 truncate max-w-[200px]">
+                      <p className="text-sm text-[var(--text-subtle)] truncate max-w-[200px]">
                         {user.email || user.id.slice(0, 8)}
                       </p>
                     </div>
@@ -192,19 +192,19 @@ export default function AdminUsersPage() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-white/60 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
                     {formatDate(user.created_at)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white/60 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
                     {user.last_sync_at ? formatDate(user.last_sync_at) : "Never"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white/60 hidden lg:table-cell">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden lg:table-cell">
                     {user.total_songs_known}
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/users/detail?id=${user.id}`}
-                      className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors inline-block"
+                      className="p-2 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors inline-block"
                     >
                       <ChevronRightIcon className="w-4 h-4" />
                     </Link>
@@ -215,7 +215,7 @@ export default function AdminUsersPage() {
           </table>
 
           {users.length === 0 && (
-            <div className="p-8 text-center text-white/40">
+            <div className="p-8 text-center text-[var(--text-subtle)]">
               No users found matching your criteria.
             </div>
           )}
@@ -225,21 +225,21 @@ export default function AdminUsersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-white/60">
+          <p className="text-sm text-[var(--text-muted)]">
             Page {page + 1} of {totalPages}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
               Next
             </button>

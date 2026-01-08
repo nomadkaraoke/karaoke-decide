@@ -58,7 +58,7 @@ export function QuizSongCard({
           }
         `}
       >
-        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+        {isSelected && <CheckIcon className="w-4 h-4 text-[var(--text)]" />}
       </div>
 
       {/* Song info */}

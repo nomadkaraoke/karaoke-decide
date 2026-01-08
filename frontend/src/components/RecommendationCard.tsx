@@ -222,7 +222,7 @@ export function RecommendationCard({
                 href={links.generator}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-blue)] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] active:scale-95"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-blue)] text-[var(--text)] text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] active:scale-95"
               >
                 <VideoIcon className="w-4 h-4" />
                 <span>Generate</span>
@@ -231,7 +231,7 @@ export function RecommendationCard({
               /* Dropdown for karaoke-ready songs */
               <>
                 <button
-                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-white text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-[var(--text)] text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <MicrophoneIcon className="w-4 h-4" />

@@ -210,10 +210,10 @@ export default function QuizPage() {
               data-testid={`progress-dot-${s}`}
               className={`w-3 h-3 rounded-full transition-colors ${
                 s === step
-                  ? "bg-[#ff2d92]"
+                  ? "bg-[var(--brand-pink)]"
                   : s < step
-                    ? "bg-[#ff2d92]/50"
-                    : "bg-white/20"
+                    ? "bg-[var(--brand-pink)]/50"
+                    : "bg-[var(--secondary)]"
               }`}
             />
           ))}
@@ -223,10 +223,10 @@ export default function QuizPage() {
         {step === 1 && (
           <>
             <div className="text-center mb-8">
-              <h1 data-testid="quiz-heading" className="text-2xl font-bold text-white mb-2">
+              <h1 data-testid="quiz-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
                 What music do you like?
               </h1>
-              <p className="text-white/60">
+              <p className="text-[var(--text)]/60">
                 Select your favorite genres to get personalized recommendations.
               </p>
             </div>
@@ -242,8 +242,8 @@ export default function QuizPage() {
                     p-4 rounded-xl text-left transition-all duration-200
                     ${
                       selectedGenres.has(genre.id)
-                        ? "bg-gradient-to-r from-[#ff2d92]/20 to-[#b347ff]/20 border-[#ff2d92]/50 border-2 scale-[1.02]"
-                        : "bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10"
+                        ? "bg-gradient-to-r from-[var(--brand-pink)]/20 to-[var(--brand-purple)]/20 border-[var(--brand-pink)]/50 border-2 scale-[1.02]"
+                        : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--primary)] hover:bg-[var(--secondary)]"
                     }
                   `}
                 >
@@ -251,15 +251,15 @@ export default function QuizPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{genre.emoji}</span>
                       <div>
-                        <h3 className="font-semibold text-white">{genre.label}</h3>
-                        <p className="text-xs text-white/50 mt-0.5">
+                        <h3 className="font-semibold text-[var(--text)]">{genre.label}</h3>
+                        <p className="text-xs text-[var(--text)]/50 mt-0.5">
                           {genre.exampleArtists.join(", ")}
                         </p>
                       </div>
                     </div>
                     {selectedGenres.has(genre.id) && (
-                      <div className="w-6 h-6 rounded-full bg-[#ff2d92] flex items-center justify-center flex-shrink-0">
-                        <CheckIcon className="w-4 h-4 text-white" />
+                      <div className="w-6 h-6 rounded-full bg-[var(--brand-pink)] flex items-center justify-center flex-shrink-0">
+                        <CheckIcon className="w-4 h-4 text-[var(--text)]" />
                       </div>
                     )}
                   </div>
@@ -269,7 +269,7 @@ export default function QuizPage() {
 
             {/* Selection count */}
             <div className="text-center mb-4">
-              <span data-testid="genre-selection-count" className="text-white/40 text-sm">
+              <span data-testid="genre-selection-count" className="text-[var(--text)]/40 text-sm">
                 {selectedGenres.size === 0
                   ? "Select at least one genre"
                   : `${selectedGenres.size} genre${selectedGenres.size > 1 ? "s" : ""} selected`}
@@ -296,17 +296,17 @@ export default function QuizPage() {
         {step === 2 && (
           <>
             <div className="text-center mb-8">
-              <h1 data-testid="preferences-heading" className="text-2xl font-bold text-white mb-2">
+              <h1 data-testid="preferences-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
                 Quick preferences
               </h1>
-              <p className="text-white/60">
+              <p className="text-[var(--text)]/60">
                 Optional: Help us fine-tune your recommendations.
               </p>
             </div>
 
             {/* Decade preference */}
             <div data-testid="decade-section" className="mb-6">
-              <h2 className="text-sm font-medium text-white/70 mb-3 uppercase tracking-wide">
+              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
                 Favorite Era
               </h2>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -321,12 +321,12 @@ export default function QuizPage() {
                       py-3 px-2 rounded-xl text-center transition-all
                       ${
                         decadePreference === d
-                          ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
-                          : "bg-white/5 border border-white/10 hover:border-white/20"
+                          ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border-2"
+                          : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--primary)]/50"
                       }
                     `}
                   >
-                    <span className="text-sm font-medium text-white">{d}</span>
+                    <span className="text-sm font-medium text-[var(--text)]">{d}</span>
                   </button>
                 ))}
               </div>
@@ -334,7 +334,7 @@ export default function QuizPage() {
 
             {/* Energy preference */}
             <div data-testid="energy-section" className="mb-8">
-              <h2 className="text-sm font-medium text-white/70 mb-3 uppercase tracking-wide">
+              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
                 Energy Level
               </h2>
               <div className="grid grid-cols-3 gap-3">
@@ -351,13 +351,13 @@ export default function QuizPage() {
                       py-4 px-3 rounded-xl text-center transition-all
                       ${
                         energyPreference === option.value
-                          ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border-2"
-                          : "bg-white/5 border border-white/10 hover:border-white/20"
+                          ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border-2"
+                          : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--primary)]/50"
                       }
                     `}
                   >
                     <span className="text-2xl block mb-1">{option.emoji}</span>
-                    <span className="text-sm font-medium text-white">{option.label}</span>
+                    <span className="text-sm font-medium text-[var(--text)]">{option.label}</span>
                   </button>
                 ))}
               </div>
@@ -389,7 +389,7 @@ export default function QuizPage() {
               <button
                 onClick={handleSkipToRecommendations}
                 disabled={isSubmitting}
-                className="text-sm text-white/40 hover:text-white/60 transition-colors"
+                className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
               >
                 {isSubmitting ? "Loading..." : "Skip to recommendations →"}
               </button>
@@ -401,10 +401,10 @@ export default function QuizPage() {
         {step === 3 && (
           <>
             <div className="text-center mb-8">
-              <h1 data-testid="artist-heading" className="text-2xl font-bold text-white mb-2">
+              <h1 data-testid="artist-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
                 Know any of these artists?
               </h1>
-              <p className="text-white/60">
+              <p className="text-[var(--text)]/60">
                 Optional: Select artists you know for better recommendations.
               </p>
             </div>
@@ -413,7 +413,7 @@ export default function QuizPage() {
               <LoadingPulse count={4} />
             ) : error ? (
               <div className="text-center py-8">
-                <p className="text-white/60 mb-4">{error}</p>
+                <p className="text-[var(--text)]/60 mb-4">{error}</p>
                 <Button onClick={() => loadQuizArtists()} variant="secondary">
                   Try again
                 </Button>
@@ -422,13 +422,13 @@ export default function QuizPage() {
               <>
                 {/* Selection count */}
                 <div className="flex items-center justify-between mb-4">
-                  <span data-testid="artist-selection-count" className="text-white/60 text-sm">
+                  <span data-testid="artist-selection-count" className="text-[var(--text)]/60 text-sm">
                     {selectedArtists.size} selected
                   </span>
                   {selectedArtists.size > 0 && (
                     <button
                       onClick={() => setSelectedArtists(new Set())}
-                      className="text-sm text-white/40 hover:text-white transition-colors"
+                      className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
                     >
                       Clear all
                     </button>
@@ -491,7 +491,7 @@ export default function QuizPage() {
                     <button
                       onClick={handleSubmit}
                       disabled={isSubmitting}
-                      className="text-sm text-white/40 hover:text-white/60 transition-colors"
+                      className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
                     >
                       {isSubmitting ? "Loading..." : "Skip, I don't know any →"}
                     </button>

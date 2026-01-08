@@ -65,7 +65,7 @@ export function QuizArtistCard({
           }
         `}
       >
-        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+        {isSelected && <CheckIcon className="w-4 h-4 text-[var(--text)]" />}
       </div>
 
       <div className="flex items-start gap-4 pr-8">

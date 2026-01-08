@@ -90,7 +90,7 @@ export function UserSongCard({
           </div>
 
           <button
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-white text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-[var(--text)] text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
             onClick={() => {
               window.open(
                 `https://www.youtube.com/results?search_query=${encodeURIComponent(

@@ -65,7 +65,7 @@ export function UpgradePrompt({
     <div className="max-w-md mx-auto p-8 rounded-2xl bg-gradient-to-br from-[var(--brand-pink)]/20 via-[var(--brand-purple)]/10 to-[var(--brand-blue)]/10 border border-[var(--card-border)]">
       <div className="text-center mb-6">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[var(--brand-pink)] to-[var(--brand-purple)] flex items-center justify-center">
-          <SparklesIcon className="w-8 h-8 text-white" />
+          <SparklesIcon className="w-8 h-8 text-[var(--text)]" />
         </div>
         <h2 className="text-xl font-bold text-[var(--text)] mb-2">{title}</h2>
         <p className="text-[var(--text-muted)]">{description}</p>

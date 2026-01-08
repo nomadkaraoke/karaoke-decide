@@ -68,10 +68,10 @@ export default function AdminSyncJobsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Sync Jobs</h2>
+        <h2 className="text-2xl font-bold text-[var(--text)]">Sync Jobs</h2>
         <button
           onClick={loadJobs}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
           <RefreshIcon className="w-4 h-4" />
           <span className="text-sm">Refresh</span>
@@ -91,8 +91,8 @@ export default function AdminSyncJobsPage() {
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === status
-                ? "bg-white/10 text-white"
-                : "bg-white/5 text-white/60 hover:text-white hover:bg-white/10"
+                ? "bg-[var(--secondary)] text-[var(--text)]"
+                : "bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)]"
             }`}
           >
             {status === "in_progress"
@@ -103,7 +103,7 @@ export default function AdminSyncJobsPage() {
       </div>
 
       {/* Results count */}
-      <p className="text-sm text-white/60">
+      <p className="text-sm text-[var(--text-muted)]">
         {total} job{total !== 1 ? "s" : ""} found
         {(statusFilter === "in_progress" || statusFilter === "pending") && (
           <span className="ml-2 text-cyan-400">(auto-refreshing)</span>
@@ -117,7 +117,7 @@ export default function AdminSyncJobsPage() {
           <p className="text-red-400">{error}</p>
           <button
             onClick={loadJobs}
-            className="mt-3 px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+            className="mt-3 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
             Retry
           </button>
@@ -133,23 +133,23 @@ export default function AdminSyncJobsPage() {
 
       {/* Jobs list */}
       {!isLoading && !error && (
-        <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+        <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+              <tr className="border-b border-[var(--card-border)]">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                   Job ID
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                   User
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                   Status
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
                   Created
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-white/60 hidden md:table-cell">
+                <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
                   Completed
                 </th>
                 <th className="px-4 py-3 w-10"></th>
@@ -159,7 +159,7 @@ export default function AdminSyncJobsPage() {
               {jobs.map((job) => (
                 <tr
                   key={job.id}
-                  className="hover:bg-white/5 transition-colors"
+                  className="hover:bg-[var(--card)] transition-colors"
                 >
                   <td className="px-4 py-3">
                     <code className="text-sm text-white/80 font-mono">
@@ -177,16 +177,16 @@ export default function AdminSyncJobsPage() {
                   <td className="px-4 py-3">
                     <StatusBadge status={job.status} />
                   </td>
-                  <td className="px-4 py-3 text-sm text-white/60 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
                     {formatDateTime(job.created_at)}
                   </td>
-                  <td className="px-4 py-3 text-sm text-white/60 hidden md:table-cell">
+                  <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
                     {job.completed_at ? formatDateTime(job.completed_at) : "-"}
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/sync-jobs/detail?id=${job.id}`}
-                      className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors inline-block"
+                      className="p-2 rounded-lg text-[var(--text-subtle)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors inline-block"
                     >
                       <ChevronRightIcon className="w-4 h-4" />
                     </Link>
@@ -197,7 +197,7 @@ export default function AdminSyncJobsPage() {
           </table>
 
           {jobs.length === 0 && (
-            <div className="p-8 text-center text-white/40">
+            <div className="p-8 text-center text-[var(--text-subtle)]">
               No sync jobs found matching your criteria.
             </div>
           )}
@@ -207,21 +207,21 @@ export default function AdminSyncJobsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-white/60">
+          <p className="text-sm text-[var(--text-muted)]">
             Page {page + 1} of {totalPages}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
               Previous
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="px-4 py-2 rounded-lg bg-white/5 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+              className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
               Next
             </button>

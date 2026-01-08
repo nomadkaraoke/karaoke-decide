@@ -103,11 +103,11 @@ export default function MyDataPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <DatabaseIcon className="w-7 h-7 text-[#00f5ff]" />
+              <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+                <DatabaseIcon className="w-7 h-7 text-[var(--brand-blue)]" />
                 My Data
               </h1>
-              <p className="text-white/60 text-sm mt-1">
+              <p className="text-[var(--text-muted)] text-sm mt-1">
                 Everything we know about your music taste
               </p>
             </div>
@@ -139,23 +139,23 @@ export default function MyDataPage() {
               {/* Summary stats */}
               {summary && (
                 <div className="grid grid-cols-3 gap-3 mb-6">
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
-                    <p className="text-2xl font-bold text-white">
+                  <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-center">
+                    <p className="text-2xl font-bold text-[var(--text)]">
                       {connectedServices}
                     </p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-xs text-[var(--text-subtle)]">
                       Service{connectedServices !== 1 ? "s" : ""}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
-                    <p className="text-2xl font-bold text-white">{totalArtists}</p>
-                    <p className="text-xs text-white/50">
+                  <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-center">
+                    <p className="text-2xl font-bold text-[var(--text)]">{totalArtists}</p>
+                    <p className="text-xs text-[var(--text-subtle)]">
                       Artist{totalArtists !== 1 ? "s" : ""}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
-                    <p className="text-2xl font-bold text-white">{totalSongs}</p>
-                    <p className="text-xs text-white/50">
+                  <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-center">
+                    <p className="text-2xl font-bold text-[var(--text)]">{totalSongs}</p>
+                    <p className="text-xs text-[var(--text-subtle)]">
                       Song{totalSongs !== 1 ? "s" : ""}
                     </p>
                   </div>
@@ -192,16 +192,16 @@ export default function MyDataPage() {
                 />
 
                 {/* Feedback section (future placeholder) */}
-                <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
+                <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] p-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                      <span className="text-lg text-white/40">*</span>
+                    <div className="w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
+                      <span className="text-lg text-[var(--text-subtle)]">*</span>
                     </div>
                     <div>
-                      <h2 className="font-semibold text-white/40">
+                      <h2 className="font-semibold text-[var(--text-subtle)]">
                         Feedback & Refinements
                       </h2>
-                      <p className="text-sm text-white/30">
+                      <p className="text-sm text-[var(--text-subtle)]">
                         Coming soon: Love/hide songs, vocal range, more!
                       </p>
                     </div>
@@ -210,14 +210,14 @@ export default function MyDataPage() {
               </div>
 
               {/* Footer help text */}
-              <div className="mt-8 text-center text-sm text-white/40">
+              <div className="mt-8 text-center text-sm text-[var(--text-subtle)]">
                 <p>
                   This data powers your personalized karaoke recommendations.
                 </p>
                 <p className="mt-1">
                   {isGuest ? (
                     <>
-                      <Link href="/login" className="text-[#00f5ff] hover:underline">
+                      <Link href="/login" className="text-[var(--brand-blue)] hover:underline">
                         Create an account
                       </Link>{" "}
                       to sync your music services.
@@ -225,7 +225,7 @@ export default function MyDataPage() {
                   ) : (
                     <>
                       More data = better recommendations.{" "}
-                      <Link href="/quiz" className="text-[#00f5ff] hover:underline">
+                      <Link href="/quiz" className="text-[var(--brand-blue)] hover:underline">
                         Take the quiz
                       </Link>{" "}
                       or connect more services.

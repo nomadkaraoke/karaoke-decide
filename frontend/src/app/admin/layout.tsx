@@ -27,19 +27,19 @@ export default function AdminLayout({
     <AdminPage>
       <div className="min-h-screen bg-[#0a0a0f]">
         {/* Admin Header */}
-        <div className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur-xl">
+        <div className="border-b border-[var(--card-border)] bg-[#0a0a0f]/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Link
                   href="/"
-                  className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   <ChevronLeftIcon className="w-4 h-4" />
                   <span className="text-sm">Back to App</span>
                 </Link>
-                <div className="h-6 w-px bg-white/10" />
-                <h1 className="text-lg font-semibold text-white">Admin</h1>
+                <div className="h-6 w-px bg-[var(--secondary)]" />
+                <h1 className="text-lg font-semibold text-[var(--text)]">Admin</h1>
               </div>
             </div>
           </div>
@@ -63,8 +63,8 @@ export default function AdminLayout({
                         flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                         ${
                           isActive
-                            ? "bg-white/10 text-white"
-                            : "text-white/60 hover:text-white hover:bg-white/5"
+                            ? "bg-[var(--secondary)] text-[var(--text)]"
+                            : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--card)]"
                         }
                       `}
                     >

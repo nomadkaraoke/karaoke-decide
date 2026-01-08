@@ -48,11 +48,11 @@ export default function ProfilePage() {
         <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <UserIcon className="w-7 h-7 text-[#ff2d92]" />
+            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+              <UserIcon className="w-7 h-7 text-[var(--brand-pink)]" />
               Profile Settings
             </h1>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-[var(--text-muted)] text-sm mt-1">
               Manage your account settings and display name
             </p>
           </div>
@@ -73,17 +73,17 @@ export default function ProfilePage() {
           )}
 
           {/* Profile form */}
-          <div className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10">
+          <div className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-[var(--card-border)]">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Account info (read-only) */}
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">
                   Email Address
                 </label>
-                <div className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60">
+                <div className="px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)]">
                   {user?.email}
                 </div>
-                <p className="text-xs text-white/40 mt-1">
+                <p className="text-xs text-[var(--text-subtle)] mt-1">
                   Email cannot be changed
                 </p>
               </div>
@@ -107,7 +107,7 @@ export default function ProfilePage() {
                   }}
                   maxLength={50}
                 />
-                <p className="text-xs text-white/40 mt-1">
+                <p className="text-xs text-[var(--text-subtle)] mt-1">
                   This is how your name will appear in the app
                 </p>
               </div>
@@ -128,8 +128,8 @@ export default function ProfilePage() {
           </div>
 
           {/* Account ID info */}
-          <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10">
-            <p className="text-xs text-white/40">
+          <div className="mt-6 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+            <p className="text-xs text-[var(--text-subtle)]">
               Account ID: <span className="font-mono">{user?.id}</span>
             </p>
           </div>

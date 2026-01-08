@@ -92,7 +92,7 @@ export default function SyncJobDetailPage() {
       <div className="space-y-6">
         <Link
           href="/admin/sync-jobs"
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronLeftIcon className="w-4 h-4" />
           Back to Sync Jobs
@@ -112,7 +112,7 @@ export default function SyncJobDetailPage() {
       {/* Back link */}
       <Link
         href="/admin/sync-jobs"
-        className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+        className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <ChevronLeftIcon className="w-4 h-4" />
         Back to Sync Jobs
@@ -121,16 +121,16 @@ export default function SyncJobDetailPage() {
       {/* Job header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
             Sync Job
             <StatusBadge status={job.status} />
           </h2>
-          <p className="text-white/60 mt-1 font-mono text-sm">{job.id}</p>
+          <p className="text-[var(--text-muted)] mt-1 font-mono text-sm">{job.id}</p>
         </div>
         {isActive && (
           <button
             onClick={loadJob}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
             <RefreshIcon className="w-4 h-4" />
             <span className="text-sm">Refresh</span>
@@ -141,11 +141,11 @@ export default function SyncJobDetailPage() {
       {/* Job info */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Basic Info */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-4">
-          <h3 className="font-semibold text-white">Job Info</h3>
+        <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
+          <h3 className="font-semibold text-[var(--text)]">Job Info</h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-white/60">User</span>
+              <span className="text-[var(--text-muted)]">User</span>
               <Link
                 href={`/admin/users/detail?id=${job.user_id}`}
                 className="text-cyan-400 hover:underline"
@@ -154,19 +154,19 @@ export default function SyncJobDetailPage() {
               </Link>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/60">Created</span>
-              <span className="text-white">{formatDateTime(job.created_at)}</span>
+              <span className="text-[var(--text-muted)]">Created</span>
+              <span className="text-[var(--text)]">{formatDateTime(job.created_at)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-white/60">Completed</span>
-              <span className="text-white">
+              <span className="text-[var(--text-muted)]">Completed</span>
+              <span className="text-[var(--text)]">
                 {job.completed_at ? formatDateTime(job.completed_at) : "-"}
               </span>
             </div>
             {job.completed_at && job.created_at && (
               <div className="flex justify-between">
-                <span className="text-white/60">Duration</span>
-                <span className="text-white">
+                <span className="text-[var(--text-muted)]">Duration</span>
+                <span className="text-[var(--text)]">
                   {formatDuration(job.created_at, job.completed_at)}
                 </span>
               </div>
@@ -176,20 +176,20 @@ export default function SyncJobDetailPage() {
 
         {/* Progress */}
         {job.progress && (
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-4">
-            <h3 className="font-semibold text-white">Progress</h3>
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
+            <h3 className="font-semibold text-[var(--text)]">Progress</h3>
             <div className="space-y-3">
               {/* Progress bar */}
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-white/60">
+                  <span className="text-[var(--text-muted)]">
                     {job.progress.current_service
                       ? `${job.progress.current_service} - ${job.progress.current_phase}`
                       : "Processing..."}
                   </span>
-                  <span className="text-white">{job.progress.percentage}%</span>
+                  <span className="text-[var(--text)]">{job.progress.percentage}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-2 rounded-full bg-[var(--secondary)] overflow-hidden">
                   <div
                     className="h-full bg-cyan-400 rounded-full transition-all duration-300"
                     style={{ width: `${job.progress.percentage}%` }}
@@ -200,22 +200,22 @@ export default function SyncJobDetailPage() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-4 pt-2">
                 <div className="text-center">
-                  <p className="text-xl font-bold text-white">
+                  <p className="text-xl font-bold text-[var(--text)]">
                     {job.progress.total_tracks}
                   </p>
-                  <p className="text-xs text-white/60">Total</p>
+                  <p className="text-xs text-[var(--text-muted)]">Total</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-white">
+                  <p className="text-xl font-bold text-[var(--text)]">
                     {job.progress.processed_tracks}
                   </p>
-                  <p className="text-xs text-white/60">Processed</p>
+                  <p className="text-xs text-[var(--text-muted)]">Processed</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xl font-bold text-green-400">
                     {job.progress.matched_tracks}
                   </p>
-                  <p className="text-xs text-white/60">Matched</p>
+                  <p className="text-xs text-[var(--text-muted)]">Matched</p>
                 </div>
               </div>
             </div>
@@ -236,17 +236,17 @@ export default function SyncJobDetailPage() {
       {/* Results */}
       {job.results.length > 0 && (
         <section>
-          <h3 className="text-lg font-semibold text-white mb-3">
+          <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
             Service Results
           </h3>
           <div className="grid md:grid-cols-2 gap-4">
             {job.results.map((result) => (
               <div
                 key={result.service_type}
-                className="rounded-xl bg-white/5 border border-white/10 p-4"
+                className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-medium text-white capitalize">
+                  <h4 className="font-medium text-[var(--text)] capitalize">
                     {result.service_type}
                   </h4>
                   {result.error ? (
@@ -264,38 +264,38 @@ export default function SyncJobDetailPage() {
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-white/60">Tracks Fetched</p>
-                    <p className="text-xl font-bold text-white">
+                    <p className="text-[var(--text-muted)]">Tracks Fetched</p>
+                    <p className="text-xl font-bold text-[var(--text)]">
                       {result.tracks_fetched}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/60">Tracks Matched</p>
+                    <p className="text-[var(--text-muted)]">Tracks Matched</p>
                     <p className="text-xl font-bold text-green-400">
                       {result.tracks_matched}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/60">Songs Created</p>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-[var(--text-muted)]">Songs Created</p>
+                    <p className="text-lg font-semibold text-[var(--text)]">
                       {result.user_songs_created}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/60">Songs Updated</p>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-[var(--text-muted)]">Songs Updated</p>
+                    <p className="text-lg font-semibold text-[var(--text)]">
                       {result.user_songs_updated}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/60">Artists Stored</p>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-[var(--text-muted)]">Artists Stored</p>
+                    <p className="text-lg font-semibold text-[var(--text)]">
                       {result.artists_stored}
                     </p>
                   </div>
                   <div>
-                    <p className="text-white/60">Match Rate</p>
-                    <p className="text-lg font-semibold text-white">
+                    <p className="text-[var(--text-muted)]">Match Rate</p>
+                    <p className="text-lg font-semibold text-[var(--text)]">
                       {result.tracks_fetched > 0
                         ? Math.round(
                             (result.tracks_matched / result.tracks_fetched) * 100

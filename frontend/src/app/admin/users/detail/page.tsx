@@ -91,7 +91,7 @@ export default function UserDetailPage() {
       <div className="space-y-6">
         <Link
           href="/admin/users"
-          className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+          className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronLeftIcon className="w-4 h-4" />
           Back to Users
@@ -109,7 +109,7 @@ export default function UserDetailPage() {
       {/* Back link */}
       <Link
         href="/admin/users"
-        className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+        className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <ChevronLeftIcon className="w-4 h-4" />
         Back to Users
@@ -118,7 +118,7 @@ export default function UserDetailPage() {
       {/* User header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+          <h2 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
             {user.display_name || user.email || "Unknown User"}
             {user.is_admin && (
               <Badge variant="primary" className="flex items-center gap-1">
@@ -127,7 +127,7 @@ export default function UserDetailPage() {
               </Badge>
             )}
           </h2>
-          <p className="text-white/60 mt-1">{user.email || user.id}</p>
+          <p className="text-[var(--text-muted)] mt-1">{user.email || user.id}</p>
         </div>
         <div className="flex items-center gap-2">
           {user.is_guest ? (
@@ -141,8 +141,8 @@ export default function UserDetailPage() {
       {/* User info grid */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Basic Info */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-4">
-          <h3 className="font-semibold text-white">Account Info</h3>
+        <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
+          <h3 className="font-semibold text-[var(--text)]">Account Info</h3>
           <div className="space-y-3 text-sm">
             <InfoRow label="User ID" value={user.id} mono />
             <InfoRow
@@ -165,26 +165,26 @@ export default function UserDetailPage() {
         </div>
 
         {/* Data Summary */}
-        <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-4">
-          <h3 className="font-semibold text-white">Data Summary</h3>
+        <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
+          <h3 className="font-semibold text-[var(--text)]">Data Summary</h3>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.artists_count}
               </p>
-              <p className="text-sm text-white/60">Artists</p>
+              <p className="text-sm text-[var(--text-muted)]">Artists</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.songs_count}
               </p>
-              <p className="text-sm text-white/60">Songs</p>
+              <p className="text-sm text-[var(--text-muted)]">Songs</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white">
+              <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.playlists_count}
               </p>
-              <p className="text-sm text-white/60">Playlists</p>
+              <p className="text-sm text-[var(--text-muted)]">Playlists</p>
             </div>
           </div>
         </div>
@@ -192,11 +192,11 @@ export default function UserDetailPage() {
 
       {/* Connected Services */}
       <section>
-        <h3 className="text-lg font-semibold text-white mb-3">
+        <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
           Connected Services
         </h3>
         {user.services.length === 0 ? (
-          <div className="rounded-xl bg-white/5 border border-white/10 p-6 text-center text-white/40">
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-6 text-center text-[var(--text-subtle)]">
             No services connected
           </div>
         ) : (
@@ -204,7 +204,7 @@ export default function UserDetailPage() {
             {user.services.map((service) => (
               <div
                 key={service.service_type}
-                className="rounded-xl bg-white/5 border border-white/10 p-4"
+                className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4"
               >
                 <div className="flex items-center gap-3 mb-3">
                   {service.service_type === "spotify" ? (
@@ -213,17 +213,17 @@ export default function UserDetailPage() {
                     <LastfmIcon className="w-6 h-6 text-red-400" />
                   )}
                   <div>
-                    <p className="font-medium text-white capitalize">
+                    <p className="font-medium text-[var(--text)] capitalize">
                       {service.service_type}
                     </p>
-                    <p className="text-sm text-white/60">
+                    <p className="text-sm text-[var(--text-muted)]">
                       @{service.service_username}
                     </p>
                   </div>
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-white/60">Status</span>
+                    <span className="text-[var(--text-muted)]">Status</span>
                     <Badge
                       variant={
                         service.sync_status === "error"
@@ -237,12 +237,12 @@ export default function UserDetailPage() {
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/60">Tracks Synced</span>
-                    <span className="text-white">{service.tracks_synced}</span>
+                    <span className="text-[var(--text-muted)]">Tracks Synced</span>
+                    <span className="text-[var(--text)]">{service.tracks_synced}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-white/60">Last Sync</span>
-                    <span className="text-white">
+                    <span className="text-[var(--text-muted)]">Last Sync</span>
+                    <span className="text-[var(--text)]">
                       {service.last_sync_at
                         ? formatDateTime(service.last_sync_at)
                         : "Never"}
@@ -262,35 +262,35 @@ export default function UserDetailPage() {
 
       {/* Recent Sync Jobs */}
       <section>
-        <h3 className="text-lg font-semibold text-white mb-3">
+        <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
           Recent Sync Jobs
         </h3>
         {user.sync_jobs.length === 0 ? (
-          <div className="rounded-xl bg-white/5 border border-white/10 p-6 text-center text-white/40">
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-6 text-center text-[var(--text-subtle)]">
             No sync jobs found
           </div>
         ) : (
-          <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                <tr className="border-b border-[var(--card-border)]">
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                     Job ID
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                     Created
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-medium text-white/60">
+                  <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
                     Completed
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {user.sync_jobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={job.id} className="hover:bg-[var(--card)] transition-colors">
                     <td className="px-4 py-3">
                       <Link
                         href={`/admin/sync-jobs/detail?id=${job.id}`}
@@ -302,10 +302,10 @@ export default function UserDetailPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-white/60">
+                    <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                       {formatDateTime(job.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-sm text-white/60">
+                    <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                       {job.completed_at
                         ? formatDateTime(job.completed_at)
                         : "-"}
@@ -332,8 +332,8 @@ function InfoRow({
 }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-white/60">{label}</span>
-      <span className={`text-white ${mono ? "font-mono text-xs" : ""}`}>
+      <span className="text-[var(--text-muted)]">{label}</span>
+      <span className={`text-[var(--text)] ${mono ? "font-mono text-xs" : ""}`}>
         {value}
       </span>
     </div>

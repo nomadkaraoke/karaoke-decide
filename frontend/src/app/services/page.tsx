@@ -15,7 +15,7 @@ export default function ServicesRedirect() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-white/60">Redirecting...</p>
+      <p className="text-[var(--text-muted)]">Redirecting...</p>
     </div>
   );
 }
