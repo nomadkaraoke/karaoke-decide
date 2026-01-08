@@ -120,11 +120,11 @@ export default function MusicIKnowPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <MusicIcon className="w-7 h-7 text-[#ff2d92]" />
+              <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+                <MusicIcon className="w-7 h-7 text-[var(--brand-pink)]" />
                 Music I Know
               </h1>
-              <p className="text-white/60 text-sm mt-1">
+              <p className="text-[var(--text-muted)] text-sm mt-1">
                 Artists and songs that power your recommendations
               </p>
             </div>
@@ -137,7 +137,7 @@ export default function MusicIKnowPage() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex gap-1 p-1 rounded-xl bg-white/5 mb-6">
+          <div className="flex gap-1 p-1 rounded-xl bg-[var(--card)] mb-6">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -145,8 +145,8 @@ export default function MusicIKnowPage() {
                 className={`
                   flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all
                   ${activeTab === tab.id
-                    ? "bg-white/10 text-white"
-                    : "text-white/50 hover:text-white/70 hover:bg-white/5"
+                    ? "bg-[var(--secondary)] text-[var(--text)]"
+                    : "text-[var(--text-subtle)] hover:text-[var(--text-muted)] hover:bg-[var(--card)]"
                   }
                 `}
               >
@@ -154,7 +154,7 @@ export default function MusicIKnowPage() {
                 {!statsLoading && tab.count > 0 && (
                   <span className={`
                     px-1.5 py-0.5 rounded-full text-xs
-                    ${activeTab === tab.id ? "bg-white/20" : "bg-white/10"}
+                    ${activeTab === tab.id ? "bg-[var(--secondary)]" : "bg-[var(--secondary)]"}
                   `}>
                     {tab.count}
                   </span>
@@ -178,8 +178,8 @@ export default function MusicIKnowPage() {
           )}
 
           {/* Footer CTA */}
-          <div className="mt-8 pt-6 border-t border-white/10 text-center">
-            <p className="text-sm text-white/50 mb-3">
+          <div className="mt-8 pt-6 border-t border-[var(--card-border)] text-center">
+            <p className="text-sm text-[var(--text-subtle)] mb-3">
               More music data = better recommendations
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
@@ -341,7 +341,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       <form onSubmit={handleAddArtist} className="flex gap-2">
         <div className="flex-1 relative">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <PlusIcon className="w-4 h-4 text-white/40" />
+            <PlusIcon className="w-4 h-4 text-[var(--text-subtle)]" />
           </div>
           <Input
             placeholder="Add an artist you like..."
@@ -371,7 +371,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       {/* Artists List */}
       {artists.length === 0 ? (
         <EmptyState
-          icon={<MusicIcon className="w-8 h-8 text-white/20" />}
+          icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
           title="No artists yet"
           description="Add artists you like or take the quiz to get started"
           action={{ label: "Take Quiz", onClick: () => window.location.href = "/quiz" }}
@@ -379,7 +379,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       ) : (
         <>
           {/* Header with count */}
-          <div className="flex items-center justify-between text-sm text-white/60">
+          <div className="flex items-center justify-between text-sm text-[var(--text-muted)]">
             <span>Showing {artists.length} of {total} artists</span>
           </div>
 
@@ -395,12 +395,12 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                   className={`py-2 px-3 rounded-lg border transition-all ${
                     isExcluded
                       ? "bg-white/[0.02] border-white/5 opacity-60"
-                      : "bg-white/5 border-white/10"
+                      : "bg-[var(--card)] border-[var(--card-border)]"
                   } ${isProcessing ? "opacity-50" : ""}`}
                 >
                   <div className="flex items-center gap-2">
                     {/* Artist Name */}
-                    <span className={`font-medium truncate ${isExcluded ? "text-white/50" : "text-white"}`}>
+                    <span className={`font-medium truncate ${isExcluded ? "text-[var(--text-subtle)]" : "text-[var(--text)]"}`}>
                       {artist.artist_name}
                     </span>
 
@@ -417,7 +417,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                         const config: Record<string, { icon: React.ReactNode; color: string; title: string }> = {
                           spotify: { icon: <SpotifyIcon className="w-3.5 h-3.5" />, color: "#1DB954", title: "Spotify" },
                           lastfm: { icon: <LastfmIcon className="w-3.5 h-3.5" />, color: "#ff4444", title: "Last.fm" },
-                          quiz: { icon: <CheckIcon className="w-3.5 h-3.5" />, color: "#ff2d92", title: "Quiz/Manual" },
+                          quiz: { icon: <CheckIcon className="w-3.5 h-3.5" />, color: "var(--brand-pink)", title: "Quiz/Manual" },
                         };
                         const sourceConfig = config[source];
                         if (!sourceConfig) return null;
@@ -434,7 +434,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                     </div>
 
                     {/* Stats - inline, text only */}
-                    <div className="flex items-center gap-1.5 text-xs text-white/40 shrink-0 ml-auto">
+                    <div className="flex items-center gap-1.5 text-xs text-[var(--text-subtle)] shrink-0 ml-auto">
                       {/* Spotify rank */}
                       {artist.spotify_rank && (
                         <span title={`Spotify Top ${artist.spotify_rank}${artist.spotify_time_range ? ` (${getTimeRangeLabel(artist.spotify_time_range)})` : ""}`}>
@@ -469,7 +469,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                       <button
                         onClick={() => handleRemoveArtist(artist.artist_name)}
                         disabled={isProcessing}
-                        className="p-1.5 rounded text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+                        className="p-1.5 rounded text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
                         title="Remove artist"
                       >
                         {isProcessing ? (
@@ -482,7 +482,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                       <button
                         onClick={() => handleIncludeArtist(artist.artist_name)}
                         disabled={isProcessing}
-                        className="p-1.5 rounded text-white/30 hover:text-green-400 hover:bg-green-400/10 transition-colors shrink-0"
+                        className="p-1.5 rounded text-[var(--text-subtle)] hover:text-green-400 hover:bg-green-400/10 transition-colors shrink-0"
                         title="Unhide from recommendations"
                       >
                         {isProcessing ? (
@@ -495,7 +495,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                       <button
                         onClick={() => handleExcludeArtist(artist.artist_name)}
                         disabled={isProcessing}
-                        className="p-1.5 rounded text-white/30 hover:text-orange-400 hover:bg-orange-400/10 transition-colors shrink-0"
+                        className="p-1.5 rounded text-[var(--text-subtle)] hover:text-orange-400 hover:bg-orange-400/10 transition-colors shrink-0"
                         title="Hide from recommendations"
                       >
                         {isProcessing ? (
@@ -662,7 +662,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
       <div>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <SearchIcon className="w-4 h-4 text-white/40" />
+            <SearchIcon className="w-4 h-4 text-[var(--text-subtle)]" />
           </div>
           <Input
             type="text"
@@ -678,10 +678,10 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
           <div className="mt-3">
             {isSearching ? (
               <div className="flex items-center justify-center py-6">
-                <div className="animate-spin w-5 h-5 border-2 border-[#00f5ff] border-t-transparent rounded-full" />
+                <div className="animate-spin w-5 h-5 border-2 border-[var(--brand-blue)] border-t-transparent rounded-full" />
               </div>
             ) : searchResults.length === 0 ? (
-              <p className="text-white/40 text-sm text-center py-4">
+              <p className="text-[var(--text-subtle)] text-sm text-center py-4">
                 No songs found for &quot;{searchQuery}&quot;
               </p>
             ) : (
@@ -692,11 +692,11 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                   return (
                     <div
                       key={song.id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10"
+                      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)]"
                     >
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-white font-medium truncate">{song.title}</h3>
-                        <p className="text-white/60 text-sm truncate">{song.artist}</p>
+                        <h3 className="text-[var(--text)] font-medium truncate">{song.title}</h3>
+                        <p className="text-[var(--text-muted)] text-sm truncate">{song.artist}</p>
                       </div>
                       <PopularityStars count={song.brand_count} />
                       <button
@@ -706,8 +706,8 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                           isAdded
                             ? "bg-green-500/20 text-green-400"
                             : isAdding
-                            ? "bg-white/10 text-white/40"
-                            : "bg-[#ff2d92]/20 text-[#ff2d92] hover:bg-[#ff2d92]/30"
+                            ? "bg-[var(--secondary)] text-[var(--text-subtle)]"
+                            : "bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/30"
                         }`}
                       >
                         {isAdded ? (
@@ -728,7 +728,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
       </div>
 
       {/* Divider */}
-      {searchQuery.trim() && <div className="border-t border-white/10" />}
+      {searchQuery.trim() && <div className="border-t border-[var(--card-border)]" />}
 
       {/* Error */}
       {error && (
@@ -740,15 +740,15 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
       {/* Known Songs List */}
       {knownSongs.length === 0 && !searchQuery ? (
         <EmptyState
-          icon={<MusicIcon className="w-8 h-8 text-white/20" />}
+          icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
           title="No songs yet"
           description="Search above to add songs you know and love to sing!"
         />
       ) : knownSongs.length > 0 && (
         <>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-white/70">My Songs</h2>
-            <span className="text-white/40 text-sm">{total} songs</span>
+            <h2 className="text-sm font-medium text-[var(--text-muted)]">My Songs</h2>
+            <span className="text-[var(--text-subtle)] text-sm">{total} songs</span>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -757,18 +757,18 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
               return (
                 <div
                   key={song.id}
-                  className={`flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10 transition-opacity ${
+                  className={`flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] transition-opacity ${
                     isRemoving ? "opacity-50" : ""
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-medium truncate">{song.title}</h3>
-                    <p className="text-white/60 text-sm truncate">{song.artist}</p>
+                    <h3 className="text-[var(--text)] font-medium truncate">{song.title}</h3>
+                    <p className="text-[var(--text-muted)] text-sm truncate">{song.artist}</p>
                   </div>
                   <button
                     onClick={() => handleRemoveSong(song)}
                     disabled={isRemoving}
-                    className="p-2 rounded-full text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                    className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
                     title="Remove song"
                   >
                     {isRemoving ? (
@@ -917,11 +917,11 @@ function ServicesTab({
   if (isGuest) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4">
-          <SpotifyIcon className="w-8 h-8 text-white/20" />
+        <div className="w-16 h-16 rounded-full bg-[var(--card)] flex items-center justify-center mx-auto mb-4">
+          <SpotifyIcon className="w-8 h-8 text-[var(--text-subtle)]" />
         </div>
-        <h3 className="text-lg font-medium text-white mb-2">Connect Your Music Services</h3>
-        <p className="text-white/60 text-sm mb-6 max-w-sm mx-auto">
+        <h3 className="text-lg font-medium text-[var(--text)] mb-2">Connect Your Music Services</h3>
+        <p className="text-[var(--text-muted)] text-sm mb-6 max-w-sm mx-auto">
           Create an account to connect Spotify and Last.fm for personalized recommendations based on your listening history.
         </p>
         <Link href="/login">
@@ -952,15 +952,15 @@ function ServicesTab({
       )}
 
       {/* Spotify */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+      <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
             <SpotifyIcon className="w-5 h-5 text-[#1DB954]" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-white">Spotify</h3>
+            <h3 className="font-medium text-[var(--text)]">Spotify</h3>
             {isConnected("spotify") && (
-              <p className="text-xs text-white/60">{getService("spotify")?.service_username}</p>
+              <p className="text-xs text-[var(--text-muted)]">{getService("spotify")?.service_username}</p>
             )}
           </div>
           {isConnected("spotify") ? (
@@ -972,7 +972,7 @@ function ServicesTab({
 
         {isConnected("spotify") ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-4 text-xs text-white/50">
+            <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
               <span>{getService("spotify")?.tracks_synced || 0} tracks</span>
               {getService("spotify")?.last_sync_at && (
                 <span>Last sync: {formatDate(getService("spotify")!.last_sync_at!)}</span>
@@ -990,15 +990,15 @@ function ServicesTab({
       </div>
 
       {/* Last.fm */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+      <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-full bg-[#D51007]/20 flex items-center justify-center">
             <LastfmIcon className="w-5 h-5 text-[#ff4444]" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-white">Last.fm</h3>
+            <h3 className="font-medium text-[var(--text)]">Last.fm</h3>
             {isConnected("lastfm") && (
-              <p className="text-xs text-white/60">{getService("lastfm")?.service_username}</p>
+              <p className="text-xs text-[var(--text-muted)]">{getService("lastfm")?.service_username}</p>
             )}
           </div>
           {isConnected("lastfm") ? (
@@ -1010,7 +1010,7 @@ function ServicesTab({
 
         {isConnected("lastfm") ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-4 text-xs text-white/50">
+            <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
               <span>{getService("lastfm")?.tracks_synced || 0} tracks</span>
               {getService("lastfm")?.last_sync_at && (
                 <span>Last sync: {formatDate(getService("lastfm")!.last_sync_at!)}</span>
@@ -1043,11 +1043,11 @@ function ServicesTab({
 
       {/* Sync Button */}
       {services.length > 0 && (
-        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+        <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium text-white text-sm">Sync listening history</h3>
-              <p className="text-xs text-white/50">
+              <h3 className="font-medium text-[var(--text)] text-sm">Sync listening history</h3>
+              <p className="text-xs text-[var(--text-subtle)]">
                 {isSyncing ? "Syncing in background..." : "Fetch latest from services"}
               </p>
             </div>
@@ -1068,7 +1068,7 @@ function ServicesTab({
       {/* Tip for Spotify-only users */}
       {isConnected("spotify") && !isConnected("lastfm") && (
         <div className="p-3 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
-          <p className="text-xs text-white/70">
+          <p className="text-xs text-[var(--text-muted)]">
             <strong className="text-[#ff4444]">Tip:</strong> Connect Last.fm for better recommendations based on your full listening history.
           </p>
         </div>

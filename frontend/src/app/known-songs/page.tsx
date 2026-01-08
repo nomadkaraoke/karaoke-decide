@@ -223,11 +223,11 @@ export default function KnownSongsPage() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                <MicrophoneIcon className="w-7 h-7 text-[#ff2d92]" />
+              <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+                <MicrophoneIcon className="w-7 h-7 text-[var(--brand-pink)]" />
                 Songs I Know
               </h1>
-              <p className="text-white/60 text-sm mt-1">
+              <p className="text-[var(--text-muted)] text-sm mt-1">
                 Add songs you already love singing to improve recommendations
               </p>
             </div>
@@ -237,7 +237,7 @@ export default function KnownSongsPage() {
           <div className="mb-8">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <SearchIcon className="w-5 h-5 text-white/40" />
+                <SearchIcon className="w-5 h-5 text-[var(--text-subtle)]" />
               </div>
               <Input
                 type="text"
@@ -254,19 +254,19 @@ export default function KnownSongsPage() {
               <div className="mt-4">
                 {isSearching ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin w-6 h-6 border-2 border-[#00f5ff] border-t-transparent rounded-full" />
+                    <div className="animate-spin w-6 h-6 border-2 border-[var(--brand-blue)] border-t-transparent rounded-full" />
                   </div>
                 ) : searchError ? (
                   <p className="text-red-400 text-sm text-center py-4">
                     {searchError}
                   </p>
                 ) : searchResults.length === 0 ? (
-                  <p className="text-white/40 text-sm text-center py-4">
+                  <p className="text-[var(--text-subtle)] text-sm text-center py-4">
                     No songs found for &quot;{searchQuery}&quot;
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <p className="text-white/60 text-sm mb-2">
+                    <p className="text-[var(--text-muted)] text-sm mb-2">
                       Search results ({searchResults.length})
                     </p>
                     {searchResults.map((song) => {
@@ -276,14 +276,14 @@ export default function KnownSongsPage() {
                       return (
                         <div
                           key={song.id}
-                          className="flex items-center gap-3 p-3 rounded-xl bg-[rgba(20,20,30,0.9)] border border-white/10"
+                          className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)]"
                           data-testid="search-result-item"
                         >
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-medium truncate">
+                            <h3 className="text-[var(--text)] font-medium truncate">
                               {song.title}
                             </h3>
-                            <p className="text-white/60 text-sm truncate">
+                            <p className="text-[var(--text-muted)] text-sm truncate">
                               {song.artist}
                             </p>
                           </div>
@@ -297,8 +297,8 @@ export default function KnownSongsPage() {
                               isAdded
                                 ? "bg-green-500/20 text-green-400 cursor-default"
                                 : isAdding
-                                ? "bg-white/10 text-white/40 cursor-wait"
-                                : "bg-[#ff2d92]/20 text-[#ff2d92] hover:bg-[#ff2d92]/30"
+                                ? "bg-[var(--secondary)] text-[var(--text-subtle)] cursor-wait"
+                                : "bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/30"
                             }`}
                             data-testid="add-song-button"
                           >
@@ -329,16 +329,16 @@ export default function KnownSongsPage() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-white/10 mb-6" />
+          <div className="border-t border-[var(--card-border)] mb-6" />
 
           {/* Known Songs List */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-[var(--text)]">
                 My Known Songs
               </h2>
               {total > 0 && (
-                <span className="text-white/40 text-sm">{total} songs</span>
+                <span className="text-[var(--text-subtle)] text-sm">{total} songs</span>
               )}
             </div>
 
@@ -349,14 +349,14 @@ export default function KnownSongsPage() {
                 <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-3">
                   <span className="text-xl">!</span>
                 </div>
-                <p className="text-white/60 mb-4">{listError}</p>
+                <p className="text-[var(--text-muted)] mb-4">{listError}</p>
                 <Button onClick={() => loadKnownSongs(1)} variant="secondary">
                   Try again
                 </Button>
               </div>
             ) : knownSongs.length === 0 ? (
               <EmptyState
-                icon={<MicrophoneIcon className="w-8 h-8 text-white/20" />}
+                icon={<MicrophoneIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
                 title="No known songs yet"
                 description="Search above to add songs you know and love to sing!"
                 action={{
@@ -373,16 +373,16 @@ export default function KnownSongsPage() {
                     return (
                       <div
                         key={song.id}
-                        className={`flex items-center gap-3 p-3 rounded-xl bg-[rgba(20,20,30,0.9)] border border-white/10 transition-opacity ${
+                        className={`flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] transition-opacity ${
                           isRemoving ? "opacity-50" : ""
                         }`}
                         data-testid="known-song-item"
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-white font-medium truncate">
+                          <h3 className="text-[var(--text)] font-medium truncate">
                             {song.title}
                           </h3>
-                          <p className="text-white/60 text-sm truncate">
+                          <p className="text-[var(--text-muted)] text-sm truncate">
                             {song.artist}
                           </p>
                         </div>
@@ -390,7 +390,7 @@ export default function KnownSongsPage() {
                         <button
                           onClick={() => handleRemoveSong(song)}
                           disabled={isRemoving}
-                          className="p-2 rounded-full text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                          className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
                           title="Remove from known songs"
                           data-testid="remove-song-button"
                         >
@@ -422,11 +422,11 @@ export default function KnownSongsPage() {
           </div>
 
           {/* Footer */}
-          <div className="mt-8 pt-6 border-t border-white/10">
+          <div className="mt-8 pt-6 border-t border-[var(--card-border)]">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
               <Link
                 href="/recommendations"
-                className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 <SparklesIcon className="w-4 h-4" />
                 View recommendations based on your songs

@@ -257,25 +257,25 @@ export function ConnectedServicesSection({
   // Show upgrade prompt for guests
   if (isGuest) {
     return (
-      <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
+      <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
         <button
           onClick={onToggle}
           aria-expanded={isExpanded}
           className="w-full p-5 flex items-center justify-between text-left"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#00f5ff]/20 flex items-center justify-center">
-              <SpotifyIcon className="w-5 h-5 text-[#00f5ff]" />
+            <div className="w-10 h-10 rounded-full bg-[var(--brand-blue)]/20 flex items-center justify-center">
+              <SpotifyIcon className="w-5 h-5 text-[var(--brand-blue)]" />
             </div>
             <div>
-              <h2 className="font-semibold text-white">Connected Services</h2>
-              <p className="text-sm text-white/60">
+              <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+              <p className="text-sm text-[var(--text-muted)]">
                 Create an account to connect
               </p>
             </div>
           </div>
           <ChevronDownIcon
-            className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
           />
         </button>
 
@@ -296,7 +296,7 @@ export function ConnectedServicesSection({
   const lastfmConnected = isConnected("lastfm");
 
   return (
-    <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
+    <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
       {/* Header - shows service logos when collapsed */}
       <button
         onClick={onToggle}
@@ -319,13 +319,13 @@ export function ConnectedServicesSection({
               )}
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-              <SpotifyIcon className="w-5 h-5 text-white/40" />
+            <div className="w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
+              <SpotifyIcon className="w-5 h-5 text-[var(--text-subtle)]" />
             </div>
           )}
           <div>
-            <h2 className="font-semibold text-white">Connected Services</h2>
-            <p className="text-sm text-white/60">
+            <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+            <p className="text-sm text-[var(--text-muted)]">
               {connectedCount === 0
                 ? "No services connected"
                 : [
@@ -338,7 +338,7 @@ export function ConnectedServicesSection({
           </div>
         </div>
         <ChevronDownIcon
-          className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -347,14 +347,14 @@ export function ConnectedServicesSection({
         <div className="px-5 pb-5 space-y-4">
           {/* Error message */}
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm">
               {error}
             </div>
           )}
 
           {/* Sync message */}
           {syncMessage && (
-            <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success)] text-sm">
               {syncMessage}
             </div>
           )}
@@ -364,15 +364,15 @@ export function ConnectedServicesSection({
           ) : (
             <>
               {/* Spotify */}
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
                     <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium text-white">Spotify</h3>
+                    <h3 className="font-medium text-[var(--text)]">Spotify</h3>
                     {isConnected("spotify") ? (
-                      <p className="text-xs text-white/60">
+                      <p className="text-xs text-[var(--text-muted)]">
                         {getService("spotify")?.service_username}
                       </p>
                     ) : null}
@@ -386,7 +386,7 @@ export function ConnectedServicesSection({
 
                 {isConnected("spotify") ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-4 text-xs text-white/50">
+                    <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
                       <span>
                         {getService("spotify")?.songs_synced || getService("spotify")?.tracks_synced || 0} songs
                       </span>
@@ -422,15 +422,15 @@ export function ConnectedServicesSection({
               </div>
 
               {/* Last.fm */}
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-full bg-[#D51007]/20 flex items-center justify-center">
                     <LastfmIcon className="w-4 h-4 text-[#ff4444]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium text-white">Last.fm</h3>
+                    <h3 className="font-medium text-[var(--text)]">Last.fm</h3>
                     {isConnected("lastfm") ? (
-                      <p className="text-xs text-white/60">
+                      <p className="text-xs text-[var(--text-muted)]">
                         {getService("lastfm")?.service_username}
                       </p>
                     ) : null}
@@ -444,7 +444,7 @@ export function ConnectedServicesSection({
 
                 {isConnected("lastfm") ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-4 text-xs text-white/50">
+                    <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
                       <span>
                         {getService("lastfm")?.songs_synced || getService("lastfm")?.tracks_synced || 0} songs
                       </span>
@@ -491,13 +491,13 @@ export function ConnectedServicesSection({
 
               {/* Sync button */}
               {services.length > 0 && (
-                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium text-white text-sm">
+                      <h3 className="font-medium text-[var(--text)] text-sm">
                         Sync listening history
                       </h3>
-                      <p className="text-xs text-white/50">
+                      <p className="text-xs text-[var(--text-subtle)]">
                         {isSyncing
                           ? "Syncing in background..."
                           : "Fetch latest from services"}
@@ -518,21 +518,21 @@ export function ConnectedServicesSection({
                   {/* Progress display */}
                   {isSyncing && activeJob?.progress && (
                     <div className="mt-3 space-y-2">
-                      <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div className="relative h-1.5 bg-[var(--secondary)] rounded-full overflow-hidden">
                         <div
-                          className="absolute inset-y-0 left-0 bg-[#00f5ff] transition-all duration-500"
+                          className="absolute inset-y-0 left-0 bg-[var(--brand-blue)] transition-all duration-500"
                           style={{ width: `${activeJob.progress.percentage}%` }}
                         />
                       </div>
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-white/50">
+                        <span className="text-[var(--text-subtle)]">
                           {activeJob.progress.current_service && (
                             <>
                               <span className="capitalize">
                                 {activeJob.progress.current_service}
                               </span>
                               {activeJob.progress.current_phase && (
-                                <span className="text-white/30">
+                                <span className="text-[var(--text-subtle)]">
                                   {" "}
                                   - {activeJob.progress.current_phase}
                                 </span>
@@ -540,7 +540,7 @@ export function ConnectedServicesSection({
                             </>
                           )}
                         </span>
-                        <span className="text-white font-medium">
+                        <span className="text-[var(--text)] font-medium">
                           {activeJob.progress.percentage}%
                         </span>
                       </div>
@@ -552,7 +552,7 @@ export function ConnectedServicesSection({
               {/* Last.fm encouragement for Spotify-only users */}
               {isConnected("spotify") && !isConnected("lastfm") && (
                 <div className="p-3 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
-                  <p className="text-xs text-white/70">
+                  <p className="text-xs text-[var(--text-muted)]">
                     <strong className="text-[#ff4444]">Tip:</strong> Connect
                     Last.fm for more accurate recommendations based on your full
                     listening history.

@@ -167,16 +167,16 @@ export default function RecommendationsPage() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
                 {title}
-                <span className="text-sm font-normal text-white/40">
+                <span className="text-sm font-normal text-[var(--text-subtle)]">
                   ({count})
                 </span>
               </h2>
-              <p className="text-sm text-white/50">{subtitle}</p>
+              <p className="text-sm text-[var(--text-subtle)]">{subtitle}</p>
             </div>
             <span
-              className={`text-white/40 transition-transform ${
+              className={`text-[var(--text-subtle)] transition-transform ${
                 isCollapsed ? "" : "rotate-180"
               }`}
             >
@@ -190,7 +190,7 @@ export default function RecommendationsPage() {
         {!isCollapsed && (
           <div className="flex flex-col gap-3">
             {count === 0 ? (
-              <p className="text-white/40 text-sm py-4 text-center">
+              <p className="text-[var(--text-subtle)] text-sm py-4 text-center">
                 {emptyMessage}
               </p>
             ) : (
@@ -214,25 +214,25 @@ export default function RecommendationsPage() {
         <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <SparklesIcon className="w-7 h-7 text-[#ffeb3b]" />
+            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+              <SparklesIcon className="w-7 h-7 text-[var(--brand-gold)]" />
               Recommendations
             </h1>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-[var(--text-muted)] text-sm mt-1">
               Songs you might love, based on your music taste
             </p>
           </div>
 
           {/* Quiz Prompt Banner - show if quiz not completed */}
           {!quizStatusLoading && !hasCompletedQuiz && (
-            <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-[#ff2d92]/10 to-[#b347ff]/10 border border-[#ff2d92]/30">
+            <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-[var(--brand-pink)]/10 to-[var(--brand-purple)]/10 border border-[var(--brand-pink)]/30">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-white font-semibold flex items-center gap-2">
+                  <h3 className="text-[var(--text)] font-semibold flex items-center gap-2">
                     <span className="text-xl">✨</span>
                     Get personalized recommendations
                   </h3>
-                  <p className="text-white/60 text-sm mt-1">
+                  <p className="text-[var(--text-muted)] text-sm mt-1">
                     Take a quick 30-second quiz to tell us your music taste
                   </p>
                 </div>
@@ -249,9 +249,9 @@ export default function RecommendationsPage() {
           )}
 
           {/* Filters */}
-          <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
+          <div className="bg-[var(--card)] rounded-xl p-4 mb-6 border border-[var(--card-border)]">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-white/80">Filters</span>
+              <span className="text-sm font-medium text-[var(--text)]">Filters</span>
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
                   Clear all
@@ -262,11 +262,11 @@ export default function RecommendationsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {/* Karaoke availability filter */}
               <div>
-                <label className="text-xs text-white/50 mb-1 block">Show</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Show</label>
                 <select
                   value={karaokeFilter}
                   onChange={(e) => setKaraokeFilter(e.target.value as KaraokeFilter)}
-                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-white/20"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
                   <option value="all">All songs</option>
                   <option value="karaoke">Karaoke ready</option>
@@ -276,11 +276,11 @@ export default function RecommendationsPage() {
 
               {/* Popularity filter */}
               <div>
-                <label className="text-xs text-white/50 mb-1 block">Popularity</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Popularity</label>
                 <select
                   value={popularityFilter}
                   onChange={(e) => setPopularityFilter(e.target.value as PopularityFilter)}
-                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-white/20"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
                   {Object.entries(POPULARITY_RANGES).map(([key, { label }]) => (
                     <option key={key} value={key}>
@@ -292,13 +292,13 @@ export default function RecommendationsPage() {
 
               {/* Duration filter */}
               <div>
-                <label className="text-xs text-white/50 mb-1 block">Duration</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Duration</label>
                 <select
                   value={durationFilter}
                   onChange={(e) =>
                     setDurationFilter(e.target.value as "any" | "short" | "medium" | "long")
                   }
-                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-white/20"
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
                   <option value="any">Any length</option>
                   <option value="short">Short (&lt;3 min)</option>
@@ -310,21 +310,21 @@ export default function RecommendationsPage() {
 
             {/* Toggle filters */}
             <div className="flex flex-wrap gap-3 mt-3">
-              <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={excludeExplicit}
                   onChange={(e) => setExcludeExplicit(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white/10 border-white/20 text-[#1ed760] focus:ring-[#1ed760]/50"
+                  className="w-4 h-4 rounded bg-[var(--secondary)] border-[var(--card-border)] text-[#1ed760] focus:ring-[#1ed760]/50"
                 />
                 Hide explicit
               </label>
-              <label className="flex items-center gap-2 text-sm text-white/70 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer">
                 <input
                   type="checkbox"
                   checked={classicsOnly}
                   onChange={(e) => setClassicsOnly(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white/10 border-white/20 text-[#1ed760] focus:ring-[#1ed760]/50"
+                  className="w-4 h-4 rounded bg-[var(--secondary)] border-[var(--card-border)] text-[#1ed760] focus:ring-[#1ed760]/50"
                 />
                 Classics only
               </label>
@@ -339,14 +339,14 @@ export default function RecommendationsPage() {
               <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                 <span className="text-2xl">⚠️</span>
               </div>
-              <p className="text-white/60 mb-4">{error}</p>
+              <p className="text-[var(--text-muted)] mb-4">{error}</p>
               <Button onClick={loadRecommendations} variant="secondary">
                 Try again
               </Button>
             </div>
           ) : !data || data.total_count === 0 ? (
             <EmptyState
-              icon={<SparklesIcon className="w-8 h-8 text-white/20" />}
+              icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
               title="No recommendations yet"
               description="Connect your music services or take the quiz to get personalized recommendations."
               action={{
@@ -394,18 +394,18 @@ export default function RecommendationsPage() {
               )}
 
               {/* Footer */}
-              <div className="mt-8 pt-6 border-t border-white/10">
+              <div className="mt-8 pt-6 border-t border-[var(--card-border)]">
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm">
                   <Link
                     href="/my-songs"
-                    className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                    className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <MusicIcon className="w-4 h-4" />
                     View my songs
                   </Link>
                   <Link
                     href="/services"
-                    className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+                    className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <LinkIcon className="w-4 h-4" />
                     Sync more music

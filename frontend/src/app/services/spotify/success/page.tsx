@@ -25,14 +25,14 @@ export default function SpotifySuccessPage() {
             <SpotifyIcon className="w-8 h-8 text-[#1DB954]" />
           </div>
           <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-            <CheckIcon className="w-5 h-5 text-white" />
+            <CheckIcon className="w-5 h-5 text-[var(--text)]" />
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
           Spotify Connected!
         </h1>
-        <p className="text-white/60">Redirecting you back...</p>
+        <p className="text-[var(--text-muted)]">Redirecting you back...</p>
       </div>
     </main>
   );

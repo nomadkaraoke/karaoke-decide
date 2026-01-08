@@ -155,25 +155,25 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
     preferences.genres.length > 0;
 
   return (
-    <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
+    <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#00f5ff]/20 flex items-center justify-center">
-            <SparklesIcon className="w-5 h-5 text-[#00f5ff]" />
+          <div className="w-10 h-10 rounded-full bg-[var(--brand-blue)]/20 flex items-center justify-center">
+            <SparklesIcon className="w-5 h-5 text-[var(--brand-blue)]" />
           </div>
           <div>
-            <h2 className="font-semibold text-white">Preferences</h2>
-            <p className="text-sm text-white/60">
+            <h2 className="font-semibold text-[var(--text)]">Preferences</h2>
+            <p className="text-sm text-[var(--text-muted)]">
               {hasPreferences ? "Customized" : "Not set"}
             </p>
           </div>
         </div>
         <ChevronDownIcon
-          className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -182,14 +182,14 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
         <div className="px-5 pb-5 space-y-6">
           {/* Error message */}
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm">
               {error}
             </div>
           )}
 
           {/* Success message */}
           {successMessage && (
-            <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success)] text-sm">
               {successMessage}
             </div>
           )}
@@ -200,7 +200,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
             <>
               {/* Decade preference */}
               <div>
-                <h3 className="text-sm font-medium text-white mb-3">
+                <h3 className="text-sm font-medium text-[var(--text)] mb-3">
                   Favorite decade
                 </h3>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -216,8 +216,8 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                         p-2 rounded-lg text-sm transition-all
                         ${
                           currentPrefs.decade_preference === decade
-                            ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border text-white"
-                            : "bg-white/5 border border-white/10 text-white/70 hover:border-white/20"
+                            ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border text-[var(--text)]"
+                            : "bg-[var(--secondary)] border border-[var(--card-border)] text-[var(--text-muted)] hover:border-[var(--text-subtle)]"
                         }
                       `}
                     >
@@ -229,7 +229,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
 
               {/* Energy preference */}
               <div>
-                <h3 className="text-sm font-medium text-white mb-3">
+                <h3 className="text-sm font-medium text-[var(--text)] mb-3">
                   Energy level
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -247,20 +247,20 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                         p-3 rounded-lg text-left transition-all
                         ${
                           currentPrefs.energy_preference === option.value
-                            ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border"
-                            : "bg-white/5 border border-white/10 hover:border-white/20"
+                            ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border"
+                            : "bg-[var(--secondary)] border border-[var(--card-border)] hover:border-[var(--text-subtle)]"
                         }
                       `}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-white">
+                        <span className="font-medium text-[var(--text)]">
                           {option.label}
                         </span>
                         {currentPrefs.energy_preference === option.value && (
-                          <CheckIcon className="w-4 h-4 text-[#ff2d92]" />
+                          <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
                         )}
                       </div>
-                      <p className="text-xs text-white/50 mt-1">
+                      <p className="text-xs text-[var(--text-subtle)] mt-1">
                         {option.description}
                       </p>
                     </button>
@@ -270,7 +270,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
 
               {/* Genre preferences */}
               <div>
-                <h3 className="text-sm font-medium text-white mb-3">
+                <h3 className="text-sm font-medium text-[var(--text)] mb-3">
                   Favorite genres
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -282,8 +282,8 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                         px-3 py-1.5 rounded-full text-sm transition-all
                         ${
                           currentPrefs.genres.includes(genre.id)
-                            ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 border text-white"
-                            : "bg-white/5 border border-white/10 text-white/70 hover:border-white/20"
+                            ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border text-[var(--text)]"
+                            : "bg-[var(--secondary)] border border-[var(--card-border)] text-[var(--text-muted)] hover:border-[var(--text-subtle)]"
                         }
                       `}
                     >
@@ -319,10 +319,10 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
               )}
 
               {/* Retake quiz link */}
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-[var(--card-border)]">
                 <Link
                   href="/quiz"
-                  className="text-sm text-[#00f5ff] hover:underline flex items-center gap-2"
+                  className="text-sm text-[var(--brand-blue)] hover:underline flex items-center gap-2"
                 >
                   <SparklesIcon className="w-4 h-4" />
                   Retake the quiz to update your preferences

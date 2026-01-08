@@ -71,7 +71,7 @@ export default function AdminDashboard() {
         <p className="text-red-400">{error}</p>
         <button
           onClick={loadStats}
-          className="mt-4 px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors"
+          className="mt-4 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
           Retry
         </button>
@@ -84,10 +84,10 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-[var(--text)]">Dashboard</h2>
         <button
           onClick={loadStats}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
           <RefreshIcon className="w-4 h-4" />
           <span className="text-sm">Refresh</span>
@@ -96,7 +96,7 @@ export default function AdminDashboard() {
 
       {/* User Stats */}
       <section>
-        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-[var(--text)] mb-3 flex items-center gap-2">
           <UsersIcon className="w-5 h-5 text-cyan-400" />
           Users
         </h3>
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
         </div>
         <Link
           href="/admin/users"
-          className="inline-block mt-3 text-sm text-white/60 hover:text-white transition-colors"
+          className="inline-block mt-3 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           View all users &rarr;
         </Link>
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
 
       {/* Sync Jobs Stats (24h) */}
       <section>
-        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+        <h3 className="text-lg font-semibold text-[var(--text)] mb-3 flex items-center gap-2">
           <ActivityIcon className="w-5 h-5 text-purple-400" />
           Sync Jobs (24h)
         </h3>
@@ -155,7 +155,7 @@ export default function AdminDashboard() {
         </div>
         <Link
           href="/admin/sync-jobs"
-          className="inline-block mt-3 text-sm text-white/60 hover:text-white transition-colors"
+          className="inline-block mt-3 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           View all sync jobs &rarr;
         </Link>
@@ -163,33 +163,33 @@ export default function AdminDashboard() {
 
       {/* Service Connections */}
       <section>
-        <h3 className="text-lg font-semibold text-white mb-3">
+        <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
           Service Connections
         </h3>
         <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/20">
                 <SpotifyIcon className="w-5 h-5 text-green-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-[var(--text)]">
                   {stats.services.spotify_connected}
                 </p>
-                <p className="text-sm text-white/60">Spotify Connected</p>
+                <p className="text-sm text-[var(--text-muted)]">Spotify Connected</p>
               </div>
             </div>
           </div>
-          <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-red-500/20">
                 <LastfmIcon className="w-5 h-5 text-red-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-[var(--text)]">
                   {stats.services.lastfm_connected}
                 </p>
-                <p className="text-sm text-white/60">Last.fm Connected</p>
+                <p className="text-sm text-[var(--text-muted)]">Last.fm Connected</p>
               </div>
             </div>
           </div>
@@ -211,7 +211,7 @@ function StatCard({
   icon?: React.ReactNode;
 }) {
   const colorClasses = {
-    default: "text-white",
+    default: "text-[var(--text)]",
     green: "text-green-400",
     amber: "text-amber-400",
     cyan: "text-cyan-400",
@@ -220,12 +220,12 @@ function StatCard({
   };
 
   return (
-    <div className="rounded-xl bg-white/5 border border-white/10 p-4">
+    <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4">
       <div className="flex items-center justify-between">
         <p className={`text-2xl font-bold ${colorClasses[color]}`}>{value}</p>
         {icon && <span className={colorClasses[color]}>{icon}</span>}
       </div>
-      <p className="text-sm text-white/60 mt-1">{label}</p>
+      <p className="text-sm text-[var(--text-muted)] mt-1">{label}</p>
     </div>
   );
 }

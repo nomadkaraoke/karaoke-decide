@@ -31,10 +31,10 @@ export function PopularityStars({ count }: { count: number }) {
         <StarIcon
           key={i}
           filled={i < stars}
-          className={`w-3.5 h-3.5 ${i < stars ? "text-[#ffeb3b]" : "text-white/20"}`}
+          className={`w-3.5 h-3.5 ${i < stars ? "text-[var(--brand-gold)]" : "text-[var(--text-subtle)]"}`}
         />
       ))}
-      <span className="ml-1.5 text-xs text-white/40 font-mono">{count}</span>
+      <span className="ml-1.5 text-xs text-[var(--text-subtle)] font-mono">{count}</span>
     </div>
   );
 }
@@ -86,18 +86,18 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
     >
       {/* Glow effect on hover */}
       <div
-        className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[#ff2d92] via-[#b347ff] to-[#00f5ff] opacity-0 blur-sm transition-opacity duration-300 ${
+        className={`absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-[var(--brand-blue)] via-[var(--brand-purple)] to-[var(--brand-pink)] opacity-0 blur-sm transition-opacity duration-300 ${
           isHovered ? "opacity-60" : ""
         }`}
       />
 
-      <div className="relative flex flex-col gap-3 p-4 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 backdrop-blur-sm transition-all duration-300 hover:border-white/20">
+      <div className="relative flex flex-col gap-3 p-4 rounded-2xl bg-[var(--card)] border border-[var(--card-border)] backdrop-blur-sm transition-all duration-300 hover:border-[var(--text-subtle)]">
         {/* Song info */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-white truncate group-hover:text-[#00f5ff] transition-colors">
+          <h3 className="text-lg font-semibold text-[var(--text)] truncate group-hover:text-[var(--brand-pink)] transition-colors">
             {song.title}
           </h3>
-          <p className="text-sm text-white/60 truncate mt-0.5">{song.artist}</p>
+          <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">{song.artist}</p>
         </div>
 
         {/* Bottom row */}
@@ -107,7 +107,7 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
           {/* Karaoke button with dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-[#ff2d92] to-[#b347ff] text-white text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,45,146,0.5)] active:scale-95"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-pink)] text-[var(--text)] text-sm font-semibold transition-all duration-200 hover:bg-[var(--brand-pink-hover)] hover:scale-105 hover:shadow-[0_0_20px_rgba(255,122,204,0.5)] active:scale-95"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <MicrophoneIcon className="w-4 h-4" />
@@ -119,19 +119,19 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
 
             {/* Dropdown menu */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[rgba(30,30,40,0.98)] border border-white/20 shadow-xl overflow-hidden z-50 animate-fade-in">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl bg-[var(--card)] border border-[var(--card-border)] shadow-xl overflow-hidden z-50 animate-fade-in">
                 <div className="p-1">
                   <a
                     href={links.youtube}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--secondary)] transition-colors"
                     onClick={() => setIsDropdownOpen(false)}
                   >
                     <YouTubeIcon className="w-5 h-5 text-red-500" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white">Search YouTube</div>
-                      <div className="text-xs text-white/50 truncate">
+                      <div className="text-sm font-medium text-[var(--text)]">Search YouTube</div>
+                      <div className="text-xs text-[var(--text-subtle)] truncate">
                         Find existing karaoke videos
                       </div>
                     </div>
@@ -141,13 +141,13 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
                     href={links.generator}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[var(--secondary)] transition-colors"
                     onClick={() => setIsDropdownOpen(false)}
                   >
-                    <VideoIcon className="w-5 h-5 text-[#00f5ff]" />
+                    <VideoIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white">Create with Generator</div>
-                      <div className="text-xs text-white/50 truncate">
+                      <div className="text-sm font-medium text-[var(--text)]">Create with Generator</div>
+                      <div className="text-xs text-[var(--text-subtle)] truncate">
                         Generate custom karaoke video
                       </div>
                     </div>

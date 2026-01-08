@@ -18,7 +18,7 @@ function PopularityStars({ count }: { count: number }) {
         <StarIcon
           key={i}
           filled={i < stars}
-          className={`w-2.5 h-2.5 ${i < stars ? "text-[#ffeb3b]" : "text-white/20"}`}
+          className={`w-2.5 h-2.5 ${i < stars ? "text-[var(--brand-gold)]" : "text-[var(--text-subtle)]"}`}
         />
       ))}
     </div>
@@ -40,8 +40,8 @@ export function QuizSongCard({
         animate-fade-in-up
         ${
           isSelected
-            ? "bg-[#ff2d92]/20 border-[#ff2d92]/50 shadow-[0_0_20px_rgba(255,45,146,0.2)]"
-            : "bg-[rgba(20,20,30,0.9)] border-white/10 hover:border-white/20 hover:bg-white/5"
+            ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 shadow-[0_0_20px_rgba(255,122,204,0.2)]"
+            : "bg-[var(--card)] border-[var(--card-border)] hover:border-[var(--text-subtle)] hover:bg-[var(--secondary)]"
         }
       `}
       style={{ animationDelay: `${index * 30}ms` }}
@@ -53,28 +53,28 @@ export function QuizSongCard({
           transition-all duration-200
           ${
             isSelected
-              ? "bg-[#ff2d92] scale-100"
-              : "bg-white/10 scale-90"
+              ? "bg-[var(--brand-pink)] scale-100"
+              : "bg-[var(--secondary)] scale-90"
           }
         `}
       >
-        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+        {isSelected && <CheckIcon className="w-4 h-4 text-[var(--text)]" />}
       </div>
 
       {/* Song info */}
       <div className="pr-10">
         <h3
           className={`font-semibold truncate transition-colors ${
-            isSelected ? "text-white" : "text-white/90"
+            isSelected ? "text-[var(--text)]" : "text-[var(--text)]"
           }`}
         >
           {song.title}
         </h3>
-        <p className="text-sm text-white/60 truncate mt-0.5">{song.artist}</p>
+        <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">{song.artist}</p>
 
         {/* Meta row */}
         <div className="flex items-center gap-3 mt-2">
-          <span className="px-2 py-0.5 rounded-full bg-white/10 text-white/60 text-xs">
+          <span className="px-2 py-0.5 rounded-full bg-[var(--secondary)] text-[var(--text-muted)] text-xs">
             {song.decade}
           </span>
           <PopularityStars count={song.brand_count} />

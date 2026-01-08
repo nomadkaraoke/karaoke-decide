@@ -124,25 +124,25 @@ export default function SettingsPage() {
         <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <SettingsIcon className="w-7 h-7 text-[#00f5ff]" />
+            <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
+              <SettingsIcon className="w-7 h-7 text-[var(--brand-blue)]" />
               Settings
             </h1>
-            <p className="text-white/60 text-sm mt-1">
+            <p className="text-[var(--text-muted)] text-sm mt-1">
               Manage your profile and preferences
             </p>
           </div>
 
           <div className="space-y-6">
             {/* Profile Section */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-[#ff2d92]/20 flex items-center justify-center">
-                  <UserIcon className="w-5 h-5 text-[#ff2d92]" />
+                <div className="w-10 h-10 rounded-full bg-[var(--brand-pink)]/20 flex items-center justify-center">
+                  <UserIcon className="w-5 h-5 text-[var(--brand-pink)]" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-white">Profile</h2>
-                  <p className="text-xs text-white/60">Your account information</p>
+                  <h2 className="font-semibold text-[var(--text)]">Profile</h2>
+                  <p className="text-xs text-[var(--text-muted)]">Your account information</p>
                 </div>
               </div>
 
@@ -162,17 +162,17 @@ export default function SettingsPage() {
               <form onSubmit={handleProfileSubmit} className="space-y-4">
                 {/* Email (read-only) */}
                 <div>
-                  <label className="block text-xs font-medium text-white/60 mb-1.5">
+                  <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
                     Email
                   </label>
-                  <div className="px-3 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-sm">
+                  <div className="px-3 py-2.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)] text-sm">
                     {user?.email || "Guest session"}
                   </div>
                 </div>
 
                 {/* Display name */}
                 <div>
-                  <label htmlFor="displayName" className="block text-xs font-medium text-white/60 mb-1.5">
+                  <label htmlFor="displayName" className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
                     Display Name
                   </label>
                   <Input
@@ -202,15 +202,15 @@ export default function SettingsPage() {
             </section>
 
             {/* Preferences Section */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#00f5ff]/20 flex items-center justify-center">
-                    <MusicIcon className="w-5 h-5 text-[#00f5ff]" />
+                  <div className="w-10 h-10 rounded-full bg-[var(--brand-blue)]/20 flex items-center justify-center">
+                    <MusicIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-white">Music Preferences</h2>
-                    <p className="text-xs text-white/60">Your karaoke style</p>
+                    <h2 className="font-semibold text-[var(--text)]">Music Preferences</h2>
+                    <p className="text-xs text-[var(--text-muted)]">Your karaoke style</p>
                   </div>
                 </div>
                 <Link href="/quiz">
@@ -233,31 +233,31 @@ export default function SettingsPage() {
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-sm text-white/40">No genres selected</span>
+                      <span className="text-sm text-[var(--text-subtle)]">No genres selected</span>
                     )}
                   </div>
 
                   {/* Decade & Energy */}
                   <div className="flex items-center gap-3 text-sm">
                     {preferences.decade ? (
-                      <span className="px-2.5 py-1 rounded-full bg-white/10 text-white/70">
+                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-[var(--text-muted)]">
                         {preferences.decade}
                       </span>
                     ) : null}
                     {preferences.energy ? (
-                      <span className="px-2.5 py-1 rounded-full bg-white/10 text-white/70">
+                      <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-[var(--text-muted)]">
                         {preferences.energy} energy
                       </span>
                     ) : null}
                     {!preferences.decade && !preferences.energy && preferences.genres.length === 0 && (
-                      <span className="text-white/40">
+                      <span className="text-[var(--text-subtle)]">
                         Take the quiz to set your preferences
                       </span>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-white/40">
+                <p className="text-sm text-[var(--text-subtle)]">
                   Take the quiz to set your preferences
                 </p>
               )}
@@ -265,29 +265,29 @@ export default function SettingsPage() {
 
             {/* Connected Services Quick View */}
             <Link href="/music-i-know" className="block">
-              <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 hover:border-white/20 transition-colors">
+              <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--card-border)] transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {/* Service icons */}
                     <div className="flex items-center gap-1">
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                        services.spotify?.connected ? "bg-[#1DB954]/20" : "bg-white/10"
+                        services.spotify?.connected ? "bg-[#1DB954]/20" : "bg-[var(--secondary)]"
                       }`}>
                         <SpotifyIcon className={`w-4 h-4 ${
-                          services.spotify?.connected ? "text-[#1DB954]" : "text-white/30"
+                          services.spotify?.connected ? "text-[#1DB954]" : "text-[var(--text-subtle)]"
                         }`} />
                       </div>
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
-                        services.lastfm?.connected ? "bg-[#D51007]/20" : "bg-white/10"
+                        services.lastfm?.connected ? "bg-[#D51007]/20" : "bg-[var(--secondary)]"
                       }`}>
                         <LastfmIcon className={`w-4 h-4 ${
-                          services.lastfm?.connected ? "text-[#ff4444]" : "text-white/30"
+                          services.lastfm?.connected ? "text-[#ff4444]" : "text-[var(--text-subtle)]"
                         }`} />
                       </div>
                     </div>
                     <div>
-                      <h2 className="font-semibold text-white">Connected Services</h2>
-                      <p className="text-xs text-white/60">
+                      <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+                      <p className="text-xs text-[var(--text-muted)]">
                         {servicesLoading ? "Loading..." :
                           connectedServicesCount === 0 ? "No services connected" :
                           `${connectedServicesCount} service${connectedServicesCount !== 1 ? "s" : ""} connected`
@@ -295,21 +295,21 @@ export default function SettingsPage() {
                       </p>
                     </div>
                   </div>
-                  <ChevronRightIcon className="w-5 h-5 text-white/40" />
+                  <ChevronRightIcon className="w-5 h-5 text-[var(--text-subtle)]" />
                 </div>
               </section>
             </Link>
 
             {/* Log Out */}
-            <section className="p-5 rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10">
+            <section className="p-5 rounded-2xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                    <LogOutIcon className="w-5 h-5 text-white/60" />
+                  <div className="w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
+                    <LogOutIcon className="w-5 h-5 text-[var(--text-muted)]" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-white">Log Out</h2>
-                    <p className="text-xs text-white/60">
+                    <h2 className="font-semibold text-[var(--text)]">Log Out</h2>
+                    <p className="text-xs text-[var(--text-muted)]">
                       {isGuest ? "Clear your guest session" : "Sign out of your account"}
                     </p>
                   </div>
@@ -329,7 +329,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <h2 className="font-semibold text-red-400">Danger Zone</h2>
-                    <p className="text-xs text-white/60">Irreversible actions</p>
+                    <p className="text-xs text-[var(--text-muted)]">Irreversible actions</p>
                   </div>
                 </div>
 
@@ -349,7 +349,7 @@ export default function SettingsPage() {
                   </Button>
                 ) : (
                   <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
-                    <p className="text-sm text-white/80 mb-4">
+                    <p className="text-sm text-[var(--text)] mb-4">
                       Are you sure? This will permanently delete your account and all your data.
                       This action cannot be undone.
                     </p>
@@ -375,7 +375,7 @@ export default function SettingsPage() {
             )}
 
             {/* Account ID */}
-            <div className="text-center text-xs text-white/30">
+            <div className="text-center text-xs text-[var(--text-subtle)]">
               Account ID: {user?.id}
             </div>
           </div>

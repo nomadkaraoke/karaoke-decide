@@ -45,8 +45,8 @@ export function QuizArtistCard({
         relative w-full p-4 rounded-xl text-left transition-all duration-200
         ${
           isSelected
-            ? "bg-gradient-to-r from-[#ff2d92]/20 to-[#b347ff]/20 border-[#ff2d92]/50 border-2 scale-[1.02]"
-            : "bg-white/5 border border-white/10 hover:border-white/30 hover:bg-white/10"
+            ? "bg-gradient-to-r from-[var(--brand-pink)]/20 to-[var(--brand-purple)]/20 border-[var(--brand-pink)]/50 border-2 scale-[1.02]"
+            : "bg-[var(--secondary)] border border-[var(--card-border)] hover:border-[var(--text-subtle)] hover:bg-[var(--card)]"
         }
       `}
       style={{
@@ -60,12 +60,12 @@ export function QuizArtistCard({
           transition-all duration-200
           ${
             isSelected
-              ? "bg-[#ff2d92] scale-100"
-              : "bg-white/10 scale-90"
+              ? "bg-[var(--brand-pink)] scale-100"
+              : "bg-[var(--secondary)] scale-90"
           }
         `}
       >
-        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+        {isSelected && <CheckIcon className="w-4 h-4 text-[var(--text)]" />}
       </div>
 
       <div className="flex items-start gap-4 pr-8">
@@ -73,20 +73,20 @@ export function QuizArtistCard({
         <div
           className={`
             w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
-            ${isSelected ? "bg-[#ff2d92]/30" : "bg-white/10"}
+            ${isSelected ? "bg-[var(--brand-pink)]/30" : "bg-[var(--secondary)]"}
           `}
         >
           <MicrophoneIcon
-            className={`w-6 h-6 ${isSelected ? "text-[#ff2d92]" : "text-white/50"}`}
+            className={`w-6 h-6 ${isSelected ? "text-[var(--brand-pink)]" : "text-[var(--text-muted)]"}`}
           />
         </div>
 
         {/* Artist info */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-white truncate text-lg">
+          <h3 className="font-semibold text-[var(--text)] truncate text-lg">
             {artist.name}
           </h3>
-          <p className="text-white/50 text-sm">
+          <p className="text-[var(--text-muted)] text-sm">
             {artist.song_count} karaoke songs
           </p>
 
@@ -96,7 +96,7 @@ export function QuizArtistCard({
               {displayGenres.map((genre, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2 py-0.5 rounded-full bg-[#ff2d92]/10 text-[#ff2d92]/80 border border-[#ff2d92]/20"
+                  className="text-xs px-2 py-0.5 rounded-full bg-[var(--brand-pink)]/10 text-[var(--brand-pink)] border border-[var(--brand-pink)]/20"
                 >
                   {formatGenre(genre)}
                 </span>
@@ -107,12 +107,12 @@ export function QuizArtistCard({
           {/* Top songs preview */}
           {artist.top_songs.length > 0 && (
             <div className="mt-2">
-              <p className="text-white/40 text-xs mb-1">Popular songs:</p>
+              <p className="text-[var(--text-subtle)] text-xs mb-1">Popular songs:</p>
               <div className="flex flex-wrap gap-1">
                 {artist.top_songs.slice(0, 3).map((song, i) => (
                   <span
                     key={i}
-                    className="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/60 truncate max-w-[120px]"
+                    className="text-xs px-2 py-0.5 rounded-full bg-[var(--secondary)] text-[var(--text-muted)] truncate max-w-[120px]"
                   >
                     {song}
                   </span>

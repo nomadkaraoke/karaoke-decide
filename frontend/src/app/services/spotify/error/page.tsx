@@ -27,14 +27,14 @@ function ErrorContent() {
             <SpotifyIcon className="w-8 h-8 text-[#1DB954]" />
           </div>
           <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-red-500 flex items-center justify-center">
-            <XIcon className="w-5 h-5 text-white" />
+            <XIcon className="w-5 h-5 text-[var(--text)]" />
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
           Connection Failed
         </h1>
-        <p className="text-white/60 mb-6">{safeDecodeURIComponent(message)}</p>
+        <p className="text-[var(--text-muted)] mb-6">{safeDecodeURIComponent(message)}</p>
 
         <div className="space-y-3">
           <Link href="/services">
@@ -58,7 +58,7 @@ export default function SpotifyErrorPage() {
     <Suspense
       fallback={
         <main className="min-h-screen flex items-center justify-center">
-          <div className="w-8 h-8 border-2 border-[#ff2d92] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[var(--brand-pink)] border-t-transparent rounded-full animate-spin" />
         </main>
       }
     >

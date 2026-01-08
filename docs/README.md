@@ -10,11 +10,14 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-06)
+## Current Status (2026-01-08)
 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL (54% complete)
 
 ### ✅ What's Working
+- **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
+- **Light/Dark Theme:** Full theme toggle support - system preference detection + manual toggle in header
+- **Homepage Overhaul:** Problem-focused hero, two user paths (quiz vs data sources), Generator integration section
 - **UX Refresh:** Streamlined navigation (Recommendations | Music I Know | Playlists | Settings)
 - **Landing Page:** Clean value prop + CTA, smart redirect (quiz if not completed, recommendations if completed)
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
@@ -61,6 +64,7 @@ See [PLAN.md](PLAN.md) for complete implementation phases.
 | [PLAN.md](PLAN.md) | Implementation plan with phases and data models |
 | [VISION.md](VISION.md) | Product goals and user stories |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data schemas, BigQuery setup |
+| [BRAND-STYLE-GUIDE.md](BRAND-STYLE-GUIDE.md) | **Brand reference** - Colors, typography, themes for UI work |
 | [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) | **Spotify data reference** - All tables, schemas, queries for LLM agents |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup, testing, deployment |
 | [API.md](API.md) | Backend endpoint documentation |
@@ -185,6 +189,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-08 | Brand Sync & Theme Toggle (Generator branding, light/dark mode, homepage overhaul) | [archive/2026-01-08-brand-sync-theme-toggle.md](archive/2026-01-08-brand-sync-theme-toggle.md) |
 | 2026-01-04 | Enhanced Artists Tab (merged sources, pagination, exclusions, compact UI) | [archive/2026-01-04-enhanced-artists-tab.md](archive/2026-01-04-enhanced-artists-tab.md) |
 | 2026-01-04 | Onboarding Flow Fix (quiz bypass bug, quiz completion tracking, quiz prompt banner) | [archive/2026-01-04-onboarding-flow-fix.md](archive/2026-01-04-onboarding-flow-fix.md) |
 | 2026-01-03 | UX Refresh (landing page, navigation, quiz streamlining, Music I Know, Settings) | [archive/2026-01-03-ux-refresh.md](archive/2026-01-03-ux-refresh.md) |

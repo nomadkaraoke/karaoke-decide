@@ -262,7 +262,7 @@ export function YourSongsSection({
   };
 
   return (
-    <div className="rounded-2xl bg-[rgba(20,20,30,0.9)] border border-white/10 overflow-hidden">
+    <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}
@@ -270,12 +270,12 @@ export function YourSongsSection({
         className="w-full p-5 flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#b347ff]/20 flex items-center justify-center">
-            <MusicIcon className="w-5 h-5 text-[#b347ff]" />
+          <div className="w-10 h-10 rounded-full bg-[var(--brand-purple)]/20 flex items-center justify-center">
+            <MusicIcon className="w-5 h-5 text-[var(--brand-purple)]" />
           </div>
           <div>
-            <h2 className="font-semibold text-white">Songs You Know</h2>
-            <p className="text-sm text-white/60">
+            <h2 className="font-semibold text-[var(--text)]">Songs You Know</h2>
+            <p className="text-sm text-[var(--text-muted)]">
               {total === 0
                 ? "No songs yet"
                 : `${total} song${total !== 1 ? "s" : ""} in your library`}
@@ -283,7 +283,7 @@ export function YourSongsSection({
           </div>
         </div>
         <ChevronDownIcon
-          className={`w-5 h-5 text-white/60 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+          className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -292,7 +292,7 @@ export function YourSongsSection({
         <div className="px-5 pb-5 space-y-4">
           {/* Error message */}
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            <div className="p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm">
               {error}
               <button
                 onClick={() => setError(null)}
@@ -326,7 +326,7 @@ export function YourSongsSection({
                   {showSuggestions && suggestions.length > 0 && (
                     <div
                       ref={suggestionsRef}
-                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/20 rounded-xl shadow-xl overflow-hidden"
+                      className="absolute z-50 top-full left-0 right-0 mt-1 bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden"
                     >
                       {suggestions.map((suggestion, index) => (
                         <button
@@ -335,25 +335,25 @@ export function YourSongsSection({
                           onClick={() => selectSuggestion(suggestion)}
                           className={`w-full px-3 py-2 text-left transition-colors ${
                             index === highlightedIndex
-                              ? "bg-[#b347ff]/20"
-                              : "hover:bg-white/5"
+                              ? "bg-[var(--brand-purple)]/20"
+                              : "hover:bg-[var(--secondary)]"
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-white truncate block">
+                              <span className="text-sm font-medium text-[var(--text)] truncate block">
                                 {suggestion.track_name}
                               </span>
-                              <span className="text-xs text-white/60 truncate block">
+                              <span className="text-xs text-[var(--text-muted)] truncate block">
                                 {suggestion.artist_name}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 ml-2">
-                              <span className="text-xs text-white/40">
+                              <span className="text-xs text-[var(--text-subtle)]">
                                 {formatDuration(suggestion.duration_ms)}
                               </span>
                               {suggestion.explicit && (
-                                <span className="text-xs px-1 py-0.5 rounded bg-white/10 text-white/60">
+                                <span className="text-xs px-1 py-0.5 rounded bg-[var(--secondary)] text-[var(--text-muted)]">
                                   E
                                 </span>
                               )}
@@ -384,7 +384,7 @@ export function YourSongsSection({
 
               {/* Song list */}
               {total === 0 ? (
-                <div className="text-center py-8 text-white/40 text-sm">
+                <div className="text-center py-8 text-[var(--text-subtle)] text-sm">
                   <p>No songs in your library yet.</p>
                   <p className="mt-1">
                     Search for songs above, connect your music services, or take
@@ -397,14 +397,14 @@ export function YourSongsSection({
                     {songs.map((song, index) => (
                       <div
                         key={song.id}
-                        className="group flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                        className="group flex items-center gap-3 p-3 rounded-xl bg-[var(--secondary)] hover:bg-[var(--secondary)]/80 transition-colors"
                       >
-                        <span className="text-xs text-white/30 w-6 text-right">
+                        <span className="text-xs text-[var(--text-subtle)] w-6 text-right">
                           {index + 1}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-white truncate">
+                            <p className="text-sm font-medium text-[var(--text)] truncate">
                               {song.title}
                             </p>
                             {song.has_karaoke_version === false && (
@@ -413,18 +413,18 @@ export function YourSongsSection({
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-white/60 truncate">
+                          <p className="text-xs text-[var(--text-muted)] truncate">
                             {song.artist}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           {song.playcount && song.playcount > 0 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/50">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--text-subtle)]">
                               {song.playcount.toLocaleString()} plays
                             </span>
                           )}
                           {song.rank && song.rank <= 50 && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-[#b347ff]/20 text-[#b347ff]/80">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--brand-purple)]/20 text-[var(--brand-purple)]">
                               #{song.rank}
                             </span>
                           )}
@@ -435,7 +435,7 @@ export function YourSongsSection({
                             <button
                               onClick={() => handleRemoveSong(song)}
                               disabled={removingSong === song.id}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-white/40 hover:text-red-400 transition-all"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-subtle)] hover:text-[var(--error)] transition-all"
                               title="Remove song"
                             >
                               {removingSong === song.id ? (
@@ -465,7 +465,7 @@ export function YourSongsSection({
                   )}
 
                   {/* Summary */}
-                  <div className="text-center text-xs text-white/40">
+                  <div className="text-center text-xs text-[var(--text-subtle)]">
                     Showing {songs.length} of {total} songs
                   </div>
                 </>

@@ -46,7 +46,7 @@ export default function LoginPage() {
   if (isLoading) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#ff2d92] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[var(--brand-pink)] border-t-transparent rounded-full animate-spin" />
       </main>
     );
   }
@@ -65,14 +65,14 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-2">
+            <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
               Check your email!
             </h1>
-            <p className="text-white/60 mb-6">
+            <p className="text-[var(--text)]/60 mb-6">
               We sent a magic link to{" "}
-              <span className="text-white font-medium">{email}</span>
+              <span className="text-[var(--text)] font-medium">{email}</span>
             </p>
-            <p className="text-white/40 text-sm mb-8">
+            <p className="text-[var(--text)]/40 text-sm mb-8">
               Click the link in your email to sign in. The link expires in 15
               minutes.
             </p>
@@ -106,11 +106,11 @@ export default function LoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="relative w-16 h-16 mx-auto mb-4">
-            <MicrophoneIcon className="w-full h-full text-[#ff2d92]" />
-            <div className="absolute inset-0 blur-xl bg-[#ff2d92]/30" />
+            <MicrophoneIcon className="w-full h-full text-[var(--brand-pink)]" />
+            <div className="absolute inset-0 blur-xl bg-[var(--brand-pink)]/30" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Welcome back</h1>
-          <p className="text-white/60">
+          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Welcome back</h1>
+          <p className="text-[var(--text)]/60">
             Sign in to access your songs and recommendations
           </p>
         </div>
@@ -143,21 +143,21 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-white/40 text-sm">
+          <p className="text-[var(--text)]/40 text-sm">
             No password needed. We&apos;ll send you a secure link to sign in.
           </p>
         </div>
 
         {/* Divider */}
         <div className="my-8 flex items-center gap-4">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-white/30 text-xs uppercase">or</span>
-          <div className="flex-1 h-px bg-white/10" />
+          <div className="flex-1 h-px bg-[var(--card-border)]" />
+          <span className="text-[var(--text)]/30 text-xs uppercase">or</span>
+          <div className="flex-1 h-px bg-[var(--card-border)]" />
         </div>
 
         {/* Alternative action */}
         <div className="text-center">
-          <p className="text-white/60 text-sm mb-3">
+          <p className="text-[var(--text)]/60 text-sm mb-3">
             Just want to browse? No account needed.
           </p>
           <Link href="/">

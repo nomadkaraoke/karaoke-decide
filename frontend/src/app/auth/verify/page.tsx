@@ -90,15 +90,15 @@ function VerifyContent() {
       <main className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
           <div className="relative w-20 h-20 mx-auto mb-6">
-            <div className="absolute inset-0 bg-[#ff2d92]/20 rounded-full animate-pulse" />
-            <div className="relative w-full h-full rounded-full bg-[#ff2d92]/10 flex items-center justify-center border border-[#ff2d92]/30">
-              <LoaderIcon className="w-10 h-10 text-[#ff2d92] animate-spin" />
+            <div className="absolute inset-0 bg-[var(--brand-pink)]/20 rounded-full animate-pulse" />
+            <div className="relative w-full h-full rounded-full bg-[var(--brand-pink)]/10 flex items-center justify-center border border-[var(--brand-pink)]/30">
+              <LoaderIcon className="w-10 h-10 text-[var(--brand-pink)] animate-spin" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
             Verifying your link...
           </h1>
-          <p className="text-white/60">Please wait a moment</p>
+          <p className="text-[var(--text-muted)]">Please wait a moment</p>
         </div>
       </main>
     );
@@ -114,10 +114,10 @@ function VerifyContent() {
               <CheckIcon className="w-10 h-10 text-green-400" />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
             You&apos;re signed in!
           </h1>
-          <p className="text-white/60">Redirecting you to your songs...</p>
+          <p className="text-[var(--text-muted)]">Redirecting you to your songs...</p>
         </div>
       </main>
     );
@@ -134,16 +134,16 @@ function VerifyContent() {
           </div>
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-2">
+        <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
           {errorType === "network" ? "Connection Error" : "Verification Failed"}
         </h1>
-        <p className="text-white/60 mb-6">{error}</p>
+        <p className="text-[var(--text-muted)] mb-6">{error}</p>
 
         {/* Network error troubleshooting tips */}
         {errorType === "network" && (
-          <div className="bg-white/5 rounded-lg p-4 mb-6 text-left">
-            <p className="text-white/80 text-sm font-medium mb-2">Troubleshooting tips:</p>
-            <ul className="text-white/60 text-sm space-y-1 list-disc list-inside">
+          <div className="bg-[var(--card)] rounded-lg p-4 mb-6 text-left">
+            <p className="text-[var(--text)] text-sm font-medium mb-2">Troubleshooting tips:</p>
+            <ul className="text-[var(--text-muted)] text-sm space-y-1 list-disc list-inside">
               <li>Try using mobile data instead of WiFi</li>
               <li>Disable VPN or ad-blocker extensions</li>
               <li>Try opening in incognito/private mode</li>
@@ -190,12 +190,12 @@ export default function VerifyPage() {
         <main className="min-h-screen flex items-center justify-center px-4">
           <div className="text-center">
             <div className="relative w-20 h-20 mx-auto mb-6">
-              <div className="absolute inset-0 bg-[#ff2d92]/20 rounded-full animate-pulse" />
-              <div className="relative w-full h-full rounded-full bg-[#ff2d92]/10 flex items-center justify-center border border-[#ff2d92]/30">
-                <LoaderIcon className="w-10 h-10 text-[#ff2d92] animate-spin" />
+              <div className="absolute inset-0 bg-[var(--brand-pink)]/20 rounded-full animate-pulse" />
+              <div className="relative w-full h-full rounded-full bg-[var(--brand-pink)]/10 flex items-center justify-center border border-[var(--brand-pink)]/30">
+                <LoaderIcon className="w-10 h-10 text-[var(--brand-pink)] animate-spin" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Loading...</h1>
+            <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Loading...</h1>
           </div>
         </main>
       }
