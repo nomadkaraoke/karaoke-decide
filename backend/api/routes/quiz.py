@@ -87,11 +87,32 @@ class QuizSubmitRequest(BaseModel):
     )
     decade_preference: str | None = Field(
         None,
-        description="User's preferred decade (e.g., '1980s', '1990s')",
+        description="User's preferred decade - legacy single select (e.g., '1980s', '1990s')",
+    )
+    decade_preferences: list[str] = Field(
+        default_factory=list,
+        description="User's preferred decades - multi-select (e.g., ['1980s', '1990s'])",
     )
     energy_preference: Literal["chill", "medium", "high"] | None = Field(
         None,
         description="User's preferred energy level",
+    )
+    # New preferences (v2)
+    genres: list[str] = Field(
+        default_factory=list,
+        description="Selected genre IDs (e.g., ['rock', 'punk', 'emo'])",
+    )
+    vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = Field(
+        None,
+        description="Preferred vocal comfort level for songs",
+    )
+    crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = Field(
+        None,
+        description="Prefer popular hits or niche deep cuts",
+    )
+    manual_artists: list[str] = Field(
+        default_factory=list,
+        description="Artists manually entered by user (free text)",
     )
 
 
@@ -152,6 +173,37 @@ class QuizEnjoySingingResponse(BaseModel):
     songs_added: int
     songs_updated: int
     songs_failed: int
+
+
+class SmartArtistRequest(BaseModel):
+    """Request for smart artist suggestions based on user input."""
+
+    genres: list[str] = Field(
+        default_factory=list,
+        description="Selected genre IDs to filter artists",
+    )
+    decades: list[str] = Field(
+        default_factory=list,
+        description="Selected decades to filter artists",
+    )
+    manual_artists: list[str] = Field(
+        default_factory=list,
+        description="Artists manually entered by user (to find similar)",
+    )
+    manual_song_artists: list[str] = Field(
+        default_factory=list,
+        description="Artists from songs user enjoys singing",
+    )
+    exclude: list[str] = Field(
+        default_factory=list,
+        description="Artist names to exclude (already selected)",
+    )
+    count: int = Field(
+        25,
+        ge=10,
+        le=50,
+        description="Number of artists to return",
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -237,6 +289,54 @@ async def get_quiz_artists(
     )
 
 
+@router.post("/artists/smart", response_model=QuizArtistsResponse)
+async def get_smart_quiz_artists(
+    request: SmartArtistRequest,
+    user: CurrentUser,
+    quiz_service: QuizServiceDep,
+) -> QuizArtistsResponse:
+    """Get quiz artists informed by user's preferences and manual entries.
+
+    This is an enhanced version of /artists that uses the user's selections
+    from earlier quiz steps to provide more relevant artist suggestions:
+
+    - Genres: Filter to artists in selected genres
+    - Decades: Filter to artists active in selected decades
+    - Manual artists: Find artists in similar genres
+    - Manual song artists: Use genres from songs user enjoys singing
+
+    The algorithm combines explicit genre selections with inferred genres
+    from manually entered artists/songs to find artists the user is more
+    likely to know and enjoy.
+
+    Use this endpoint for the final "Artists You Know" step in the quiz,
+    after collecting preferences in earlier steps.
+    """
+    artists = await quiz_service.get_smart_quiz_artists(
+        genres=request.genres if request.genres else None,
+        decades=request.decades if request.decades else None,
+        seed_artists=request.manual_artists if request.manual_artists else None,
+        seed_song_artists=request.manual_song_artists if request.manual_song_artists else None,
+        exclude_artists=request.exclude if request.exclude else None,
+        count=request.count,
+    )
+
+    return QuizArtistsResponse(
+        artists=[
+            QuizArtistResponse(
+                name=artist.name,
+                song_count=artist.song_count,
+                top_songs=artist.top_songs,
+                total_brand_count=artist.total_brand_count,
+                primary_decade=artist.primary_decade,
+                genres=artist.genres,
+                image_url=artist.image_url,
+            )
+            for artist in artists
+        ]
+    )
+
+
 @router.get("/decade-artists", response_model=DecadeArtistsResponse)
 async def get_decade_artists(
     user: CurrentUser,
@@ -277,12 +377,14 @@ async def submit_quiz(
     """Submit quiz responses.
 
     Creates UserSong records for artists/songs the user knows and
-    stores their preferences (decade, energy). This data is used
-    to generate personalized song recommendations.
+    stores their preferences (decades, genres, energy, vocal comfort,
+    crowd pleaser preference). This data is used to generate
+    personalized song recommendations.
 
     You can submit either:
     - known_artists: List of artist names (recommended, richer data)
     - known_song_ids: List of song IDs (legacy support)
+    - manual_artists: Artists entered by user (used for genre inference)
 
     A user can submit the quiz multiple times - each submission
     will add new songs and update preferences.
@@ -292,7 +394,12 @@ async def submit_quiz(
         known_song_ids=request.known_song_ids,
         known_artists=request.known_artists,
         decade_preference=request.decade_preference,
+        decade_preferences=request.decade_preferences,
         energy_preference=request.energy_preference,
+        genres=request.genres,
+        vocal_comfort_pref=request.vocal_comfort_pref,
+        crowd_pleaser_pref=request.crowd_pleaser_pref,
+        manual_artists=request.manual_artists,
     )
 
     return QuizSubmitResponse(
