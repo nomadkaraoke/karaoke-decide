@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Valid values for "Enjoy Singing" metadata
 SINGING_TAGS = [
@@ -122,9 +122,19 @@ class UserSong(BaseModel):
     # "Enjoy Singing" metadata - for songs user enjoys singing at karaoke
     enjoy_singing: bool = False  # True if user marked this as "enjoy singing"
     singing_tags: list[str] = Field(default_factory=list)
-    # Valid tags: "easy_to_sing", "crowd_pleaser", "shows_range", "fun_lyrics", "nostalgic"
     singing_energy: Literal["upbeat_party", "chill_ballad", "emotional_powerhouse"] | None = None
     vocal_comfort: Literal["easy", "comfortable", "challenging"] | None = None
+
+    @field_validator("singing_tags")
+    @classmethod
+    def validate_singing_tags(cls, v: list[str]) -> list[str]:
+        """Validate that all singing tags are from the allowed set."""
+        if not v:
+            return v
+        invalid_tags = [tag for tag in v if tag not in SINGING_TAGS]
+        if invalid_tags:
+            raise ValueError(f"Invalid singing tags: {invalid_tags}. Valid: {SINGING_TAGS}")
+        return v
 
     # Denormalized for queries
     artist: str
