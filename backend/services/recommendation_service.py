@@ -22,9 +22,18 @@ class UserContext:
     user_id: str
     known_artists: set[str]  # Lowercase artist names
     known_song_ids: set[str]
-    quiz_decade_pref: str | None
+    quiz_decade_pref: str | None  # Legacy single decade
     quiz_energy_pref: str | None
     total_songs: int
+
+    # New v2 preferences
+    quiz_decades: list[str] | None = None  # Multi-select decades
+    quiz_genres: list[str] | None = None  # Selected genre IDs
+    quiz_vocal_comfort_pref: str | None = None  # "easy", "challenging", "any"
+    quiz_crowd_pleaser_pref: str | None = None  # "hits", "deep_cuts", "any"
+
+    # Computed from enjoy_singing songs for primitive vocal range
+    comfortable_artist_keys: set[str] | None = None  # Artists from "easy"/"comfortable" songs
 
 
 @dataclass
@@ -86,6 +95,10 @@ class RecommendationService:
     KARAOKE_AVAILABILITY_WEIGHT = 0.20
     GENRE_WEIGHT = 0.12
     DECADE_WEIGHT = 0.08
+
+    # New scoring weights for v2 preferences
+    VOCAL_COMFORT_WEIGHT = 0.10  # Bonus for songs by "comfortable" artists
+    CROWD_PLEASER_ADJUSTMENT = 0.08  # Adjustment based on popularity preference
 
     # Thresholds
     MIN_BRAND_COUNT = 3  # Minimum brands for recommendation
@@ -543,10 +556,18 @@ class RecommendationService:
 
         known_artists: set[str] = set()
         known_song_ids: set[str] = set()
+        comfortable_artist_keys: set[str] = set()
 
         for doc in docs:
-            known_artists.add(doc["artist"].lower())
+            artist_lower = doc["artist"].lower()
+            known_artists.add(artist_lower)
             known_song_ids.add(doc["song_id"])
+
+            # Track artists from songs user enjoys singing that are comfortable
+            if doc.get("enjoy_singing"):
+                vocal_comfort = doc.get("vocal_comfort")
+                if vocal_comfort in ("easy", "comfortable"):
+                    comfortable_artist_keys.add(artist_lower)
 
         # Get user preferences from quiz and excluded artists
         user_docs = await self.firestore.query_documents(
@@ -557,12 +578,24 @@ class RecommendationService:
 
         quiz_decade_pref = None
         quiz_energy_pref = None
+        quiz_decades: list[str] = []
+        quiz_genres: list[str] = []
+        quiz_vocal_comfort_pref = None
+        quiz_crowd_pleaser_pref = None
         excluded_artists: set[str] = set()
 
         if user_docs:
             user_doc = user_docs[0]
+            # Legacy preferences
             quiz_decade_pref = user_doc.get("quiz_decade_pref")
             quiz_energy_pref = user_doc.get("quiz_energy_pref")
+
+            # New v2 preferences
+            quiz_decades = user_doc.get("quiz_decades", [])
+            quiz_genres = user_doc.get("quiz_genres", [])
+            quiz_vocal_comfort_pref = user_doc.get("quiz_vocal_comfort_pref")
+            quiz_crowd_pleaser_pref = user_doc.get("quiz_crowd_pleaser_pref")
+
             # Get excluded artists (stored as lowercase)
             excluded_artists = set(user_doc.get("excluded_artists", []))
 
@@ -577,6 +610,11 @@ class RecommendationService:
             quiz_decade_pref=quiz_decade_pref,
             quiz_energy_pref=quiz_energy_pref,
             total_songs=len(known_song_ids),
+            quiz_decades=quiz_decades if quiz_decades else None,
+            quiz_genres=quiz_genres if quiz_genres else None,
+            quiz_vocal_comfort_pref=quiz_vocal_comfort_pref,
+            quiz_crowd_pleaser_pref=quiz_crowd_pleaser_pref,
+            comfortable_artist_keys=comfortable_artist_keys if comfortable_artist_keys else None,
         )
 
     async def _score_candidates(
@@ -695,9 +733,43 @@ class RecommendationService:
             brand_score = min(brand_score / 1.5, 1.0)
             score += self.KARAOKE_AVAILABILITY_WEIGHT * brand_score
 
-        # Decade preference bonus (if we have data)
-        if context.quiz_decade_pref and song.get("decade") == context.quiz_decade_pref:
-            score += self.DECADE_WEIGHT
+        # Decade preference bonus (supports both legacy single and new multi-select)
+        song_decade = song.get("decade")
+        if song_decade:
+            # New: multi-decade preferences
+            if context.quiz_decades and song_decade in context.quiz_decades:
+                score += self.DECADE_WEIGHT
+            # Legacy: single decade preference
+            elif context.quiz_decade_pref and song_decade == context.quiz_decade_pref:
+                score += self.DECADE_WEIGHT
+
+        # Vocal comfort bonus - boost songs by artists user finds comfortable
+        # This enables primitive vocal range filtering based on enjoy_singing data
+        if context.comfortable_artist_keys:
+            artist_key = song.get("artist", "").lower()
+            if artist_key in context.comfortable_artist_keys:
+                # If user prefers easy songs, give full bonus
+                # If user prefers challenging, no bonus (they want the opposite)
+                if context.quiz_vocal_comfort_pref == "easy":
+                    score += self.VOCAL_COMFORT_WEIGHT
+                elif context.quiz_vocal_comfort_pref != "challenging":
+                    # "any" or None: give partial bonus
+                    score += self.VOCAL_COMFORT_WEIGHT * 0.5
+
+        # Crowd pleaser adjustment based on user preference
+        if context.quiz_crowd_pleaser_pref:
+            brand_count = song.get("brand_count", 0)
+            is_popular_hit = brand_count >= self.CLASSIC_THRESHOLD or spotify_pop >= 70
+
+            if context.quiz_crowd_pleaser_pref == "hits":
+                # User wants crowd pleasers - boost popular songs
+                if is_popular_hit:
+                    score += self.CROWD_PLEASER_ADJUSTMENT
+            elif context.quiz_crowd_pleaser_pref == "deep_cuts":
+                # User wants deep cuts - boost less popular songs
+                if not is_popular_hit:
+                    score += self.CROWD_PLEASER_ADJUSTMENT
+            # "any" - no adjustment
 
         capped_score: float = min(score, 1.0)  # Cap at 1.0
         return capped_score

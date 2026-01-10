@@ -570,13 +570,38 @@ export const api = {
       known_song_ids?: string[];
       known_artists?: string[];
       decade_preference?: string | null;
+      decade_preferences?: string[];
       energy_preference?: "chill" | "medium" | "high" | null;
+      genres?: string[];
+      vocal_comfort_pref?: "easy" | "challenging" | "any" | null;
+      crowd_pleaser_pref?: "hits" | "deep_cuts" | "any" | null;
+      manual_artists?: string[];
     }) =>
       api.post<{
         message: string;
         songs_added: number;
         recommendations_ready: boolean;
       }>("/api/quiz/submit", data),
+
+    getSmartArtists: (params: {
+      genres?: string[];
+      decades?: string[];
+      manual_artists?: string[];
+      manual_song_artists?: string[];
+      exclude?: string[];
+      count?: number;
+    }) =>
+      api.post<{
+        artists: Array<{
+          name: string;
+          song_count: number;
+          top_songs: string[];
+          total_brand_count: number;
+          primary_decade: string;
+          genres: string[];
+          image_url: string | null;
+        }>;
+      }>("/api/quiz/artists/smart", params),
 
     getStatus: () =>
       api.get<{

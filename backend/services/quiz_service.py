@@ -148,6 +148,154 @@ class QuizService:
 
         return candidates
 
+    async def get_smart_quiz_artists(
+        self,
+        genres: list[str] | None = None,
+        decades: list[str] | None = None,
+        seed_artists: list[str] | None = None,
+        seed_song_artists: list[str] | None = None,
+        exclude_artists: list[str] | None = None,
+        count: int = DEFAULT_ARTIST_COUNT,
+    ) -> list[QuizArtist]:
+        """Get quiz artists informed by user's preferences and manual entries.
+
+        This enhanced version uses multiple signals to find more relevant artists:
+        1. Explicit genre selections from user
+        2. Genres inferred from manually entered artists
+        3. Genres inferred from artists of songs user enjoys singing
+        4. Decade filtering
+
+        Args:
+            genres: User's selected genre IDs (e.g., ['rock', 'punk']).
+            decades: User's selected decades (e.g., ['1990s', '2000s']).
+            seed_artists: Artists manually entered by user (to infer genres).
+            seed_song_artists: Artists from songs user enjoys singing.
+            exclude_artists: Artists to exclude (already selected/entered).
+            count: Number of artists to return.
+
+        Returns:
+            List of QuizArtist objects that match user's taste profile.
+        """
+        # Combine all exclusions
+        all_exclusions = list(set((exclude_artists or []) + (seed_artists or []) + (seed_song_artists or [])))
+
+        # Get genres from seed artists if provided
+        inferred_genres: list[str] = []
+        if seed_artists or seed_song_artists:
+            all_seed_artists = list(set((seed_artists or []) + (seed_song_artists or [])))
+            inferred_genres = self._get_artist_genres(all_seed_artists)
+
+        # Combine explicit genres with inferred genres
+        all_genres = list(set((genres or []) + inferred_genres))
+
+        # If we have genres, use them for filtering
+        # If "other" is in genres, don't filter by genre at all
+        effective_genres = None
+        if all_genres and "other" not in all_genres:
+            effective_genres = all_genres
+
+        # Fetch candidates with combined filters
+        candidates = self._fetch_artist_candidates(
+            limit=count * 2,
+            genres=effective_genres,
+            exclude_artists=all_exclusions if all_exclusions else None,
+        )
+
+        # Randomly select final set
+        if len(candidates) > count:
+            candidates = random.sample(candidates, count)
+
+        return candidates
+
+    def _get_artist_genres(self, artist_names: list[str]) -> list[str]:
+        """Get genres for given artists from BigQuery.
+
+        Used to infer user's genre preferences from manually entered artists.
+
+        Args:
+            artist_names: List of artist names.
+
+        Returns:
+            List of genre IDs that map to these artists.
+        """
+        if not artist_names:
+            return []
+
+        # Build query to get genres for these artists
+        placeholders = ", ".join([f"@artist_{i}" for i in range(len(artist_names))])
+        sql = f"""
+            SELECT DISTINCT sag.genre
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists` sa
+            JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artist_genres` sag
+                ON sa.artist_id = sag.artist_id
+            WHERE LOWER(sa.artist_name) IN ({placeholders})
+            LIMIT 50
+        """
+
+        params = [
+            bigquery.ScalarQueryParameter(f"artist_{i}", "STRING", name.lower()) for i, name in enumerate(artist_names)
+        ]
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+
+        try:
+            results = self.bigquery.query(sql, job_config=job_config).result()
+            spotify_genres = [row.genre.lower() for row in results]
+
+            # Map Spotify genres back to our genre IDs
+            return self._map_spotify_genres_to_ids(spotify_genres)
+        except Exception:
+            # If query fails, return empty list
+            return []
+
+    def _map_spotify_genres_to_ids(self, spotify_genres: list[str]) -> list[str]:
+        """Map Spotify genre strings to our genre IDs.
+
+        Args:
+            spotify_genres: List of Spotify genre strings (e.g., 'classic rock').
+
+        Returns:
+            List of our genre IDs (e.g., 'classic-rock').
+        """
+        # Reverse mapping from Spotify genre patterns to our IDs
+        genre_keywords = {
+            "pop": "pop",
+            "rock": "rock",
+            "hip hop": "hiphop",
+            "r&b": "rnb",
+            "country": "country",
+            "electro": "electronic",
+            "dance": "electronic",
+            "metal": "metal",
+            "jazz": "jazz",
+            "latin": "latin",
+            "reggaeton": "latin",
+            "indie": "indie",
+            "alternative": "indie",
+            "k-pop": "kpop",
+            "disco": "disco",
+            "funk": "disco",
+            "soul": "rnb",
+            "classic rock": "classic-rock",
+            "broadway": "musical",
+            "reggae": "reggae",
+            "punk": "punk",
+            "emo": "emo",
+            "grunge": "grunge",
+            "folk": "folk",
+            "blues": "blues",
+            "ska": "ska",
+        }
+
+        matched_ids: set[str] = set()
+        for spotify_genre in spotify_genres:
+            for keyword, genre_id in genre_keywords.items():
+                if keyword in spotify_genre:
+                    matched_ids.add(genre_id)
+                    break
+
+        return list(matched_ids)
+
     async def get_decade_artists(self, artists_per_decade: int = 5) -> dict[str, list[dict]]:
         """Get example artists for each decade.
 
@@ -375,6 +523,14 @@ class QuizService:
             "classic-rock": "%classic rock%",
             "musical": "%broadway%",
             "reggae": "%reggae%",
+            # New genres added for expanded quiz
+            "punk": "%punk%",
+            "emo": "%emo%",
+            "grunge": "%grunge%",
+            "folk": "%folk%",
+            "blues": "%blues%",
+            "ska": "%ska%",
+            # "other" is intentionally not mapped - it's a catch-all
         }
 
         patterns = []
@@ -400,6 +556,13 @@ class QuizService:
         # This provides reliable results even before ETL of album dates
         # TODO: Replace with BigQuery query after album ETL complete
         decade_artists = {
+            "1950s": [
+                {"name": "Elvis Presley", "top_song": "Hound Dog"},
+                {"name": "Chuck Berry", "top_song": "Johnny B. Goode"},
+                {"name": "Little Richard", "top_song": "Tutti Frutti"},
+                {"name": "Buddy Holly", "top_song": "Peggy Sue"},
+                {"name": "Ray Charles", "top_song": "What'd I Say"},
+            ],
             "1960s": [
                 {"name": "The Beatles", "top_song": "Hey Jude"},
                 {"name": "Elvis Presley", "top_song": "Can't Help Falling in Love"},
@@ -506,7 +669,12 @@ class QuizService:
         known_song_ids: list[str] | None = None,
         known_artists: list[str] | None = None,
         decade_preference: str | None = None,
+        decade_preferences: list[str] | None = None,
         energy_preference: Literal["chill", "medium", "high"] | None = None,
+        genres: list[str] | None = None,
+        vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None,
+        crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None,
+        manual_artists: list[str] | None = None,
     ) -> QuizSubmitResult:
         """Submit quiz responses and update user profile.
 
@@ -517,8 +685,13 @@ class QuizService:
             user_id: User's ID.
             known_song_ids: List of song IDs the user recognized (legacy).
             known_artists: List of artist names the user knows.
-            decade_preference: User's preferred decade (e.g., "1980s").
+            decade_preference: User's preferred decade - legacy single (e.g., "1980s").
+            decade_preferences: User's preferred decades - multi-select.
             energy_preference: User's preferred energy level.
+            genres: User's selected genre IDs.
+            vocal_comfort_pref: Preferred vocal comfort (easy, challenging, any).
+            crowd_pleaser_pref: Prefer hits or deep cuts.
+            manual_artists: Artists manually entered by user.
 
         Returns:
             QuizSubmitResult with counts.
@@ -598,17 +771,22 @@ class QuizService:
 
         # Update user profile with quiz data
         await self._update_user_quiz_data(
-            user_id,
-            known_song_ids,
-            known_artists,
-            decade_preference,
-            energy_preference,
-            now,
+            user_id=user_id,
+            known_song_ids=known_song_ids,
+            known_artists=known_artists,
+            decade_preference=decade_preference,
+            decade_preferences=decade_preferences,
+            energy_preference=energy_preference,
+            genres=genres,
+            vocal_comfort_pref=vocal_comfort_pref,
+            crowd_pleaser_pref=crowd_pleaser_pref,
+            manual_artists=manual_artists,
+            completed_at=now,
         )
 
         return QuizSubmitResult(
             songs_added=songs_added,
-            recommendations_ready=len(known_song_ids) > 0 or len(known_artists) > 0,
+            recommendations_ready=len(known_song_ids) > 0 or len(known_artists) > 0 or len(manual_artists or []) > 0,
         )
 
     def _get_songs_by_artists(self, artist_names: list[str], limit_per_artist: int = 5) -> list[dict]:
@@ -688,7 +866,12 @@ class QuizService:
         known_song_ids: list[str],
         known_artists: list[str],
         decade_preference: str | None,
+        decade_preferences: list[str] | None,
         energy_preference: Literal["chill", "medium", "high"] | None,
+        genres: list[str] | None,
+        vocal_comfort_pref: Literal["easy", "challenging", "any"] | None,
+        crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None,
+        manual_artists: list[str] | None,
         completed_at: datetime,
     ) -> None:
         """Update user profile with quiz data.
@@ -697,8 +880,13 @@ class QuizService:
             user_id: User's ID.
             known_song_ids: Song IDs from quiz.
             known_artists: Artist names from quiz.
-            decade_preference: Decade preference.
+            decade_preference: Legacy single decade preference.
+            decade_preferences: Multi-select decade preferences.
             energy_preference: Energy preference.
+            genres: Selected genre IDs.
+            vocal_comfort_pref: Vocal comfort preference.
+            crowd_pleaser_pref: Crowd pleaser preference.
+            manual_artists: Manually entered artists.
             completed_at: Quiz completion timestamp.
         """
         # For guest users, store by user_id directly
@@ -730,11 +918,29 @@ class QuizService:
             "updated_at": completed_at.isoformat(),
         }
 
+        # Legacy single decade
         if decade_preference is not None:
             update_data["quiz_decade_pref"] = decade_preference
 
+        # New multi-select decades
+        if decade_preferences:
+            update_data["quiz_decades"] = decade_preferences
+
         if energy_preference is not None:
             update_data["quiz_energy_pref"] = energy_preference
+
+        # New preference fields
+        if genres:
+            update_data["quiz_genres"] = genres
+
+        if vocal_comfort_pref is not None:
+            update_data["quiz_vocal_comfort_pref"] = vocal_comfort_pref
+
+        if crowd_pleaser_pref is not None:
+            update_data["quiz_crowd_pleaser_pref"] = crowd_pleaser_pref
+
+        if manual_artists:
+            update_data["quiz_manual_artists"] = manual_artists
 
         await self.firestore.update_document(
             self.USERS_COLLECTION,

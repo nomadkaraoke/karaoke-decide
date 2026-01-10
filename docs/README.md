@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-09)
+## Current Status (2026-01-10)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework ✅
 
 ### ✅ What's Working
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
@@ -22,7 +22,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Landing Page:** Clean value prop + CTA, smart redirect (quiz if not completed, recommendations if completed)
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
-- **Quiz Flow:** Streamlined 3-step quiz (Genres → Preferences → Artists) with skip links
+- **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
@@ -124,9 +124,11 @@ cd frontend && npm run dev
 - `POST /api/services/sync` - Trigger listening history sync
 - `GET /api/services/sync/status` - Get sync status
 - `GET /api/quiz/artists` - Get quiz artists for onboarding (supports genre filtering)
+- `POST /api/quiz/artists/smart` - Get smart artist suggestions informed by user preferences
 - `GET /api/quiz/decade-artists` - Get example artists per decade
 - `GET /api/quiz/songs` - Get quiz songs for onboarding (legacy)
-- `POST /api/quiz/submit` - Submit quiz responses (accepts artists or songs)
+- `POST /api/quiz/submit` - Submit quiz responses (accepts artists, songs, genres, decades, preferences)
+- `POST /api/quiz/enjoy-singing` - Submit songs user enjoys singing with metadata
 - `GET /api/quiz/status` - Get quiz completion status
 - `GET /api/my/songs` - Get user's song library
 - `GET /api/known-songs` - Get user's manually-added known songs
@@ -182,6 +184,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-10 | Quiz Rework (5-step flow, 22 genres, multi-decade, vocal comfort/crowd pleaser prefs, smart artists) | [archive/2026-01-10-quiz-rework.md](archive/2026-01-10-quiz-rework.md) |
 | 2026-01-08 | Brand Sync & Theme Toggle (Generator branding, light/dark mode, homepage overhaul) | [archive/2026-01-08-brand-sync-theme-toggle.md](archive/2026-01-08-brand-sync-theme-toggle.md) |
 | 2026-01-04 | Enhanced Artists Tab (merged sources, pagination, exclusions, compact UI) | [archive/2026-01-04-enhanced-artists-tab.md](archive/2026-01-04-enhanced-artists-tab.md) |
 | 2026-01-04 | Onboarding Flow Fix (quiz bypass bug, quiz completion tracking, quiz prompt banner) | [archive/2026-01-04-onboarding-flow-fix.md](archive/2026-01-04-onboarding-flow-fix.md) |

@@ -37,8 +37,15 @@ class User(BaseModel):
     # Quiz data (for data-light users)
     quiz_completed_at: datetime | None = None
     quiz_songs_known: list[str] = Field(default_factory=list)
-    quiz_decade_pref: str | None = None
+    quiz_decade_pref: str | None = None  # Legacy: single decade
     quiz_energy_pref: Literal["chill", "medium", "high"] | None = None
+
+    # New quiz preferences (v2)
+    quiz_decades: list[str] = Field(default_factory=list)  # Multi-select decades
+    quiz_genres: list[str] = Field(default_factory=list)  # Selected genre IDs
+    quiz_vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None
+    quiz_crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None
+    quiz_manual_artists: list[str] = Field(default_factory=list)  # Manually entered artists
 
 
 class MusicService(BaseModel):
@@ -210,9 +217,16 @@ class QuizResponse(BaseModel):
     user_id: str
     known_song_ids: list[str] = Field(default_factory=list)  # Legacy: Songs the user recognized
     known_artists: list[str] = Field(default_factory=list)  # Artists the user knows
-    decade_preference: str | None = None  # Preferred decade
+    decade_preference: str | None = None  # Legacy: single decade
+    decade_preferences: list[str] = Field(default_factory=list)  # Multi-select decades
     energy_preference: Literal["chill", "medium", "high"] | None = None
     submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    # New preferences (v2)
+    genres: list[str] = Field(default_factory=list)  # Selected genre IDs
+    vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None
+    crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None
+    manual_artists: list[str] = Field(default_factory=list)  # Manually entered artists
 
 
 class Recommendation(BaseModel):
