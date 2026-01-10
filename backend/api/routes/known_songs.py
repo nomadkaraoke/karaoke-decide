@@ -101,6 +101,44 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class SetEnjoySingingRequest(BaseModel):
+    """Request to mark a song as one the user enjoys singing."""
+
+    singing_tags: list[str] = Field(
+        default_factory=list,
+        description="Tags describing why user enjoys singing this song. "
+        "Valid: easy_to_sing, crowd_pleaser, shows_range, fun_lyrics, nostalgic",
+    )
+    singing_energy: str | None = Field(
+        default=None,
+        description="Energy/mood of the song for the user. " "Valid: upbeat_party, chill_ballad, emotional_powerhouse",
+    )
+    vocal_comfort: str | None = Field(
+        default=None,
+        description="Comfort level in user's vocal range. " "Valid: easy, comfortable, challenging",
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional free-form notes about the song",
+    )
+
+
+class SetEnjoySingingResponse(BaseModel):
+    """Response after marking a song as enjoy singing."""
+
+    success: bool
+    song_id: str
+    artist: str
+    title: str
+    enjoy_singing: bool
+    singing_tags: list[str]
+    singing_energy: str | None
+    vocal_comfort: str | None
+    notes: str | None
+    created_new: bool
+
+
 # -----------------------------------------------------------------------------
 # List Known Songs
 # -----------------------------------------------------------------------------
@@ -278,6 +316,83 @@ async def remove_spotify_track(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Track not found in known songs or cannot be removed",
+        )
+
+
+# -----------------------------------------------------------------------------
+# Enjoy Singing (must be before /{song_id} routes to avoid path conflicts)
+# -----------------------------------------------------------------------------
+
+
+@router.post("/enjoy-singing", response_model=SetEnjoySingingResponse, status_code=status.HTTP_201_CREATED)
+async def set_enjoy_singing_by_query(
+    request: SetEnjoySingingRequest,
+    user: CurrentUser,
+    known_songs_service: KnownSongsServiceDep,
+    song_id: str = Query(..., description="Song ID - karaoke catalog ID or 'spotify:{track_id}'"),
+) -> SetEnjoySingingResponse:
+    """Mark a song as one the user enjoys singing at karaoke.
+
+    This endpoint adds or updates "enjoy singing" metadata on a song:
+    - If the song is already in user's library, updates with enjoy_singing=True
+    - If the song is new, creates it with source="enjoy_singing"
+
+    The song_id can be:
+    - A karaoke catalog song ID (integer as string)
+    - A Spotify track ID prefixed with "spotify:" (e.g., "spotify:4iV5W9uYEdYUVa79Axb7Rh")
+
+    All metadata fields are optional - the user doesn't need to fill in everything.
+    """
+    try:
+        result = await known_songs_service.set_enjoy_singing(
+            user_id=user.id,
+            song_id=song_id,
+            singing_tags=request.singing_tags,
+            singing_energy=request.singing_energy,
+            vocal_comfort=request.vocal_comfort,
+            notes=request.notes,
+        )
+
+        return SetEnjoySingingResponse(
+            success=result.success,
+            song_id=result.song_id,
+            artist=result.artist,
+            title=result.title,
+            enjoy_singing=result.enjoy_singing,
+            singing_tags=result.singing_tags,
+            singing_energy=result.singing_energy,
+            vocal_comfort=result.vocal_comfort,
+            notes=result.notes,
+            created_new=result.created_new,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.delete("/enjoy-singing", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_enjoy_singing(
+    user: CurrentUser,
+    known_songs_service: KnownSongsServiceDep,
+    song_id: str = Query(..., description="Song ID - karaoke catalog ID or 'spotify:{track_id}'"),
+) -> None:
+    """Remove enjoy singing flag from a song.
+
+    If the song was added solely via enjoy_singing, the song is deleted.
+    If the song exists from another source (spotify sync, lastfm, quiz),
+    only the enjoy_singing metadata is cleared.
+    """
+    removed = await known_songs_service.remove_enjoy_singing(
+        user_id=user.id,
+        song_id=song_id,
+    )
+
+    if not removed:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Song not found in user's library",
         )
 
 

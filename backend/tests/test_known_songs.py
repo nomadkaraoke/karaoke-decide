@@ -11,6 +11,7 @@ from backend.services.known_songs_service import (
     AddKnownSongResult,
     KnownSongsListResult,
     KnownSongsService,
+    SetEnjoySingingResult,
 )
 
 
@@ -73,6 +74,21 @@ def mock_known_songs_service(sample_known_songs: list[dict]) -> MagicMock:
             "total_requested": 3,
         }
     )
+    mock.set_enjoy_singing = AsyncMock(
+        return_value=SetEnjoySingingResult(
+            success=True,
+            song_id="1",
+            artist="Queen",
+            title="Bohemian Rhapsody",
+            enjoy_singing=True,
+            singing_tags=["crowd_pleaser", "shows_range"],
+            singing_energy="emotional_powerhouse",
+            vocal_comfort="challenging",
+            notes="Great song for the finale!",
+            created_new=False,
+        )
+    )
+    mock.remove_enjoy_singing = AsyncMock(return_value=True)
     return mock
 
 
@@ -513,3 +529,398 @@ class TestKnownSongsServiceUnit:
         assert result["total_requested"] == 2
         # Both should be processed (1 added, 1 already existed)
         assert result["added"] + result["already_existed"] == 2
+
+
+# =============================================================================
+# Enjoy Singing Tests
+# =============================================================================
+
+
+class TestSetEnjoySinging:
+    """Tests for POST /api/known-songs/enjoy-singing."""
+
+    def test_set_enjoy_singing_success(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing metadata on a song."""
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "1"},
+            json={
+                "singing_tags": ["crowd_pleaser", "shows_range"],
+                "singing_energy": "emotional_powerhouse",
+                "vocal_comfort": "challenging",
+                "notes": "Great song for the finale!",
+            },
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+        assert data["song_id"] == "1"
+        assert data["enjoy_singing"] is True
+        assert "crowd_pleaser" in data["singing_tags"]
+        assert data["singing_energy"] == "emotional_powerhouse"
+        assert data["vocal_comfort"] == "challenging"
+
+    def test_set_enjoy_singing_minimal_data(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing with minimal/empty metadata."""
+        mock_known_songs_service.set_enjoy_singing.return_value = SetEnjoySingingResult(
+            success=True,
+            song_id="1",
+            artist="Queen",
+            title="Bohemian Rhapsody",
+            enjoy_singing=True,
+            singing_tags=[],
+            singing_energy=None,
+            vocal_comfort=None,
+            notes=None,
+            created_new=False,
+        )
+
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "1"},
+            json={},  # No optional fields
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+        assert data["singing_tags"] == []
+        assert data["singing_energy"] is None
+
+    def test_set_enjoy_singing_creates_new_song(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test enjoy singing creates song if it doesn't exist."""
+        mock_known_songs_service.set_enjoy_singing.return_value = SetEnjoySingingResult(
+            success=True,
+            song_id="1",
+            artist="Queen",
+            title="Bohemian Rhapsody",
+            enjoy_singing=True,
+            singing_tags=["easy_to_sing"],
+            singing_energy=None,
+            vocal_comfort=None,
+            notes=None,
+            created_new=True,
+        )
+
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "1"},
+            json={"singing_tags": ["easy_to_sing"]},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["created_new"] is True
+
+    def test_set_enjoy_singing_invalid_tag(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing with invalid tag returns error."""
+        mock_known_songs_service.set_enjoy_singing.side_effect = ValueError("Invalid singing tag: invalid_tag")
+
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "1"},
+            json={"singing_tags": ["invalid_tag"]},
+        )
+
+        assert response.status_code == 400
+
+    def test_set_enjoy_singing_song_not_found(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing on non-existent song returns 400."""
+        mock_known_songs_service.set_enjoy_singing.side_effect = ValueError("Song with ID 999 not found")
+
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "999"},
+            json={},
+        )
+
+        assert response.status_code == 400
+
+    def test_set_enjoy_singing_requires_auth(
+        self,
+        known_songs_client: TestClient,
+    ) -> None:
+        """Test setting enjoy singing requires authentication."""
+        response = known_songs_client.post(
+            "/api/known-songs/enjoy-singing",
+            params={"song_id": "1"},
+            json={},
+        )
+
+        assert response.status_code == 401
+
+
+class TestRemoveEnjoySinging:
+    """Tests for DELETE /api/known-songs/enjoy-singing."""
+
+    def test_remove_enjoy_singing_success(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test removing enjoy singing from a song."""
+        response = known_songs_client.delete(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "1"},
+        )
+
+        assert response.status_code == 204
+        mock_known_songs_service.remove_enjoy_singing.assert_called_once()
+
+    def test_remove_enjoy_singing_not_found(
+        self,
+        known_songs_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Test removing enjoy singing from non-existent song."""
+        mock_known_songs_service.remove_enjoy_singing.return_value = False
+
+        response = known_songs_client.delete(
+            "/api/known-songs/enjoy-singing",
+            headers={"Authorization": "Bearer test-token"},
+            params={"song_id": "999"},
+        )
+
+        assert response.status_code == 404
+
+    def test_remove_enjoy_singing_requires_auth(
+        self,
+        known_songs_client: TestClient,
+    ) -> None:
+        """Test removing enjoy singing requires authentication."""
+        response = known_songs_client.delete(
+            "/api/known-songs/enjoy-singing",
+            params={"song_id": "1"},
+        )
+
+        assert response.status_code == 401
+
+
+class TestEnjoySingingServiceUnit:
+    """Unit tests for enjoy singing methods in KnownSongsService."""
+
+    @pytest.fixture
+    def known_songs_service(
+        self,
+        mock_backend_settings: MagicMock,
+        mock_firestore_service: MagicMock,
+    ) -> KnownSongsService:
+        """Create known songs service with mocked dependencies."""
+        mock_bigquery = MagicMock()
+        return KnownSongsService(
+            mock_backend_settings,
+            mock_firestore_service,
+            bigquery_client=mock_bigquery,
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_enjoy_singing_existing_song(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing on an existing song updates it."""
+        # Mock existing song in user's library
+        mock_firestore_service.get_document.return_value = {
+            "id": "user-123:1",
+            "song_id": "1",
+            "artist": "Queen",
+            "title": "Bohemian Rhapsody",
+            "source": "known_songs",
+            "enjoy_singing": False,
+            "singing_tags": [],
+        }
+
+        result = await known_songs_service.set_enjoy_singing(
+            user_id="user-123",
+            song_id="1",
+            singing_tags=["crowd_pleaser"],
+            singing_energy="emotional_powerhouse",
+            vocal_comfort="challenging",
+            notes="Love this one!",
+        )
+
+        assert result.success is True
+        assert result.created_new is False
+        assert result.enjoy_singing is True
+        mock_firestore_service.update_document.assert_called_once()
+
+        # Verify the update data
+        call_args = mock_firestore_service.update_document.call_args
+        doc_data = call_args[0][2]
+        assert doc_data["enjoy_singing"] is True
+        assert "crowd_pleaser" in doc_data["singing_tags"]
+        assert doc_data["singing_energy"] == "emotional_powerhouse"
+
+    @pytest.mark.asyncio
+    async def test_set_enjoy_singing_new_song_from_catalog(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing on a new song creates it."""
+        # Mock song not in user's library
+        mock_firestore_service.get_document.return_value = None
+
+        # Mock BigQuery to return song details
+        mock_result = MagicMock()
+        mock_result.id = "1"
+        mock_result.artist = "Queen"
+        mock_result.title = "Bohemian Rhapsody"
+        known_songs_service._bigquery_client.query.return_value.result.return_value = [mock_result]  # type: ignore[union-attr]
+
+        result = await known_songs_service.set_enjoy_singing(
+            user_id="user-123",
+            song_id="1",
+            singing_tags=["easy_to_sing"],
+        )
+
+        assert result.success is True
+        assert result.created_new is True
+        assert result.enjoy_singing is True
+        mock_firestore_service.set_document.assert_called_once()
+
+        # Verify the new song data
+        call_args = mock_firestore_service.set_document.call_args
+        doc_data = call_args[0][2]
+        assert doc_data["source"] == "enjoy_singing"
+        assert doc_data["enjoy_singing"] is True
+
+    @pytest.mark.asyncio
+    async def test_set_enjoy_singing_invalid_tag_raises(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing with invalid tag raises ValueError."""
+        mock_firestore_service.get_document.return_value = {
+            "id": "user-123:1",
+            "song_id": "1",
+            "artist": "Queen",
+            "title": "Bohemian Rhapsody",
+        }
+
+        with pytest.raises(ValueError, match="Invalid singing tag"):
+            await known_songs_service.set_enjoy_singing(
+                user_id="user-123",
+                song_id="1",
+                singing_tags=["invalid_tag"],
+            )
+
+    @pytest.mark.asyncio
+    async def test_set_enjoy_singing_invalid_energy_raises(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test setting enjoy singing with invalid energy raises ValueError."""
+        mock_firestore_service.get_document.return_value = {
+            "id": "user-123:1",
+            "song_id": "1",
+            "artist": "Queen",
+            "title": "Bohemian Rhapsody",
+        }
+
+        with pytest.raises(ValueError, match="Invalid singing_energy"):
+            await known_songs_service.set_enjoy_singing(
+                user_id="user-123",
+                song_id="1",
+                singing_energy="invalid_energy",
+            )
+
+    @pytest.mark.asyncio
+    async def test_remove_enjoy_singing_clears_metadata(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test removing enjoy singing clears metadata but keeps song."""
+        # Mock song from spotify (should not be deleted)
+        mock_firestore_service.get_document.return_value = {
+            "id": "user-123:1",
+            "song_id": "1",
+            "source": "spotify",
+            "enjoy_singing": True,
+            "singing_tags": ["crowd_pleaser"],
+        }
+
+        result = await known_songs_service.remove_enjoy_singing(
+            user_id="user-123",
+            song_id="1",
+        )
+
+        assert result is True
+        mock_firestore_service.update_document.assert_called_once()
+        mock_firestore_service.delete_document.assert_not_called()
+
+        # Verify metadata was cleared
+        call_args = mock_firestore_service.update_document.call_args
+        doc_data = call_args[0][2]
+        assert doc_data["enjoy_singing"] is False
+        assert doc_data["singing_tags"] == []
+
+    @pytest.mark.asyncio
+    async def test_remove_enjoy_singing_deletes_if_enjoy_source(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test removing enjoy singing deletes song if source was enjoy_singing."""
+        # Mock song with enjoy_singing source (should be deleted)
+        mock_firestore_service.get_document.return_value = {
+            "id": "user-123:1",
+            "song_id": "1",
+            "source": "enjoy_singing",
+            "enjoy_singing": True,
+        }
+
+        result = await known_songs_service.remove_enjoy_singing(
+            user_id="user-123",
+            song_id="1",
+        )
+
+        assert result is True
+        mock_firestore_service.delete_document.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_remove_enjoy_singing_not_found(
+        self,
+        known_songs_service: KnownSongsService,
+        mock_firestore_service: MagicMock,
+    ) -> None:
+        """Test removing enjoy singing from non-existent song."""
+        mock_firestore_service.get_document.return_value = None
+
+        result = await known_songs_service.remove_enjoy_singing(
+            user_id="user-123",
+            song_id="999",
+        )
+
+        assert result is False

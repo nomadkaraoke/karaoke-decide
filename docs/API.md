@@ -609,6 +609,47 @@ Get user's quiz completion status.
 }
 ```
 
+### POST /api/quiz/enjoy-singing
+
+Submit songs the user enjoys singing from quiz step 4. Bulk submission of enjoy-singing metadata.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "songs": [
+    {
+      "song_id": "1",
+      "singing_tags": ["crowd_pleaser"],
+      "singing_energy": "upbeat_party",
+      "vocal_comfort": "comfortable",
+      "notes": "My go-to opener!"
+    },
+    {
+      "song_id": "spotify:4iV5W9uYEdYUVa79Axb7Rh",
+      "singing_tags": ["shows_range", "nostalgic"]
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "submitted": 2,
+  "created_new": 1,
+  "updated_existing": 1,
+  "failed": 0,
+  "errors": []
+}
+```
+
+**Notes:**
+- All metadata fields are optional for each song
+- Accepts both karaoke catalog IDs and Spotify track IDs (prefixed with "spotify:")
+- Returns counts of created, updated, and failed entries
+
 ---
 
 ## My Songs ✅ Implemented
@@ -1104,6 +1145,71 @@ Remove a song from user's known songs.
 - `404` - Song not in user's known songs (or was added from different source)
 
 **Note:** Only songs with source "known_songs" can be removed via this endpoint. Songs synced from Spotify/Last.fm use different endpoints.
+
+### POST /api/known-songs/enjoy-singing
+
+Mark a song as one the user enjoys singing at karaoke, with optional metadata.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| song_id | string | Song ID - karaoke catalog ID or "spotify:{track_id}" |
+
+**Request:**
+```json
+{
+  "singing_tags": ["crowd_pleaser", "shows_range"],
+  "singing_energy": "emotional_powerhouse",
+  "vocal_comfort": "challenging",
+  "notes": "Great song for the finale!"
+}
+```
+
+All fields are optional. Valid values:
+- `singing_tags`: "easy_to_sing", "crowd_pleaser", "shows_range", "fun_lyrics", "nostalgic"
+- `singing_energy`: "upbeat_party", "chill_ballad", "emotional_powerhouse"
+- `vocal_comfort`: "easy", "comfortable", "challenging"
+- `notes`: Free-form text (max 500 characters)
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "song_id": "1",
+  "artist": "Queen",
+  "title": "Bohemian Rhapsody",
+  "enjoy_singing": true,
+  "singing_tags": ["crowd_pleaser", "shows_range"],
+  "singing_energy": "emotional_powerhouse",
+  "vocal_comfort": "challenging",
+  "notes": "Great song for the finale!",
+  "created_new": false
+}
+```
+
+**Notes:**
+- If the song already exists in user's library, updates it with enjoy_singing=true
+- If the song doesn't exist, creates it with source="enjoy_singing"
+- Works with both karaoke catalog IDs and Spotify track IDs (prefixed with "spotify:")
+
+### DELETE /api/known-songs/enjoy-singing
+
+Remove the enjoy singing flag from a song.
+
+**Requires:** Bearer token
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| song_id | string | Song ID - karaoke catalog ID or "spotify:{track_id}" |
+
+**Response:** `204 No Content`
+
+**Notes:**
+- If the song was added solely via enjoy_singing source, the song is deleted
+- If the song exists from another source (Spotify sync, Last.fm, quiz), only the enjoy_singing metadata is cleared
 
 ---
 

@@ -9,7 +9,7 @@ from typing import Literal
 from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import CurrentUser, QuizServiceDep
+from backend.api.deps import CurrentUser, KnownSongsServiceDep, QuizServiceDep
 
 router = APIRouter()
 
@@ -109,6 +109,49 @@ class QuizStatusResponse(BaseModel):
     completed: bool
     completed_at: str | None
     songs_known_count: int
+
+
+class EnjoySongEntry(BaseModel):
+    """A song the user enjoys singing with optional metadata."""
+
+    song_id: str = Field(..., description="Song ID - karaoke catalog ID or 'spotify:{track_id}'")
+    singing_tags: list[str] = Field(
+        default_factory=list,
+        description="Tags describing why user enjoys singing. "
+        "Valid: easy_to_sing, crowd_pleaser, shows_range, fun_lyrics, nostalgic",
+    )
+    singing_energy: str | None = Field(
+        default=None,
+        description="Energy/mood. Valid: upbeat_party, chill_ballad, emotional_powerhouse",
+    )
+    vocal_comfort: str | None = Field(
+        default=None,
+        description="Comfort level. Valid: easy, comfortable, challenging",
+    )
+    notes: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Optional free-form notes about the song",
+    )
+
+
+class QuizEnjoySingingRequest(BaseModel):
+    """Request to submit songs the user enjoys singing (quiz step 4)."""
+
+    songs: list[EnjoySongEntry] = Field(
+        ...,
+        min_length=1,
+        max_length=50,
+        description="List of songs with enjoy singing metadata",
+    )
+
+
+class QuizEnjoySingingResponse(BaseModel):
+    """Response after submitting enjoy singing songs."""
+
+    songs_added: int
+    songs_updated: int
+    songs_failed: int
 
 
 # -----------------------------------------------------------------------------
@@ -281,4 +324,61 @@ async def get_quiz_status(
         completed=status.completed,
         completed_at=status.completed_at.isoformat() if status.completed_at else None,
         songs_known_count=status.songs_known_count,
+    )
+
+
+# -----------------------------------------------------------------------------
+# Submit Enjoy Singing Songs (Quiz Step 4)
+# -----------------------------------------------------------------------------
+
+
+@router.post("/enjoy-singing", response_model=QuizEnjoySingingResponse, status_code=status.HTTP_201_CREATED)
+async def submit_enjoy_singing(
+    request: QuizEnjoySingingRequest,
+    user: CurrentUser,
+    known_songs_service: KnownSongsServiceDep,
+) -> QuizEnjoySingingResponse:
+    """Submit songs the user enjoys singing (quiz step 4).
+
+    This is an optional step in the quiz flow where users can add
+    specific songs they already know they enjoy singing at karaoke,
+    along with metadata about why they enjoy them.
+
+    Each song can include:
+    - singing_tags: Why they enjoy it (easy_to_sing, crowd_pleaser, etc.)
+    - singing_energy: The mood/energy (upbeat_party, chill_ballad, etc.)
+    - vocal_comfort: Comfort level (easy, comfortable, challenging)
+    - notes: Free-form notes
+
+    All metadata fields are optional. Users can add songs with minimal
+    information and fill in details later.
+
+    Songs are added to the user's library with `source="enjoy_singing"` if new,
+    or updated with `enjoy_singing=True` if already in library.
+    """
+    songs_added = 0
+    songs_updated = 0
+    songs_failed = 0
+
+    for song_entry in request.songs:
+        try:
+            result = await known_songs_service.set_enjoy_singing(
+                user_id=user.id,
+                song_id=song_entry.song_id,
+                singing_tags=song_entry.singing_tags,
+                singing_energy=song_entry.singing_energy,
+                vocal_comfort=song_entry.vocal_comfort,
+                notes=song_entry.notes,
+            )
+            if result.created_new:
+                songs_added += 1
+            else:
+                songs_updated += 1
+        except ValueError:
+            songs_failed += 1
+
+    return QuizEnjoySingingResponse(
+        songs_added=songs_added,
+        songs_updated=songs_updated,
+        songs_failed=songs_failed,
     )

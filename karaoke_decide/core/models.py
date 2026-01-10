@@ -3,7 +3,19 @@
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Valid values for "Enjoy Singing" metadata
+SINGING_TAGS = [
+    "easy_to_sing",
+    "crowd_pleaser",
+    "shows_range",
+    "fun_lyrics",
+    "nostalgic",
+]
+
+SINGING_ENERGY_OPTIONS = ["upbeat_party", "chill_ballad", "emotional_powerhouse"]
+VOCAL_COMFORT_OPTIONS = ["easy", "comfortable", "challenging"]
 
 
 class User(BaseModel):
@@ -92,7 +104,7 @@ class UserSong(BaseModel):
     song_id: str
 
     # Source tracking
-    source: Literal["spotify", "lastfm", "quiz", "known_songs"] = "spotify"
+    source: Literal["spotify", "lastfm", "quiz", "known_songs", "enjoy_singing"] = "spotify"
 
     # From listening history
     play_count: int = 0  # Legacy: sync count (times seen during sync)
@@ -106,6 +118,23 @@ class UserSong(BaseModel):
     last_sung_at: datetime | None = None
     average_rating: float | None = None  # 1-5
     notes: str | None = None
+
+    # "Enjoy Singing" metadata - for songs user enjoys singing at karaoke
+    enjoy_singing: bool = False  # True if user marked this as "enjoy singing"
+    singing_tags: list[str] = Field(default_factory=list)
+    singing_energy: Literal["upbeat_party", "chill_ballad", "emotional_powerhouse"] | None = None
+    vocal_comfort: Literal["easy", "comfortable", "challenging"] | None = None
+
+    @field_validator("singing_tags")
+    @classmethod
+    def validate_singing_tags(cls, v: list[str]) -> list[str]:
+        """Validate that all singing tags are from the allowed set."""
+        if not v:
+            return v
+        invalid_tags = [tag for tag in v if tag not in SINGING_TAGS]
+        if invalid_tags:
+            raise ValueError(f"Invalid singing tags: {invalid_tags}. Valid: {SINGING_TAGS}")
+        return v
 
     # Denormalized for queries
     artist: str
@@ -201,6 +230,7 @@ class Recommendation(BaseModel):
         "crowd_pleaser",
         "popular",
         "generate_karaoke",  # For songs without karaoke version
+        "similar_to_enjoyed",  # Similar audio profile to songs user enjoys singing
     ]
 
     # Karaoke availability
