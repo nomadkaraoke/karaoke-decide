@@ -31,15 +31,65 @@ export interface CatalogSong {
   is_popular: boolean;
 }
 
+// ============================================================================
+// Enjoy Singing Types
+// ============================================================================
+
+export type SingingTag =
+  | "easy_to_sing"
+  | "crowd_pleaser"
+  | "shows_range"
+  | "fun_lyrics"
+  | "nostalgic";
+
+export type SingingEnergy = "upbeat_party" | "chill_ballad" | "emotional_powerhouse";
+
+export type VocalComfort = "easy" | "comfortable" | "challenging";
+
+export interface EnjoySingingMetadata {
+  enjoy_singing: boolean;
+  singing_tags: SingingTag[];
+  singing_energy: SingingEnergy | null;
+  vocal_comfort: VocalComfort | null;
+  notes: string | null;
+}
+
+// Display labels for UI
+export const SINGING_TAG_LABELS: Record<SingingTag, string> = {
+  easy_to_sing: "Easy to sing",
+  crowd_pleaser: "Crowd pleaser",
+  shows_range: "Shows off my range",
+  fun_lyrics: "Fun lyrics",
+  nostalgic: "Nostalgic",
+};
+
+export const SINGING_ENERGY_LABELS: Record<SingingEnergy, { label: string; emoji: string }> = {
+  upbeat_party: { label: "Upbeat Party", emoji: "🎉" },
+  chill_ballad: { label: "Chill Ballad", emoji: "🌙" },
+  emotional_powerhouse: { label: "Emotional Powerhouse", emoji: "💪" },
+};
+
+export const VOCAL_COMFORT_LABELS: Record<VocalComfort, { label: string; emoji: string }> = {
+  easy: { label: "Easy", emoji: "😌" },
+  comfortable: { label: "Comfortable", emoji: "👍" },
+  challenging: { label: "Challenging", emoji: "💪" },
+};
+
 export interface UserSong {
   id: string;
   song_id: string;
   artist: string;
   title: string;
-  source: "spotify" | "lastfm" | "quiz";
+  source: "spotify" | "lastfm" | "quiz" | "known_songs" | "enjoy_singing";
   play_count: number;
   is_saved: boolean;
   times_sung: number;
+  // Enjoy singing metadata
+  enjoy_singing?: boolean;
+  singing_tags?: SingingTag[];
+  singing_energy?: SingingEnergy | null;
+  vocal_comfort?: VocalComfort | null;
+  notes?: string | null;
 }
 
 export interface Recommendation {
@@ -154,6 +204,48 @@ export interface QuizSubmitRequest {
   known_song_ids: string[];
   decade_preference?: string | null;
   energy_preference?: "chill" | "medium" | "high" | null;
+}
+
+// ============================================================================
+// Enjoy Singing Request/Response Types
+// ============================================================================
+
+export interface SetEnjoySingingRequest {
+  singing_tags?: SingingTag[];
+  singing_energy?: SingingEnergy | null;
+  vocal_comfort?: VocalComfort | null;
+  notes?: string | null;
+}
+
+export interface SetEnjoySingingResponse {
+  success: boolean;
+  song_id: string;
+  artist: string;
+  title: string;
+  enjoy_singing: boolean;
+  singing_tags: SingingTag[];
+  singing_energy: SingingEnergy | null;
+  vocal_comfort: VocalComfort | null;
+  notes: string | null;
+  created_new: boolean;
+}
+
+export interface EnjoySongEntry {
+  song_id: string;
+  singing_tags?: SingingTag[];
+  singing_energy?: SingingEnergy | null;
+  vocal_comfort?: VocalComfort | null;
+  notes?: string | null;
+}
+
+export interface QuizEnjoySingingRequest {
+  songs: EnjoySongEntry[];
+}
+
+export interface QuizEnjoySingingResponse {
+  songs_added: number;
+  songs_updated: number;
+  songs_failed: number;
 }
 
 // ============================================================================

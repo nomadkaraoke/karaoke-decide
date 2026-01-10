@@ -51,6 +51,22 @@ class KnownSongsListResult:
     per_page: int
 
 
+@dataclass
+class SetEnjoySingingResult:
+    """Result of setting enjoy singing metadata on a song."""
+
+    success: bool
+    song_id: str
+    artist: str
+    title: str
+    enjoy_singing: bool
+    singing_tags: list[str]
+    singing_energy: str | None
+    vocal_comfort: str | None
+    notes: str | None
+    created_new: bool = False  # True if song was newly added
+
+
 class KnownSongsService:
     """Service for managing user's manually added known songs.
 
@@ -407,6 +423,287 @@ class KnownSongsService:
             return False
 
         await self.firestore.delete_document(self.USER_SONGS_COLLECTION, user_song_id)
+        return True
+
+    async def set_enjoy_singing(
+        self,
+        user_id: str,
+        song_id: str,
+        singing_tags: list[str] | None = None,
+        singing_energy: str | None = None,
+        vocal_comfort: str | None = None,
+        notes: str | None = None,
+    ) -> SetEnjoySingingResult:
+        """Mark a song as one the user enjoys singing with optional metadata.
+
+        This can work on:
+        - Existing songs in user's library (updates with enjoy_singing=True)
+        - New karaoke catalog songs (creates with source="enjoy_singing")
+        - New Spotify tracks (creates with source="enjoy_singing")
+
+        Args:
+            user_id: User's ID.
+            song_id: Song ID - either karaoke catalog ID or "spotify:{track_id}".
+            singing_tags: Optional list of tags describing why user enjoys singing.
+                Valid: "easy_to_sing", "crowd_pleaser", "shows_range", "fun_lyrics", "nostalgic"
+            singing_energy: Optional energy/mood of the song for the user.
+                Valid: "upbeat_party", "chill_ballad", "emotional_powerhouse"
+            vocal_comfort: Optional comfort level in user's vocal range.
+                Valid: "easy", "comfortable", "challenging"
+            notes: Optional free-form notes from user.
+
+        Returns:
+            SetEnjoySingingResult with song details and metadata.
+
+        Raises:
+            ValueError: If song not found in catalog.
+        """
+        from karaoke_decide.core.models import (
+            SINGING_ENERGY_OPTIONS,
+            SINGING_TAGS,
+            VOCAL_COMFORT_OPTIONS,
+        )
+
+        # Validate inputs
+        if singing_tags:
+            invalid_tags = [t for t in singing_tags if t not in SINGING_TAGS]
+            if invalid_tags:
+                raise ValueError(f"Invalid singing tags: {invalid_tags}. Valid: {SINGING_TAGS}")
+
+        if singing_energy and singing_energy not in SINGING_ENERGY_OPTIONS:
+            raise ValueError(f"Invalid singing_energy: {singing_energy}. Valid: {SINGING_ENERGY_OPTIONS}")
+
+        if vocal_comfort and vocal_comfort not in VOCAL_COMFORT_OPTIONS:
+            raise ValueError(f"Invalid vocal_comfort: {vocal_comfort}. Valid: {VOCAL_COMFORT_OPTIONS}")
+
+        now = datetime.now(UTC)
+        is_spotify = song_id.startswith("spotify:")
+
+        # Build the user_song_id based on song type
+        if is_spotify:
+            track_id = song_id.replace("spotify:", "")
+            user_song_id = f"{user_id}:spotify:{track_id}"
+        else:
+            user_song_id = f"{user_id}:{song_id}"
+
+        # Check if already exists
+        existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
+
+        if existing is not None:
+            # Update existing song with enjoy_singing metadata
+            update_data = {
+                "enjoy_singing": True,
+                "singing_tags": singing_tags or [],
+                "singing_energy": singing_energy,
+                "vocal_comfort": vocal_comfort,
+                "notes": notes,
+                "updated_at": now.isoformat(),
+            }
+            await self.firestore.update_document(self.USER_SONGS_COLLECTION, user_song_id, update_data)
+            return SetEnjoySingingResult(
+                success=True,
+                song_id=song_id,
+                artist=existing.get("artist", ""),
+                title=existing.get("title", ""),
+                enjoy_singing=True,
+                singing_tags=singing_tags or [],
+                singing_energy=singing_energy,
+                vocal_comfort=vocal_comfort,
+                notes=notes,
+                created_new=False,
+            )
+
+        # Song doesn't exist - need to look it up and create
+        loop = asyncio.get_running_loop()
+
+        if is_spotify:
+            track_id = song_id.replace("spotify:", "")
+            track = await loop.run_in_executor(None, self._get_spotify_track, track_id)
+            if not track:
+                raise ValueError(f"Track with ID {track_id} not found in Spotify catalog")
+
+            artist = track["artist_name"]
+            title = track["track_name"]
+
+            user_song_data = {
+                "id": user_song_id,
+                "user_id": user_id,
+                "song_id": song_id,
+                "source": "enjoy_singing",
+                "play_count": 1,
+                "last_played_at": None,
+                "is_saved": True,
+                "times_sung": 0,
+                "last_sung_at": None,
+                "average_rating": None,
+                "artist": artist,
+                "title": title,
+                "has_karaoke_version": False,
+                "spotify_track_id": track_id,
+                "spotify_artist_id": track["artist_id"],
+                "spotify_popularity": track["popularity"],
+                "duration_ms": track["duration_ms"],
+                "explicit": track["explicit"],
+                # Enjoy singing metadata
+                "enjoy_singing": True,
+                "singing_tags": singing_tags or [],
+                "singing_energy": singing_energy,
+                "vocal_comfort": vocal_comfort,
+                "notes": notes,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+        else:
+            # Karaoke catalog song
+            song_id_int = int(song_id)
+            song = await loop.run_in_executor(None, self._get_song_by_id, song_id_int)
+            if not song:
+                raise ValueError(f"Song with ID {song_id} not found in catalog")
+
+            artist = song["artist"]
+            title = song["title"]
+
+            user_song_data = {
+                "id": user_song_id,
+                "user_id": user_id,
+                "song_id": song_id,
+                "source": "enjoy_singing",
+                "play_count": 1,
+                "last_played_at": None,
+                "is_saved": True,
+                "times_sung": 0,
+                "last_sung_at": None,
+                "average_rating": None,
+                "artist": artist,
+                "title": title,
+                "has_karaoke_version": True,
+                "spotify_popularity": None,
+                "duration_ms": None,
+                "explicit": False,
+                # Enjoy singing metadata
+                "enjoy_singing": True,
+                "singing_tags": singing_tags or [],
+                "singing_energy": singing_energy,
+                "vocal_comfort": vocal_comfort,
+                "notes": notes,
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+
+        await self.firestore.set_document(
+            self.USER_SONGS_COLLECTION,
+            user_song_id,
+            user_song_data,
+            merge=True,
+        )
+
+        return SetEnjoySingingResult(
+            success=True,
+            song_id=song_id,
+            artist=artist,
+            title=title,
+            enjoy_singing=True,
+            singing_tags=singing_tags or [],
+            singing_energy=singing_energy,
+            vocal_comfort=vocal_comfort,
+            notes=notes,
+            created_new=True,
+        )
+
+    async def get_enjoy_singing_songs(
+        self,
+        user_id: str,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> KnownSongsListResult:
+        """Get user's songs marked as enjoy singing.
+
+        Args:
+            user_id: User's ID.
+            page: Page number (1-indexed).
+            per_page: Items per page.
+
+        Returns:
+            KnownSongsListResult with paginated songs.
+        """
+        if page < 1:
+            raise ValueError("page must be >= 1")
+        if per_page < 1:
+            raise ValueError("per_page must be >= 1")
+
+        offset = (page - 1) * per_page
+
+        # Count total enjoy_singing songs for this user
+        total = await self.firestore.count_documents(
+            self.USER_SONGS_COLLECTION,
+            filters=[
+                ("user_id", "==", user_id),
+                ("enjoy_singing", "==", True),
+            ],
+        )
+
+        # Get paginated results
+        songs = await self.firestore.query_documents(
+            self.USER_SONGS_COLLECTION,
+            filters=[
+                ("user_id", "==", user_id),
+                ("enjoy_singing", "==", True),
+            ],
+            order_by="created_at",
+            order_direction="DESCENDING",
+            limit=per_page,
+            offset=offset,
+        )
+
+        return KnownSongsListResult(
+            songs=songs,
+            total=total,
+            page=page,
+            per_page=per_page,
+        )
+
+    async def remove_enjoy_singing(
+        self,
+        user_id: str,
+        song_id: str,
+    ) -> bool:
+        """Remove enjoy singing flag from a song.
+
+        If the song was added solely via enjoy_singing source, deletes it.
+        If the song has another source (spotify, lastfm, etc.), just removes the flag.
+
+        Args:
+            user_id: User's ID.
+            song_id: Song ID - either karaoke catalog ID or "spotify:{track_id}".
+
+        Returns:
+            True if updated/removed, False if not found.
+        """
+        is_spotify = song_id.startswith("spotify:")
+        if is_spotify:
+            track_id = song_id.replace("spotify:", "")
+            user_song_id = f"{user_id}:spotify:{track_id}"
+        else:
+            user_song_id = f"{user_id}:{song_id}"
+
+        existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
+        if existing is None:
+            return False
+
+        # If source is enjoy_singing, delete the whole record
+        if existing.get("source") == "enjoy_singing":
+            await self.firestore.delete_document(self.USER_SONGS_COLLECTION, user_song_id)
+            return True
+
+        # Otherwise, just clear the enjoy_singing metadata
+        update_data = {
+            "enjoy_singing": False,
+            "singing_tags": [],
+            "singing_energy": None,
+            "vocal_comfort": None,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        await self.firestore.update_document(self.USER_SONGS_COLLECTION, user_song_id, update_data)
         return True
 
     def _get_song_by_id(self, song_id: int) -> dict | None:

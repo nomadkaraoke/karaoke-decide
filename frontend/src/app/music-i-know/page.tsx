@@ -17,7 +17,9 @@ import {
   RefreshIcon,
   EyeIcon,
   EyeOffIcon,
+  MicrophoneIcon,
 } from "@/components/icons";
+import { EnjoySingingModal } from "@/components/EnjoySingingModal";
 import { Button, Input, Badge, LoadingPulse, EmptyState } from "@/components/ui";
 import { PopularityStars } from "@/components/SongCard";
 
@@ -55,6 +57,12 @@ interface KnownSong {
   is_saved: boolean;
   created_at: string;
   updated_at: string;
+  // Enjoy singing fields
+  enjoy_singing?: boolean;
+  singing_tags?: string[];
+  singing_energy?: string | null;
+  vocal_comfort?: string | null;
+  notes?: string | null;
 }
 
 interface ConnectedService {
@@ -540,6 +548,10 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
   const [error, setError] = useState<string | null>(null);
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
 
+  // Enjoy singing modal state
+  const [showEnjoySingingModal, setShowEnjoySingingModal] = useState(false);
+  const [selectedSongForModal, setSelectedSongForModal] = useState<KnownSong | null>(null);
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CatalogSong[]>([]);
@@ -652,6 +664,16 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
     }
   };
 
+  const handleEnjoySingingClick = (song: KnownSong) => {
+    setSelectedSongForModal(song);
+    setShowEnjoySingingModal(true);
+  };
+
+  const handleEnjoySingingSuccess = () => {
+    // Refresh the song list to show updated enjoy_singing status
+    loadKnownSongs(1);
+  };
+
   if (isLoading) {
     return <LoadingPulse count={4} />;
   }
@@ -762,9 +784,29 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                   }`}
                 >
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-[var(--text)] font-medium truncate">{song.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[var(--text)] font-medium truncate">{song.title}</h3>
+                      {song.enjoy_singing && (
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand-pink)]/20 text-[var(--brand-pink)]">
+                          Love singing
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[var(--text-muted)] text-sm truncate">{song.artist}</p>
                   </div>
+                  {/* Enjoy Singing button */}
+                  <button
+                    onClick={() => handleEnjoySingingClick(song)}
+                    className={`p-2 rounded-full transition-colors ${
+                      song.enjoy_singing
+                        ? "text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10"
+                        : "text-[var(--text-subtle)] hover:text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10"
+                    }`}
+                    title={song.enjoy_singing ? "Edit singing details" : "I enjoy singing this"}
+                  >
+                    <MicrophoneIcon className="w-4 h-4" />
+                  </button>
+                  {/* Remove button */}
                   <button
                     onClick={() => handleRemoveSong(song)}
                     disabled={isRemoving}
@@ -790,6 +832,28 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
             </div>
           )}
         </>
+      )}
+
+      {/* Enjoy Singing Modal */}
+      {selectedSongForModal && (
+        <EnjoySingingModal
+          isOpen={showEnjoySingingModal}
+          onClose={() => {
+            setShowEnjoySingingModal(false);
+            setSelectedSongForModal(null);
+          }}
+          onSuccess={handleEnjoySingingSuccess}
+          song={{
+            song_id: selectedSongForModal.song_id,
+            artist: selectedSongForModal.artist,
+            title: selectedSongForModal.title,
+            enjoy_singing: selectedSongForModal.enjoy_singing,
+            singing_tags: selectedSongForModal.singing_tags as import("@/types").SingingTag[] | undefined,
+            singing_energy: selectedSongForModal.singing_energy as import("@/types").SingingEnergy | null | undefined,
+            vocal_comfort: selectedSongForModal.vocal_comfort as import("@/types").VocalComfort | null | undefined,
+            notes: selectedSongForModal.notes,
+          }}
+        />
       )}
     </div>
   );

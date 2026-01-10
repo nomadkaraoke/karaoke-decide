@@ -584,6 +584,25 @@ export const api = {
         completed_at: string | null;
         songs_known_count: number;
       }>("/api/quiz/status"),
+
+    /**
+     * Submit songs the user enjoys singing (quiz step 4)
+     * @param songs - Array of songs with optional metadata
+     */
+    submitEnjoySinging: (
+      songs: Array<{
+        song_id: string;
+        singing_tags?: string[];
+        singing_energy?: string | null;
+        vocal_comfort?: string | null;
+        notes?: string | null;
+      }>
+    ) =>
+      api.post<{
+        songs_added: number;
+        songs_updated: number;
+        songs_failed: number;
+      }>("/api/quiz/enjoy-singing", { songs }),
   },
 
   // ============================================================================
@@ -796,6 +815,40 @@ export const api = {
 
     removeSpotifyTrack: (trackId: string) =>
       api.delete<Record<string, never>>(`/api/known-songs/spotify/${trackId}`),
+
+    /**
+     * Mark a song as one the user enjoys singing at karaoke
+     * @param songId - Karaoke catalog ID or "spotify:{track_id}"
+     * @param metadata - Optional metadata about why user enjoys singing
+     */
+    setEnjoySinging: (
+      songId: string,
+      metadata?: {
+        singing_tags?: string[];
+        singing_energy?: string | null;
+        vocal_comfort?: string | null;
+        notes?: string | null;
+      }
+    ) =>
+      api.post<{
+        success: boolean;
+        song_id: string;
+        artist: string;
+        title: string;
+        enjoy_singing: boolean;
+        singing_tags: string[];
+        singing_energy: string | null;
+        vocal_comfort: string | null;
+        notes: string | null;
+        created_new: boolean;
+      }>(`/api/known-songs/enjoy-singing?song_id=${encodeURIComponent(songId)}`, metadata || {}),
+
+    /**
+     * Remove enjoy singing flag from a song
+     * @param songId - Karaoke catalog ID or "spotify:{track_id}"
+     */
+    removeEnjoySinging: (songId: string) =>
+      api.delete<Record<string, never>>(`/api/known-songs/enjoy-singing?song_id=${encodeURIComponent(songId)}`),
   },
 
   // ============================================================================

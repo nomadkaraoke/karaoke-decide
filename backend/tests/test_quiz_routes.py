@@ -1,8 +1,12 @@
 """Tests for quiz API routes."""
 
-from unittest.mock import MagicMock
+from collections.abc import Generator
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
+
+from backend.services.known_songs_service import SetEnjoySingingResult
 
 
 class TestGetQuizSongs:
@@ -191,5 +195,207 @@ class TestGetQuizStatus:
     def test_requires_authentication(self, quiz_client: TestClient) -> None:
         """Requires authentication."""
         response = quiz_client.get("/api/quiz/status")
+
+        assert response.status_code == 401
+
+
+class TestQuizEnjoySinging:
+    """Tests for POST /api/quiz/enjoy-singing endpoint."""
+
+    @pytest.fixture
+    def mock_known_songs_service(self) -> MagicMock:
+        """Mock known songs service for enjoy singing tests."""
+        mock = MagicMock()
+        mock.set_enjoy_singing = AsyncMock(
+            return_value=SetEnjoySingingResult(
+                success=True,
+                song_id="1",
+                artist="Queen",
+                title="Bohemian Rhapsody",
+                enjoy_singing=True,
+                singing_tags=["crowd_pleaser"],
+                singing_energy="emotional_powerhouse",
+                vocal_comfort="challenging",
+                notes="Love it!",
+                created_new=True,
+            )
+        )
+        return mock
+
+    @pytest.fixture
+    def quiz_enjoy_client(
+        self,
+        mock_catalog_service: MagicMock,
+        mock_auth_service: MagicMock,
+        mock_quiz_service: MagicMock,
+        mock_known_songs_service: MagicMock,
+    ) -> Generator[TestClient, None, None]:
+        """Create test client with mocked quiz and known songs services."""
+        with (
+            patch(
+                "backend.api.routes.catalog.get_catalog_service",
+                return_value=mock_catalog_service,
+            ),
+            patch(
+                "backend.api.deps.get_auth_service",
+                return_value=mock_auth_service,
+            ),
+            patch(
+                "backend.api.deps.get_quiz_service",
+                return_value=mock_quiz_service,
+            ),
+            patch(
+                "backend.api.deps.get_known_songs_service",
+                return_value=mock_known_songs_service,
+            ),
+        ):
+            from backend.main import app
+
+            yield TestClient(app)
+
+    def test_submit_enjoy_singing_success(
+        self,
+        quiz_enjoy_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Submit enjoy singing songs successfully."""
+        response = quiz_enjoy_client.post(
+            "/api/quiz/enjoy-singing",
+            json={
+                "songs": [
+                    {
+                        "song_id": "1",
+                        "singing_tags": ["crowd_pleaser"],
+                        "singing_energy": "emotional_powerhouse",
+                        "vocal_comfort": "challenging",
+                        "notes": "Love it!",
+                    },
+                    {
+                        "song_id": "2",
+                        "singing_tags": ["easy_to_sing"],
+                    },
+                ]
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["songs_added"] == 2  # Both songs created_new=True
+        assert data["songs_updated"] == 0
+        assert data["songs_failed"] == 0
+
+    def test_submit_enjoy_singing_with_updates(
+        self,
+        quiz_enjoy_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Submit enjoy singing tracks both adds and updates."""
+        # First call adds, second call updates
+        mock_known_songs_service.set_enjoy_singing.side_effect = [
+            SetEnjoySingingResult(
+                success=True,
+                song_id="1",
+                artist="Queen",
+                title="Test",
+                enjoy_singing=True,
+                singing_tags=[],
+                singing_energy=None,
+                vocal_comfort=None,
+                notes=None,
+                created_new=True,
+            ),
+            SetEnjoySingingResult(
+                success=True,
+                song_id="2",
+                artist="Journey",
+                title="Test 2",
+                enjoy_singing=True,
+                singing_tags=[],
+                singing_energy=None,
+                vocal_comfort=None,
+                notes=None,
+                created_new=False,
+            ),
+        ]
+
+        response = quiz_enjoy_client.post(
+            "/api/quiz/enjoy-singing",
+            json={
+                "songs": [
+                    {"song_id": "1"},
+                    {"song_id": "2"},
+                ]
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["songs_added"] == 1
+        assert data["songs_updated"] == 1
+        assert data["songs_failed"] == 0
+
+    def test_submit_enjoy_singing_with_failures(
+        self,
+        quiz_enjoy_client: TestClient,
+        mock_known_songs_service: MagicMock,
+    ) -> None:
+        """Submit enjoy singing handles failures gracefully."""
+        # First call succeeds, second call fails
+        mock_known_songs_service.set_enjoy_singing.side_effect = [
+            SetEnjoySingingResult(
+                success=True,
+                song_id="1",
+                artist="Queen",
+                title="Test",
+                enjoy_singing=True,
+                singing_tags=[],
+                singing_energy=None,
+                vocal_comfort=None,
+                notes=None,
+                created_new=True,
+            ),
+            ValueError("Song not found"),
+        ]
+
+        response = quiz_enjoy_client.post(
+            "/api/quiz/enjoy-singing",
+            json={
+                "songs": [
+                    {"song_id": "1"},
+                    {"song_id": "999"},
+                ]
+            },
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["songs_added"] == 1
+        assert data["songs_failed"] == 1
+
+    def test_submit_enjoy_singing_empty_list(
+        self,
+        quiz_enjoy_client: TestClient,
+    ) -> None:
+        """Empty songs list fails validation."""
+        response = quiz_enjoy_client.post(
+            "/api/quiz/enjoy-singing",
+            json={"songs": []},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 422
+
+    def test_submit_enjoy_singing_requires_auth(
+        self,
+        quiz_enjoy_client: TestClient,
+    ) -> None:
+        """Requires authentication."""
+        response = quiz_enjoy_client.post(
+            "/api/quiz/enjoy-singing",
+            json={"songs": [{"song_id": "1"}]},
+        )
 
         assert response.status_code == 401
