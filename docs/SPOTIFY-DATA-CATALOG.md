@@ -2,7 +2,7 @@
 
 This document describes all Spotify data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-01-06 (ETL in progress - 54% complete)
+> **Last Updated:** 2026-01-09 (ETL complete)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
@@ -18,15 +18,13 @@ All data comes from the [Anna's Archive Spotify July 2025 dataset](https://annas
 | Table | Row Count | Description |
 |-------|-----------|-------------|
 | `spotify_track_artists` | 348M | Track-to-artist mapping (many-to-many) |
+| `spotify_audio_analysis_sections` | **325M** | Song sections with timing and musical properties |
 | `spotify_tracks` | 256M | Track metadata (title, artist, popularity) |
 | `spotify_audio_features` | 230M | Audio features (danceability, energy, etc.) |
-| `spotify_audio_analysis_sections` | 179M* | Song sections with timing and musical properties |
 | `spotify_albums` | 59M | Album metadata |
-| `spotify_audio_analysis_tracks` | 18M* | Track-level audio analysis summary |
+| `spotify_audio_analysis_tracks` | **33.5M** | Track-level audio analysis summary |
 | `spotify_artists` | 15M | Artist metadata |
 | `spotify_artist_genres` | 2.2M | Artist-to-genre mapping (768 unique genres) |
-
-*ETL in progress - counts will increase as more files are processed
 
 ---
 
@@ -394,14 +392,14 @@ This data enables many karaoke-related features:
 ## Data Quality Notes
 
 1. **Popularity scores** are point-in-time snapshots from July 2025
-2. **Audio analysis** coverage is partial (~18M of ~256M tracks so far, ETL in progress)
+2. **Audio analysis** covers 33.5M tracks (~13% of all Spotify tracks) - these are tracks that had audio analysis data in the source dataset
 3. **Genre data** is at artist level, not track level
 4. **Some tracks** may have missing audio features (null values)
 5. **Confidence scores** in audio analysis indicate reliability of detection
 
-## ETL Status
+## Data Backup
 
-The audio analysis ETL is currently running and will be complete in ~37 hours:
-- **Tracks processed**: 262/484 files (54%)
-- **Current counts**: 18.4M tracks, 178M sections
-- **Expected final**: ~35M tracks, ~340M sections (estimated)
+Raw torrent data is archived in GCS for future re-processing if needed:
+- **Location:** `gs://nomadkaraoke-raw-archives/spotify-audio-analysis-2025-07/`
+- **Size:** 6.97 TiB (484 .zst files)
+- **Storage class:** Archive (~$7/month)

@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-08)
+## Current Status (2026-01-09)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL (54% complete)
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL ✅
 
 ### ✅ What's Working
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
@@ -33,18 +33,11 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 18M audio analysis tracks
+- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + **33.5M audio analysis tracks + 325M sections**
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
-- **GCS Backup:** Complete backup of 3.88TB audio analysis torrent (484 files, 6.97 TiB)
-
-### 🔄 In Progress
-- **Full Spotify Audio Analysis ETL** - 54% complete (262/484 files)
-  - 18.4M tracks + 179M sections loaded to BigQuery
-  - ETA: ~37 hours remaining
-  - Both torrents seeding (audio ratio 2.6x, metadata ratio 18.4x)
-  - See [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) for available data
+- **Spotify Audio Analysis ETL:** Complete! 33.5M tracks + 325M sections from 3.88TB torrent (backed up to GCS)
 
 ### 🚧 Next Up (Post-MLP)
 1. **Energy/Tempo Filters** - Use audio analysis data for "high energy karaoke" / "chill karaoke" filtering
@@ -98,11 +91,11 @@ cd frontend && npm run dev
 |-------|------|-------------|
 | `karaoke_decide.karaokenerds_raw` | 275,809 | Karaoke songs with brand counts |
 | `karaoke_decide.spotify_track_artists` | 348M | Track-artist junction (multi-artist) |
+| `karaoke_decide.spotify_audio_analysis_sections` | **325M** | Song sections with timing, tempo, key changes |
 | `karaoke_decide.spotify_tracks` | 256M | Spotify track metadata |
 | `karaoke_decide.spotify_audio_features` | 230M | Audio features (danceability, energy, tempo, key, valence, etc.) |
-| `karaoke_decide.spotify_audio_analysis_sections` | 179M+ | Song sections with timing, tempo, key changes (ETL in progress) |
 | `karaoke_decide.spotify_albums` | 59M | Album metadata with release dates |
-| `karaoke_decide.spotify_audio_analysis_tracks` | 18M+ | Track-level audio analysis (tempo, key, confidence) (ETL in progress) |
+| `karaoke_decide.spotify_audio_analysis_tracks` | **33.5M** | Track-level audio analysis (tempo, key, confidence) |
 | `karaoke_decide.spotify_artists` | 15M | Artist metadata (followers, popularity) |
 | `karaoke_decide.spotify_artist_genres` | 2.2M | Artist-genre associations (768 unique genres) |
 | `karaoke_decide.spotify_artists_normalized` | 15.4M | Pre-normalized artists with aggregated genres |
@@ -200,7 +193,7 @@ cd frontend && npm run dev
 | 2026-01-02 | My Data Page (unified data management, replaces My Songs + Services, editable preferences) | [archive/2026-01-02-my-data-page.md](archive/2026-01-02-my-data-page.md) |
 | 2026-01-02 | Quiz UX Improvements (genre selection step, refresh artists, connect CTA, data-testid) | [archive/2026-01-02-quiz-ux-improvements.md](archive/2026-01-02-quiz-ux-improvements.md) |
 | 2026-01-02 | Guest User Onboarding (frictionless onboarding, guest sessions, upgrade flow) | [archive/2026-01-02-guest-onboarding-flow.md](archive/2026-01-02-guest-onboarding-flow.md) |
-| 2026-01-03 | **Full Spotify ETL** (In Progress - 84.7% downloaded, 108 files ready for partial ETL, incremental approach) | [archive/2026-01-02-full-spotify-etl.md](archive/2026-01-02-full-spotify-etl.md) |
+| 2026-01-09 | **Full Spotify ETL Complete** (33.5M tracks, 325M sections from 3.88TB torrent, VM deleted) | [archive/2026-01-02-full-spotify-etl.md](archive/2026-01-02-full-spotify-etl.md) |
 | 2026-01-02 | Audio Analysis ETL Setup (3.45 TiB preserved in GCS Archive) | [archive/2025-01-01-spotify-audio-analysis-etl-setup.md](archive/2025-01-01-spotify-audio-analysis-etl-setup.md) |
 | 2026-01-01 | Quiz UX V2 (15 inclusive genres, genre filtering, "Show More Artists", genre pills, decade examples, ETL script) | [archive/2026-01-01-quiz-ux-v2.md](archive/2026-01-01-quiz-ux-v2.md) |
 | 2026-01-01 | Enhanced Recommendations (categorized sections, artist diversity, rich filters, Create Your Own Karaoke) | [archive/2026-01-01-enhanced-recommendations.md](archive/2026-01-01-enhanced-recommendations.md) |
