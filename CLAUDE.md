@@ -96,6 +96,44 @@ See [docs/TESTING.md](docs/TESTING.md) for Playwright setup and usage.
 - Use `gcloud` CLI only for reading/debugging
 - Stop and notify on auth issues
 
+### Music Data Modeling (CRITICAL)
+
+**We have 15M artists and 256M tracks in BigQuery. USE THEM.**
+
+When storing any music-related user data (artists, songs, preferences):
+
+1. **Always use autocomplete** - NEVER allow free-text entry for artists or songs. Users must select from our catalog via autocomplete search.
+
+2. **Store Spotify IDs as primary keys** - Reference `spotify_artists.artist_id` or `spotify_tracks.spotify_id`, not plain text names. This enables:
+   - Joining with audio features, genres, popularity data
+   - Deduplication (no "Green Day" vs "green day" vs "Greenday" issues)
+   - Future features like "similar artists" that require ID-based lookups
+
+3. **Denormalize display names** - Store the ID as the primary reference, but include `artist_name` / `title` as denormalized fields for display. Example:
+   ```python
+   # CORRECT
+   user_artist = {
+       "artist_id": "7oPftvlwr6VrsViSDV7fJY",  # Primary key - Spotify ID
+       "artist_name": "Green Day",              # Denormalized for display
+       "source": "quiz",
+   }
+
+   # WRONG - plain text with no ID reference
+   user_artist = {
+       "artist_name": "Green Day",  # Can't join with Spotify data!
+       "source": "quiz",
+   }
+   ```
+
+4. **API endpoints for user input** - Any endpoint accepting artist/song input should:
+   - Accept Spotify IDs (not names) in the request
+   - Frontend should use autocomplete components that return IDs
+   - See `/api/catalog/artists?q=` and `/api/catalog/songs?q=` for search APIs
+
+5. **Reference the Spotify catalog docs** - See [docs/SPOTIFY-DATA-CATALOG.md](docs/SPOTIFY-DATA-CATALOG.md) for all available tables, schemas, and example queries.
+
+**Why this matters:** Without IDs, we can't leverage our 230M audio features, 2.2M artist-genre mappings, or any cross-referencing. Plain text names are a dead end.
+
 ## Code Patterns
 
 ### Backend Services
