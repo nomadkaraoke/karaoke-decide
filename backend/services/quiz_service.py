@@ -8,7 +8,7 @@ import hashlib
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from google.cloud import bigquery
 
@@ -32,6 +32,15 @@ class QuizSubmitResult:
 
     songs_added: int
     recommendations_ready: bool
+
+
+@dataclass
+class ManualArtist:
+    """Artist selected by user via autocomplete search (with Spotify ID)."""
+
+    artist_id: str
+    artist_name: str
+    genres: list[str] | None = None
 
 
 class QuizService:
@@ -674,7 +683,7 @@ class QuizService:
         genres: list[str] | None = None,
         vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None,
         crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None,
-        manual_artists: list[str] | None = None,
+        manual_artists: list[ManualArtist] | None = None,
     ) -> QuizSubmitResult:
         """Submit quiz responses and update user profile.
 
@@ -691,7 +700,7 @@ class QuizService:
             genres: User's selected genre IDs.
             vocal_comfort_pref: Preferred vocal comfort (easy, challenging, any).
             crowd_pleaser_pref: Prefer hits or deep cuts.
-            manual_artists: Artists manually entered by user.
+            manual_artists: Artists selected by user via autocomplete (with Spotify IDs).
 
         Returns:
             QuizSubmitResult with counts.
@@ -871,7 +880,7 @@ class QuizService:
         genres: list[str] | None,
         vocal_comfort_pref: Literal["easy", "challenging", "any"] | None,
         crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None,
-        manual_artists: list[str] | None,
+        manual_artists: list[ManualArtist] | None,
         completed_at: datetime,
     ) -> None:
         """Update user profile with quiz data.
@@ -886,7 +895,7 @@ class QuizService:
             genres: Selected genre IDs.
             vocal_comfort_pref: Vocal comfort preference.
             crowd_pleaser_pref: Crowd pleaser preference.
-            manual_artists: Manually entered artists.
+            manual_artists: Artists selected via autocomplete (with Spotify IDs).
             completed_at: Quiz completion timestamp.
         """
         # For guest users, store by user_id directly
@@ -911,7 +920,7 @@ class QuizService:
                 doc_id = user_id
 
         # Update quiz fields
-        update_data = {
+        update_data: dict[str, Any] = {
             "quiz_completed_at": completed_at.isoformat(),
             "quiz_songs_known": known_song_ids,
             "quiz_artists_known": known_artists,
@@ -940,7 +949,15 @@ class QuizService:
             update_data["quiz_crowd_pleaser_pref"] = crowd_pleaser_pref
 
         if manual_artists:
-            update_data["quiz_manual_artists"] = manual_artists
+            # Store as list of dicts with artist_id as primary key
+            update_data["quiz_manual_artists"] = [
+                {
+                    "artist_id": a.artist_id,
+                    "artist_name": a.artist_name,
+                    "genres": a.genres or [],
+                }
+                for a in manual_artists
+            ]
 
         await self.firestore.update_document(
             self.USERS_COLLECTION,

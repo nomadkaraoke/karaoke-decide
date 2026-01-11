@@ -6,9 +6,10 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { QuizArtistCard } from "@/components/QuizArtistCard";
 import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAutocomplete";
+import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
-import { SparklesIcon, CheckIcon, ChevronRightIcon, RefreshIcon, MicrophoneIcon, XIcon, PlusIcon } from "@/components/icons";
-import { Button, LoadingPulse, LoadingOverlay, Input } from "@/components/ui";
+import { SparklesIcon, CheckIcon, ChevronRightIcon, RefreshIcon, MicrophoneIcon, XIcon } from "@/components/icons";
+import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
 
 interface QuizArtist {
@@ -119,8 +120,7 @@ export default function QuizPage() {
   const [crowdPleaserPref, setCrowdPleaserPref] = useState<CrowdPleaserPref>(null);
 
   // Step 4: Manual artist/song entry
-  const [manualArtists, setManualArtists] = useState<string[]>([]);
-  const [artistInput, setArtistInput] = useState("");
+  const [manualArtists, setManualArtists] = useState<SelectedArtist[]>([]);
   const [enjoySongs, setEnjoySongs] = useState<EnjoySongSelection[]>([]);
   const [showEnjoySingingModal, setShowEnjoySingingModal] = useState(false);
   const [selectedSongForModal, setSelectedSongForModal] = useState<EnjoySongSelection | null>(null);
@@ -141,7 +141,7 @@ export default function QuizPage() {
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists : undefined,
+        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: Array.from(selectedArtists),
         count: 15,
@@ -237,7 +237,7 @@ export default function QuizPage() {
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists : undefined,
+        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: [...Array.from(selectedArtists), ...currentArtistNames],
         count: 10,
@@ -299,23 +299,15 @@ export default function QuizPage() {
   };
 
   // Step 4: Manual artist handlers
-  const handleAddManualArtist = () => {
-    const trimmed = artistInput.trim();
-    if (trimmed && !manualArtists.includes(trimmed)) {
-      setManualArtists((prev) => [...prev, trimmed]);
-      setArtistInput("");
+  const handleAddManualArtist = (artist: SelectedArtist) => {
+    // Don't add duplicates
+    if (!manualArtists.some((a) => a.artist_id === artist.artist_id)) {
+      setManualArtists((prev) => [...prev, artist]);
     }
   };
 
-  const handleRemoveManualArtist = (artist: string) => {
-    setManualArtists((prev) => prev.filter((a) => a !== artist));
-  };
-
-  const handleArtistInputKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddManualArtist();
-    }
+  const handleRemoveManualArtist = (artistId: string) => {
+    setManualArtists((prev) => prev.filter((a) => a.artist_id !== artistId));
   };
 
   // Step 4: Enjoy singing handlers
@@ -694,32 +686,22 @@ export default function QuizPage() {
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
                 Artists you like
               </h2>
-              <div className="flex gap-2 mb-3">
-                <Input
-                  value={artistInput}
-                  onChange={(e) => setArtistInput(e.target.value)}
-                  onKeyDown={handleArtistInputKeyDown}
-                  placeholder="Type an artist name..."
-                  className="flex-1"
-                />
-                <Button
-                  variant="secondary"
-                  onClick={handleAddManualArtist}
-                  disabled={!artistInput.trim()}
-                >
-                  <PlusIcon className="w-5 h-5" />
-                </Button>
-              </div>
+              <ArtistSearchAutocomplete
+                onSelect={handleAddManualArtist}
+                selectedArtistIds={new Set(manualArtists.map((a) => a.artist_id))}
+                placeholder="Search for artists you like..."
+                className="mb-3"
+              />
               {manualArtists.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {manualArtists.map((artist) => (
                     <span
-                      key={artist}
+                      key={artist.artist_id}
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] text-sm font-medium"
                     >
-                      {artist}
+                      {artist.artist_name}
                       <button
-                        onClick={() => handleRemoveManualArtist(artist)}
+                        onClick={() => handleRemoveManualArtist(artist.artist_id)}
                         className="hover:text-[var(--text)] transition-colors"
                       >
                         <XIcon className="w-3 h-3" />

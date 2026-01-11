@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import CurrentUser, KnownSongsServiceDep, QuizServiceDep
+from backend.services.quiz_service import ManualArtist
 
 router = APIRouter()
 
@@ -74,6 +75,14 @@ class DecadeArtistsResponse(BaseModel):
     decades: list[DecadeInfo]
 
 
+class ManualArtistInput(BaseModel):
+    """Artist manually entered by user via autocomplete search."""
+
+    artist_id: str = Field(..., description="Spotify artist ID")
+    artist_name: str = Field(..., description="Artist name for display")
+    genres: list[str] = Field(default_factory=list, description="Artist genres")
+
+
 class QuizSubmitRequest(BaseModel):
     """Request to submit quiz responses."""
 
@@ -110,9 +119,9 @@ class QuizSubmitRequest(BaseModel):
         None,
         description="Prefer popular hits or niche deep cuts",
     )
-    manual_artists: list[str] = Field(
+    manual_artists: list[ManualArtistInput] = Field(
         default_factory=list,
-        description="Artists manually entered by user (free text)",
+        description="Artists selected by user via autocomplete (with Spotify IDs)",
     )
 
 
@@ -389,6 +398,20 @@ async def submit_quiz(
     A user can submit the quiz multiple times - each submission
     will add new songs and update preferences.
     """
+    # Convert Pydantic models to dataclasses for service layer
+    manual_artists_data = (
+        [
+            ManualArtist(
+                artist_id=a.artist_id,
+                artist_name=a.artist_name,
+                genres=a.genres,
+            )
+            for a in request.manual_artists
+        ]
+        if request.manual_artists
+        else None
+    )
+
     result = await quiz_service.submit_quiz(
         user_id=user.id,
         known_song_ids=request.known_song_ids,
@@ -399,7 +422,7 @@ async def submit_quiz(
         genres=request.genres,
         vocal_comfort_pref=request.vocal_comfort_pref,
         crowd_pleaser_pref=request.crowd_pleaser_pref,
-        manual_artists=request.manual_artists,
+        manual_artists=manual_artists_data,
     )
 
     return QuizSubmitResponse(

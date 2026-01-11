@@ -575,7 +575,11 @@ export const api = {
       genres?: string[];
       vocal_comfort_pref?: "easy" | "challenging" | "any" | null;
       crowd_pleaser_pref?: "hits" | "deep_cuts" | "any" | null;
-      manual_artists?: string[];
+      manual_artists?: Array<{
+        artist_id: string;
+        artist_name: string;
+        genres?: string[];
+      }>;
     }) =>
       api.post<{
         message: string;

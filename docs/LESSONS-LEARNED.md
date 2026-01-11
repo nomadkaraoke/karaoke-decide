@@ -15,6 +15,26 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-10: Always Use Spotify IDs and Autocomplete for Music Data
+
+**Context:** Implemented quiz onboarding with manual artist entry using plain text input. Users could type any artist name which was stored as-is without validation or linking to Spotify data.
+
+**Lesson:** Plain text artist/song names are a dead end. They can't be joined with our Spotify catalog (15M artists, 256M tracks, 230M audio features) because of spelling variations, case differences, and typos. We lose the ability to:
+- Look up artist genres
+- Find similar artists
+- Access audio features for recommendations
+- Deduplicate entries
+
+**Recommendation:**
+1. **Never use plain text input for artists/songs** - Always use autocomplete that searches our catalog
+2. **Store Spotify IDs as primary keys** - `artist_id` from `spotify_artists` table, not `artist_name`
+3. **Denormalize names for display** - Store both ID (for joins) and name (for display)
+4. **Use existing search APIs** - `/api/catalog/artists?q=` and `/api/catalog/songs?q=` already exist
+
+See CLAUDE.md "Music Data Modeling (CRITICAL)" section for full guidelines.
+
+---
+
 ### 2026-01-04: Use Query Parameters for Identifiers with Special Characters
 
 **Context:** Building exclude/include artist endpoints with artist name in the path like `/artists/{name}/exclude`.
