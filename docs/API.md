@@ -508,6 +508,85 @@ Get quiz artists for onboarding (recommended). Returns popular karaoke artists w
 
 **Note:** Genre filtering requires the Spotify artist genres table to be populated via ETL. Falls back to unfiltered results if table doesn't exist.
 
+### POST /api/quiz/artists/smart
+
+Get smart quiz artists informed by user's preferences and previous quiz step selections. This is an enhanced version of `/api/quiz/artists` that uses multiple signals to find more relevant artist suggestions:
+
+- Genres: Filter to artists in selected genres
+- Decades: Filter to artists active in selected decades
+- Manual artists: Find artists in similar genres
+- Manual song artists: Use genres from songs user enjoys singing
+
+Each returned artist includes a `suggestion_reason` explaining why they were suggested.
+
+**Requires:** Bearer token
+
+**Request:**
+```json
+{
+  "genres": ["rock", "punk"],
+  "decades": ["1990s", "2000s"],
+  "manual_artists": ["Green Day", "Blink-182"],
+  "manual_song_artists": ["Sum 41"],
+  "exclude": ["Nirvana", "Pearl Jam"],
+  "count": 15
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| genres | list[str] | User's selected genre IDs |
+| decades | list[str] | User's selected decades |
+| manual_artists | list[str] | Artists manually entered by user |
+| manual_song_artists | list[str] | Artists from songs user enjoys singing |
+| exclude | list[str] | Artists to exclude (already shown/selected) |
+| count | int | Number of artists to return (default: 25, max: 50) |
+
+**Response:**
+```json
+{
+  "artists": [
+    {
+      "name": "The Offspring",
+      "song_count": 28,
+      "top_songs": ["Self Esteem", "Pretty Fly (For a White Guy)", "The Kids Aren't Alright"],
+      "total_brand_count": 156,
+      "primary_decade": "1990s",
+      "genres": ["punk rock", "skate punk", "alternative rock"],
+      "image_url": null,
+      "suggestion_reason": {
+        "type": "similar_artist",
+        "display_text": "Similar to Green Day",
+        "related_to": "Green Day"
+      }
+    },
+    {
+      "name": "Foo Fighters",
+      "song_count": 35,
+      "top_songs": ["Everlong", "Learn to Fly", "Best of You"],
+      "total_brand_count": 198,
+      "primary_decade": "1990s",
+      "genres": ["alternative rock", "post-grunge", "rock"],
+      "image_url": null,
+      "suggestion_reason": {
+        "type": "genre_match",
+        "display_text": "Based on rock",
+        "related_to": null
+      }
+    }
+  ],
+  "has_more": true
+}
+```
+
+**Suggestion Reason Types:**
+| Type | Description | Example |
+|------|-------------|---------|
+| `similar_artist` | Shares 2+ genres with a user's manual artist | "Similar to Green Day" |
+| `genre_match` | Matches user's selected genres | "Based on punk & rock" |
+| `decade_match` | Artist's primary decade matches user's selection | "Popular in the 1990s" |
+| `popular_choice` | Fallback for popular artists with no specific match | "Popular karaoke choice" |
+
 ### GET /api/quiz/decade-artists
 
 Get example artists for each decade. Useful for helping users understand what era each decade represents.

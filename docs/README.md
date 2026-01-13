@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-10)
+## Current Status (2026-01-13)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection ✅
 
 ### ✅ What's Working
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
@@ -23,6 +23,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
 - **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
+- **Better Artist Selection (NEW):** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration

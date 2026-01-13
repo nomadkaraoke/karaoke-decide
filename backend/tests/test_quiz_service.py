@@ -6,6 +6,7 @@ import pytest
 
 from backend.config import BackendSettings
 from backend.services.quiz_service import QuizService
+from karaoke_decide.core.models import QuizArtist
 
 
 @pytest.fixture
@@ -387,3 +388,211 @@ class TestGetSongsByIds:
         mock_bigquery.query.assert_called()
         assert len(result) == 1
         assert result[0]["artist"] == "Queen"
+
+
+class TestSuggestionReasonGeneration:
+    """Tests for suggestion reason generation."""
+
+    def test_format_genre_names_single(self, quiz_service: QuizService) -> None:
+        """Formats single genre correctly."""
+        result = quiz_service._format_genre_names(["rock"])
+        assert result == "rock"
+
+    def test_format_genre_names_two(self, quiz_service: QuizService) -> None:
+        """Formats two genres with ampersand."""
+        result = quiz_service._format_genre_names(["rock", "punk"])
+        assert result == "rock & punk"
+
+    def test_format_genre_names_special(self, quiz_service: QuizService) -> None:
+        """Formats special genre names correctly."""
+        result = quiz_service._format_genre_names(["hiphop", "rnb"])
+        assert result == "hip-hop & R&B"
+
+    def test_generate_reason_similar_artist(self, quiz_service: QuizService) -> None:
+        """Generates similar_artist reason when 2+ genres overlap."""
+        # Use genres that match Spotify's format - the service maps "punk rock" -> punk, rock
+        artist = QuizArtist(
+            name="Sum 41",
+            song_count=10,
+            top_songs=["Fat Lip"],
+            total_brand_count=50,
+            primary_decade="2000s",
+            # Include multiple distinct genre types that will map to our IDs
+            genres=["punk rock", "pop punk", "alternative rock", "rock"],
+        )
+        # Green Day has punk and rock - need 2+ overlap
+        seed_artist_genres = {"Green Day": ["punk", "rock", "pop"]}
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=artist,
+            user_genres=[],
+            user_decades=[],
+            seed_artist_genres=seed_artist_genres,
+        )
+
+        assert reason.type == "similar_artist"
+        assert "Green Day" in reason.display_text
+        assert reason.related_to == "Green Day"
+
+    def test_generate_reason_genre_match(self, quiz_service: QuizService) -> None:
+        """Generates genre_match reason when user genres match."""
+        artist = QuizArtist(
+            name="Blink-182",
+            song_count=15,
+            top_songs=["All the Small Things"],
+            total_brand_count=80,
+            primary_decade="1990s",
+            genres=["punk rock", "pop punk"],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=artist,
+            user_genres=["punk", "rock"],
+            user_decades=[],
+            seed_artist_genres={},
+        )
+
+        assert reason.type == "genre_match"
+        assert "punk" in reason.display_text.lower() or "rock" in reason.display_text.lower()
+
+    def test_generate_reason_decade_match(self, quiz_service: QuizService) -> None:
+        """Generates decade_match reason when decade matches."""
+        artist = QuizArtist(
+            name="Queen",
+            song_count=50,
+            top_songs=["Bohemian Rhapsody"],
+            total_brand_count=200,
+            primary_decade="1970s",
+            genres=[],  # No genres to match
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=artist,
+            user_genres=[],
+            user_decades=["1970s", "1980s"],
+            seed_artist_genres={},
+        )
+
+        assert reason.type == "decade_match"
+        assert "1970s" in reason.display_text
+
+    def test_generate_reason_popular_choice_fallback(self, quiz_service: QuizService) -> None:
+        """Falls back to popular_choice when no other match."""
+        artist = QuizArtist(
+            name="Unknown Artist",
+            song_count=5,
+            top_songs=["Some Song"],
+            total_brand_count=30,
+            primary_decade="Unknown",
+            genres=[],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=artist,
+            user_genres=["metal"],  # Artist has no genres
+            user_decades=["2010s"],  # Artist has Unknown decade
+            seed_artist_genres={},
+        )
+
+        assert reason.type == "popular_choice"
+        assert "Popular karaoke choice" in reason.display_text
+
+    def test_generate_reason_priority_order(self, quiz_service: QuizService) -> None:
+        """Similar artist takes priority over genre match."""
+        artist = QuizArtist(
+            name="Nirvana",
+            song_count=20,
+            top_songs=["Smells Like Teen Spirit"],
+            total_brand_count=100,
+            primary_decade="1990s",
+            genres=["grunge", "alternative rock", "rock"],
+        )
+
+        # Has both: similar artist match AND genre match
+        reason = quiz_service._generate_suggestion_reason(
+            artist=artist,
+            user_genres=["grunge", "rock"],  # Would match genre
+            user_decades=["1990s"],  # Would match decade
+            seed_artist_genres={"Pearl Jam": ["grunge", "rock"]},  # Similar artist
+        )
+
+        # Similar artist should win
+        assert reason.type == "similar_artist"
+        assert "Pearl Jam" in reason.display_text
+
+    def test_add_suggestion_reasons_to_all_candidates(self, quiz_service: QuizService) -> None:
+        """Adds reasons to all candidate artists."""
+        candidates = [
+            QuizArtist(
+                name="Artist 1",
+                song_count=10,
+                top_songs=["Song 1"],
+                total_brand_count=50,
+                primary_decade="1990s",
+                genres=["rock"],
+            ),
+            QuizArtist(
+                name="Artist 2",
+                song_count=20,
+                top_songs=["Song 2"],
+                total_brand_count=80,
+                primary_decade="2000s",
+                genres=["pop"],
+            ),
+        ]
+
+        results = quiz_service._add_suggestion_reasons(
+            candidates=candidates,
+            user_genres=["rock"],
+            user_decades=["1990s"],
+            seed_artist_genres={},
+        )
+
+        assert len(results) == 2
+        assert all(r.suggestion_reason is not None for r in results)
+        # First artist should match genre, second should be popular_choice
+        assert results[0].suggestion_reason.type == "genre_match"
+        assert results[1].suggestion_reason.type == "popular_choice"
+
+
+class TestSmartQuizArtists:
+    """Tests for get_smart_quiz_artists with reasons."""
+
+    @pytest.mark.asyncio
+    async def test_returns_artists_with_reasons(
+        self,
+        quiz_service: QuizService,
+        mock_bigquery: MagicMock,
+    ) -> None:
+        """Returns artists with suggestion reasons."""
+        # Mock artist query results
+        mock_rows = []
+        for i, name in enumerate(["Green Day", "Blink-182", "Sum 41"]):
+            row = MagicMock()
+            row.artist_name = name
+            row.song_count = 20 - i
+            row.total_brand_count = 100 - i * 10
+            row.top_songs = [f"{name} Song 1", f"{name} Song 2"]
+            row.genres = ["punk rock", "pop punk"]
+            mock_rows.append(row)
+
+        mock_result = MagicMock()
+        mock_result.result.return_value = mock_rows
+        mock_bigquery.query.return_value = mock_result
+
+        artists = await quiz_service.get_smart_quiz_artists(
+            genres=["punk", "rock"],
+            decades=["1990s", "2000s"],
+            count=3,
+        )
+
+        # All should have suggestion reasons
+        assert len(artists) <= 3
+        for artist in artists:
+            assert artist.suggestion_reason is not None
+            assert artist.suggestion_reason.type in [
+                "similar_artist",
+                "genre_match",
+                "decade_match",
+                "popular_choice",
+            ]
