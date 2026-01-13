@@ -451,8 +451,8 @@ def run_discovery(
             playcount = user_info.get("playcount", "N/A")
             print(f"✓ (playcount: {playcount})")
 
-            # Get friends if we need more users
-            if len(discovered) < max_users and depth < 3:
+            # Get friends if we need more users (depth < 5 allows sufficient expansion)
+            if len(discovered) < max_users and depth < 5:
                 friends = client.get_user_friends(username)
                 new_friends = [f for f in friends if f not in visited and f not in [u for u, _ in to_visit]]
                 for friend in new_friends[:20]:  # Limit friends added per user
