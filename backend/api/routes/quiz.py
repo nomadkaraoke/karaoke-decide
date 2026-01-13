@@ -40,9 +40,9 @@ class QuizSongsResponse(BaseModel):
 class SuggestionReasonResponse(BaseModel):
     """Explanation for why an artist was suggested."""
 
-    type: Literal["similar_artist", "genre_match", "decade_match", "popular_choice"]
+    type: Literal["fans_also_like", "similar_artist", "genre_match", "decade_match", "popular_choice"]
     display_text: str  # Human-readable text, e.g., "Based on punk, rock"
-    related_to: str | None = None  # For similar_artist: the artist name it's similar to
+    related_to: str | None = None  # For similar_artist/fans_also_like: the artist name(s)
 
 
 class QuizArtistResponse(BaseModel):
