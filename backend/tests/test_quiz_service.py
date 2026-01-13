@@ -595,8 +595,278 @@ class TestSmartQuizArtists:
         for artist in artists:
             assert artist.suggestion_reason is not None
             assert artist.suggestion_reason.type in [
+                "fans_also_like",
                 "similar_artist",
                 "genre_match",
                 "decade_match",
                 "popular_choice",
             ]
+
+
+class TestCollaborativeSuggestions:
+    """Tests for collaborative filtering recommendations."""
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_too_few_artists(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Returns empty dict when user has fewer than MIN_SHARED_ARTISTS."""
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182"],  # Only 2, need 3
+            exclude_artists=set(),
+        )
+        assert result == {}
+        # Should not even query Firestore
+        mock_firestore.query_documents.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_no_similar_users(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Returns empty dict when no users share enough artists."""
+        # Mock users with different artists
+        mock_firestore.query_documents.return_value = [
+            {"quiz_artists_known": ["Taylor Swift", "Ariana Grande", "Drake"]},
+            {"quiz_artists_known": ["Metallica", "Slayer", "Megadeth"]},
+        ]
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_finds_collaborative_suggestions(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Returns artists liked by similar users."""
+        # Create 6 users who all like Green Day, Blink-182, Sum 41
+        # and also like The Offspring (which user hasn't selected)
+        similar_users = [
+            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring", "NOFX"]} for _ in range(6)
+        ]
+        # Add some non-similar users
+        other_users = [
+            {"quiz_artists_known": ["Taylor Swift", "Ariana Grande"]},
+            {"quiz_artists_known": ["Metallica"]},  # Too few artists
+        ]
+        mock_firestore.query_documents.return_value = similar_users + other_users
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Should find The Offspring and NOFX as collaborative suggestions
+        assert len(result) >= 1
+        # Check that at least one suggestion has shared artists
+        for artist_name, shared_artists in result.items():
+            assert len(shared_artists) > 0
+            # Shared artists should be from user's selection
+            for shared in shared_artists:
+                assert shared.lower() in ["green day", "blink-182", "sum 41"]
+
+    @pytest.mark.asyncio
+    async def test_excludes_user_selected_artists(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Does not suggest artists user already selected."""
+        # Users share Green Day, Blink-182, Sum 41 and also like NOFX
+        mock_firestore.query_documents.return_value = [
+            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "NOFX"]} for _ in range(6)
+        ]
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Should not include Green Day, Blink-182, or Sum 41 in suggestions
+        for artist_name in result.keys():
+            assert artist_name.lower() not in ["green day", "blink-182", "sum 41"]
+
+    @pytest.mark.asyncio
+    async def test_respects_exclude_list(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Does not suggest artists in exclude list."""
+        mock_firestore.query_documents.return_value = [
+            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "NOFX", "Bad Religion"]} for _ in range(6)
+        ]
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists={"nofx"},  # Exclude NOFX
+        )
+
+        # NOFX should not be in results
+        for artist_name in result.keys():
+            assert artist_name.lower() != "nofx"
+
+    @pytest.mark.asyncio
+    async def test_requires_minimum_similar_users(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Only suggests artists liked by MIN_SIMILAR_USERS or more users."""
+        # Only 4 similar users like The Offspring (need 5)
+        mock_firestore.query_documents.return_value = [
+            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(4)
+        ]
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Should be empty because only 4 users like The Offspring
+        assert result == {}
+
+
+class TestFansAlsoLikeReason:
+    """Tests for fans_also_like suggestion reason generation."""
+
+    def test_generates_fans_also_like_reason(
+        self,
+        quiz_service: QuizService,
+    ) -> None:
+        """Generates fans_also_like reason when collaborative data exists."""
+        candidate = QuizArtist(
+            name="The Offspring",
+            song_count=15,
+            top_songs=["Self Esteem", "Pretty Fly"],
+            total_brand_count=50,
+            primary_decade="1990s",
+            genres=["punk rock"],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=candidate,
+            user_genres=[],
+            user_decades=[],
+            seed_artist_genres={},
+            collaborative_suggestions={
+                "The Offspring": ["Green Day", "Blink-182", "Sum 41"],
+            },
+        )
+
+        assert reason.type == "fans_also_like"
+        assert "Green Day" in reason.display_text
+        assert "Blink-182" in reason.display_text
+
+    def test_fans_also_like_takes_priority(
+        self,
+        quiz_service: QuizService,
+    ) -> None:
+        """fans_also_like has higher priority than other reasons."""
+        candidate = QuizArtist(
+            name="NOFX",
+            song_count=15,
+            top_songs=["Linoleum"],
+            total_brand_count=50,
+            primary_decade="1990s",
+            genres=["punk rock", "pop punk"],  # Would match genre
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=candidate,
+            user_genres=["punk", "rock"],  # Genre match would apply
+            user_decades=["1990s"],  # Decade match would apply
+            seed_artist_genres={"Green Day": ["punk", "rock"]},  # Similar artist would apply
+            collaborative_suggestions={
+                "NOFX": ["Green Day", "Blink-182", "Bad Religion"],
+            },
+        )
+
+        # fans_also_like should win over all others
+        assert reason.type == "fans_also_like"
+
+    def test_formats_single_shared_artist(
+        self,
+        quiz_service: QuizService,
+    ) -> None:
+        """Formats display text correctly for single shared artist."""
+        candidate = QuizArtist(
+            name="Test Artist",
+            song_count=10,
+            top_songs=[],
+            total_brand_count=30,
+            primary_decade="2000s",
+            genres=[],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=candidate,
+            user_genres=[],
+            user_decades=[],
+            seed_artist_genres={},
+            collaborative_suggestions={
+                "Test Artist": ["Green Day"],
+            },
+        )
+
+        assert reason.display_text == "Liked by fans of Green Day"
+
+    def test_formats_two_shared_artists(
+        self,
+        quiz_service: QuizService,
+    ) -> None:
+        """Formats display text correctly for two shared artists."""
+        candidate = QuizArtist(
+            name="Test Artist",
+            song_count=10,
+            top_songs=[],
+            total_brand_count=30,
+            primary_decade="2000s",
+            genres=[],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=candidate,
+            user_genres=[],
+            user_decades=[],
+            seed_artist_genres={},
+            collaborative_suggestions={
+                "Test Artist": ["Green Day", "Blink-182"],
+            },
+        )
+
+        assert reason.display_text == "Liked by fans of Green Day & Blink-182"
+
+    def test_formats_three_shared_artists(
+        self,
+        quiz_service: QuizService,
+    ) -> None:
+        """Formats display text correctly for three shared artists."""
+        candidate = QuizArtist(
+            name="Test Artist",
+            song_count=10,
+            top_songs=[],
+            total_brand_count=30,
+            primary_decade="2000s",
+            genres=[],
+        )
+
+        reason = quiz_service._generate_suggestion_reason(
+            artist=candidate,
+            user_genres=[],
+            user_decades=[],
+            seed_artist_genres={},
+            collaborative_suggestions={
+                "Test Artist": ["Green Day", "Blink-182", "Sum 41"],
+            },
+        )
+
+        assert reason.display_text == "Liked by fans of Green Day, Blink-182 & Sum 41"

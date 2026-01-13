@@ -3,7 +3,7 @@
 import { CheckIcon, MicrophoneIcon } from "@/components/icons";
 
 interface SuggestionReason {
-  type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
   display_text: string;
   related_to: string | null;
 }
@@ -41,6 +41,9 @@ function formatGenre(genre: string): string {
  */
 function getReasonColors(type: SuggestionReason["type"]): string {
   switch (type) {
+    case "fans_also_like":
+      // Purple for collaborative recommendations - most personal/relevant
+      return "bg-[var(--brand-purple)]/15 text-[var(--brand-purple)] border-[var(--brand-purple)]/30";
     case "similar_artist":
       return "bg-[var(--brand-pink)]/15 text-[var(--brand-pink)] border-[var(--brand-pink)]/30";
     case "genre_match":

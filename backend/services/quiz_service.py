@@ -67,6 +67,10 @@ class QuizService:
     MIN_ARTIST_SONGS = 3  # Artists must have at least 3 karaoke songs
     CACHE_TTL_HOURS = 24  # How long to cache quiz data
 
+    # Collaborative filtering configuration
+    MIN_SHARED_ARTISTS = 3  # Minimum artists in common to consider users "similar"
+    MIN_SIMILAR_USERS = 5  # Minimum similar users needed to show "fans_also_like"
+
     def __init__(
         self,
         settings: BackendSettings,
@@ -169,10 +173,11 @@ class QuizService:
         """Get quiz artists informed by user's preferences and manual entries.
 
         This enhanced version uses multiple signals to find more relevant artists:
-        1. Explicit genre selections from user
-        2. Genres inferred from manually entered artists
-        3. Genres inferred from artists of songs user enjoys singing
-        4. Decade filtering
+        1. Collaborative filtering (artists liked by users with similar taste)
+        2. Explicit genre selections from user
+        3. Genres inferred from manually entered artists
+        4. Genres inferred from artists of songs user enjoys singing
+        5. Decade filtering
 
         Args:
             genres: User's selected genre IDs (e.g., ['rock', 'punk']).
@@ -208,6 +213,15 @@ class QuizService:
         if all_genres and "other" not in all_genres:
             effective_genres = all_genres
 
+        # Get collaborative suggestions if user has selected enough artists
+        # This finds artists liked by users with similar taste
+        collaborative_suggestions: dict[str, list[str]] = {}
+        if all_seed_artists and len(all_seed_artists) >= self.MIN_SHARED_ARTISTS:
+            collaborative_suggestions = await self._get_collaborative_suggestions(
+                user_selected_artists=all_seed_artists,
+                exclude_artists=set(all_exclusions) if all_exclusions else set(),
+            )
+
         # Fetch candidates with combined filters
         candidates = self._fetch_artist_candidates(
             limit=count * 2,
@@ -221,6 +235,7 @@ class QuizService:
             user_genres=genres or [],
             user_decades=decades or [],
             seed_artist_genres=seed_artist_genres,
+            collaborative_suggestions=collaborative_suggestions,
         )
 
         # Randomly select final set
@@ -278,20 +293,23 @@ class QuizService:
         user_genres: list[str],
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
+        collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> list[QuizArtist]:
         """Add suggestion reasons to each candidate artist.
 
         Priority order:
-        1. similar_artist - if artist shares 2+ genres with a seed artist
-        2. genre_match - if artist matches user's selected genres
-        3. decade_match - if artist's decade matches user's selection
-        4. popular_choice - fallback for popular karaoke artists
+        1. fans_also_like - if artist is liked by users with similar taste
+        2. similar_artist - if artist shares 2+ genres with a seed artist
+        3. genre_match - if artist matches user's selected genres
+        4. decade_match - if artist's decade matches user's selection
+        5. popular_choice - fallback for popular karaoke artists
 
         Args:
             candidates: List of QuizArtist candidates.
             user_genres: User's explicitly selected genre IDs.
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
+            collaborative_suggestions: Dict of artist name -> shared artists that connect them.
 
         Returns:
             List of QuizArtist with suggestion_reason populated.
@@ -304,6 +322,7 @@ class QuizService:
                 user_genres=user_genres,
                 user_decades=user_decades,
                 seed_artist_genres=seed_artist_genres,
+                collaborative_suggestions=collaborative_suggestions or {},
             )
 
             # Create new QuizArtist with reason
@@ -319,6 +338,7 @@ class QuizService:
         user_genres: list[str],
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
+        collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> SuggestionReason:
         """Generate a suggestion reason for an artist.
 
@@ -327,10 +347,30 @@ class QuizService:
             user_genres: User's explicitly selected genre IDs.
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
+            collaborative_suggestions: Dict of artist name -> shared artists that connect them.
 
         Returns:
             SuggestionReason explaining why this artist was suggested.
         """
+        collaborative_suggestions = collaborative_suggestions or {}
+
+        # Priority 0: Check for fans_also_like (collaborative filtering)
+        # Look for case-insensitive match in collaborative suggestions
+        for collab_artist, shared_artists in collaborative_suggestions.items():
+            if collab_artist.lower() == artist.name.lower() and shared_artists:
+                # Format: "Liked by fans of Artist1, Artist2 & Artist3"
+                if len(shared_artists) == 1:
+                    display_text = f"Liked by fans of {shared_artists[0]}"
+                elif len(shared_artists) == 2:
+                    display_text = f"Liked by fans of {shared_artists[0]} & {shared_artists[1]}"
+                else:
+                    display_text = f"Liked by fans of {shared_artists[0]}, {shared_artists[1]} & {shared_artists[2]}"
+                return SuggestionReason(
+                    type="fans_also_like",
+                    display_text=display_text,
+                    related_to=None,
+                )
+
         # Map artist's Spotify genres to our genre IDs
         artist_genre_ids = self._map_spotify_genres_to_ids([g.lower() for g in artist.genres] if artist.genres else [])
 
@@ -458,6 +498,93 @@ class QuizService:
         except Exception:
             # If query fails, return empty list
             return []
+
+    async def _get_collaborative_suggestions(
+        self,
+        user_selected_artists: list[str],
+        exclude_artists: set[str],
+    ) -> dict[str, list[str]]:
+        """Find artists liked by users with similar taste.
+
+        Queries all users with quiz data, finds those who share at least
+        MIN_SHARED_ARTISTS with the current user, then returns artists
+        those similar users like (that the current user hasn't selected).
+
+        Args:
+            user_selected_artists: Artists the current user has selected.
+            exclude_artists: Artists to exclude from suggestions.
+
+        Returns:
+            Dict mapping artist_name -> list of shared artists that connect them.
+            Empty dict if not enough similar users found.
+        """
+        if len(user_selected_artists) < self.MIN_SHARED_ARTISTS:
+            return {}
+
+        # Normalize for comparison
+        user_artists_lower = {a.lower() for a in user_selected_artists}
+        exclude_lower = {a.lower() for a in exclude_artists}
+
+        # Query all users with quiz_artists_known
+        # This is O(N) but acceptable for <10K users
+        try:
+            all_users = await self.firestore.query_documents(
+                self.USERS_COLLECTION,
+                filters=[],  # Get all users
+                limit=10000,  # Safety limit
+            )
+        except Exception:
+            return {}
+
+        # Find similar users and collect their artists
+        # Structure: artist_name_lower -> list of (shared_artists, user_artists)
+        artist_supporters: dict[str, list[tuple[list[str], list[str]]]] = {}
+
+        for user_doc in all_users:
+            their_artists = user_doc.get("quiz_artists_known", [])
+            if not their_artists or len(their_artists) < self.MIN_SHARED_ARTISTS:
+                continue
+
+            their_artists_lower = {a.lower() for a in their_artists}
+
+            # Find overlap
+            shared = user_artists_lower & their_artists_lower
+            if len(shared) >= self.MIN_SHARED_ARTISTS:
+                # This user is similar! Get their other artists
+                # Find original case versions for display
+                shared_display = [a for a in their_artists if a.lower() in shared][:3]
+
+                for artist in their_artists:
+                    artist_lower = artist.lower()
+                    # Skip if user already has this artist or it's excluded
+                    if artist_lower in user_artists_lower or artist_lower in exclude_lower:
+                        continue
+
+                    if artist_lower not in artist_supporters:
+                        artist_supporters[artist_lower] = []
+                    artist_supporters[artist_lower].append((shared_display, their_artists))
+
+        # Filter to artists with enough supporters
+        result: dict[str, list[str]] = {}
+        for artist_lower, supporters in artist_supporters.items():
+            if len(supporters) >= self.MIN_SIMILAR_USERS:
+                # Use the shared artists from the first supporter for display
+                # (all supporters share similar artists by definition)
+                shared_artists = supporters[0][0]
+                # Find original case artist name from any supporter's list
+                original_name = None
+                for _, their_artists in supporters:
+                    for a in their_artists:
+                        if a.lower() == artist_lower:
+                            original_name = a
+                            break
+                    if original_name:
+                        break
+
+                if original_name:
+                    result[original_name] = shared_artists
+
+        return result
 
     def _map_spotify_genres_to_ids(self, spotify_genres: list[str]) -> list[str]:
         """Map Spotify genre strings to our genre IDs.
