@@ -399,8 +399,13 @@ class QuizService:
 
         # Priority 1b: Check for music listener similarity (ListenBrainz)
         # Based on general music listening patterns from millions of users
-        if listenbrainz_matches and artist.name in listenbrainz_matches:
-            similar_to = listenbrainz_matches[artist.name]
+        # Use case-insensitive lookup for robustness
+        listenbrainz_match_key = artist.name.lower()
+        listenbrainz_matches_lower = (
+            {k.lower(): v for k, v in listenbrainz_matches.items()} if listenbrainz_matches else {}
+        )
+        if listenbrainz_match_key in listenbrainz_matches_lower:
+            similar_to = listenbrainz_matches_lower[listenbrainz_match_key]
             if len(similar_to) == 1:
                 display_text = f"Fans of {similar_to[0]} also like"
             elif len(similar_to) == 2:
