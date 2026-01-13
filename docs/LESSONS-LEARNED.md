@@ -48,6 +48,32 @@ const observer = new IntersectionObserver(
 
 ---
 
+### 2026-01-13: Combining Multiple Collaborative Filtering Sources
+
+**Context:** Implemented collaborative filtering for quiz artist suggestions. Initially used only our own quiz data (users who selected similar artists), then added ListenBrainz API for broader music listener patterns.
+
+**Lesson:** Different sources of collaborative data serve different purposes:
+1. **Domain-specific data** (our quiz) - More relevant because it's from the exact same use case (karaoke selection)
+2. **General data** (ListenBrainz) - Broader coverage but less specific to our domain
+
+**Recommendation:**
+- Prioritize domain-specific signals ("Singers who like X also chose")
+- Use general signals as a supplement ("Fans of X also like")
+- Make the source clear in UI so users understand why each suggestion appears
+- Differentiate display text based on signal source - users appreciate understanding *why* something is recommended
+- Cache external API results aggressively (ListenBrainz: 7 days) to avoid rate limits
+
+```python
+# Priority order for suggestion reasons
+# 1. Karaoke singers similarity (our data - most relevant)
+# 2. Music fans similarity (ListenBrainz - broader)
+# 3. Similar artists by genre
+# 4. Genre match
+# 5. Popular fallback
+```
+
+---
+
 ### 2026-01-10: Always Use Spotify IDs and Autocomplete for Music Data
 
 **Context:** Implemented quiz onboarding with manual artist entry using plain text input. Users could type any artist name which was stored as-is without validation or linking to Spotify data.

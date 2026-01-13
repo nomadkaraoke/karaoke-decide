@@ -42,9 +42,9 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │   (Analytics)   │ ├─────────────────────────────────────────────────┤
 ├─────────────────┤ │  Spotify API     - User listening history       │
 │ karaokenerds_   │ │  Last.fm API     - Scrobbles and loved tracks   │
-│   raw (275K)    │ │  KaraokeNerds    - Karaoke song catalog         │
-│ spotify_tracks  │ │  SendGrid        - Magic link emails            │
-│   (256M)        │ │                                                 │
+│   raw (275K)    │ │  ListenBrainz    - Similar artist data          │
+│ spotify_tracks  │ │  KaraokeNerds    - Karaoke song catalog         │
+│   (256M)        │ │  SendGrid        - Magic link emails            │
 ├─────────────────┤ └─────────────────────────────────────────────────┘
 │   Firestore     │
 │   (User Data)   │
