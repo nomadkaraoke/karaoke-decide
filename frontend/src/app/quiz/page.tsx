@@ -182,7 +182,10 @@ export default function QuizPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedGenres, selectedDecades, manualArtists, enjoySongs, selectedArtists]);
+    // NOTE: selectedArtists intentionally excluded - we only reload when ENTERING step 5,
+    // not when user toggles selections. Infinite scroll handles excludes separately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGenres, selectedDecades, manualArtists, enjoySongs]);
 
   // Create guest session if not authenticated
   useEffect(() => {
