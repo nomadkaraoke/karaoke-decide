@@ -1,8 +1,18 @@
-# MLHD+ Data Import Plan
+# MusicBrainz Data Import Plan
 
 ## Overview
 
-Import the **MLHD+ (Music Listening Histories Dataset+)** to power collaborative filtering recommendations. This dataset contains 27 billion listening events from 583,000 Last.fm users - vastly larger than our original plan to crawl 10,000 users via the Last.fm API.
+Import data from the **MusicBrainz/MetaBrainz ecosystem** to enhance our recommendation engine:
+
+1. **MLHD+ (Music Listening Histories Dataset+)** - 27 billion listening events from 583,000 Last.fm users for collaborative filtering
+2. **MusicBrainz Database** - Rich artist/recording/release metadata, relationships, and genre tags
+3. **ListenBrainz APIs** - Pre-computed similar artists and real-time recommendations
+
+This replaces our original plan to crawl 10,000 users via the Last.fm API with a much richer dataset.
+
+---
+
+# Part 1: MLHD+ Listening History Data
 
 ## Why MLHD+ Instead of Last.fm API Crawling
 
@@ -284,10 +294,285 @@ async def get_similar_from_listenbrainz(artist_mbid: str) -> list[dict]:
 4. Process full dataset
 5. Integrate with recommendation service
 
+---
+
+# Part 2: MusicBrainz Database (Artist/Recording Metadata)
+
+## Overview
+
+The **MusicBrainz Database** is the world's largest open music encyclopedia, containing rich metadata that complements our Spotify data catalog.
+
+**Source:** https://metabrainz.org/datasets/postgres-dumps
+
+**Update frequency:** Twice weekly (Wednesdays and Saturdays)
+
+**License:** CC0 (core data) / CC BY-NC-SA 3.0 (supplementary)
+
+## What MusicBrainz Has That Spotify Doesn't
+
+| Data Type | Spotify | MusicBrainz |
+|-----------|---------|-------------|
+| Artist relationships | Limited | **Rich** (members, collaborators, tributes, renamed-to) |
+| Genre/tags | Basic genres | **Community tags** (768+ hierarchical genres) |
+| Artist disambiguation | None | **Full** (e.g., "Queen (UK rock band)" vs "Queen (70s funk)") |
+| Recording work links | None | **Compositions** (links covers to originals) |
+| ISRCs/ISWCs | Limited | **Comprehensive** industry identifiers |
+| Artist areas/countries | Basic | **Detailed** (city-level, with history) |
+| Aliases/translations | None | **Full** (artist names in different languages/scripts) |
+| Release history | Limited | **Complete** (all editions, pressings, countries) |
+
+## MusicBrainz Entity Model
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     MusicBrainz Core Entities                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
+│  │   Artist    │───▶│  Recording  │───▶│    Work     │                  │
+│  │ (performer) │    │ (specific   │    │ (abstract   │                  │
+│  │             │    │  version)   │    │ composition)│                  │
+│  └─────────────┘    └─────────────┘    └─────────────┘                  │
+│         │                  │                                             │
+│         ▼                  ▼                                             │
+│  ┌─────────────┐    ┌─────────────┐                                     │
+│  │   Release   │◀───│   Medium    │                                     │
+│  │  (product)  │    │ (disc/side) │                                     │
+│  └─────────────┘    └─────────────┘                                     │
+│         │                                                                │
+│         ▼                                                                │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                  │
+│  │Release Group│    │    Label    │    │    Area     │                  │
+│  │(album/EP/   │    │ (record co) │    │ (location)  │                  │
+│  │ single)     │    │             │    │             │                  │
+│  └─────────────┘    └─────────────┘    └─────────────┘                  │
+│                                                                          │
+│  Cross-cutting: Tags, Ratings, Aliases, Annotations, Relationships      │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Key Tables for Our Use Case
+
+### Artist Relationships (High Value)
+```
+artist_relation:
+  - artist_0_mbid, artist_1_mbid, relationship_type
+  - Types: member_of, collaboration, tribute, founded, subgroup, renamed
+```
+
+**Use case:** "Members of Green Day" → suggest solo projects, side bands
+
+### Community Tags (High Value)
+```
+artist_tag:
+  - artist_mbid, tag_name, count (community votes)
+
+recording_tag:
+  - recording_mbid, tag_name, count
+```
+
+**Use case:** Community-sourced genre tags often more accurate than Spotify's algorithmic genres
+
+### Work → Recording Links (Medium Value)
+```
+recording_work:
+  - recording_mbid, work_mbid
+
+work:
+  - mbid, title, composer_artist_mbid
+```
+
+**Use case:** Find all covers of a song, link to original songwriter
+
+### Artist Aliases (Medium Value)
+```
+artist_alias:
+  - artist_mbid, name, locale, type (legal_name, stage_name, etc.)
+```
+
+**Use case:** Better search matching ("The Beatles" = "Beatles" = "ビートルズ")
+
+## Import Strategy
+
+### Option A: Full PostgreSQL Import (Comprehensive)
+
+1. Download PostgreSQL dump (~30-50 GB compressed)
+2. Restore to local/cloud PostgreSQL
+3. Extract relevant tables to BigQuery
+4. Join with Spotify data via name matching or external IDs
+
+**Pros:** Full access to all data and relationships
+**Cons:** Complex setup, large storage, ongoing sync needed
+
+### Option B: JSON Dump (Simpler)
+
+MusicBrainz also provides JSON dumps with the same data.
+
+**Pros:** Easier to process, no PostgreSQL needed
+**Cons:** Same data, just different format
+
+### Option C: Selective API Queries (Lightweight)
+
+Use MusicBrainz API for on-demand lookups:
+```
+GET https://musicbrainz.org/ws/2/artist/{mbid}?inc=artist-rels+tags
+```
+
+**Pros:** No bulk download, always current
+**Cons:** Rate limited (1 req/sec), latency
+
+### Recommended Approach
+
+**Hybrid:**
+1. Download and process artist relationships once (for "members of", "collaborated with")
+2. Download community tags for top artists
+3. Use API for on-demand lookups when needed
+4. Build MBID ↔ Spotify ID mapping table for joins
+
+## BigQuery Tables to Create
+
+```sql
+-- Artist relationships from MusicBrainz
+CREATE TABLE karaoke_decide.mb_artist_relationships (
+    artist_mbid STRING,
+    related_artist_mbid STRING,
+    relationship_type STRING,  -- member_of, tribute, collaboration, etc.
+    begin_date DATE,
+    end_date DATE
+);
+
+-- Community genre tags
+CREATE TABLE karaoke_decide.mb_artist_tags (
+    artist_mbid STRING,
+    tag_name STRING,
+    vote_count INT64
+);
+
+-- Master mapping table
+CREATE TABLE karaoke_decide.mbid_spotify_mapping (
+    artist_mbid STRING,
+    spotify_artist_id STRING,
+    artist_name STRING,
+    match_method STRING,  -- exact_id, name_match, fuzzy_match
+    match_confidence FLOAT64
+);
+```
+
+---
+
+# Part 3: ListenBrainz APIs (Real-time Recommendations)
+
+## Overview
+
+ListenBrainz provides **pre-computed similar artists** based on their user listening data. This is useful for:
+- Quick lookups without processing MLHD+ ourselves
+- Always up-to-date (computed from live data)
+- Different algorithm than our co-occurrence matrix
+
+## Available APIs
+
+### Similar Artists API
+```
+POST https://labs.api.listenbrainz.org/similar-artists/json
+{
+    "artist_mbids": ["8f6bd1e4-fbe1-4f50-aa9b-94c450ec0f11"],
+    "algorithm": "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
+}
+```
+
+**Response:** List of similar artists with similarity scores
+
+### Spotify ID Mapping APIs
+```
+POST https://labs.api.listenbrainz.org/spotify-id-from-mbid/json
+{"artist_mbid": ["..."]}
+
+POST https://labs.api.listenbrainz.org/mbid-from-spotify-id/json
+{"spotify_id": ["..."]}
+```
+
+### Artist Metadata API
+```
+POST https://labs.api.listenbrainz.org/artist-credit-from-artist-mbid/json
+{"artist_mbid": ["..."]}
+```
+
+## Integration Strategy
+
+```python
+async def get_similar_artists_listenbrainz(spotify_artist_id: str) -> list[dict]:
+    """Get similar artists using ListenBrainz API."""
+
+    # 1. Convert Spotify ID to MBID
+    mbid = await get_mbid_from_spotify_id(spotify_artist_id)
+    if not mbid:
+        return []
+
+    # 2. Query similar artists
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://labs.api.listenbrainz.org/similar-artists/json",
+            json={
+                "artist_mbids": [mbid],
+                "algorithm": "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
+            }
+        )
+        similar = response.json()
+
+    # 3. Convert MBIDs back to Spotify IDs
+    similar_mbids = [s["artist_mbid"] for s in similar]
+    spotify_ids = await get_spotify_ids_from_mbids(similar_mbids)
+
+    return [
+        {"spotify_id": spotify_ids.get(s["artist_mbid"]), "similarity": s["score"]}
+        for s in similar
+        if spotify_ids.get(s["artist_mbid"])
+    ]
+```
+
+---
+
+# Combined Implementation Plan
+
+## Phase 1: MLHD+ Processing (Priority: High)
+1. Download MLHD+ complete archives
+2. Process to extract artist co-occurrence
+3. Build similarity table in BigQuery
+
+## Phase 2: MBID ↔ Spotify Mapping (Priority: High)
+1. Use ListenBrainz API for bulk mapping
+2. Fall back to name matching for unmapped artists
+3. Store mapping table in BigQuery
+
+## Phase 3: MusicBrainz Metadata (Priority: Medium)
+1. Download artist relationships from MB dump
+2. Extract community tags for top artists
+3. Import to BigQuery for enrichment queries
+
+## Phase 4: ListenBrainz API Integration (Priority: Low)
+1. Add as secondary recommendation source
+2. Use for real-time suggestions
+3. Cache results to reduce API calls
+
+## Combined Cost Estimate
+
+| Resource | Usage | Est. Cost |
+|----------|-------|-----------|
+| GCS Storage (MLHD+) | ~300GB | ~$7/month |
+| GCS Storage (MB dump) | ~50GB | ~$1/month |
+| BigQuery Storage | ~20GB tables | ~$0.40/month |
+| BigQuery Queries | All sources | ~$10/month |
+| Processing | One-time | ~$5 |
+| **Total** | | **~$25/month** |
+
 ## References
 
 - [MLHD+ Documentation](https://musicbrainz.org/doc/MLHD+)
 - [MLHD+ Download](https://data.musicbrainz.org/pub/musicbrainz/listenbrainz/mlhd/)
 - [ListenBrainz Similar Artists API](https://labs.api.listenbrainz.org/similar-artists)
+- [MusicBrainz Database Schema](https://musicbrainz.org/doc/MusicBrainz_Database/Schema)
+- [MusicBrainz PostgreSQL Dumps](https://metabrainz.org/datasets/postgres-dumps)
+- [ListenBrainz Labs API](https://labs.api.listenbrainz.org/)
 - [Original MLHD Paper](https://simssa.ca/assets/files/gabriel-MLHD-ismir2017.pdf)
 - [MLHD Cleanup Blog Post](https://blog.metabrainz.org/2022/10/28/cleaning-up-the-music-listening-histories-dataset/)
