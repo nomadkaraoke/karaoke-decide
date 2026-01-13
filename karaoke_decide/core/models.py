@@ -202,7 +202,13 @@ class QuizSong(BaseModel):
 class SuggestionReason(BaseModel):
     """Explanation for why an artist was suggested."""
 
-    type: Literal["fans_also_like", "similar_artist", "genre_match", "decade_match", "popular_choice"]
+    type: Literal[
+        "fans_also_like",  # Collaborative: liked by users with similar taste (ListenBrainz + Firestore)
+        "similar_artist",  # Shares genres with user's selected artists
+        "genre_match",  # Matches user's selected genres
+        "decade_match",  # Matches user's selected decades
+        "popular_choice",  # Fallback for popular artists
+    ]
     display_text: str  # Human-readable text, e.g., "Based on punk, rock"
     related_to: str | None = None  # For similar_artist/fans_also_like: the artist name(s)
 
