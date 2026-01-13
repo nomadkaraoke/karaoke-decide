@@ -2,6 +2,12 @@
 
 import { CheckIcon, MicrophoneIcon } from "@/components/icons";
 
+interface SuggestionReason {
+  type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  display_text: string;
+  related_to: string | null;
+}
+
 interface QuizArtist {
   name: string;
   song_count: number;
@@ -10,6 +16,7 @@ interface QuizArtist {
   primary_decade: string;
   genres?: string[];
   image_url: string | null;
+  suggestion_reason?: SuggestionReason | null;
 }
 
 interface QuizArtistCardProps {
@@ -27,6 +34,40 @@ function formatGenre(genre: string): string {
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+/**
+ * Get color classes for suggestion reason type
+ */
+function getReasonColors(type: SuggestionReason["type"]): string {
+  switch (type) {
+    case "similar_artist":
+      return "bg-[var(--brand-pink)]/15 text-[var(--brand-pink)] border-[var(--brand-pink)]/30";
+    case "genre_match":
+      return "bg-[var(--brand-blue)]/15 text-[var(--brand-blue)] border-[var(--brand-blue)]/30";
+    case "decade_match":
+      return "bg-[var(--brand-yellow)]/15 text-[var(--brand-yellow)] border-[var(--brand-yellow)]/30";
+    case "popular_choice":
+    default:
+      return "bg-[var(--text)]/10 text-[var(--text-muted)] border-[var(--text)]/20";
+  }
+}
+
+/**
+ * Badge showing why an artist was suggested
+ */
+function ReasonBadge({ reason }: { reason: SuggestionReason }) {
+  return (
+    <span
+      className={`
+        inline-flex items-center text-xs px-2 py-0.5 rounded-full border
+        ${getReasonColors(reason.type)}
+      `}
+      title={reason.related_to ? `Similar to ${reason.related_to}` : undefined}
+    >
+      {reason.display_text}
+    </span>
+  );
 }
 
 export function QuizArtistCard({
@@ -86,9 +127,15 @@ export function QuizArtistCard({
           <h3 className="font-semibold text-[var(--text)] truncate text-lg">
             {artist.name}
           </h3>
-          <p className="text-[var(--text-muted)] text-sm">
-            {artist.song_count} karaoke songs
-          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[var(--text-muted)] text-sm">
+              {artist.song_count} karaoke songs
+            </p>
+            {/* Suggestion reason badge */}
+            {artist.suggestion_reason && (
+              <ReasonBadge reason={artist.suggestion_reason} />
+            )}
+          </div>
 
           {/* Genre pills */}
           {displayGenres.length > 0 && (

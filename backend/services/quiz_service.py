@@ -14,7 +14,7 @@ from google.cloud import bigquery
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
-from karaoke_decide.core.models import QuizArtist, QuizSong
+from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 
 
 @dataclass
@@ -183,16 +183,21 @@ class QuizService:
             count: Number of artists to return.
 
         Returns:
-            List of QuizArtist objects that match user's taste profile.
+            List of QuizArtist objects that match user's taste profile with suggestion reasons.
         """
         # Combine all exclusions
         all_exclusions = list(set((exclude_artists or []) + (seed_artists or []) + (seed_song_artists or [])))
 
-        # Get genres from seed artists if provided
+        # Get genres from seed artists if provided, tracking which artist they came from
         inferred_genres: list[str] = []
-        if seed_artists or seed_song_artists:
-            all_seed_artists = list(set((seed_artists or []) + (seed_song_artists or [])))
-            inferred_genres = self._get_artist_genres(all_seed_artists)
+        seed_artist_genres: dict[str, list[str]] = {}  # artist_name -> genres
+        all_seed_artists = list(set((seed_artists or []) + (seed_song_artists or [])))
+
+        if all_seed_artists:
+            seed_artist_genres = self._get_artist_genres_detailed(all_seed_artists)
+            for artist_genres in seed_artist_genres.values():
+                inferred_genres.extend(artist_genres)
+            inferred_genres = list(set(inferred_genres))
 
         # Combine explicit genres with inferred genres
         all_genres = list(set((genres or []) + inferred_genres))
@@ -210,11 +215,208 @@ class QuizService:
             exclude_artists=all_exclusions if all_exclusions else None,
         )
 
-        # Randomly select final set
-        if len(candidates) > count:
-            candidates = random.sample(candidates, count)
+        # Generate suggestion reasons for each candidate
+        candidates_with_reasons = self._add_suggestion_reasons(
+            candidates=candidates,
+            user_genres=genres or [],
+            user_decades=decades or [],
+            seed_artist_genres=seed_artist_genres,
+        )
 
-        return candidates
+        # Randomly select final set
+        if len(candidates_with_reasons) > count:
+            candidates_with_reasons = random.sample(candidates_with_reasons, count)
+
+        return candidates_with_reasons
+
+    def _get_artist_genres_detailed(self, artist_names: list[str]) -> dict[str, list[str]]:
+        """Get genres for given artists from BigQuery, returning a dict by artist.
+
+        Used to track which seed artist contributed which genres.
+
+        Args:
+            artist_names: List of artist names.
+
+        Returns:
+            Dict mapping artist name to list of genre IDs.
+        """
+        if not artist_names:
+            return {}
+
+        # Build query to get genres for these artists
+        placeholders = ", ".join([f"@artist_{i}" for i in range(len(artist_names))])
+        sql = f"""
+            SELECT sa.artist_name, ARRAY_AGG(DISTINCT sag.genre) as genres
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists` sa
+            JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artist_genres` sag
+                ON sa.artist_id = sag.artist_id
+            WHERE LOWER(sa.artist_name) IN ({placeholders})
+            GROUP BY sa.artist_name
+            LIMIT 50
+        """
+
+        params = [
+            bigquery.ScalarQueryParameter(f"artist_{i}", "STRING", name.lower()) for i, name in enumerate(artist_names)
+        ]
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+
+        try:
+            results = self.bigquery.query(sql, job_config=job_config).result()
+            result_dict: dict[str, list[str]] = {}
+            for row in results:
+                spotify_genres = [g.lower() for g in row.genres] if row.genres else []
+                genre_ids = self._map_spotify_genres_to_ids(spotify_genres)
+                result_dict[row.artist_name] = genre_ids
+            return result_dict
+        except Exception:
+            return {}
+
+    def _add_suggestion_reasons(
+        self,
+        candidates: list[QuizArtist],
+        user_genres: list[str],
+        user_decades: list[str],
+        seed_artist_genres: dict[str, list[str]],
+    ) -> list[QuizArtist]:
+        """Add suggestion reasons to each candidate artist.
+
+        Priority order:
+        1. similar_artist - if artist shares 2+ genres with a seed artist
+        2. genre_match - if artist matches user's selected genres
+        3. decade_match - if artist's decade matches user's selection
+        4. popular_choice - fallback for popular karaoke artists
+
+        Args:
+            candidates: List of QuizArtist candidates.
+            user_genres: User's explicitly selected genre IDs.
+            user_decades: User's selected decades.
+            seed_artist_genres: Dict of seed artist name -> their genre IDs.
+
+        Returns:
+            List of QuizArtist with suggestion_reason populated.
+        """
+        results: list[QuizArtist] = []
+
+        for candidate in candidates:
+            reason = self._generate_suggestion_reason(
+                artist=candidate,
+                user_genres=user_genres,
+                user_decades=user_decades,
+                seed_artist_genres=seed_artist_genres,
+            )
+
+            # Create new QuizArtist with reason
+            artist_dict = candidate.model_dump()
+            artist_dict["suggestion_reason"] = reason
+            results.append(QuizArtist(**artist_dict))
+
+        return results
+
+    def _generate_suggestion_reason(
+        self,
+        artist: QuizArtist,
+        user_genres: list[str],
+        user_decades: list[str],
+        seed_artist_genres: dict[str, list[str]],
+    ) -> SuggestionReason:
+        """Generate a suggestion reason for an artist.
+
+        Args:
+            artist: The artist to generate reason for.
+            user_genres: User's explicitly selected genre IDs.
+            user_decades: User's selected decades.
+            seed_artist_genres: Dict of seed artist name -> their genre IDs.
+
+        Returns:
+            SuggestionReason explaining why this artist was suggested.
+        """
+        # Map artist's Spotify genres to our genre IDs
+        artist_genre_ids = self._map_spotify_genres_to_ids([g.lower() for g in artist.genres] if artist.genres else [])
+
+        # Priority 1: Check for similar_artist (shares 2+ genres with seed artist)
+        if seed_artist_genres:
+            for seed_artist, seed_genres in seed_artist_genres.items():
+                if seed_genres and artist_genre_ids:
+                    overlap = set(artist_genre_ids) & set(seed_genres)
+                    if len(overlap) >= 2:
+                        return SuggestionReason(
+                            type="similar_artist",
+                            display_text=f"Similar to {seed_artist}",
+                            related_to=seed_artist,
+                        )
+
+        # Priority 2: Check for genre_match
+        if user_genres and artist_genre_ids:
+            matching_genres = set(user_genres) & set(artist_genre_ids)
+            if matching_genres:
+                # Format genre names nicely
+                formatted = self._format_genre_names(list(matching_genres)[:2])
+                return SuggestionReason(
+                    type="genre_match",
+                    display_text=f"Based on {formatted}",
+                    related_to=None,
+                )
+
+        # Priority 3: Check for decade_match
+        if user_decades and artist.primary_decade != "Unknown":
+            if artist.primary_decade in user_decades:
+                return SuggestionReason(
+                    type="decade_match",
+                    display_text=f"Popular in the {artist.primary_decade}",
+                    related_to=None,
+                )
+
+        # Priority 4: Fallback to popular_choice
+        return SuggestionReason(
+            type="popular_choice",
+            display_text="Popular karaoke choice",
+            related_to=None,
+        )
+
+    def _format_genre_names(self, genre_ids: list[str]) -> str:
+        """Format genre IDs into human-readable names.
+
+        Args:
+            genre_ids: List of genre IDs like ['rock', 'punk'].
+
+        Returns:
+            Formatted string like "rock, punk" or "rock & punk".
+        """
+        # Map IDs to display names
+        display_names = {
+            "pop": "pop",
+            "rock": "rock",
+            "hiphop": "hip-hop",
+            "rnb": "R&B",
+            "country": "country",
+            "electronic": "electronic",
+            "dance": "dance",
+            "metal": "metal",
+            "jazz": "jazz",
+            "latin": "Latin",
+            "indie": "indie",
+            "kpop": "K-pop",
+            "disco": "disco",
+            "classic-rock": "classic rock",
+            "musical": "musical theater",
+            "reggae": "reggae",
+            "punk": "punk",
+            "emo": "emo",
+            "grunge": "grunge",
+            "folk": "folk",
+            "blues": "blues",
+            "ska": "ska",
+        }
+
+        names = [display_names.get(gid, gid) for gid in genre_ids]
+
+        if len(names) == 1:
+            return names[0]
+        elif len(names) == 2:
+            return f"{names[0]} & {names[1]}"
+        else:
+            return ", ".join(names)
 
     def _get_artist_genres(self, artist_names: list[str]) -> list[str]:
         """Get genres for given artists from BigQuery.

@@ -15,6 +15,39 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-01-13: Infinite Scroll UX for Selection Interfaces
+
+**Context:** Quiz step 5 "Artists You Know" had a "Show More Artists" button that would reload/shuffle the list. Users complained that artists they'd already seen and planned to select would suddenly disappear.
+
+**Lesson:** When users are making selections from a list:
+1. **Never remove visible items** - Items already shown should stay visible regardless of user actions
+2. **Explain why items appear** - Users trust and engage more when they understand the logic ("Similar to Green Day")
+3. **Keep finish action accessible** - With infinite scroll, ensure users can always finish (sticky bar > button that scrolls away)
+
+**Recommendation:**
+- Use Intersection Observer to detect scroll near bottom
+- Track all shown items in a ref to prevent duplicates
+- Return a `has_more` flag from API to know when to stop fetching
+- Include `suggestion_reason` with each item explaining why it was suggested
+- Add a fixed/sticky UI element for the primary action (submit, finish, etc.)
+
+```typescript
+// Track shown items to never remove them
+const shownItemsRef = useRef<Set<string>>(new Set());
+
+// IntersectionObserver triggers more loads
+const observer = new IntersectionObserver(
+  (entries) => {
+    if (entries[0].isIntersecting && hasMore && !isLoading) {
+      loadMore();
+    }
+  },
+  { rootMargin: "200px" }
+);
+```
+
+---
+
 ### 2026-01-10: Always Use Spotify IDs and Autocomplete for Music Data
 
 **Context:** Implemented quiz onboarding with manual artist entry using plain text input. Users could type any artist name which was stored as-is without validation or linking to Spotify data.

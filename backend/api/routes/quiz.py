@@ -37,6 +37,14 @@ class QuizSongsResponse(BaseModel):
     songs: list[QuizSongResponse]
 
 
+class SuggestionReasonResponse(BaseModel):
+    """Explanation for why an artist was suggested."""
+
+    type: Literal["similar_artist", "genre_match", "decade_match", "popular_choice"]
+    display_text: str  # Human-readable text, e.g., "Based on punk, rock"
+    related_to: str | None = None  # For similar_artist: the artist name it's similar to
+
+
 class QuizArtistResponse(BaseModel):
     """Artist presented in the onboarding quiz."""
 
@@ -47,12 +55,14 @@ class QuizArtistResponse(BaseModel):
     primary_decade: str
     genres: list[str] = []
     image_url: str | None = None
+    suggestion_reason: SuggestionReasonResponse | None = None
 
 
 class QuizArtistsResponse(BaseModel):
     """Response containing quiz artists."""
 
     artists: list[QuizArtistResponse]
+    has_more: bool = True  # Whether more artists are available for infinite scroll
 
 
 class DecadeArtist(BaseModel):
@@ -330,6 +340,9 @@ async def get_smart_quiz_artists(
         count=request.count,
     )
 
+    # If we got fewer artists than requested, we've exhausted available artists
+    has_more = len(artists) >= request.count
+
     return QuizArtistsResponse(
         artists=[
             QuizArtistResponse(
@@ -340,9 +353,17 @@ async def get_smart_quiz_artists(
                 primary_decade=artist.primary_decade,
                 genres=artist.genres,
                 image_url=artist.image_url,
+                suggestion_reason=SuggestionReasonResponse(
+                    type=artist.suggestion_reason.type,
+                    display_text=artist.suggestion_reason.display_text,
+                    related_to=artist.suggestion_reason.related_to,
+                )
+                if artist.suggestion_reason
+                else None,
             )
             for artist in artists
-        ]
+        ],
+        has_more=has_more,
     )
 
 

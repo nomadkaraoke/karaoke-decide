@@ -604,7 +604,13 @@ export const api = {
           primary_decade: string;
           genres: string[];
           image_url: string | null;
+          suggestion_reason: {
+            type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+            display_text: string;
+            related_to: string | null;
+          } | null;
         }>;
+        has_more: boolean;
       }>("/api/quiz/artists/smart", params),
 
     getStatus: () =>

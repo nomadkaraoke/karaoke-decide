@@ -199,6 +199,14 @@ class QuizSong(BaseModel):
     brand_count: int  # Number of karaoke brands
 
 
+class SuggestionReason(BaseModel):
+    """Explanation for why an artist was suggested."""
+
+    type: Literal["similar_artist", "genre_match", "decade_match", "popular_choice"]
+    display_text: str  # Human-readable text, e.g., "Based on punk, rock"
+    related_to: str | None = None  # For similar_artist: the artist name it's similar to
+
+
 class QuizArtist(BaseModel):
     """Artist presented in the onboarding quiz."""
 
@@ -209,6 +217,7 @@ class QuizArtist(BaseModel):
     primary_decade: str  # Most common decade for their songs
     genres: list[str] = Field(default_factory=list)  # Genres from Spotify
     image_url: str | None = None  # Artist image URL (from Spotify)
+    suggestion_reason: SuggestionReason | None = None  # Why this artist is suggested
 
 
 class QuizResponse(BaseModel):

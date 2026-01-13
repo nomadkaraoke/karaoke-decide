@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { QuizArtistCard } from "@/components/QuizArtistCard";
+import { StickyFinishBar } from "@/components/StickyFinishBar";
 import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAutocomplete";
 import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
-import { SparklesIcon, CheckIcon, ChevronRightIcon, RefreshIcon, MicrophoneIcon, XIcon } from "@/components/icons";
+import { SparklesIcon, CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
+
+interface SuggestionReason {
+  type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  display_text: string;
+  related_to: string | null;
+}
 
 interface QuizArtist {
   name: string;
@@ -20,6 +27,7 @@ interface QuizArtist {
   primary_decade: string;
   genres?: string[];
   image_url: string | null;
+  suggestion_reason?: SuggestionReason | null;
 }
 
 type EnergyPreference = "chill" | "medium" | "high" | null;
@@ -128,12 +136,19 @@ export default function QuizPage() {
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreArtists, setHasMoreArtists] = useState(true);
+
+  // Refs for infinite scroll
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const shownArtistNamesRef = useRef<Set<string>>(new Set());
 
   // Load smart artists for step 5 (informed by previous selections)
   const loadSmartArtists = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
+      // Reset tracking for fresh load
+      shownArtistNamesRef.current = new Set();
 
       // Get artists from songs user enjoys singing
       const songArtists = enjoySongs.map((s) => s.artist);
@@ -147,14 +162,20 @@ export default function QuizPage() {
         count: 15,
       });
 
+      // Track shown artists
+      response.artists.forEach((a) => shownArtistNamesRef.current.add(a.name));
+
       setQuizArtists(response.artists);
+      setHasMoreArtists(response.has_more);
     } catch (err) {
       // Fallback to regular artist loading if smart endpoint fails
       console.error("Smart artist loading failed, falling back:", err);
       try {
         const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined;
         const response = await api.quiz.getArtists(15, genresArray);
+        response.artists.forEach((a) => shownArtistNamesRef.current.add(a.name));
         setQuizArtists(response.artists);
+        setHasMoreArtists(true); // Assume there's more in fallback mode
       } catch (fallbackErr) {
         setError(fallbackErr instanceof Error ? fallbackErr.message : "Failed to load artists");
       }
@@ -228,33 +249,77 @@ export default function QuizPage() {
     });
   };
 
-  const handleLoadMoreArtists = async () => {
+  const handleLoadMoreArtists = useCallback(async () => {
+    if (isLoadingMore || !hasMoreArtists) return;
+
     try {
       setIsLoadingMore(true);
-      const currentArtistNames = quizArtists.map((a) => a.name);
       const songArtists = enjoySongs.map((s) => s.artist);
+
+      // Exclude all artists we've shown + selected artists
+      const allExcluded = new Set([
+        ...Array.from(shownArtistNamesRef.current),
+        ...Array.from(selectedArtists),
+      ]);
 
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
         manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
-        exclude: [...Array.from(selectedArtists), ...currentArtistNames],
+        exclude: Array.from(allExcluded),
         count: 10,
       });
 
-      const existingNames = new Set(quizArtists.map((a) => a.name));
-      const newArtists = response.artists.filter((a) => !existingNames.has(a.name));
+      // Filter out any duplicates that somehow got through
+      const newArtists = response.artists.filter(
+        (a) => !shownArtistNamesRef.current.has(a.name)
+      );
 
+      // Track new shown artists
+      newArtists.forEach((a) => shownArtistNamesRef.current.add(a.name));
+
+      // Append to existing list (never replace!)
       if (newArtists.length > 0) {
         setQuizArtists((prev) => [...prev, ...newArtists]);
       }
+
+      setHasMoreArtists(response.has_more && newArtists.length > 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load more artists");
     } finally {
       setIsLoadingMore(false);
     }
-  };
+  }, [isLoadingMore, hasMoreArtists, selectedGenres, selectedDecades, manualArtists, enjoySongs, selectedArtists]);
+
+  // Infinite scroll: Observe when user scrolls near bottom to load more
+  useEffect(() => {
+    if (step !== 5) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasMoreArtists && !isLoadingMore && !isLoading) {
+          handleLoadMoreArtists();
+        }
+      },
+      {
+        rootMargin: "200px", // Trigger 200px before reaching the element
+        threshold: 0,
+      }
+    );
+
+    const trigger = loadMoreTriggerRef.current;
+    if (trigger) {
+      observer.observe(trigger);
+    }
+
+    return () => {
+      if (trigger) {
+        observer.unobserve(trigger);
+      }
+    };
+  }, [step, hasMoreArtists, isLoadingMore, isLoading, handleLoadMoreArtists]);
 
   const handleSubmit = async () => {
     try {
@@ -871,7 +936,7 @@ export default function QuizPage() {
               </div>
             ) : (
               <>
-                {/* Selection count */}
+                {/* Selection count and clear button */}
                 <div className="flex items-center justify-between mb-4">
                   <span data-testid="artist-selection-count" className="text-[var(--text)]/60 text-sm">
                     {selectedArtists.size} selected
@@ -886,8 +951,12 @@ export default function QuizPage() {
                   )}
                 </div>
 
-                {/* Artist grid */}
-                <div data-testid="artist-grid" className="grid grid-cols-1 gap-3 mb-4">
+                {/* Artist grid with infinite scroll */}
+                <div
+                  data-testid="artist-grid"
+                  className="grid grid-cols-1 gap-3"
+                  style={{ paddingBottom: "120px" }} // Space for sticky bar
+                >
                   {quizArtists.map((artist, index) => (
                     <QuizArtistCard
                       key={artist.name}
@@ -897,55 +966,42 @@ export default function QuizPage() {
                       index={index}
                     />
                   ))}
+
+                  {/* Infinite scroll trigger */}
+                  <div
+                    ref={loadMoreTriggerRef}
+                    className="flex items-center justify-center py-4"
+                  >
+                    {isLoadingMore && (
+                      <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                        <LoaderIcon className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Finding more artists...</span>
+                      </div>
+                    )}
+                    {!hasMoreArtists && quizArtists.length > 0 && (
+                      <p className="text-sm text-[var(--text-muted)]">
+                        No more artists to show
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Load more artists button */}
-                <div className="mb-6">
-                  <Button
-                    data-testid="load-more-artists-btn"
-                    variant="ghost"
-                    size="md"
-                    className="w-full"
-                    onClick={handleLoadMoreArtists}
-                    isLoading={isLoadingMore}
-                    leftIcon={<RefreshIcon className="w-4 h-4" />}
-                  >
-                    Show More Artists
-                  </Button>
-                </div>
+                {/* Sticky finish bar */}
+                <StickyFinishBar
+                  selectedCount={selectedArtists.size}
+                  onFinish={handleSubmit}
+                  onSkip={handleSkipToRecommendations}
+                  isSubmitting={isSubmitting}
+                />
 
-                {/* Navigation */}
-                <div className="flex gap-3 sticky bottom-4">
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    className="flex-1"
-                    onClick={() => setStep(4)}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="flex-1"
-                    onClick={handleSubmit}
-                    isLoading={isSubmitting}
-                    leftIcon={<SparklesIcon className="w-5 h-5" />}
-                  >
-                    See Recommendations
-                  </Button>
-                </div>
-
-                {/* Skip link */}
-                <div className="text-center mt-4">
-                  <button
-                    onClick={handleSkipToRecommendations}
-                    disabled={isSubmitting}
-                    className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
-                  >
-                    {isSubmitting ? "Loading..." : "Skip artist selection →"}
-                  </button>
-                </div>
+                {/* Back button - fixed in corner for easy access */}
+                <button
+                  onClick={() => setStep(4)}
+                  className="fixed bottom-20 left-4 z-50 p-2 rounded-full bg-[var(--secondary)] border border-[var(--card-border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                  title="Go back"
+                >
+                  <ChevronRightIcon className="w-5 h-5 transform rotate-180" />
+                </button>
               </>
             )}
           </>
