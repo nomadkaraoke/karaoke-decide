@@ -12,7 +12,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2026-01-13)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs ✅
 
 ### ✅ What's Working
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
@@ -23,7 +23,8 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
 - **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
-- **Better Artist Selection (NEW):** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
+- **Better Artist Selection:** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
+- **Collaborative Recommendations (NEW):** Artists are suggested based on what users with similar taste also like ("Liked by fans of Green Day, Blink-182 & Sum 41") - requires 3+ shared artists with 5+ similar users
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration

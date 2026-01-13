@@ -579,9 +579,10 @@ Each returned artist includes a `suggestion_reason` explaining why they were sug
 }
 ```
 
-**Suggestion Reason Types:**
+**Suggestion Reason Types (priority order):**
 | Type | Description | Example |
 |------|-------------|---------|
+| `fans_also_like` | Liked by users with similar taste (≥3 shared artists, ≥5 similar users) | "Liked by fans of Green Day, Blink-182 & Sum 41" |
 | `similar_artist` | Shares 2+ genres with a user's manual artist | "Similar to Green Day" |
 | `genre_match` | Matches user's selected genres | "Based on punk & rock" |
 | `decade_match` | Artist's primary decade matches user's selection | "Popular in the 1990s" |
