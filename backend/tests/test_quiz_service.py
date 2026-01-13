@@ -551,8 +551,12 @@ class TestSuggestionReasonGeneration:
         assert len(results) == 2
         assert all(r.suggestion_reason is not None for r in results)
         # First artist should match genre, second should be popular_choice
-        assert results[0].suggestion_reason.type == "genre_match"
-        assert results[1].suggestion_reason.type == "popular_choice"
+        reason_0 = results[0].suggestion_reason
+        reason_1 = results[1].suggestion_reason
+        assert reason_0 is not None
+        assert reason_1 is not None
+        assert reason_0.type == "genre_match"
+        assert reason_1.type == "popular_choice"
 
 
 class TestSmartQuizArtists:
