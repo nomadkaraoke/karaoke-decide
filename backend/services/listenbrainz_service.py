@@ -273,7 +273,7 @@ class ListenBrainzService:
                     cached_dt = datetime.fromisoformat(cached_at)
                     age_hours = (datetime.now(UTC) - cached_dt).total_seconds() / 3600
                     if age_hours < self.CACHE_TTL_HOURS:
-                        return doc.get("similar_artists", [])
+                        return list(doc.get("similar_artists", []))
         except Exception:
             pass
 
