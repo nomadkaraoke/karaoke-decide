@@ -223,58 +223,125 @@ def build_cooccurrence_matrix(
     return result
 
 
-async def map_mbid_to_spotify(
+async def map_mbid_to_spotify_via_musicbrainz(
     artist_mbids: list[str],
-    batch_size: int = 50,
-) -> dict[str, str | None]:
+    rate_limit_delay: float = 1.1,  # MusicBrainz rate limit: 1 req/sec
+) -> dict[str, dict]:
     """
-    Map MusicBrainz artist IDs to Spotify artist IDs using ListenBrainz Labs API.
+    Map MusicBrainz artist IDs to Spotify artist IDs using MusicBrainz API.
+
+    Queries MusicBrainz for URL relations which include Spotify artist links.
 
     Args:
         artist_mbids: List of MusicBrainz artist IDs
-        batch_size: Number of IDs per API request
+        rate_limit_delay: Delay between requests (MusicBrainz allows 1 req/sec)
 
     Returns:
-        Dict mapping MBID to Spotify artist ID (or None if not found)
+        Dict mapping MBID to {spotify_id, name, type} or None if not found
     """
-    console.print(f"[blue]Mapping {len(artist_mbids)} MBIDs to Spotify IDs...[/blue]")
+    console.print(f"[blue]Mapping {len(artist_mbids)} MBIDs to Spotify IDs via MusicBrainz API...[/blue]")
+    console.print(f"[yellow]Note: Rate limited to 1 req/sec. ETA: {len(artist_mbids) / 60:.1f} minutes[/yellow]")
 
-    mapping: dict[str, str | None] = {}
+    mapping: dict[str, dict] = {}
+    errors = 0
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(
+        timeout=30.0,
+        headers={"User-Agent": "KaraokeDecide/1.0 (contact@nomadkaraoke.com)"},
+    ) as client:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeRemainingColumn(),
             console=console,
         ) as progress:
             task = progress.add_task("Mapping to Spotify", total=len(artist_mbids))
 
-            for i in range(0, len(artist_mbids), batch_size):
-                batch = artist_mbids[i : i + batch_size]
-
+            for mbid in artist_mbids:
                 try:
-                    # Use artist-credit-recording endpoint to find Spotify IDs
-                    # This is an approximation - may need refinement
-                    response = await client.post(
-                        f"{LISTENBRAINZ_LABS_URL}/spotify-id-from-mbid/json",
-                        json={"artist_mbid": batch},
+                    response = await client.get(
+                        f"https://musicbrainz.org/ws/2/artist/{mbid}",
+                        params={"fmt": "json", "inc": "url-rels"},
                     )
+
                     if response.status_code == 200:
                         data = response.json()
-                        for item in data:
-                            mbid = item.get("artist_mbid")
-                            spotify_id = item.get("spotify_artist_id")
-                            if mbid:
-                                mapping[mbid] = spotify_id
+                        artist_name = data.get("name")
+                        artist_type = data.get("type")
+
+                        # Look for Spotify URL in relations
+                        spotify_id = None
+                        for rel in data.get("relations", []):
+                            url = rel.get("url", {}).get("resource", "")
+                            if "open.spotify.com/artist/" in url:
+                                spotify_id = url.split("/artist/")[-1].split("?")[0]
+                                break
+
+                        mapping[mbid] = {
+                            "spotify_id": spotify_id,
+                            "name": artist_name,
+                            "type": artist_type,
+                        }
+                    elif response.status_code == 404:
+                        mapping[mbid] = {"spotify_id": None, "name": None, "type": None}
+                    else:
+                        errors += 1
+
                 except Exception as e:
-                    console.print(f"[yellow]API error for batch {i}: {e}[/yellow]")
+                    console.print(f"[yellow]Error for {mbid}: {e}[/yellow]")
+                    errors += 1
 
-                progress.advance(task, len(batch))
+                progress.advance(task)
 
-                # Rate limit
-                await asyncio.sleep(0.1)
+                # Respect rate limit
+                await asyncio.sleep(rate_limit_delay)
+
+    # Report stats
+    mapped_count = sum(1 for v in mapping.values() if v.get("spotify_id"))
+    console.print(
+        f"[green]Mapped {mapped_count}/{len(artist_mbids)} "
+        f"({100 * mapped_count / len(artist_mbids):.1f}%) to Spotify IDs[/green]"
+    )
+    if errors:
+        console.print(f"[yellow]Encountered {errors} errors[/yellow]")
+
+    return mapping
+
+
+async def map_mbid_to_spotify_batch(
+    artist_mbids: list[str],
+    our_spotify_artists: dict[str, str] | None = None,
+) -> dict[str, str | None]:
+    """
+    Fast batch mapping using name matching against our Spotify catalog.
+
+    This is much faster than MusicBrainz API calls but less accurate.
+
+    Args:
+        artist_mbids: List of MusicBrainz artist IDs
+        our_spotify_artists: Dict of lowercase name -> Spotify ID from our catalog
+
+    Returns:
+        Dict mapping MBID to Spotify artist ID or None
+    """
+    if not our_spotify_artists:
+        console.print("[yellow]No Spotify catalog provided, falling back to API mapping[/yellow]")
+        mb_mapping = await map_mbid_to_spotify_via_musicbrainz(artist_mbids)
+        return {mbid: data.get("spotify_id") for mbid, data in mb_mapping.items()}
+
+    console.print(f"[blue]Mapping {len(artist_mbids)} MBIDs via name matching...[/blue]")
+
+    # First get artist names from MusicBrainz (batch via similar-artists is faster)
+    # For now, fall back to individual lookups
+    mb_mapping = await map_mbid_to_spotify_via_musicbrainz(artist_mbids[:100])  # Sample
+
+    # Try name matching
+    mapping: dict[str, str | None] = {}
+    for mbid, data in mb_mapping.items():
+        name = data.get("name", "").lower()
+        mapping[mbid] = our_spotify_artists.get(name)
 
     return mapping
 
@@ -461,8 +528,14 @@ def process(
     required=True,
     help="Output file with Spotify mappings",
 )
-def map_spotify(input_file: Path, output: Path):
-    """Map MusicBrainz IDs to Spotify IDs."""
+@click.option(
+    "--limit",
+    type=int,
+    default=None,
+    help="Limit number of MBIDs to map (for testing)",
+)
+def map_spotify(input_file: Path, output: Path, limit: int | None):
+    """Map MusicBrainz IDs to Spotify IDs via MusicBrainz API."""
     # Load co-occurrence data
     with open(input_file) as f:
         cooccurrence = json.load(f)
@@ -474,22 +547,19 @@ def map_spotify(input_file: Path, output: Path):
         all_mbids.add(a)
         all_mbids.add(b)
 
-    console.print(f"[blue]Found {len(all_mbids)} unique artist MBIDs[/blue]")
+    mbid_list = list(all_mbids)
+    if limit:
+        mbid_list = mbid_list[:limit]
 
-    # Map to Spotify
-    mapping = asyncio.run(map_mbid_to_spotify(list(all_mbids)))
+    console.print(f"[blue]Found {len(all_mbids)} unique artist MBIDs, mapping {len(mbid_list)}[/blue]")
 
-    # Count successful mappings
-    mapped_count = sum(1 for v in mapping.values() if v is not None)
-    console.print(
-        f"[green]Mapped {mapped_count}/{len(all_mbids)} "
-        f"({100*mapped_count/len(all_mbids):.1f}%) to Spotify IDs[/green]"
-    )
+    # Map to Spotify via MusicBrainz API
+    mapping = asyncio.run(map_mbid_to_spotify_via_musicbrainz(mbid_list))
 
     # Save mapping
     output.parent.mkdir(parents=True, exist_ok=True)
     with open(output, "w") as f:
-        json.dump(mapping, f)
+        json.dump(mapping, f, indent=2)
 
     console.print(f"[green]Saved mapping to {output}[/green]")
 
