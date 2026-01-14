@@ -1250,7 +1250,7 @@ class SyncService:
 
             username = service.service_username
             if not username:
-                raise ExternalServiceError("ListenBrainz username not configured")
+                raise ExternalServiceError("ListenBrainz", "Username not configured")
             all_tracks: list[dict] = []
 
             # Phase 1: Fetch top tracks
@@ -1304,8 +1304,8 @@ class SyncService:
                 )
 
             # Match tracks
-            track_inputs = [(t["artist"], t["title"]) for t in all_tracks]
-            matched_tracks = await self.track_matcher.match_tracks(track_inputs)
+            track_infos = [{"artist": t["artist"], "title": t["title"]} for t in all_tracks]
+            matched_tracks = await self.track_matcher.batch_match_tracks(track_infos)
             logger.info(f"Matched {len(matched_tracks)} tracks from ListenBrainz")
 
             # Create UserSong records

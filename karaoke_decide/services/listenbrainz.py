@@ -95,16 +95,17 @@ class ListenBrainzClient:
             response = await client.get(f"{self.API_BASE}/user/{username}/listen-count")
 
             if response.status_code == 404:
-                raise ExternalServiceError(f"ListenBrainz user '{username}' not found")
+                raise ExternalServiceError("ListenBrainz", f"User '{username}' not found")
 
             if response.status_code != 200:
-                raise ExternalServiceError(f"ListenBrainz API error: {response.status_code}")
+                raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
             data = response.json()
-            return data.get("payload", {}).get("count", 0)
+            count: int = data.get("payload", {}).get("count", 0)
+            return count
 
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"Failed to connect to ListenBrainz: {e}")
+            raise ExternalServiceError("ListenBrainz", f"Failed to connect: {e}")
 
     async def get_user_info(self, username: str) -> ListenBrainzUserInfo:
         """Get user information.
@@ -157,7 +158,7 @@ class ListenBrainzClient:
             )
 
             if response.status_code != 200:
-                raise ExternalServiceError(f"ListenBrainz API error: {response.status_code}")
+                raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
             data = response.json()
             listens_data = data.get("payload", {}).get("listens", [])
@@ -181,7 +182,7 @@ class ListenBrainzClient:
             return listens
 
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"Failed to fetch listens: {e}")
+            raise ExternalServiceError("ListenBrainz", f"Failed to fetch listens: {e}")
 
     async def get_all_listens(
         self,
@@ -261,7 +262,7 @@ class ListenBrainzClient:
             )
 
             if response.status_code != 200:
-                raise ExternalServiceError(f"ListenBrainz API error: {response.status_code}")
+                raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
             data = response.json()
             artists_data = data.get("payload", {}).get("artists", [])
@@ -276,7 +277,7 @@ class ListenBrainzClient:
             ]
 
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"Failed to fetch top artists: {e}")
+            raise ExternalServiceError("ListenBrainz", f"Failed to fetch top artists: {e}")
 
     async def get_top_tracks(
         self,
@@ -306,7 +307,7 @@ class ListenBrainzClient:
             )
 
             if response.status_code != 200:
-                raise ExternalServiceError(f"ListenBrainz API error: {response.status_code}")
+                raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
             data = response.json()
             tracks_data = data.get("payload", {}).get("recordings", [])
@@ -322,4 +323,4 @@ class ListenBrainzClient:
             ]
 
         except httpx.HTTPError as e:
-            raise ExternalServiceError(f"Failed to fetch top tracks: {e}")
+            raise ExternalServiceError("ListenBrainz", f"Failed to fetch top tracks: {e}")

@@ -53,7 +53,7 @@ class MusicService(BaseModel):
 
     id: str
     user_id: str
-    service_type: Literal["spotify", "lastfm", "apple_music"]
+    service_type: Literal["spotify", "lastfm", "apple_music", "listenbrainz"]
     service_user_id: str
     service_username: str
 
