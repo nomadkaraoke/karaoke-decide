@@ -128,6 +128,7 @@ GET /api/my/songs?sort=play_count
 | Collection | Primary Key | Description |
 |------------|-------------|-------------|
 | `decide_users` | email hash / guest_id | User accounts (karaoke-decide) |
+| `lastfm_users` | lastfm username | Last.fm users for collaborative filtering (9.9K users, MBID-first) |
 | `music_services` | user_id + service_type | Connected music accounts |
 | `karaoke_songs` | normalized artist-title | Song catalog (shared) |
 | `user_songs` | user_id + song_id | User-song relationships |
