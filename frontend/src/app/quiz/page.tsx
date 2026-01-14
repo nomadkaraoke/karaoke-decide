@@ -9,7 +9,7 @@ import { StickyFinishBar } from "@/components/StickyFinishBar";
 import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAutocomplete";
 import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
-import { SparklesIcon, CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon } from "@/components/icons";
+import { SparklesIcon, CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon, LastfmIcon, SpotifyIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
 
@@ -142,24 +142,61 @@ export default function QuizPage() {
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const shownArtistNamesRef = useRef<Set<string>>(new Set());
 
-  // Load smart artists for step 5 (informed by previous selections)
+  // Pre-loading state: load artists based on genres/decades while user is on step 4
+  const preloadedArtistsRef = useRef<QuizArtist[] | null>(null);
+  const preloadHasMoreRef = useRef<boolean>(true);
+  const isPreloadingRef = useRef<boolean>(false);
+
+  // Pre-load artists based on genres/decades only (called when entering step 4)
+  // This allows step 5 to load instantly
+  const preloadArtists = useCallback(async () => {
+    // Don't preload if already preloading or already have data
+    if (isPreloadingRef.current || preloadedArtistsRef.current !== null) return;
+
+    isPreloadingRef.current = true;
+    try {
+      const response = await api.quiz.getSmartArtists({
+        genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
+        decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
+        // Don't include manual artists/songs - those will be used for subsequent loads
+        count: 50,
+      });
+
+      preloadedArtistsRef.current = response.artists;
+      preloadHasMoreRef.current = response.has_more;
+    } catch (err) {
+      console.error("Pre-load failed:", err);
+      // That's okay, we'll load fresh when entering step 5
+    } finally {
+      isPreloadingRef.current = false;
+    }
+  }, [selectedGenres, selectedDecades]);
+
+  // Load smart artists for step 5 - uses pre-loaded data if available
   const loadSmartArtists = useCallback(async () => {
+    // Reset tracking
+    shownArtistNamesRef.current = new Set();
+
+    // Use pre-loaded data if available (instant!)
+    if (preloadedArtistsRef.current !== null) {
+      preloadedArtistsRef.current.forEach((a) => shownArtistNamesRef.current.add(a.name));
+      setQuizArtists(preloadedArtistsRef.current);
+      setHasMoreArtists(preloadHasMoreRef.current);
+      // Clear pre-loaded data so we don't reuse stale data
+      preloadedArtistsRef.current = null;
+      return;
+    }
+
+    // Otherwise load fresh (fallback if pre-load didn't happen)
     try {
       setIsLoading(true);
       setError(null);
-      // Reset tracking for fresh load
-      shownArtistNamesRef.current = new Set();
-
-      // Get artists from songs user enjoys singing
-      const songArtists = enjoySongs.map((s) => s.artist);
 
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
-        manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
-        exclude: Array.from(selectedArtists),
-        count: 15,
+        // Initial load doesn't include manual artists - those are for subsequent loads
+        count: 50,
       });
 
       // Track shown artists
@@ -172,7 +209,7 @@ export default function QuizPage() {
       console.error("Smart artist loading failed, falling back:", err);
       try {
         const genresArray = selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined;
-        const response = await api.quiz.getArtists(15, genresArray);
+        const response = await api.quiz.getArtists(50, genresArray);
         response.artists.forEach((a) => shownArtistNamesRef.current.add(a.name));
         setQuizArtists(response.artists);
         setHasMoreArtists(true); // Assume there's more in fallback mode
@@ -182,10 +219,7 @@ export default function QuizPage() {
     } finally {
       setIsLoading(false);
     }
-    // NOTE: selectedArtists intentionally excluded - we only reload when ENTERING step 5,
-    // not when user toggles selections. Infinite scroll handles excludes separately.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedGenres, selectedDecades, manualArtists, enjoySongs]);
+  }, [selectedGenres, selectedDecades]);
 
   // Create guest session if not authenticated
   useEffect(() => {
@@ -209,7 +243,14 @@ export default function QuizPage() {
     }
   }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
 
-  // Load smart artists when entering step 5
+  // Pre-load artists when entering step 4 (so step 5 loads instantly)
+  useEffect(() => {
+    if (isAuthenticated && step === 4) {
+      preloadArtists();
+    }
+  }, [isAuthenticated, step, preloadArtists]);
+
+  // Load smart artists when entering step 5 (uses pre-loaded data if available)
   useEffect(() => {
     if (isAuthenticated && step === 5) {
       loadSmartArtists();
@@ -271,7 +312,7 @@ export default function QuizPage() {
         manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: Array.from(allExcluded),
-        count: 10,
+        count: 50,
       });
 
       // Filter out any duplicates that somehow got through
@@ -307,7 +348,7 @@ export default function QuizPage() {
         }
       },
       {
-        rootMargin: "200px", // Trigger 200px before reaching the element
+        rootMargin: "800px", // Trigger 800px before reaching the element (start loading early)
         threshold: 0,
       }
     );
@@ -849,6 +890,29 @@ export default function QuizPage() {
               </div>
             )}
 
+            {/* Import listening history info */}
+            <div className="mb-6 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
+                Have listening history?
+              </h2>
+              <p className="text-[var(--text)]/60 text-sm mb-3">
+                After completing the quiz, you can import your listening history from:
+              </p>
+              <ul className="text-[var(--text)]/50 text-sm space-y-2">
+                <li className="flex items-center gap-2">
+                  <LastfmIcon className="w-4 h-4 text-[#d51007] flex-shrink-0" />
+                  <span><span className="text-[var(--text)]/70">Last.fm</span> — direct import</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <SpotifyIcon className="w-4 h-4 text-[#1DB954] flex-shrink-0" />
+                  <span><span className="text-[var(--text)]/70">ListenBrainz</span> — imports from Spotify, Libre.fm, PanoScrobbler, and Maloja</span>
+                </li>
+              </ul>
+              <p className="text-[var(--text)]/40 text-xs mt-3">
+                Go to Settings → Connected Services after creating an account.
+              </p>
+            </div>
+
             {/* Hint when empty */}
             {manualArtists.length === 0 && enjoySongs.length === 0 && (
               <div className="text-center py-6 mb-6">
@@ -978,7 +1042,7 @@ export default function QuizPage() {
                     {isLoadingMore && (
                       <div className="flex items-center gap-2 text-[var(--text-muted)]">
                         <LoaderIcon className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">Finding more artists...</span>
+                        <span className="text-sm">Finding more artists you may know...</span>
                       </div>
                     )}
                     {!hasMoreArtists && quizArtists.length > 0 && (

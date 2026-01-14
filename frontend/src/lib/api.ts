@@ -247,6 +247,17 @@ export const api = {
         total: number;
       }>(`/api/catalog/artists?q=${encodeURIComponent(query)}&limit=${limit}`),
 
+    // Full artist index for client-side search (~168K artists, ~4MB compressed)
+    getArtistIndex: () =>
+      api.get<{
+        artists: Array<{
+          i: string; // artist_id
+          n: string; // artist_name
+          p: number; // popularity
+        }>;
+        count: number;
+      }>("/api/catalog/artists/index"),
+
     searchTracks: (query: string, limit: number = 10) =>
       api.get<{
         tracks: Array<{
@@ -671,6 +682,17 @@ export const api = {
         tracks_synced: number;
         songs_synced: number;
       }>("/api/services/lastfm/connect", { username }),
+
+    connectListenbrainz: (username: string) =>
+      api.post<{
+        service_type: string;
+        service_username: string;
+        last_sync_at: string | null;
+        sync_status: string;
+        sync_error: string | null;
+        tracks_synced: number;
+        songs_synced: number;
+      }>("/api/services/listenbrainz/connect", { username }),
 
     disconnect: (serviceType: string) =>
       api.delete<{ message: string }>(`/api/services/${serviceType}`),
