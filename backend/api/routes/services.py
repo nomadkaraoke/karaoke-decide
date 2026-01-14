@@ -60,6 +60,12 @@ class LastFmConnectRequest(BaseModel):
     username: str
 
 
+class ListenBrainzConnectRequest(BaseModel):
+    """Request to connect ListenBrainz account."""
+
+    username: str
+
+
 class SyncResultItem(BaseModel):
     """Result for a single service sync."""
 
@@ -283,6 +289,43 @@ async def connect_lastfm(
 
 
 # -----------------------------------------------------------------------------
+# ListenBrainz Connection
+# -----------------------------------------------------------------------------
+
+
+@router.post("/listenbrainz/connect", response_model=ConnectedServiceResponse)
+async def connect_listenbrainz(
+    request: ListenBrainzConnectRequest,
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+) -> ConnectedServiceResponse:
+    """Connect ListenBrainz account.
+
+    ListenBrainz is an open-source music tracking service that can import
+    data from Spotify, Apple Music, and other services. We just need the
+    username. We validate the username by fetching the user's listen count.
+    """
+    try:
+        service = await music_service.create_listenbrainz_service(user.id, request.username)
+
+        return ConnectedServiceResponse(
+            service_type=service.service_type,
+            service_username=service.service_username,
+            last_sync_at=service.last_sync_at.isoformat() if service.last_sync_at else None,
+            sync_status=service.sync_status,
+            sync_error=service.sync_error,
+            tracks_synced=service.tracks_synced,
+            songs_synced=service.songs_synced,
+        )
+
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        )
+
+
+# -----------------------------------------------------------------------------
 # Disconnect Service
 # -----------------------------------------------------------------------------
 
@@ -298,7 +341,7 @@ async def disconnect_service(
     Removes the service connection and any stored tokens.
     Does not delete synced UserSong records.
     """
-    if service_type not in ("spotify", "lastfm"):
+    if service_type not in ("spotify", "lastfm", "listenbrainz"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid service type: {service_type}",
