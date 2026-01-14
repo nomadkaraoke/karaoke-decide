@@ -308,6 +308,31 @@ Search artists by name for autocomplete. Returns artists sorted by popularity.
 }
 ```
 
+### GET /api/catalog/artists/index
+
+Get the full artist index for client-side autocomplete. Returns ~24K popular artists (popularity >= 50) in a compact format optimized for download to the browser.
+
+This endpoint is designed to be cached aggressively. Response is ~600KB with brotli compression. The frontend uses Fuse.js for instant fuzzy search against this index.
+
+**Response:**
+```json
+{
+  "artists": [
+    {
+      "i": "4q3ewBCX7sLwd24euuV69X",
+      "n": "Bad Bunny",
+      "p": 100
+    }
+  ],
+  "count": 24446
+}
+```
+
+**Compact format keys:**
+- `i` - artist_id (Spotify ID)
+- `n` - artist_name
+- `p` - popularity (0-100)
+
 ### GET /api/catalog/stats
 
 Get catalog statistics.
