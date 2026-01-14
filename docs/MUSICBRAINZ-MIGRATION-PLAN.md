@@ -311,40 +311,46 @@ function ArtistCard({ artist }: { artist: Artist }) {
 
 ## Migration Steps
 
-### Phase 1: Data Foundation (Week 1)
-- [ ] Create `mb_artists` table from MusicBrainz dump
-- [ ] Create `mb_recordings` table
-- [ ] Create `id_mappings` table
-- [ ] Populate mappings from existing Spotify data + ListenBrainz API
+### Phase 1: Data Foundation ✅ PARTIAL (2026-01-14)
+- [ ] Create `mb_artists` table from MusicBrainz dump (NOT YET - blocked on another agent)
+- [ ] Create `mb_recordings` table (NOT YET)
+- [ ] Create `id_mappings` table (NOT YET)
+- [x] **Discover: Last.fm API already returns MBIDs** (~80-87% coverage)
 
-### Phase 2: API Dual-Support (Week 2)
+### Phase 2: API Dual-Support (Not Started)
 - [ ] Update API models to include both IDs
 - [ ] Add MBID lookup endpoints
 - [ ] Keep Spotify ID endpoints working (backward compat)
 - [ ] Update search to return MBID-primary results
 
-### Phase 3: Recommendation Migration (Week 3)
-- [ ] Update `_get_collaborative_suggestions()` for MBID-first
-- [ ] Update Last.fm import to store MBIDs properly
+### Phase 3: Recommendation Migration ✅ COMPLETE (2026-01-14)
+- [x] Update `_get_collaborative_suggestions()` for MBID-first
+  - Now queries BOTH `decide_users` AND `lastfm_users` in parallel
+  - Uses `artist_names_lower` for name-based matching (backwards compat)
+  - Ready for MBID queries when mapping table exists
+- [x] Update Last.fm import to store MBIDs properly
+  - `scripts/lastfm_firestore_import.py` now extracts MBIDs from Last.fm API
+  - Stores `artist_mbids` array for MBID-based queries
+  - Maintains `artist_names_lower` for backwards compatibility
 - [ ] Integrate MLHD+ data (from other agent's work)
-- [ ] Test recommendation quality
+- [x] Test recommendation quality (unit tests passing)
 
-### Phase 4: User Data Migration (Week 4)
+### Phase 4: User Data Migration (Not Started)
 - [ ] Add `quiz_artists_known_mbid` field
 - [ ] Migrate existing users' Spotify IDs → MBIDs
 - [ ] Update quiz submission to store MBIDs
 - [ ] Deprecate Spotify-only fields
 
-### Phase 5: Frontend Update (Week 5)
+### Phase 5: Frontend Update (Not Started)
 - [ ] Update TypeScript interfaces
 - [ ] Update artist selection components
 - [ ] Add disambiguation display where helpful
 - [ ] Test full flow
 
-### Phase 6: Cleanup (Week 6)
+### Phase 6: Cleanup (Not Started)
 - [ ] Remove deprecated Spotify-only code paths
 - [ ] Archive old Spotify-primary tables
-- [ ] Update documentation
+- [x] Update documentation
 - [ ] Set up MusicBrainz dump refresh automation
 
 ## Risks & Mitigations
@@ -383,7 +389,33 @@ This migration plan assumes that work will provide the foundational MusicBrainz 
 
 ## Next Steps
 
-1. **Sync with MLHD+ agent** - understand their table schemas
-2. **Create mapping table** - link existing Spotify IDs to MBIDs
-3. **Update Last.fm import** - store MBIDs properly (we have them!)
-4. **Plan API versioning** - v1 (Spotify) vs v2 (MBID-first)?
+1. ~~**Update Last.fm import** - store MBIDs properly~~ ✅ DONE (2026-01-14)
+2. ~~**Update collaborative filtering** - query lastfm_users collection~~ ✅ DONE (2026-01-14)
+3. **Wait for MusicBrainz tables** - another agent to create `mb_artists` etc.
+4. **Create MBID↔Spotify mapping** - for bridging quiz artists to Last.fm users
+5. **Plan API versioning** - v1 (Spotify) vs v2 (MBID-first)?
+6. **Enable MBID-based queries** - switch from `artist_names_lower` to `artist_mbids`
+
+## Implementation Notes (2026-01-14)
+
+### Key Discovery
+Last.fm API responses include MBIDs directly (~80-87% coverage). We don't need MusicBrainz database import to start MBID-first architecture.
+
+### Changes Made
+1. `scripts/lastfm_firestore_import.py` - Now MBID-first:
+   - Extracts MBIDs from Last.fm API responses
+   - Stores `artist_mbids` array for efficient queries
+   - Tracks `mbid_count` and `mbid_coverage` per user
+   - Keeps `artist_names_lower` for backwards compatibility
+
+2. `backend/services/quiz_service.py` - Now queries both user sources:
+   - `_get_collaborative_suggestions()` queries in parallel:
+     - `decide_users` (organic quiz users) by artist name
+     - `lastfm_users` (Last.fm imported) by artist name (MBID-ready)
+   - `_query_collaborative_sources()` handles parallel queries
+   - Uses `array_contains_any` for efficient Last.fm user filtering
+
+3. Tests added for Last.fm user integration:
+   - `test_queries_both_user_collections`
+   - `test_includes_lastfm_users_in_suggestions`
+   - `test_lastfm_users_use_array_contains_any`

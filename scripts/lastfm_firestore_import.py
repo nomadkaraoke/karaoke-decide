@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
 """
-Last.fm to Firestore Import Script
+Last.fm to Firestore Import Script (MBID-First)
 
-Imports processed Last.fm user data into Firestore's lastfm_users collection.
+Imports Last.fm user data into Firestore's lastfm_users collection.
 This enables collaborative filtering recommendations based on 10,000+ users.
+
+MBID-First Architecture:
+- MusicBrainz IDs (MBIDs) are the PRIMARY artist identifier
+- ~80-87% of Last.fm artists have MBIDs directly from the API
+- Artist names kept for backwards compatibility and display
+- Spotify IDs optional (from separate mapping if available)
+
+Data Model:
+- artist_mbids: Array of MBIDs for efficient array_contains queries
+- top_artists: Full artist data including mbid, name, playcount
+- artist_names_lower: Legacy field for name-based queries (backwards compat)
 
 Prerequisites:
 - Artist fetching complete (scripts/lastfm_import.py)
-- Spotify mapping complete (scripts/lastfm_spotify_mapping.py)
+- Optional: Spotify mapping (scripts/lastfm_spotify_mapping.py)
 
 Usage:
     # Run full import
@@ -33,7 +44,10 @@ from google.cloud import firestore, storage
 # Configuration
 GCS_BUCKET = "nomadkaraoke-lastfm-cache"
 FIRESTORE_COLLECTION = "lastfm_users"
-BATCH_SIZE = 500  # Firestore batch limit
+# Batch size reduced to 20 due to large document sizes
+# Each user can have up to MAX_ARTISTS_PER_USER artists
+BATCH_SIZE = 20
+MAX_ARTISTS_PER_USER = 500  # Limit from 1000 to reduce doc size
 
 
 class GCSStorage:
@@ -72,18 +86,32 @@ def sanitize_doc_id(username: str) -> str:
 
 def build_user_document(
     username: str,
-    user_info: dict,
+    user_info: dict | None,
     artists: list[dict],
-    mapping: dict,
+    spotify_mapping: dict | None = None,
 ) -> dict:
-    """Build a Firestore document for a Last.fm user."""
+    """Build a Firestore document for a Last.fm user.
+
+    MBID-First: MusicBrainz IDs are extracted directly from Last.fm API responses.
+    Spotify IDs are optional enrichment from a separate mapping file.
+
+    Args:
+        username: Last.fm username
+        user_info: User info from Last.fm API (optional)
+        artists: List of artist dicts from Last.fm API (includes mbid field)
+        spotify_mapping: Optional Spotify ID mapping dict
+
+    Returns:
+        Firestore document dict with MBID as primary identifier
+    """
     top_artists = []
-    spotify_ids = []
-    artist_names_lower = []
+    artist_mbids = []  # Primary identifier array for queries
+    artist_names_lower = []  # Backwards compatibility
+    spotify_ids = []  # Optional enrichment
 
-    mappings = mapping.get("mappings", {})
+    mappings = spotify_mapping.get("mappings", {}) if spotify_mapping else {}
 
-    for artist in artists[:1000]:  # Limit to top 1000
+    for artist in artists[:MAX_ARTISTS_PER_USER]:  # Limit artists per user
         name = artist.get("name", "")
         if not name:
             continue
@@ -91,22 +119,34 @@ def build_user_document(
         name_lower = name.lower()
         playcount = int(artist.get("playcount", 0))
 
-        # Look up Spotify mapping
+        # Extract MBID directly from Last.fm response (primary identifier)
+        mbid = artist.get("mbid", "")
+
+        # Look up Spotify mapping (optional enrichment)
         spotify_info = mappings.get(name_lower, {})
         spotify_id = spotify_info.get("spotify_id")
 
         top_artists.append(
             {
+                "mbid": mbid,  # PRIMARY identifier
                 "name": name,
                 "playcount": playcount,
-                "spotify_id": spotify_id,
+                "spotify_id": spotify_id,  # Optional enrichment
                 "spotify_name": spotify_info.get("spotify_name"),
             }
         )
 
+        # Build query arrays
+        if mbid:
+            artist_mbids.append(mbid)
         artist_names_lower.append(name_lower)
         if spotify_id:
             spotify_ids.append(spotify_id)
+
+    # Calculate MBID coverage stats
+    mbid_count = len(artist_mbids)
+    total_count = len(top_artists)
+    mbid_coverage = mbid_count / total_count if total_count > 0 else 0
 
     return {
         "lastfm_username": username,
@@ -114,8 +154,14 @@ def build_user_document(
         "playcount": int(user_info.get("playcount", 0)) if user_info else 0,
         "imported_at": firestore.SERVER_TIMESTAMP,
         "source": "lastfm_friends_crawl",
+        # Artist data
         "top_artists": top_artists,
-        "artist_count": len(top_artists),
+        "artist_count": total_count,
+        # MBID-first query arrays
+        "artist_mbids": artist_mbids,  # PRIMARY for queries
+        "mbid_count": mbid_count,
+        "mbid_coverage": mbid_coverage,
+        # Backwards compatibility arrays
         "artist_names_lower": artist_names_lower,
         "spotify_artist_ids": spotify_ids,
         "top_artist_names": [a["name"] for a in top_artists[:100]],
@@ -123,20 +169,23 @@ def build_user_document(
 
 
 def run_import(gcs: GCSStorage, db: firestore.Client, dry_run: bool = False):
-    """Run the Firestore import."""
-    print("\n🔥 Last.fm to Firestore Import")
+    """Run the Firestore import (MBID-First).
+
+    MBIDs are extracted directly from Last.fm API responses.
+    Spotify mapping is optional enrichment.
+    """
+    print("\n🔥 Last.fm to Firestore Import (MBID-First)")
     print("=" * 60)
 
-    # Load Spotify mapping
-    print("\n📋 Loading Spotify artist mapping...")
-    mapping = gcs.read_json("processed/artist_mapping.json")
-    if not mapping:
-        print("❌ No mapping found. Run lastfm_spotify_mapping.py first.")
-        return
-
-    stats = mapping.get("stats", {})
-    print(f"   Loaded mapping: {stats.get('total_artists', 0):,} artists")
-    print(f"   Match rate: {stats.get('match_rate', 0):.1%}")
+    # Try to load Spotify mapping (optional)
+    print("\n📋 Loading Spotify artist mapping (optional)...")
+    spotify_mapping = gcs.read_json("processed/artist_mapping.json")
+    if spotify_mapping:
+        stats = spotify_mapping.get("stats", {})
+        print(f"   Loaded mapping: {stats.get('total_artists', 0):,} artists")
+        print(f"   Match rate: {stats.get('match_rate', 0):.1%}")
+    else:
+        print("   No Spotify mapping found (MBIDs will still be imported)")
 
     # List all cached artist files
     print("\n📋 Loading cached user artist data...")
@@ -154,7 +203,8 @@ def run_import(gcs: GCSStorage, db: firestore.Client, dry_run: bool = False):
     batch_count = 0
     total_imported = 0
     total_artists = 0
-    total_mapped = 0
+    total_with_mbid = 0  # MBID stats (primary)
+    total_with_spotify = 0  # Spotify stats (optional)
     errors = 0
 
     start_time = time.time()
@@ -191,12 +241,13 @@ def run_import(gcs: GCSStorage, db: firestore.Client, dry_run: bool = False):
         if user_info_data and "response" in user_info_data:
             user_info = user_info_data["response"].get("user", {})
 
-        # Build document
-        doc = build_user_document(username, user_info, artists, mapping)
+        # Build document (MBID-first)
+        doc = build_user_document(username, user_info, artists, spotify_mapping)
 
         # Track stats
         total_artists += doc["artist_count"]
-        total_mapped += len(doc["spotify_artist_ids"])
+        total_with_mbid += doc["mbid_count"]  # Primary metric
+        total_with_spotify += len(doc["spotify_artist_ids"])  # Secondary
 
         if not dry_run:
             # Add to batch
@@ -219,7 +270,10 @@ def run_import(gcs: GCSStorage, db: firestore.Client, dry_run: bool = False):
             rate = total_imported / elapsed if elapsed > 0 else 0
             remaining = len(artist_files) - i - 1
             eta = remaining / rate if rate > 0 else 0
-            print(f"   [{i + 1}/{len(artist_files)}] {total_imported} imported, ETA: {eta / 60:.1f}min")
+            mbid_rate = total_with_mbid / total_artists if total_artists > 0 else 0
+            print(
+                f"   [{i + 1}/{len(artist_files)}] {total_imported} users, MBID coverage: {mbid_rate:.1%}, ETA: {eta / 60:.1f}min"
+            )
 
     # Commit remaining batch
     if not dry_run and batch_count > 0:
@@ -228,33 +282,37 @@ def run_import(gcs: GCSStorage, db: firestore.Client, dry_run: bool = False):
     # Print summary
     elapsed = time.time() - start_time
     avg_artists = total_artists / total_imported if total_imported > 0 else 0
-    avg_mapped = total_mapped / total_imported if total_imported > 0 else 0
-    map_rate = total_mapped / total_artists if total_artists > 0 else 0
+    mbid_rate = total_with_mbid / total_artists if total_artists > 0 else 0
+    spotify_rate = total_with_spotify / total_artists if total_artists > 0 else 0
 
     print("\n" + "=" * 60)
-    print("IMPORT SUMMARY")
+    print("IMPORT SUMMARY (MBID-First)")
     print("=" * 60)
     print(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"Users imported: {total_imported:,}")
     print(f"Errors/skipped: {errors}")
     print(f"Total artists: {total_artists:,}")
     print(f"Avg artists/user: {avg_artists:.0f}")
-    print(f"Total mapped to Spotify: {total_mapped:,}")
-    print(f"Avg mapped/user: {avg_mapped:.0f}")
-    print(f"Overall map rate: {map_rate:.1%}")
+    print("-" * 40)
+    print("PRIMARY: MusicBrainz IDs (from Last.fm API)")
+    print(f"  Artists with MBID: {total_with_mbid:,} ({mbid_rate:.1%})")
+    print("-" * 40)
+    print("OPTIONAL: Spotify IDs (from mapping file)")
+    print(f"  Artists with Spotify ID: {total_with_spotify:,} ({spotify_rate:.1%})")
+    print("-" * 40)
     print(f"Time: {elapsed:.1f}s")
     print("=" * 60)
 
     if dry_run:
         print("\n✓ Dry run complete. Run without --dry-run to import.")
     else:
-        print(f"\n✓ Imported {total_imported:,} users to Firestore.")
+        print(f"\n✓ Imported {total_imported:,} users to Firestore (MBID-first).")
 
 
 def show_status(db: firestore.Client):
-    """Show current import status."""
+    """Show current import status (MBID-First)."""
     print("\n" + "=" * 60)
-    print("FIRESTORE IMPORT STATUS")
+    print("FIRESTORE IMPORT STATUS (MBID-First)")
     print("=" * 60)
 
     # Count documents
@@ -274,18 +332,31 @@ def show_status(db: firestore.Client):
             docs = collection_ref.limit(5).stream()
             for doc in docs:
                 data = doc.to_dict()
+                mbid_count = data.get("mbid_count", len(data.get("artist_mbids", [])))
+                artist_count = data.get("artist_count", 0)
+                mbid_coverage = mbid_count / artist_count if artist_count > 0 else 0
                 print(f"  {doc.id}:")
-                print(f"    Artists: {data.get('artist_count', 0)}")
-                print(f"    Spotify mapped: {len(data.get('spotify_artist_ids', []))}")
-                print(f"    Top artists: {', '.join(data.get('top_artist_names', [])[:3])}")
+                print(f"    Artists: {artist_count}")
+                print(f"    With MBID: {mbid_count} ({mbid_coverage:.1%})")
+                print(f"    With Spotify: {len(data.get('spotify_artist_ids', []))}")
+                # Show sample MBIDs
+                mbids = data.get("artist_mbids", [])[:2]
+                if mbids:
+                    print(f"    Sample MBIDs: {', '.join(mbids[:2])}")
 
-            # Query test
-            print("\nQuery test (users who like 'radiohead'):")
-            test_results = collection_ref.where("artist_names_lower", "array_contains", "radiohead").limit(5).stream()
-            test_count = 0
-            for doc in test_results:
-                test_count += 1
-            print(f"  Found {test_count} users")
+            # MBID query test (primary)
+            # Test with Radiohead's MBID: a74b1b7f-71a5-4011-9441-d0b5e4122711
+            radiohead_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+            print(f"\nMBID Query test (Radiohead: {radiohead_mbid[:8]}...):")
+            mbid_results = collection_ref.where("artist_mbids", "array_contains", radiohead_mbid).limit(10).stream()
+            mbid_count = sum(1 for _ in mbid_results)
+            print(f"  Found {mbid_count} users via MBID query")
+
+            # Name query test (backwards compat)
+            print("\nName Query test (users who like 'radiohead'):")
+            name_results = collection_ref.where("artist_names_lower", "array_contains", "radiohead").limit(10).stream()
+            name_count = sum(1 for _ in name_results)
+            print(f"  Found {name_count} users via name query")
 
     except Exception as e:
         print(f"Error: {e}")

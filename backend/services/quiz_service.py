@@ -56,6 +56,7 @@ class QuizService:
     USERS_COLLECTION = "decide_users"
     USER_SONGS_COLLECTION = "user_songs"
     QUIZ_SONGS_CACHE_COLLECTION = "quiz_songs_cache"
+    LASTFM_USERS_COLLECTION = "lastfm_users"  # MBID-first collaborative filtering
 
     # BigQuery config
     PROJECT_ID = "nomadkaraoke"
@@ -553,9 +554,10 @@ class QuizService:
     ) -> dict[str, list[str]]:
         """Find artists liked by users with similar taste.
 
-        Queries all users with quiz data, finds those who share at least
-        MIN_SHARED_ARTISTS with the current user, then returns artists
-        those similar users like (that the current user hasn't selected).
+        MBID-First Architecture: Queries two data sources in parallel:
+        1. Organic users (decide_users) - by artist name (quiz_artists_known)
+        2. Last.fm users (lastfm_users) - by artist name (artist_names_lower)
+           Future: Will query by MBID when mapping table is available
 
         Args:
             user_selected_artists: Artists the current user has selected.
@@ -572,55 +574,59 @@ class QuizService:
         user_artists_lower = {a.lower() for a in user_selected_artists}
         exclude_lower = {a.lower() for a in exclude_artists}
 
-        # Query all users with quiz_artists_known
-        # This is O(N) but acceptable for <10K users
-        try:
-            all_users = await self.firestore.query_documents(
-                self.USERS_COLLECTION,
-                filters=[],  # Get all users
-                limit=10000,  # Safety limit
-            )
-        except Exception:
-            return {}
+        # Query both user collections in parallel
+        organic_users, lastfm_users = await self._query_collaborative_sources(user_artists_lower)
 
         # Find similar users and collect their artists
-        # Structure: artist_name_lower -> list of (shared_artists, user_artists)
-        artist_supporters: dict[str, list[tuple[list[str], list[str]]]] = {}
+        # Structure: artist_name_lower -> list of (shared_artists, user_artists, source)
+        artist_supporters: dict[str, list[tuple[list[str], list[str], str]]] = {}
 
-        for user_doc in all_users:
+        # Process organic users (from quiz)
+        for user_doc in organic_users:
             their_artists = user_doc.get("quiz_artists_known", [])
             if not their_artists or len(their_artists) < self.MIN_SHARED_ARTISTS:
                 continue
 
             their_artists_lower = {a.lower() for a in their_artists}
-
-            # Find overlap
             shared = user_artists_lower & their_artists_lower
-            if len(shared) >= self.MIN_SHARED_ARTISTS:
-                # This user is similar! Get their other artists
-                # Find original case versions for display
-                shared_display = [a for a in their_artists if a.lower() in shared][:3]
 
+            if len(shared) >= self.MIN_SHARED_ARTISTS:
+                shared_display = [a for a in their_artists if a.lower() in shared][:3]
                 for artist in their_artists:
                     artist_lower = artist.lower()
-                    # Skip if user already has this artist or it's excluded
                     if artist_lower in user_artists_lower or artist_lower in exclude_lower:
                         continue
-
                     if artist_lower not in artist_supporters:
                         artist_supporters[artist_lower] = []
-                    artist_supporters[artist_lower].append((shared_display, their_artists))
+                    artist_supporters[artist_lower].append((shared_display, their_artists, "organic"))
+
+        # Process Last.fm users (MBID-first source)
+        for user_doc in lastfm_users:
+            # Use top_artist_names for efficient comparison (top 100)
+            their_artists = user_doc.get("top_artist_names", [])
+            if not their_artists or len(their_artists) < self.MIN_SHARED_ARTISTS:
+                continue
+
+            their_artists_lower = {a.lower() for a in their_artists}
+            shared = user_artists_lower & their_artists_lower
+
+            if len(shared) >= self.MIN_SHARED_ARTISTS:
+                shared_display = [a for a in their_artists if a.lower() in shared][:3]
+                for artist in their_artists:
+                    artist_lower = artist.lower()
+                    if artist_lower in user_artists_lower or artist_lower in exclude_lower:
+                        continue
+                    if artist_lower not in artist_supporters:
+                        artist_supporters[artist_lower] = []
+                    artist_supporters[artist_lower].append((shared_display, their_artists, "lastfm"))
 
         # Filter to artists with enough supporters
         result: dict[str, list[str]] = {}
         for artist_lower, supporters in artist_supporters.items():
             if len(supporters) >= self.MIN_SIMILAR_USERS:
-                # Use the shared artists from the first supporter for display
-                # (all supporters share similar artists by definition)
                 shared_artists = supporters[0][0]
-                # Find original case artist name from any supporter's list
                 original_name = None
-                for _, their_artists in supporters:
+                for _, their_artists, _ in supporters:
                     for a in their_artists:
                         if a.lower() == artist_lower:
                             original_name = a
@@ -632,6 +638,67 @@ class QuizService:
                     result[original_name] = shared_artists
 
         return result
+
+    async def _query_collaborative_sources(
+        self,
+        user_artists_lower: set[str],
+    ) -> tuple[list[dict], list[dict]]:
+        """Query both organic and Last.fm users for collaborative filtering.
+
+        Queries in parallel for efficiency:
+        1. Organic users: Full scan of decide_users (small collection)
+        2. Last.fm users: Uses array_contains_any on artist_names_lower
+
+        Args:
+            user_artists_lower: Set of lowercased artist names for matching.
+
+        Returns:
+            Tuple of (organic_users, lastfm_users) document lists.
+        """
+        import asyncio
+
+        async def query_organic() -> list[dict]:
+            """Query organic users (our quiz users)."""
+            try:
+                return await self.firestore.query_documents(
+                    self.USERS_COLLECTION,
+                    filters=[],
+                    limit=10000,
+                )
+            except Exception:
+                return []
+
+        async def query_lastfm() -> list[dict]:
+            """Query Last.fm users using array_contains_any.
+
+            Note: array_contains_any has a 30-value limit, so we use
+            a subset of the user's artists for the initial filter.
+            """
+            try:
+                # Take up to 30 artists for array_contains_any query
+                query_artists = list(user_artists_lower)[:30]
+                if not query_artists:
+                    return []
+
+                # Use array_contains_any for efficient filtering
+                # This finds users who like AT LEAST ONE of the query artists
+                return await self.firestore.query_documents(
+                    self.LASTFM_USERS_COLLECTION,
+                    filters=[
+                        ("artist_names_lower", "array_contains_any", query_artists),
+                    ],
+                    limit=1000,
+                )
+            except Exception:
+                return []
+
+        # Run both queries in parallel
+        organic_users, lastfm_users = await asyncio.gather(
+            query_organic(),
+            query_lastfm(),
+        )
+
+        return organic_users, lastfm_users
 
     def _map_spotify_genres_to_ids(self, spotify_genres: list[str]) -> list[str]:
         """Map Spotify genre strings to our genre IDs.
