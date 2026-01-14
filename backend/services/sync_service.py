@@ -1249,6 +1249,8 @@ class SyncService:
                 )
 
             username = service.service_username
+            if not username:
+                raise ExternalServiceError("ListenBrainz username not configured")
             all_tracks: list[dict] = []
 
             # Phase 1: Fetch top tracks
@@ -1306,12 +1308,6 @@ class SyncService:
             matched_tracks = await self.track_matcher.match_tracks(track_inputs)
             logger.info(f"Matched {len(matched_tracks)} tracks from ListenBrainz")
 
-            # Build playcount lookup
-            playcount_lookup: dict[tuple[str, str], int] = {}
-            for track in all_tracks:
-                key = (track["artist"].lower().strip(), track["title"].lower().strip())
-                playcount_lookup[key] = track.get("playcount", 0)
-
             # Create UserSong records
             if progress_callback:
                 await progress_callback(
@@ -1322,11 +1318,10 @@ class SyncService:
                     matched_tracks=len(matched_tracks),
                 )
 
-            created, updated = await self._create_user_songs(
+            created, updated = await self._upsert_user_songs(
                 user_id,
                 matched_tracks,
-                source="listenbrainz",
-                playcount_lookup=playcount_lookup,
+                "listenbrainz",
             )
 
             # Update sync status
@@ -1335,7 +1330,7 @@ class SyncService:
                 "listenbrainz",
                 "idle",
                 tracks_synced=len(matched_tracks),
-                songs_synced=len(all_tracks),
+                songs_synced=created + updated,
             )
 
             return SyncResult(

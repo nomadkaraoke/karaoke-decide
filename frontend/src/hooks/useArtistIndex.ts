@@ -66,6 +66,9 @@ export function useArtistIndex(): UseArtistIndexReturn {
 
       // Start loading
       globalLoadPromise = (async () => {
+        // Clear any previous error when starting a new load attempt
+        globalError = null;
+
         try {
           console.log("[ArtistIndex] Loading artist index...");
           const startTime = performance.now();
@@ -97,6 +100,9 @@ export function useArtistIndex(): UseArtistIndexReturn {
           console.log(
             `[ArtistIndex] Loaded ${response.count.toLocaleString()} artists in ${elapsed.toFixed(0)}ms`
           );
+
+          // Explicitly clear error on success
+          globalError = null;
         } catch (err) {
           console.error("[ArtistIndex] Failed to load:", err);
           globalError = err instanceof Error ? err.message : "Failed to load artist index";
