@@ -1,5 +1,6 @@
 """Tests for quiz service."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -767,7 +768,7 @@ class TestCollaborativeSuggestions:
         """Last.fm users contribute to collaborative suggestions."""
 
         # Set up mock to return different data for each collection
-        async def mock_query(collection: str, **kwargs) -> list[dict]:
+        async def mock_query(collection: str, **kwargs: Any) -> list[dict]:
             if collection == "decide_users":
                 # Organic users - only 3 (not enough for MIN_SIMILAR_USERS=5)
                 return [{"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(3)]
