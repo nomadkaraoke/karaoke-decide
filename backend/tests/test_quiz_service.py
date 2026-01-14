@@ -734,6 +734,87 @@ class TestCollaborativeSuggestions:
         # Should be empty because only 4 users like The Offspring
         assert result == {}
 
+    @pytest.mark.asyncio
+    async def test_queries_both_user_collections(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Queries both organic users and Last.fm users collections."""
+        # Set up mock to track calls
+        mock_firestore.query_documents = AsyncMock(return_value=[])
+
+        await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Should query both collections
+        assert mock_firestore.query_documents.call_count == 2
+
+        # Check collection names in calls
+        call_args_list = mock_firestore.query_documents.call_args_list
+        collections_queried = [call[0][0] for call in call_args_list]
+        assert "decide_users" in collections_queried
+        assert "lastfm_users" in collections_queried
+
+    @pytest.mark.asyncio
+    async def test_includes_lastfm_users_in_suggestions(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Last.fm users contribute to collaborative suggestions."""
+
+        # Set up mock to return different data for each collection
+        async def mock_query(collection: str, **kwargs) -> list[dict]:
+            if collection == "decide_users":
+                # Organic users - only 3 (not enough for MIN_SIMILAR_USERS=5)
+                return [{"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(3)]
+            elif collection == "lastfm_users":
+                # Last.fm users - 3 more (totaling 6 > MIN_SIMILAR_USERS=5)
+                return [{"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(3)]
+            return []
+
+        mock_firestore.query_documents = AsyncMock(side_effect=mock_query)
+
+        result = await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Should find The Offspring since 6 total users like them (3 organic + 3 lastfm)
+        assert "The Offspring" in result
+
+    @pytest.mark.asyncio
+    async def test_lastfm_users_use_array_contains_any(
+        self,
+        quiz_service: QuizService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        """Last.fm users query uses array_contains_any filter."""
+        # Track calls to verify filter is used
+        mock_firestore.query_documents = AsyncMock(return_value=[])
+
+        await quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+
+        # Find the lastfm_users call
+        for call in mock_firestore.query_documents.call_args_list:
+            if call[0][0] == "lastfm_users":
+                filters = call[1].get("filters", [])
+                # Should have array_contains_any filter
+                assert len(filters) == 1
+                field, op, values = filters[0]
+                assert field == "artist_names_lower"
+                assert op == "array_contains_any"
+                # Should contain lowercased artist names
+                assert "green day" in values
+                assert "blink-182" in values
+                assert "sum 41" in values
+
 
 class TestFansAlsoLikeReason:
     """Tests for fans_also_like suggestion reason generation."""

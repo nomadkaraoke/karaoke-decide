@@ -1,24 +1,30 @@
-# Firestore Import Plan
+# Firestore Import Plan (MBID-First)
+
+## Status: IMPLEMENTED
+
+**Last Updated:** 2026-01-14
+
+The Last.fm user import is now MBID-first. MusicBrainz IDs are the primary artist identifier, with artist names kept for backwards compatibility.
 
 ## Overview
 
-After mapping Last.fm artists to Spotify IDs, import the processed user data into Firestore's `lastfm_users` collection. This enables the collaborative filtering feature to query 10,000+ users with rich artist preferences.
+Import Last.fm user data into Firestore's `lastfm_users` collection using MBIDs as the primary artist identifier. This enables MBID-based collaborative filtering with 10,000+ users.
 
 ## Current State
 
-### Existing Implementation
+### Implementation Complete
 
-The `QuizService._get_collaborative_suggestions()` method currently:
-1. Queries `decide_users` collection (our organic users)
-2. Looks at `quiz_artists_known` field (list of artist names)
-3. Finds users with ≥3 shared artists
-4. Returns suggestions from those users
+The `QuizService._get_collaborative_suggestions()` now queries TWO collections in parallel:
+1. `decide_users` - organic quiz users (by artist name)
+2. `lastfm_users` - Last.fm imported users (by artist name, MBID-ready)
 
-**Location:** `backend/services/quiz_service.py:502-590`
+**Location:** `backend/services/quiz_service.py:549-707`
 
-### Limitation
+### MBID Coverage
 
-With no organic users yet, collaborative filtering returns empty results. The Last.fm import solves this by providing 10,000 users with real listening data.
+- ~80-87% of Last.fm artists have MBIDs directly from the API
+- MBIDs stored in `artist_mbids` array for efficient queries
+- Artist names stored in `artist_names_lower` for backwards compatibility
 
 ## Data Model
 
@@ -31,7 +37,7 @@ Separate collection from `decide_users` to:
 
 **Document ID:** Last.fm username (lowercase, sanitized)
 
-**Schema:**
+**Schema (MBID-First):**
 ```typescript
 interface LastFmUser {
   // Identity
@@ -43,19 +49,27 @@ interface LastFmUser {
   imported_at: Timestamp;
   source: "lastfm_friends_crawl";
 
-  // Artist data - stored as array for Firestore queries
+  // Artist data - stored as array with MBID as primary identifier
   top_artists: Array<{
+    mbid: string;                // PRIMARY - MusicBrainz ID (from Last.fm API)
     name: string;                // Last.fm artist name
     playcount: number;           // User's play count for this artist
-    spotify_id: string | null;   // Mapped Spotify ID
-    spotify_name: string | null; // Spotify's artist name
+    spotify_id: string | null;   // Optional Spotify ID (from mapping)
+    spotify_name: string | null; // Optional Spotify artist name
   }>;
 
   // Denormalized for efficient querying
   artist_count: number;                    // Length of top_artists
-  artist_names_lower: string[];            // Lowercase names for matching
+
+  // MBID-first query arrays (PRIMARY)
+  artist_mbids: string[];                  // MBIDs for array_contains queries
+  mbid_count: number;                      // Count of artists with MBIDs
+  mbid_coverage: number;                   // Percentage with MBIDs (0.0-1.0)
+
+  // Backwards compatibility arrays
+  artist_names_lower: string[];            // Lowercase names for name-based matching
   spotify_artist_ids: string[];            // Non-null Spotify IDs only
-  top_artist_names: string[];              // Top 100 artist names for array_contains_any
+  top_artist_names: string[];              // Top 100 artist names for display
 }
 ```
 
