@@ -119,6 +119,7 @@ cd frontend && npm run dev
 - `GET /api/catalog/songs/popular?limit=20` - Popular songs
 - `GET /api/catalog/songs/{id}/links` - Get karaoke links for a song
 - `GET /api/catalog/artists?q=<query>` - Search artists (for autocomplete)
+- `GET /api/catalog/artists/index` - Get full artist index for client-side search (~24K artists)
 - `GET /api/catalog/stats` - Catalog statistics
 - `GET /api/services` - List connected music services
 - `POST /api/services/spotify/connect` - Start Spotify OAuth
