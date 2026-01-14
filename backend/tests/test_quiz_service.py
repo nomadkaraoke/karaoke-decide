@@ -817,7 +817,7 @@ class TestFansAlsoLikeReason:
             },
         )
 
-        assert reason.display_text == "Liked by fans of Green Day"
+        assert reason.display_text == "Singers who like Green Day also chose"
 
     def test_formats_two_shared_artists(
         self,
@@ -843,7 +843,7 @@ class TestFansAlsoLikeReason:
             },
         )
 
-        assert reason.display_text == "Liked by fans of Green Day & Blink-182"
+        assert reason.display_text == "Singers who like Green Day & Blink-182 also chose"
 
     def test_formats_three_shared_artists(
         self,
@@ -869,4 +869,4 @@ class TestFansAlsoLikeReason:
             },
         )
 
-        assert reason.display_text == "Liked by fans of Green Day, Blink-182 & Sum 41"
+        assert reason.display_text == "Singers who like Green Day, Blink-182 & others also chose"

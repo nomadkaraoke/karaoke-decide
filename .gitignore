@@ -99,3 +99,4 @@ frontend/.env.local
 
 # Emulator data
 emulator-data/
+data/

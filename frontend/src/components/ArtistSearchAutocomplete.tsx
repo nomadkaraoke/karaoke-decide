@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { SearchIcon, PlusIcon, CheckIcon } from "@/components/icons";
 import { Input } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useArtistIndex } from "@/hooks/useArtistIndex";
 
 export interface SearchableArtist {
   artist_id: string;
@@ -35,8 +36,13 @@ export function ArtistSearchAutocomplete({
   const [searchResults, setSearchResults] = useState<SearchableArtist[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [showApiSearch, setShowApiSearch] = useState(false);
+  const [isApiSearching, setIsApiSearching] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Client-side search index
+  const { isReady: indexReady, search: searchIndex, isLoading: indexLoading } = useArtistIndex();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -52,28 +58,83 @@ export function ArtistSearchAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setIsOpen(false);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      const response = await api.catalog.searchArtists(query, 8);
-      setSearchResults(response.artists);
+  // Client-side search (instant)
+  const handleLocalSearch = useCallback(
+    (query: string) => {
+      if (!query.trim() || !indexReady) {
+        setSearchResults([]);
+        setShowApiSearch(false);
+        return;
+      }
+
+      const results = searchIndex(query, 8);
+      const mapped: SearchableArtist[] = results.map((r) => ({
+        artist_id: r.artist_id,
+        artist_name: r.artist_name,
+        popularity: r.popularity,
+        genres: [], // Local index doesn't include genres
+      }));
+
+      setSearchResults(mapped);
+      setShowApiSearch(true); // Always show option to search more
       setIsOpen(true);
-    } catch {
-      setSearchResults([]);
+    },
+    [indexReady, searchIndex]
+  );
+
+  // API search (for niche artists not in local index)
+  const handleApiSearch = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+
+    setIsApiSearching(true);
+    try {
+      const response = await api.catalog.searchArtists(query, 15);
+      // Merge with existing results, deduplicate by ID
+      setSearchResults((prev) => {
+        const existingIds = new Set(prev.map((a) => a.artist_id));
+        const newArtists = response.artists.filter(
+          (a) => !existingIds.has(a.artist_id)
+        );
+        return [...prev, ...newArtists];
+      });
+      setShowApiSearch(false); // Hide "search more" after API search
+    } catch (err) {
+      console.error("API search failed:", err);
     } finally {
-      setIsSearching(false);
+      setIsApiSearching(false);
     }
   }, []);
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setShowApiSearch(false);
+
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => handleSearch(value), 300);
+
+    if (!value.trim()) {
+      setSearchResults([]);
+      setIsOpen(false);
+      return;
+    }
+
+    // If index is ready, search locally (instant)
+    if (indexReady) {
+      handleLocalSearch(value);
+    } else {
+      // Fallback to API search with debounce if index not ready
+      setIsSearching(true);
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const response = await api.catalog.searchArtists(value, 8);
+          setSearchResults(response.artists);
+          setIsOpen(true);
+        } catch {
+          setSearchResults([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 150);
+    }
   };
 
   const handleSelectArtist = (artist: SearchableArtist) => {
@@ -86,6 +147,7 @@ export function ArtistSearchAutocomplete({
     setSearchQuery("");
     setSearchResults([]);
     setIsOpen(false);
+    setShowApiSearch(false);
   };
 
   // Cleanup on unmount
@@ -107,7 +169,7 @@ export function ArtistSearchAutocomplete({
       {/* Search Input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          {isSearching ? (
+          {isSearching || isApiSearching ? (
             <div className="w-4 h-4 border-2 border-[var(--brand-pink)] border-t-transparent rounded-full animate-spin" />
           ) : (
             <SearchIcon className="w-4 h-4 text-[var(--text-subtle)]" />
@@ -115,7 +177,7 @@ export function ArtistSearchAutocomplete({
         </div>
         <Input
           type="text"
-          placeholder={placeholder}
+          placeholder={indexLoading ? "Loading artists..." : placeholder}
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           onFocus={() => {
@@ -127,12 +189,20 @@ export function ArtistSearchAutocomplete({
 
       {/* Search Results Dropdown */}
       {isOpen && searchQuery.trim() && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-lg z-50 max-h-80 overflow-y-auto">
-          {searchResults.length === 0 ? (
-            <div className="p-4 text-center text-[var(--text-subtle)] text-sm">
-              {isSearching
-                ? "Searching..."
-                : `No artists found for "${searchQuery}"`}
+        <div className="absolute top-full left-0 right-0 mt-2 bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-lg z-50 max-h-96 overflow-y-auto">
+          {searchResults.length === 0 && !isSearching && !isApiSearching ? (
+            <div className="p-4">
+              <p className="text-center text-[var(--text-subtle)] text-sm mb-3">
+                No artists found for &quot;{searchQuery}&quot;
+              </p>
+              {indexReady && (
+                <button
+                  onClick={() => handleApiSearch(searchQuery)}
+                  className="w-full py-2 px-4 text-sm text-[var(--brand-pink)] hover:bg-[var(--secondary)] rounded-lg transition-colors"
+                >
+                  Search full database...
+                </button>
+              )}
             </div>
           ) : (
             <div className="py-2">
@@ -174,6 +244,27 @@ export function ArtistSearchAutocomplete({
                   </button>
                 );
               })}
+
+              {/* Search more button */}
+              {showApiSearch && searchResults.length > 0 && (
+                <button
+                  onClick={() => handleApiSearch(searchQuery)}
+                  disabled={isApiSearching}
+                  className="w-full py-3 px-4 text-sm text-[var(--text-muted)] hover:text-[var(--brand-pink)] hover:bg-[var(--secondary)] border-t border-[var(--card-border)] transition-colors flex items-center justify-center gap-2"
+                >
+                  {isApiSearching ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-[var(--brand-pink)] border-t-transparent rounded-full animate-spin" />
+                      Searching...
+                    </>
+                  ) : (
+                    <>
+                      <SearchIcon className="w-3 h-3" />
+                      Search for more artists...
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           )}
         </div>

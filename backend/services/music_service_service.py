@@ -13,6 +13,7 @@ from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.lastfm import LastFmClient
+from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
 
 
@@ -42,6 +43,7 @@ class MusicServiceService:
         firestore: FirestoreService,
         spotify_client: SpotifyClient | None = None,
         lastfm_client: LastFmClient | None = None,
+        listenbrainz_client: ListenBrainzClient | None = None,
     ):
         """Initialize the music service service.
 
@@ -50,11 +52,13 @@ class MusicServiceService:
             firestore: Firestore service for persistence.
             spotify_client: Optional Spotify client (created lazily if not provided).
             lastfm_client: Optional Last.fm client (created lazily if not provided).
+            listenbrainz_client: Optional ListenBrainz client (created lazily if not provided).
         """
         self.settings = settings
         self.firestore = firestore
         self._spotify_client = spotify_client
         self._lastfm_client = lastfm_client
+        self._listenbrainz_client = listenbrainz_client
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -69,6 +73,13 @@ class MusicServiceService:
         if self._lastfm_client is None:
             self._lastfm_client = LastFmClient(self.settings)
         return self._lastfm_client
+
+    @property
+    def listenbrainz(self) -> ListenBrainzClient:
+        """Get or create ListenBrainz client."""
+        if self._listenbrainz_client is None:
+            self._listenbrainz_client = ListenBrainzClient(self.settings)
+        return self._listenbrainz_client
 
     # -------------------------------------------------------------------------
     # OAuth State Management
@@ -346,6 +357,91 @@ class MusicServiceService:
             "service_type": "lastfm",
             "service_user_id": lastfm_username,
             "service_username": lastfm_username,
+            "access_token": None,
+            "refresh_token": None,
+            "token_expires_at": None,
+            "last_sync_at": None,
+            "sync_status": "idle",
+            "sync_error": None,
+            "tracks_synced": 0,
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+
+        await self.firestore.set_document(
+            self.SERVICES_COLLECTION,
+            service_id,
+            service_data,
+        )
+
+        return self._doc_to_music_service(service_data)
+
+    async def create_listenbrainz_service(
+        self,
+        user_id: str,
+        username: str,
+    ) -> MusicService:
+        """Create ListenBrainz service connection.
+
+        ListenBrainz is an open-source alternative to Last.fm that can import
+        data from Spotify, Apple Music, and other services. No API key needed.
+
+        Args:
+            user_id: User ID.
+            username: ListenBrainz username.
+
+        Returns:
+            Created MusicService.
+
+        Raises:
+            ValidationError: If username is invalid or doesn't exist.
+        """
+        # Validate username by fetching listen count
+        try:
+            user_info = await self.listenbrainz.get_user_info(username)
+            lb_username = user_info.username
+        except ExternalServiceError as e:
+            raise ValidationError(f"Invalid ListenBrainz username: {e}")
+
+        service_id = self._get_service_id(user_id, "listenbrainz")
+        now = datetime.now(UTC)
+
+        # Check if already exists
+        existing = await self.get_service(user_id, "listenbrainz")
+        if existing:
+            # Update existing
+            await self.firestore.update_document(
+                self.SERVICES_COLLECTION,
+                service_id,
+                {
+                    "service_username": lb_username,
+                    "updated_at": now.isoformat(),
+                },
+            )
+            return MusicService(
+                id=service_id,
+                user_id=user_id,
+                service_type="listenbrainz",
+                service_user_id=lb_username,
+                service_username=lb_username,
+                access_token=None,
+                refresh_token=None,
+                token_expires_at=None,
+                last_sync_at=existing.last_sync_at,
+                sync_status=existing.sync_status,
+                sync_error=existing.sync_error,
+                tracks_synced=existing.tracks_synced,
+                created_at=existing.created_at,
+                updated_at=now,
+            )
+
+        # Create new service
+        service_data = {
+            "id": service_id,
+            "user_id": user_id,
+            "service_type": "listenbrainz",
+            "service_user_id": lb_username,
+            "service_username": lb_username,
             "access_token": None,
             "refresh_token": None,
             "token_expires_at": None,

@@ -14,6 +14,7 @@ from google.cloud import bigquery
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
+from backend.services.listenbrainz_service import ListenBrainzService
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 
 
@@ -76,6 +77,7 @@ class QuizService:
         settings: BackendSettings,
         firestore: FirestoreService,
         bigquery_client: bigquery.Client | None = None,
+        listenbrainz: ListenBrainzService | None = None,
     ):
         """Initialize the quiz service.
 
@@ -83,10 +85,12 @@ class QuizService:
             settings: Backend settings.
             firestore: Firestore service for user data.
             bigquery_client: Optional BigQuery client (created lazily).
+            listenbrainz: Optional ListenBrainz service for similar artists.
         """
         self.settings = settings
         self.firestore = firestore
         self._bigquery_client = bigquery_client
+        self._listenbrainz = listenbrainz
 
     @property
     def bigquery(self) -> bigquery.Client:
@@ -94,6 +98,13 @@ class QuizService:
         if self._bigquery_client is None:
             self._bigquery_client = bigquery.Client(project=self.PROJECT_ID)
         return self._bigquery_client
+
+    @property
+    def listenbrainz(self) -> ListenBrainzService:
+        """Get or create ListenBrainz service."""
+        if self._listenbrainz is None:
+            self._listenbrainz = ListenBrainzService(self.settings, self.firestore)
+        return self._listenbrainz
 
     async def get_quiz_songs(self, count: int = DEFAULT_QUIZ_SIZE) -> list[QuizSong]:
         """Get quiz songs for onboarding.
@@ -229,12 +240,22 @@ class QuizService:
             exclude_artists=all_exclusions if all_exclusions else None,
         )
 
+        # Get ListenBrainz similar artist matches (candidate -> seed artists)
+        listenbrainz_matches: dict[str, list[str]] = {}
+        if all_seed_artists:
+            candidate_names = [c.name for c in candidates]
+            listenbrainz_matches = await self.listenbrainz.find_similar_artist_matches(
+                seed_artists=all_seed_artists,
+                candidate_names=candidate_names,
+            )
+
         # Generate suggestion reasons for each candidate
         candidates_with_reasons = self._add_suggestion_reasons(
             candidates=candidates,
             user_genres=genres or [],
             user_decades=decades or [],
             seed_artist_genres=seed_artist_genres,
+            listenbrainz_matches=listenbrainz_matches,
             collaborative_suggestions=collaborative_suggestions,
         )
 
@@ -293,12 +314,14 @@ class QuizService:
         user_genres: list[str],
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
+        listenbrainz_matches: dict[str, list[str]] | None = None,
         collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> list[QuizArtist]:
         """Add suggestion reasons to each candidate artist.
 
         Priority order:
-        1. fans_also_like - if artist is liked by users with similar taste
+        1a. fans_also_like - Karaoke singers with similar taste (our quiz data)
+        1b. fans_also_like - Music listeners with similar taste (ListenBrainz)
         2. similar_artist - if artist shares 2+ genres with a seed artist
         3. genre_match - if artist matches user's selected genres
         4. decade_match - if artist's decade matches user's selection
@@ -309,7 +332,8 @@ class QuizService:
             user_genres: User's explicitly selected genre IDs.
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
-            collaborative_suggestions: Dict of artist name -> shared artists that connect them.
+            listenbrainz_matches: Dict of candidate name -> seed artists (ListenBrainz).
+            collaborative_suggestions: Dict of artist name -> shared artists (karaoke singers).
 
         Returns:
             List of QuizArtist with suggestion_reason populated.
@@ -322,6 +346,7 @@ class QuizService:
                 user_genres=user_genres,
                 user_decades=user_decades,
                 seed_artist_genres=seed_artist_genres,
+                listenbrainz_matches=listenbrainz_matches,
                 collaborative_suggestions=collaborative_suggestions or {},
             )
 
@@ -338,6 +363,7 @@ class QuizService:
         user_genres: list[str],
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
+        listenbrainz_matches: dict[str, list[str]] | None = None,
         collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> SuggestionReason:
         """Generate a suggestion reason for an artist.
@@ -347,34 +373,55 @@ class QuizService:
             user_genres: User's explicitly selected genre IDs.
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
-            collaborative_suggestions: Dict of artist name -> shared artists that connect them.
+            listenbrainz_matches: Dict of candidate name -> seed artists (ListenBrainz).
+            collaborative_suggestions: Dict of artist name -> shared artists (Firestore).
 
         Returns:
             SuggestionReason explaining why this artist was suggested.
         """
         collaborative_suggestions = collaborative_suggestions or {}
 
-        # Priority 0: Check for fans_also_like (collaborative filtering)
-        # Look for case-insensitive match in collaborative suggestions
+        # Priority 1a: Check for karaoke singer similarity (our quiz data)
+        # This is karaoke-specific - people who sing similar artists at karaoke
         for collab_artist, shared_artists in collaborative_suggestions.items():
             if collab_artist.lower() == artist.name.lower() and shared_artists:
-                # Format: "Liked by fans of Artist1, Artist2 & Artist3"
                 if len(shared_artists) == 1:
-                    display_text = f"Liked by fans of {shared_artists[0]}"
+                    display_text = f"Singers who like {shared_artists[0]} also chose"
                 elif len(shared_artists) == 2:
-                    display_text = f"Liked by fans of {shared_artists[0]} & {shared_artists[1]}"
+                    display_text = f"Singers who like {shared_artists[0]} & {shared_artists[1]} also chose"
                 else:
-                    display_text = f"Liked by fans of {shared_artists[0]}, {shared_artists[1]} & {shared_artists[2]}"
+                    display_text = f"Singers who like {shared_artists[0]}, {shared_artists[1]} & others also chose"
                 return SuggestionReason(
                     type="fans_also_like",
                     display_text=display_text,
-                    related_to=None,
+                    related_to=", ".join(shared_artists[:3]),
                 )
+
+        # Priority 1b: Check for music listener similarity (ListenBrainz)
+        # Based on general music listening patterns from millions of users
+        # Use case-insensitive lookup for robustness
+        listenbrainz_match_key = artist.name.lower()
+        listenbrainz_matches_lower = (
+            {k.lower(): v for k, v in listenbrainz_matches.items()} if listenbrainz_matches else {}
+        )
+        if listenbrainz_match_key in listenbrainz_matches_lower:
+            similar_to = listenbrainz_matches_lower[listenbrainz_match_key]
+            if len(similar_to) == 1:
+                display_text = f"Fans of {similar_to[0]} also like"
+            elif len(similar_to) == 2:
+                display_text = f"Fans of {similar_to[0]} & {similar_to[1]} also like"
+            else:
+                display_text = f"Fans of {similar_to[0]}, {similar_to[1]} & others also like"
+            return SuggestionReason(
+                type="fans_also_like",
+                display_text=display_text,
+                related_to=", ".join(similar_to[:3]),
+            )
 
         # Map artist's Spotify genres to our genre IDs
         artist_genre_ids = self._map_spotify_genres_to_ids([g.lower() for g in artist.genres] if artist.genres else [])
 
-        # Priority 1: Check for similar_artist (shares 2+ genres with seed artist)
+        # Priority 2: Check for similar_artist (shares 2+ genres with seed artist)
         if seed_artist_genres:
             for seed_artist, seed_genres in seed_artist_genres.items():
                 if seed_genres and artist_genre_ids:
@@ -386,7 +433,7 @@ class QuizService:
                             related_to=seed_artist,
                         )
 
-        # Priority 2: Check for genre_match
+        # Priority 3: Check for genre_match
         if user_genres and artist_genre_ids:
             matching_genres = set(user_genres) & set(artist_genre_ids)
             if matching_genres:
@@ -398,7 +445,7 @@ class QuizService:
                     related_to=None,
                 )
 
-        # Priority 3: Check for decade_match
+        # Priority 4: Check for decade_match
         if user_decades and artist.primary_decade != "Unknown":
             if artist.primary_decade in user_decades:
                 return SuggestionReason(
@@ -407,7 +454,7 @@ class QuizService:
                     related_to=None,
                 )
 
-        # Priority 4: Fallback to popular_choice
+        # Priority 5: Fallback to popular_choice
         return SuggestionReason(
             type="popular_choice",
             display_text="Popular karaoke choice",

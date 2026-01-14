@@ -17,6 +17,7 @@ from backend.services.track_matcher import MatchedTrack, TrackMatcher
 from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.lastfm import LastFmClient
+from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ class SyncService:
         music_service_service: MusicServiceService,
         spotify_client: SpotifyClient | None = None,
         lastfm_client: LastFmClient | None = None,
+        listenbrainz_client: ListenBrainzClient | None = None,
         track_matcher: TrackMatcher | None = None,
     ):
         """Initialize the sync service.
@@ -79,6 +81,7 @@ class SyncService:
             music_service_service: Music service management service.
             spotify_client: Optional Spotify client (created lazily).
             lastfm_client: Optional Last.fm client (created lazily).
+            listenbrainz_client: Optional ListenBrainz client (created lazily).
             track_matcher: Optional track matcher (created lazily).
         """
         self.settings = settings
@@ -86,6 +89,7 @@ class SyncService:
         self.music_service_service = music_service_service
         self._spotify_client = spotify_client
         self._lastfm_client = lastfm_client
+        self._listenbrainz_client = listenbrainz_client
         self._track_matcher = track_matcher
 
     @property
@@ -101,6 +105,13 @@ class SyncService:
         if self._lastfm_client is None:
             self._lastfm_client = LastFmClient(self.settings)
         return self._lastfm_client
+
+    @property
+    def listenbrainz(self) -> ListenBrainzClient:
+        """Get or create ListenBrainz client."""
+        if self._listenbrainz_client is None:
+            self._listenbrainz_client = ListenBrainzClient(self.settings)
+        return self._listenbrainz_client
 
     @property
     def track_matcher(self) -> TrackMatcher:
@@ -128,6 +139,8 @@ class SyncService:
                 result = await self.sync_spotify(user_id, service)
             elif service.service_type == "lastfm":
                 result = await self.sync_lastfm(user_id, service)
+            elif service.service_type == "listenbrainz":
+                result = await self.sync_listenbrainz(user_id, service)
             else:
                 result = SyncResult(
                     service_type=service.service_type,
@@ -169,6 +182,8 @@ class SyncService:
                 result = await self._sync_spotify_with_progress(user_id, service, progress_callback)
             elif service.service_type == "lastfm":
                 result = await self._sync_lastfm_with_progress(user_id, service, progress_callback)
+            elif service.service_type == "listenbrainz":
+                result = await self._sync_listenbrainz_with_progress(user_id, service, progress_callback)
             else:
                 result = SyncResult(
                     service_type=service.service_type,
@@ -1178,6 +1193,220 @@ class SyncService:
                 created += 1
 
         return created, updated
+
+    # -------------------------------------------------------------------------
+    # ListenBrainz Sync
+    # -------------------------------------------------------------------------
+
+    async def sync_listenbrainz(
+        self,
+        user_id: str,
+        service: MusicService,
+    ) -> SyncResult:
+        """Sync listening history from ListenBrainz.
+
+        ListenBrainz can import data from Spotify, Apple Music, and other services.
+        This is a simplified sync that fetches top tracks and artists.
+
+        Args:
+            user_id: User ID.
+            service: ListenBrainz service connection.
+
+        Returns:
+            SyncResult with counts.
+        """
+        return await self._sync_listenbrainz_with_progress(user_id, service, None)
+
+    async def _sync_listenbrainz_with_progress(
+        self,
+        user_id: str,
+        service: MusicService,
+        progress_callback: ProgressCallback | None,
+    ) -> SyncResult:
+        """Sync ListenBrainz with progress updates.
+
+        Fetches top tracks and artists from ListenBrainz and matches them
+        against the karaoke catalog.
+
+        Args:
+            user_id: User ID.
+            service: ListenBrainz service connection.
+            progress_callback: Optional progress callback.
+
+        Returns:
+            SyncResult with counts.
+        """
+        try:
+            await self.music_service_service.update_sync_status(user_id, "listenbrainz", "syncing")
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="listenbrainz",
+                    current_phase="fetching_top_tracks",
+                    total_tracks=0,
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            username = service.service_username
+            if not username:
+                raise ExternalServiceError("ListenBrainz", "Username not configured")
+            all_tracks: list[dict] = []
+
+            # Phase 1: Fetch top tracks
+            logger.info(f"Fetching ListenBrainz top tracks for {username}")
+            top_tracks = await self.listenbrainz.get_top_tracks(
+                username,
+                count=100,
+                range_="all_time",
+            )
+
+            for track in top_tracks:
+                all_tracks.append(
+                    {
+                        "artist": track.get("artist_name", "Unknown"),
+                        "title": track.get("track_name", "Unknown"),
+                        "playcount": track.get("listen_count", 0),
+                    }
+                )
+
+            logger.info(f"Fetched {len(top_tracks)} top tracks from ListenBrainz")
+
+            # Phase 2: Fetch top artists
+            if progress_callback:
+                await progress_callback(
+                    current_service="listenbrainz",
+                    current_phase="fetching_artists",
+                    total_tracks=len(all_tracks),
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            logger.info(f"Fetching ListenBrainz top artists for {username}")
+            top_artists = await self.listenbrainz.get_top_artists(
+                username,
+                count=100,
+                range_="all_time",
+            )
+
+            # Store artists
+            artists_stored = await self._store_listenbrainz_artists(user_id, top_artists)
+            logger.info(f"Stored {artists_stored} artists from ListenBrainz")
+
+            # Phase 3: Match tracks against karaoke catalog
+            if progress_callback:
+                await progress_callback(
+                    current_service="listenbrainz",
+                    current_phase="matching",
+                    total_tracks=len(all_tracks),
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            # Match tracks
+            track_infos = [{"artist": t["artist"], "title": t["title"]} for t in all_tracks]
+            matched_tracks = await self.track_matcher.batch_match_tracks(track_infos)
+            logger.info(f"Matched {len(matched_tracks)} tracks from ListenBrainz")
+
+            # Create UserSong records
+            if progress_callback:
+                await progress_callback(
+                    current_service="listenbrainz",
+                    current_phase="saving",
+                    total_tracks=len(all_tracks),
+                    processed_tracks=len(all_tracks),
+                    matched_tracks=len(matched_tracks),
+                )
+
+            created, updated = await self._upsert_user_songs(
+                user_id,
+                matched_tracks,
+                "listenbrainz",
+            )
+
+            # Update sync status
+            await self.music_service_service.update_sync_status(
+                user_id,
+                "listenbrainz",
+                "idle",
+                tracks_synced=len(matched_tracks),
+                songs_synced=created + updated,
+            )
+
+            return SyncResult(
+                service_type="listenbrainz",
+                tracks_fetched=len(all_tracks),
+                tracks_matched=len(matched_tracks),
+                user_songs_created=created,
+                user_songs_updated=updated,
+                artists_stored=artists_stored,
+            )
+
+        except ExternalServiceError as e:
+            logger.error(f"ListenBrainz sync error: {e}")
+            await self.music_service_service.update_sync_status(user_id, "listenbrainz", "error", error=str(e))
+            return SyncResult(
+                service_type="listenbrainz",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=str(e),
+            )
+
+        except Exception as e:
+            logger.exception(f"Unexpected error during ListenBrainz sync: {e}")
+            await self.music_service_service.update_sync_status(user_id, "listenbrainz", "error", error=str(e))
+            return SyncResult(
+                service_type="listenbrainz",
+                tracks_fetched=0,
+                tracks_matched=0,
+                user_songs_created=0,
+                user_songs_updated=0,
+                error=str(e),
+            )
+
+    async def _store_listenbrainz_artists(
+        self,
+        user_id: str,
+        artists: list[dict],
+    ) -> int:
+        """Store user's top artists from ListenBrainz.
+
+        Args:
+            user_id: User ID.
+            artists: List of artist dicts from ListenBrainz.
+
+        Returns:
+            Number of artists stored.
+        """
+        stored = 0
+        now = datetime.now(UTC)
+
+        for rank, artist in enumerate(artists, 1):
+            artist_name = artist.get("artist_name", "")
+            if not artist_name:
+                continue
+
+            # Create safe document ID
+            safe_name = re.sub(r"[^a-z0-9_]", "_", artist_name.lower())[:50]
+            artist_id = f"{user_id}:listenbrainz:{safe_name}"
+
+            artist_data = {
+                "id": artist_id,
+                "user_id": user_id,
+                "source": "listenbrainz",
+                "artist_name": artist_name,
+                "rank": rank,
+                "playcount": artist.get("listen_count", 0),
+                "artist_mbid": artist.get("artist_mbid"),
+                "updated_at": now.isoformat(),
+            }
+
+            await self.firestore.set_document("user_artists", artist_id, artist_data)
+            stored += 1
+
+        return stored
 
 
 # Lazy initialization

@@ -248,6 +248,51 @@ async def get_catalog_stats() -> CatalogStatsResponse:
     return CatalogStatsResponse(**stats)
 
 
+class ArtistIndexEntry(BaseModel):
+    """Compact artist entry for client-side search index."""
+
+    i: str  # artist_id
+    n: str  # artist_name
+    p: int  # popularity
+
+
+class ArtistIndexResponse(BaseModel):
+    """Response containing the full artist index for client-side search."""
+
+    artists: list[ArtistIndexEntry]
+    count: int
+
+
+# Cache for artist index (regenerated daily or on restart)
+_artist_index_cache: ArtistIndexResponse | None = None
+
+
+@router.get("/artists/index", response_model=ArtistIndexResponse)
+async def get_artist_index() -> ArtistIndexResponse:
+    """Get the full artist index for client-side autocomplete.
+
+    Returns ~24K popular artists (popularity >= 50) in a compact format.
+    This endpoint is designed to be cached aggressively (CDN, browser).
+    Response is ~600KB with brotli compression.
+
+    The compact format uses short keys to minimize payload size:
+    - i: artist_id (Spotify ID)
+    - n: artist_name
+    - p: popularity (0-100)
+    """
+    global _artist_index_cache
+
+    if _artist_index_cache is not None:
+        return _artist_index_cache
+
+    results = get_catalog_service().get_artist_index(min_popularity=50)
+    _artist_index_cache = ArtistIndexResponse(
+        artists=[ArtistIndexEntry(i=r.artist_id, n=r.artist_name, p=r.popularity) for r in results],
+        count=len(results),
+    )
+    return _artist_index_cache
+
+
 @router.get("/artists", response_model=ArtistSearchResponse)
 async def search_artists(
     q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),

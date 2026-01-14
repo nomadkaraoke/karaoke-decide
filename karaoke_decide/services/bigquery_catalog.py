@@ -2,6 +2,7 @@
 
 import logging
 import re
+import time
 from dataclasses import dataclass
 
 from google.cloud import bigquery
@@ -76,6 +77,11 @@ class BigQueryCatalogService:
 
     PROJECT_ID = "nomadkaraoke"
     DATASET_ID = "karaoke_decide"
+
+    # Cache for artist search results (key: query_prefix, value: (timestamp, results))
+    _artist_search_cache: dict[str, tuple[float, list["ArtistSearchResult"]]] = {}
+    _track_search_cache: dict[str, tuple[float, list["TrackSearchResult"]]] = {}
+    CACHE_TTL = 300  # 5 minutes
 
     def __init__(self, client: bigquery.Client | None = None):
         self.client = client or bigquery.Client(project=self.PROJECT_ID)
@@ -614,10 +620,59 @@ class BigQueryCatalogService:
         logger.info(f"BigQuery: found metadata for {len(all_results)} artists (fast)")
         return all_results
 
+    def get_artist_index(
+        self,
+        min_popularity: int = 30,
+    ) -> list[ArtistSearchResult]:
+        """Get all artists above a popularity threshold for client-side search.
+
+        Returns a large list of artists for building a client-side search index.
+        This is designed to be called once and cached server-side.
+
+        Args:
+            min_popularity: Minimum popularity score (0-100, default 30)
+
+        Returns:
+            List of ArtistSearchResult sorted by popularity (highest first)
+        """
+        logger.info(f"Loading artist index with min_popularity={min_popularity}")
+
+        sql = f"""
+            SELECT
+                artist_id,
+                artist_name,
+                popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists_normalized`
+            WHERE popularity >= @min_popularity
+            ORDER BY popularity DESC
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
+            ]
+        )
+
+        results = self.client.query(sql, job_config=job_config).result()
+
+        artist_list = [
+            ArtistSearchResult(
+                artist_id=row.artist_id,
+                artist_name=row.artist_name,
+                popularity=row.popularity or 0,
+                genres=[],  # Skip genres for index to reduce size
+            )
+            for row in results
+        ]
+
+        logger.info(f"Loaded {len(artist_list)} artists for index")
+        return artist_list
+
     def search_artists(
         self,
         query: str,
         limit: int = 10,
+        min_popularity: int = 20,
     ) -> list[ArtistSearchResult]:
         """Search artists by name prefix for autocomplete.
 
@@ -627,6 +682,7 @@ class BigQueryCatalogService:
         Args:
             query: Search query (will be normalized)
             limit: Maximum results to return (default 10)
+            min_popularity: Minimum popularity score (0-100, default 20 for faster queries)
 
         Returns:
             List of ArtistSearchResult sorted by popularity
@@ -638,7 +694,17 @@ class BigQueryCatalogService:
         if not normalized:
             return []
 
-        # Use prefix matching on normalized name
+        # Check cache first
+        cache_key = f"{normalized}:{limit}:{min_popularity}"
+        now = time.time()
+        if cache_key in self._artist_search_cache:
+            cached_time, cached_results = self._artist_search_cache[cache_key]
+            if now - cached_time < self.CACHE_TTL:
+                logger.debug(f"Artist search cache hit for '{normalized}'")
+                return cached_results
+
+        # Use prefix matching on normalized name with popularity filter
+        # The popularity filter significantly reduces scan time
         sql = f"""
             SELECT
                 artist_id,
@@ -647,6 +713,7 @@ class BigQueryCatalogService:
                 genres
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_artists_normalized`
             WHERE normalized_name LIKE @query_prefix
+              AND popularity >= @min_popularity
             ORDER BY popularity DESC
             LIMIT @limit
         """
@@ -654,13 +721,14 @@ class BigQueryCatalogService:
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
                 bigquery.ScalarQueryParameter("limit", "INT64", limit),
             ]
         )
 
         results = self.client.query(sql, job_config=job_config).result()
 
-        return [
+        artist_results = [
             ArtistSearchResult(
                 artist_id=row.artist_id,
                 artist_name=row.artist_name,
@@ -670,10 +738,21 @@ class BigQueryCatalogService:
             for row in results
         ]
 
+        # Cache the results
+        self._artist_search_cache[cache_key] = (now, artist_results)
+
+        # Clean old cache entries periodically (simple cleanup)
+        if len(self._artist_search_cache) > 1000:
+            cutoff = now - self.CACHE_TTL
+            self._artist_search_cache = {k: v for k, v in self._artist_search_cache.items() if v[0] > cutoff}
+
+        return artist_results
+
     def search_tracks(
         self,
         query: str,
         limit: int = 10,
+        min_popularity: int = 30,
     ) -> list[TrackSearchResult]:
         """Search tracks by title or artist for autocomplete.
 
@@ -684,6 +763,7 @@ class BigQueryCatalogService:
         Args:
             query: Search query (will be normalized)
             limit: Maximum results to return (default 10)
+            min_popularity: Minimum popularity score (0-100, default 30 for faster queries)
 
         Returns:
             List of TrackSearchResult sorted by popularity
@@ -695,7 +775,16 @@ class BigQueryCatalogService:
         if not normalized:
             return []
 
-        # Search both title and artist, deduplicate by track_id
+        # Check cache first
+        cache_key = f"{normalized}:{limit}:{min_popularity}"
+        now = time.time()
+        if cache_key in self._track_search_cache:
+            cached_time, cached_results = self._track_search_cache[cache_key]
+            if now - cached_time < self.CACHE_TTL:
+                logger.debug(f"Track search cache hit for '{normalized}'")
+                return cached_results
+
+        # Search both title and artist with popularity filter
         sql = f"""
             SELECT DISTINCT
                 track_id,
@@ -706,8 +795,8 @@ class BigQueryCatalogService:
                 duration_ms,
                 explicit
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
-            WHERE normalized_title LIKE @query_prefix
-               OR normalized_artist LIKE @query_prefix
+            WHERE (normalized_title LIKE @query_prefix OR normalized_artist LIKE @query_prefix)
+              AND popularity >= @min_popularity
             ORDER BY popularity DESC
             LIMIT @limit
         """
@@ -715,13 +804,14 @@ class BigQueryCatalogService:
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
                 bigquery.ScalarQueryParameter("limit", "INT64", limit),
             ]
         )
 
         results = self.client.query(sql, job_config=job_config).result()
 
-        return [
+        track_results = [
             TrackSearchResult(
                 track_id=row.track_id,
                 track_name=row.track_name,
@@ -733,3 +823,13 @@ class BigQueryCatalogService:
             )
             for row in results
         ]
+
+        # Cache the results
+        self._track_search_cache[cache_key] = (now, track_results)
+
+        # Clean old cache entries periodically
+        if len(self._track_search_cache) > 1000:
+            cutoff = now - self.CACHE_TTL
+            self._track_search_cache = {k: v for k, v in self._track_search_cache.items() if v[0] > cutoff}
+
+        return track_results
