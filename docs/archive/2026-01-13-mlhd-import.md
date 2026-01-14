@@ -1,53 +1,70 @@
 # MLHD+ and MusicBrainz Data Import
 
 **Date:** 2026-01-13
-**Last Updated:** 2026-01-14
-**Status:** Two VMs running in parallel
+**Last Updated:** 2026-01-14 18:30 UTC
+**Status:** MLHD+ processing in progress, MusicBrainz COMPLETE
 
 ## Quick Status Check
 
 ```bash
-# MLHD+ Phase 2 - Check progress (use IAP tunnel)
+# MLHD+ - Check progress (use IAP tunnel, log is /tmp/mlhd.log)
 gcloud compute ssh mlhd-import --project=nomadkaraoke --zone=us-central1-a \
-  --tunnel-through-iap --command="sudo tail -20 /var/log/mlhd-process.log"
+  --tunnel-through-iap --command="tail -20 /tmp/mlhd.log"
 
-# MusicBrainz Import - Check progress
-gcloud compute ssh musicbrainz-import --project=nomadkaraoke --zone=us-central1-a \
-  --command="sudo tail -20 /var/log/musicbrainz-import.log"
+# Check MLHD+ archive processing progress
+gsutil ls -lh gs://nomadkaraoke-mlhd-data/processed/
 
 # Check if MLHD+ complete (this file exists when done)
 gsutil stat gs://nomadkaraoke-mlhd-data/cooccurrence.json
 
-# Check if MusicBrainz complete (this file exists when done)
-gsutil stat gs://nomadkaraoke-musicbrainz-data/processed/mbid_spotify_mapping.json
+# Check MusicBrainz (COMPLETE - these files exist)
+gsutil ls -lh gs://nomadkaraoke-musicbrainz-data/processed/
 ```
 
-## Currently Running Jobs
+## Current Status
 
-### Job 1: MLHD+ Phase 2 Processing
+### ✅ MusicBrainz Import - COMPLETE (VM deleted)
+- 376,231 MBID → Spotify ID mappings
+- 804,812 artist relationships
+- Files in `gs://nomadkaraoke-musicbrainz-data/processed/`
+
+### 🔄 MLHD+ Phase 2 - IN PROGRESS
 
 | Property | Value |
 |----------|-------|
 | VM Name | `mlhd-import` |
 | Machine | n2-standard-8 (8 vCPU, 32GB RAM) |
-| Log File | `/var/log/mlhd-process.log` |
-| Script | `/tmp/mlhd_process.sh` |
-| SSH Note | **Requires IAP tunnel** (`--tunnel-through-iap`) |
+| Log File | `/tmp/mlhd.log` |
+| Script | `/tmp/mlhd_complete.py` |
+| SSH Note | Use `--tunnel-through-iap` (standard SSH flaky) |
+
+**Progress (as of 2026-01-14 18:30):**
+- Archives 0-5: ✅ Complete (checkpointed from earlier)
+- Archive 6: ✅ Complete (36,998 users)
+- Archives 7-15: 🔄 Processing
+- Estimated completion: ~3 hours
 
 **What it does:**
-1. Downloads processed history files from GCS (or extracts from archives)
-2. Processes ~36k user files per archive (16 archives total)
-3. Filters to users with 10+ artists
-4. Builds artist co-occurrence matrix
-5. Calculates Jaccard similarity scores
-6. Uploads `cooccurrence.json` and `artist_stats.json` to GCS
+1. Downloads raw archives from GCS (16 archives, ~15GB each)
+2. Extracts ~37k user files per archive (streaming zstd)
+3. Filters to users with 10+ artists (~37k per archive)
+4. Saves per-archive JSON to GCS (checkpointing)
+5. Builds artist co-occurrence matrix
+6. Calculates Jaccard similarity scores
+7. Uploads `cooccurrence.json` and `artist_stats.json` to GCS
 
 **Completion indicator:**
 ```bash
 gsutil stat gs://nomadkaraoke-mlhd-data/cooccurrence.json
 ```
 
-### Job 2: MusicBrainz Import
+## Technical Notes
+
+### Streaming Zstd Fix (2026-01-14)
+The MLHD+ user files use streaming zstd compression (no content size header).
+Must use `dctx.stream_reader(f).read()` instead of `dctx.decompress()`.
+
+### MusicBrainz Import
 
 | Property | Value |
 |----------|-------|
