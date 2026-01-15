@@ -585,6 +585,70 @@ class AuthService:
             last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
         )
 
+    async def delete_user(self, user_id: str) -> bool:
+        """Delete a user and all their associated data.
+
+        This method deletes:
+        1. The user document
+        2. All user_songs documents
+        3. All user_artists documents
+
+        Args:
+            user_id: User's ID (user_xxx or guest_xxx format)
+
+        Returns:
+            True if user was deleted, False if not found
+        """
+        # Find the user document
+        # For guest users, the document ID is the user_id itself
+        # For verified users, the document ID is the email hash
+        user_doc = None
+        doc_id = None
+
+        if user_id.startswith("guest_"):
+            # Guest user - document ID is the user_id
+            user_doc = await self.firestore.get_document(self.USERS_COLLECTION, user_id)
+            doc_id = user_id
+        else:
+            # Verified user - need to find by user_id field
+            docs = await self.firestore.query_documents(
+                self.USERS_COLLECTION,
+                filters=[("user_id", "==", user_id)],
+                limit=1,
+            )
+            if docs:
+                user_doc = docs[0]
+                doc_id = user_doc.get("id")
+
+        if not user_doc or not doc_id:
+            return False
+
+        # Delete all user_songs for this user
+        user_songs = await self.firestore.query_documents(
+            "user_songs",
+            filters=[("user_id", "==", user_id)],
+            limit=10000,
+        )
+        for song in user_songs:
+            song_doc_id = song.get("id", f"{user_id}:{song.get('song_id', '')}")
+            await self.firestore.delete_document("user_songs", song_doc_id)
+
+        # Delete all user_artists for this user
+        user_artists = await self.firestore.query_documents(
+            "user_artists",
+            filters=[("user_id", "==", user_id)],
+            limit=10000,
+        )
+        for artist in user_artists:
+            artist_doc_id = artist.get("id", "")
+            if artist_doc_id:
+                await self.firestore.delete_document("user_artists", artist_doc_id)
+
+        # Delete the user document
+        await self.firestore.delete_document(self.USERS_COLLECTION, doc_id)
+
+        return True
+
 
 # Singleton instance (lazy initialization)
 _auth_service: AuthService | None = None
