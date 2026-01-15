@@ -317,7 +317,7 @@ cloud_run_service = gcp.cloudrunv2.Service(
                 "resources": {
                     "limits": {
                         "cpu": "1",
-                        "memory": "512Mi",
+                        "memory": "1Gi",  # Increased from 512Mi to handle collaborative filtering queries
                     },
                     "cpu_idle": True,
                     "startup_cpu_boost": True,
