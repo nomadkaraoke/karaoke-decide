@@ -6,6 +6,7 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
+      - '.github/workflows/prod-health-check.yml'
   workflow_dispatch:
 
 permissions:
