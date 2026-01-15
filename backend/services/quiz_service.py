@@ -1561,12 +1561,15 @@ class QuizService:
         # MBID-First: Resolve Spotify IDs to MBIDs for manual artists (bulk lookup)
         manual_artists_with_mbid: list[dict[str, Any]] = []
         if manual_artists:
-            # Bulk lookup all Spotify IDs in one query
-            spotify_ids = [a.artist_id for a in manual_artists]
+            # Bulk lookup all Spotify IDs in one query (filter out None values)
+            spotify_ids = [a.artist_id for a in manual_artists if a.artist_id]
             spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
 
             for a in manual_artists:
-                manual_mbid: str | None = spotify_to_mbid.get(a.artist_id)
+                # Look up MBID from Spotify ID mapping (use artist's mbid if already provided)
+                manual_mbid: str | None = a.mbid
+                if not manual_mbid and a.artist_id:
+                    manual_mbid = spotify_to_mbid.get(a.artist_id)
                 manual_artists_with_mbid.append(
                     {
                         "artist_id": a.artist_id,  # Spotify ID (backward compat)

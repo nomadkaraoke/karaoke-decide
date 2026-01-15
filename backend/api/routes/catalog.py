@@ -102,13 +102,13 @@ class ArtistSearchResult(BaseModel):
     genres: list[str] = []  # Spotify algorithmic genres
 
     # Backward compatibility aliases (deprecated, will be removed)
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def artist_id(self) -> str:
         """Deprecated: Use mbid or spotify_id instead."""
         return self.spotify_id or self.mbid or ""
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def artist_name(self) -> str:
         """Deprecated: Use name instead."""
