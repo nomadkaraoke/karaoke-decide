@@ -49,10 +49,38 @@ test.describe("Production Comprehensive E2E Tests", () => {
   // ==========================================================================
 
   test.describe("Authentication Flow", () => {
+    let authToken: string | null = null;
+
     test.skip(
       !process.env.TESTMAIL_API_KEY || !process.env.TESTMAIL_NAMESPACE,
       "Requires TESTMAIL_API_KEY and TESTMAIL_NAMESPACE env vars"
     );
+
+    test.afterEach(async ({ request, page }) => {
+      // Clean up test user to prevent database clutter
+      if (!authToken) {
+        try {
+          authToken = await page.evaluate(() => localStorage.getItem("karaoke_decide_token"));
+        } catch {
+          // Page may have been closed
+        }
+      }
+
+      if (authToken) {
+        try {
+          const response = await request.delete(`${API_BASE}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (response.ok()) {
+            console.log("✓ Test user cleaned up successfully");
+          } else {
+            console.log(`⚠ Failed to clean up test user: ${response.status()}`);
+          }
+        } catch (error) {
+          console.log(`⚠ Error cleaning up test user: ${error}`);
+        }
+      }
+    });
 
     test("complete magic link login flow", async ({ page }) => {
       // Generate a unique tag for this test
@@ -105,7 +133,8 @@ test.describe("Production Comprehensive E2E Tests", () => {
       // and can access authenticated content
       await expect(page.getByRole("link", { name: /sign in/i })).not.toBeVisible({ timeout: 5000 });
 
-      // No cleanup needed - TestMail.app emails auto-expire
+      // Store token for cleanup in afterEach
+      authToken = await page.evaluate(() => localStorage.getItem("karaoke_decide_token"));
     });
   });
 

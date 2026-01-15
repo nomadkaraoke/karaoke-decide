@@ -17,8 +17,35 @@ import {
  */
 test.describe("Magic Link E2E", () => {
   const testMailClient = createTestMailClient();
+  let authToken: string | null = null;
 
   test.skip(!testMailClient, "Requires TESTMAIL_API_KEY and TESTMAIL_NAMESPACE env vars");
+
+  test.afterEach(async ({ request, page }) => {
+    // Clean up test user to prevent database clutter
+    if (!authToken) {
+      try {
+        authToken = await page.evaluate(() => localStorage.getItem("karaoke_decide_token"));
+      } catch {
+        // Page may have been closed
+      }
+    }
+
+    if (authToken) {
+      try {
+        const response = await request.delete("https://karaoke-decide-718638054799.us-central1.run.app/api/auth/me", {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (response.ok()) {
+          console.log("✓ Test user cleaned up successfully");
+        } else {
+          console.log(`⚠ Failed to clean up test user: ${response.status()}`);
+        }
+      } catch (error) {
+        console.log(`⚠ Error cleaning up test user: ${error}`);
+      }
+    }
+  });
 
   test("complete magic link authentication flow", async ({ page }) => {
     // Increase timeout for this test as it involves email delivery
@@ -81,6 +108,7 @@ test.describe("Magic Link E2E", () => {
 
     console.log("Magic link authentication successful!");
 
-    // No cleanup needed - TestMail.app emails auto-expire
+    // Store token for cleanup in afterEach
+    authToken = await page.evaluate(() => localStorage.getItem("karaoke_decide_token"));
   });
 });
