@@ -1561,18 +1561,18 @@ class QuizService:
             spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
 
             for a in manual_artists:
-                mbid = spotify_to_mbid.get(a.artist_id)
+                manual_mbid: str | None = spotify_to_mbid.get(a.artist_id)
                 manual_artists_with_mbid.append(
                     {
                         "artist_id": a.artist_id,  # Spotify ID (backward compat)
                         "artist_name": a.artist_name,
                         "genres": a.genres or [],
-                        "mbid": mbid,  # MBID-First: Add MusicBrainz ID
+                        "mbid": manual_mbid,  # MBID-First: Add MusicBrainz ID
                     }
                 )
                 # Also add to mbids list if resolved
-                if mbid:
-                    artist_mbids.append(mbid)
+                if manual_mbid:
+                    artist_mbids.append(manual_mbid)
 
         # Update quiz fields
         update_data: dict[str, Any] = {
