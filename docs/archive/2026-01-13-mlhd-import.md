@@ -1,62 +1,66 @@
 # MLHD+ and MusicBrainz Data Import
 
 **Date:** 2026-01-13
-**Last Updated:** 2026-01-14 18:30 UTC
-**Status:** MLHD+ processing in progress, MusicBrainz COMPLETE
+**Last Updated:** 2026-01-14 23:30 UTC
+**Status:** ✅ COMPLETE - Data loaded to BigQuery and integrated into quiz service
 
-## Quick Status Check
+## Summary
+
+Successfully imported listening history data from 583,000 Last.fm users to enhance quiz recommendations with collaborative filtering.
+
+### Final Results
+
+| Metric | Value |
+|--------|-------|
+| Total users processed | 594,370 |
+| Unique artists | 489,578 |
+| Artist pairs (50+ shared users) | 1,805,782 |
+| MBID → Spotify mappings | 376,231 |
+| **Final similarity pairs (with Spotify IDs)** | **1,542,594** |
+
+### BigQuery Tables Created
+
+| Table | Rows | Description |
+|-------|------|-------------|
+| `karaoke_decide.mlhd_artist_similarity` | 1,542,594 | Artist pairs with Spotify IDs and similarity scores |
+| `karaoke_decide.mbid_spotify_mapping` | 376,231 | MusicBrainz ID to Spotify ID mapping |
+| `karaoke_decide.mlhd_cooccurrence_staging` | 1,805,782 | Raw co-occurrence data (MBIDs) |
+
+### Integration
+
+The MLHD data is now integrated into the quiz recommendation service:
+- Added `_get_mlhd_similar_artists()` method in `backend/services/quiz_service.py`
+- Queries BigQuery for artists similar to user's selections
+- Shows "Listeners of X also like" suggestions in the quiz
+- Priority: after karaoke singers and ListenBrainz, before genre matching
+
+## Quick Reference
 
 ```bash
-# MLHD+ - Check progress (use IAP tunnel, log is /tmp/mlhd.log)
-gcloud compute ssh mlhd-import --project=nomadkaraoke --zone=us-central1-a \
-  --tunnel-through-iap --command="tail -20 /tmp/mlhd.log"
+# Query similar artists in BigQuery
+SELECT artist_a_name, artist_b_name, shared_users, jaccard_similarity
+FROM karaoke_decide.mlhd_artist_similarity
+WHERE artist_a_name = 'Green Day' OR artist_b_name = 'Green Day'
+ORDER BY shared_users DESC
+LIMIT 10;
 
-# Check MLHD+ archive processing progress
-gsutil ls -lh gs://nomadkaraoke-mlhd-data/processed/
-
-# Check if MLHD+ complete (this file exists when done)
-gsutil stat gs://nomadkaraoke-mlhd-data/cooccurrence.json
-
-# Check MusicBrainz (COMPLETE - these files exist)
-gsutil ls -lh gs://nomadkaraoke-musicbrainz-data/processed/
+# Check table sizes
+SELECT table_id, row_count FROM karaoke_decide.__TABLES__
+WHERE table_id LIKE 'mlhd%' OR table_id = 'mbid_spotify_mapping';
 ```
 
-## Current Status
+## Completed Status
 
-### ✅ MusicBrainz Import - COMPLETE (VM deleted)
+### ✅ MusicBrainz Import - COMPLETE
 - 376,231 MBID → Spotify ID mappings
-- 804,812 artist relationships
 - Files in `gs://nomadkaraoke-musicbrainz-data/processed/`
 
-### 🔄 MLHD+ Phase 2 - IN PROGRESS
-
-| Property | Value |
-|----------|-------|
-| VM Name | `mlhd-import` |
-| Machine | n2-standard-8 (8 vCPU, 32GB RAM) |
-| Log File | `/tmp/mlhd.log` |
-| Script | `/tmp/mlhd_complete.py` |
-| SSH Note | Use `--tunnel-through-iap` (standard SSH flaky) |
-
-**Progress (as of 2026-01-14 18:30):**
-- Archives 0-5: ✅ Complete (checkpointed from earlier)
-- Archive 6: ✅ Complete (36,998 users)
-- Archives 7-15: 🔄 Processing
-- Estimated completion: ~3 hours
-
-**What it does:**
-1. Downloads raw archives from GCS (16 archives, ~15GB each)
-2. Extracts ~37k user files per archive (streaming zstd)
-3. Filters to users with 10+ artists (~37k per archive)
-4. Saves per-archive JSON to GCS (checkpointing)
-5. Builds artist co-occurrence matrix
-6. Calculates Jaccard similarity scores
-7. Uploads `cooccurrence.json` and `artist_stats.json` to GCS
-
-**Completion indicator:**
-```bash
-gsutil stat gs://nomadkaraoke-mlhd-data/cooccurrence.json
-```
+### ✅ MLHD+ Processing - COMPLETE
+- All 16 archives processed (594,370 users)
+- Co-occurrence matrix built (1.8M pairs)
+- Loaded to BigQuery with Spotify ID mapping
+- Integrated into quiz service
+- **VM deleted** (2026-01-14)
 
 ## Technical Notes
 

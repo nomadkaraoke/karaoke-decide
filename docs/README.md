@@ -10,9 +10,9 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-13)
+## Current Status (2026-01-14)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + MLHD+ Import ✅
 
 ### ✅ What's Working
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
@@ -24,9 +24,10 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
 - **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
 - **Better Artist Selection:** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
-- **Collaborative Recommendations (NEW):** Artists are suggested based on two sources of similarity data:
+- **Collaborative Recommendations:** Artists are suggested based on three sources of similarity data:
   - **Karaoke singers:** "Singers who like Green Day also chose" - from our own quiz data (users who selected similar artists)
   - **Music fans:** "Fans of Green Day also like" - from ListenBrainz API (general music listener patterns)
+  - **MLHD+ (NEW):** "Listeners of Green Day also like" - from 583K Last.fm users' listening history (1.5M artist pairs)
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
@@ -37,7 +38,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + **33.5M audio analysis tracks + 325M sections**
+- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **1.5M MLHD+ artist similarity pairs**
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
@@ -103,6 +104,8 @@ cd frontend && npm run dev
 | `karaoke_decide.spotify_artists` | 15M | Artist metadata (followers, popularity) |
 | `karaoke_decide.spotify_artist_genres` | 2.2M | Artist-genre associations (768 unique genres) |
 | `karaoke_decide.spotify_artists_normalized` | 15.4M | Pre-normalized artists with aggregated genres |
+| `karaoke_decide.mlhd_artist_similarity` | **1.5M** | MLHD+ artist similarity (from 583K Last.fm users) |
+| `karaoke_decide.mbid_spotify_mapping` | 376K | MusicBrainz ID to Spotify ID mapping |
 
 > See [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) for detailed schemas, queries, and feature ideas.
 
@@ -189,6 +192,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-14 | **MLHD+ Import** (1.5M artist similarity pairs from 583K Last.fm users, BigQuery integration) | [archive/2026-01-13-mlhd-import.md](archive/2026-01-13-mlhd-import.md) |
 | 2026-01-10 | Quiz Rework (5-step flow, 22 genres, multi-decade, vocal comfort/crowd pleaser prefs, smart artists) | [archive/2026-01-10-quiz-rework.md](archive/2026-01-10-quiz-rework.md) |
 | 2026-01-08 | Brand Sync & Theme Toggle (Generator branding, light/dark mode, homepage overhaul) | [archive/2026-01-08-brand-sync-theme-toggle.md](archive/2026-01-08-brand-sync-theme-toggle.md) |
 | 2026-01-04 | Enhanced Artists Tab (merged sources, pagination, exclusions, compact UI) | [archive/2026-01-04-enhanced-artists-tab.md](archive/2026-01-04-enhanced-artists-tab.md) |

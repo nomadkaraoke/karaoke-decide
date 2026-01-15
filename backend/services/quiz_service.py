@@ -71,6 +71,7 @@ class QuizService:
     # Collaborative filtering configuration
     MIN_SHARED_ARTISTS = 3  # Minimum artists in common to consider users "similar"
     MIN_SIMILAR_USERS = 5  # Minimum similar users needed to show "fans_also_like"
+    MLHD_MIN_SHARED_USERS = 500  # Minimum shared users in MLHD data to suggest
 
     def __init__(
         self,
@@ -242,11 +243,20 @@ class QuizService:
 
         # Get ListenBrainz similar artist matches (candidate -> seed artists)
         listenbrainz_matches: dict[str, list[str]] = {}
+        candidate_names = [c.name for c in candidates]
         if all_seed_artists:
-            candidate_names = [c.name for c in candidates]
             listenbrainz_matches = await self.listenbrainz.find_similar_artist_matches(
                 seed_artists=all_seed_artists,
                 candidate_names=candidate_names,
+            )
+
+        # Get MLHD+ similar artist matches (from 583K Last.fm users)
+        mlhd_matches: dict[str, list[str]] = {}
+        if all_seed_artists:
+            mlhd_matches = self._get_mlhd_similar_artists(
+                seed_artist_names=all_seed_artists,
+                candidate_names=candidate_names,
+                exclude_artists=set(all_exclusions) if all_exclusions else None,
             )
 
         # Generate suggestion reasons for each candidate
@@ -256,6 +266,7 @@ class QuizService:
             user_decades=decades or [],
             seed_artist_genres=seed_artist_genres,
             listenbrainz_matches=listenbrainz_matches,
+            mlhd_matches=mlhd_matches,
             collaborative_suggestions=collaborative_suggestions,
         )
 
@@ -315,6 +326,7 @@ class QuizService:
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
         listenbrainz_matches: dict[str, list[str]] | None = None,
+        mlhd_matches: dict[str, list[str]] | None = None,
         collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> list[QuizArtist]:
         """Add suggestion reasons to each candidate artist.
@@ -322,6 +334,7 @@ class QuizService:
         Priority order:
         1a. fans_also_like - Karaoke singers with similar taste (our quiz data)
         1b. fans_also_like - Music listeners with similar taste (ListenBrainz)
+        1c. fans_also_like - Last.fm listeners with similar taste (MLHD+)
         2. similar_artist - if artist shares 2+ genres with a seed artist
         3. genre_match - if artist matches user's selected genres
         4. decade_match - if artist's decade matches user's selection
@@ -333,6 +346,7 @@ class QuizService:
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
             listenbrainz_matches: Dict of candidate name -> seed artists (ListenBrainz).
+            mlhd_matches: Dict of candidate name -> seed artists (MLHD+ Last.fm data).
             collaborative_suggestions: Dict of artist name -> shared artists (karaoke singers).
 
         Returns:
@@ -347,6 +361,7 @@ class QuizService:
                 user_decades=user_decades,
                 seed_artist_genres=seed_artist_genres,
                 listenbrainz_matches=listenbrainz_matches,
+                mlhd_matches=mlhd_matches,
                 collaborative_suggestions=collaborative_suggestions or {},
             )
 
@@ -364,6 +379,7 @@ class QuizService:
         user_decades: list[str],
         seed_artist_genres: dict[str, list[str]],
         listenbrainz_matches: dict[str, list[str]] | None = None,
+        mlhd_matches: dict[str, list[str]] | None = None,
         collaborative_suggestions: dict[str, list[str]] | None = None,
     ) -> SuggestionReason:
         """Generate a suggestion reason for an artist.
@@ -374,6 +390,7 @@ class QuizService:
             user_decades: User's selected decades.
             seed_artist_genres: Dict of seed artist name -> their genre IDs.
             listenbrainz_matches: Dict of candidate name -> seed artists (ListenBrainz).
+            mlhd_matches: Dict of candidate name -> seed artists (MLHD+ Last.fm data).
             collaborative_suggestions: Dict of artist name -> shared artists (Firestore).
 
         Returns:
@@ -412,6 +429,24 @@ class QuizService:
                 display_text = f"Fans of {similar_to[0]} & {similar_to[1]} also like"
             else:
                 display_text = f"Fans of {similar_to[0]}, {similar_to[1]} & others also like"
+            return SuggestionReason(
+                type="fans_also_like",
+                display_text=display_text,
+                related_to=", ".join(similar_to[:3]),
+            )
+
+        # Priority 1c: Check for MLHD+ similarity (Last.fm listening history)
+        # Based on co-occurrence from 583K Last.fm users
+        mlhd_match_key = artist.name.lower()
+        mlhd_matches_lower = {k.lower(): v for k, v in mlhd_matches.items()} if mlhd_matches else {}
+        if mlhd_match_key in mlhd_matches_lower:
+            similar_to = mlhd_matches_lower[mlhd_match_key]
+            if len(similar_to) == 1:
+                display_text = f"Listeners of {similar_to[0]} also like"
+            elif len(similar_to) == 2:
+                display_text = f"Listeners of {similar_to[0]} & {similar_to[1]} also like"
+            else:
+                display_text = f"Listeners of {similar_to[0]}, {similar_to[1]} & others also like"
             return SuggestionReason(
                 type="fans_also_like",
                 display_text=display_text,
@@ -632,6 +667,96 @@ class QuizService:
                     result[original_name] = shared_artists
 
         return result
+
+    def _get_mlhd_similar_artists(
+        self,
+        seed_artist_names: list[str],
+        candidate_names: list[str],
+        exclude_artists: set[str] | None = None,
+    ) -> dict[str, list[str]]:
+        """Find similar artists using MLHD+ listening history data.
+
+        Queries the mlhd_artist_similarity BigQuery table which contains
+        artist co-occurrence data from 583,000 Last.fm users.
+
+        Args:
+            seed_artist_names: Artists the user has selected.
+            candidate_names: Candidate artists to check for similarity.
+            exclude_artists: Artists to exclude from suggestions.
+
+        Returns:
+            Dict mapping candidate artist name -> list of seed artists they're similar to.
+        """
+        if not seed_artist_names or not candidate_names:
+            return {}
+
+        exclude_artists = exclude_artists or set()
+        exclude_lower = {a.lower() for a in exclude_artists}
+
+        # Build query to find candidates similar to seed artists
+        # We query in both directions since the table stores pairs as (a, b) where a < b
+        seed_placeholders = ", ".join([f"@seed_{i}" for i in range(len(seed_artist_names))])
+        candidate_placeholders = ", ".join([f"@cand_{i}" for i in range(len(candidate_names))])
+
+        sql = f"""
+            WITH seed_matches AS (
+                -- Find where seed is artist_a and candidate is artist_b
+                SELECT
+                    artist_a_name AS seed_name,
+                    artist_b_name AS similar_name,
+                    shared_users
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mlhd_artist_similarity`
+                WHERE LOWER(artist_a_name) IN ({seed_placeholders})
+                  AND LOWER(artist_b_name) IN ({candidate_placeholders})
+                  AND shared_users >= @min_shared
+
+                UNION ALL
+
+                -- Find where seed is artist_b and candidate is artist_a
+                SELECT
+                    artist_b_name AS seed_name,
+                    artist_a_name AS similar_name,
+                    shared_users
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mlhd_artist_similarity`
+                WHERE LOWER(artist_b_name) IN ({seed_placeholders})
+                  AND LOWER(artist_a_name) IN ({candidate_placeholders})
+                  AND shared_users >= @min_shared
+            )
+            SELECT
+                similar_name,
+                ARRAY_AGG(seed_name ORDER BY shared_users DESC LIMIT 3) AS seed_artists,
+                MAX(shared_users) AS max_shared
+            FROM seed_matches
+            GROUP BY similar_name
+            ORDER BY max_shared DESC
+            LIMIT 100
+        """
+
+        # Build query parameters
+        params = [
+            bigquery.ScalarQueryParameter("min_shared", "INT64", self.MLHD_MIN_SHARED_USERS),
+        ]
+        for i, name in enumerate(seed_artist_names):
+            params.append(bigquery.ScalarQueryParameter(f"seed_{i}", "STRING", name.lower()))
+        for i, name in enumerate(candidate_names):
+            params.append(bigquery.ScalarQueryParameter(f"cand_{i}", "STRING", name.lower()))
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+
+        try:
+            results = self.bigquery.query(sql, job_config=job_config).result()
+
+            matches: dict[str, list[str]] = {}
+            for row in results:
+                # Skip if in exclude list
+                if row.similar_name.lower() in exclude_lower:
+                    continue
+                matches[row.similar_name] = list(row.seed_artists)
+
+            return matches
+        except Exception:
+            # If query fails (e.g., table doesn't exist), return empty
+            return {}
 
     def _map_spotify_genres_to_ids(self, spotify_genres: list[str]) -> list[str]:
         """Map Spotify genre strings to our genre IDs.
