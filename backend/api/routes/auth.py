@@ -283,3 +283,43 @@ async def logout(user: CurrentUser) -> dict[str, str]:
     # Stateless logout - just acknowledge the request
     # The client is responsible for discarding the token
     return {"message": "Successfully logged out"}
+
+
+class DeleteAccountResponse(BaseModel):
+    """Response after deleting account."""
+
+    message: str
+    deleted_user_id: str
+
+
+@router.delete("/me", response_model=DeleteAccountResponse)
+async def delete_account(
+    user: CurrentUser,
+    auth_service: AuthServiceDep,
+) -> DeleteAccountResponse:
+    """Delete the current user's account and all associated data.
+
+    This permanently deletes:
+    - The user account
+    - All saved songs (user_songs)
+    - All saved artists (user_artists)
+    - Quiz responses
+
+    This action cannot be undone.
+
+    Primarily used for:
+    - GDPR data deletion requests
+    - Test cleanup (E2E tests create guest accounts that should be cleaned up)
+    """
+    deleted = await auth_service.delete_user(user.id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    return DeleteAccountResponse(
+        message="Account and all associated data deleted successfully",
+        deleted_user_id=user.id,
+    )
