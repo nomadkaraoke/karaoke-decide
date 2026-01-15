@@ -15,8 +15,8 @@ class BackendSettings(Settings):
     # Catalog sync
     catalog_sync_interval_hours: int = 24
 
-    # Magic link
-    magic_link_expiration_minutes: int = 15
+    # Magic link (24 hours to allow time for email delivery and user action)
+    magic_link_expiration_minutes: int = 1440
 
 
 @lru_cache

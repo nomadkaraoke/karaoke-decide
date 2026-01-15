@@ -28,9 +28,9 @@ class TestBackendSettings:
         assert settings.catalog_sync_interval_hours == 24
 
     def test_default_magic_link_expiration(self) -> None:
-        """Test default magic link expiration."""
+        """Test default magic link expiration (24 hours)."""
         settings = BackendSettings()
-        assert settings.magic_link_expiration_minutes == 15
+        assert settings.magic_link_expiration_minutes == 1440
 
     def test_custom_rate_limit(self) -> None:
         """Test custom rate limit from environment."""
