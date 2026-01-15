@@ -12,10 +12,15 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2026-01-14)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + MBID-First + MLHD+ Import ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE** + MLHD+ Import ✅
 
 ### ✅ What's Working
-- **MBID-First Architecture (NEW 2026-01-14):** Last.fm users now imported with MusicBrainz IDs as primary identifier. Collaborative filtering queries both organic users AND 10K+ Last.fm users in parallel.
+- **MBID-First Architecture COMPLETE (2026-01-14):**
+  - **BigQuery MusicBrainz tables:** 2.78M artists, 693K tags, 376K Spotify mappings
+  - **MBID search APIs:** `search_artists_mbid()`, `get_artist_by_mbid()`, `lookup_mbids_by_names()`
+  - **Quiz stores MBIDs:** `quiz_artist_mbids` array in user documents
+  - **Collaborative filtering:** Queries by MBID when available, falls back to name matching
+  - **User migration complete:** 16/16 users backfilled with MBIDs (100%)
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
 - **Light/Dark Theme:** Full theme toggle support - system preference detection + manual toggle in header
 - **Homepage Overhaul:** Problem-focused hero, two user paths (quiz vs data sources), Generator integration section
@@ -40,7 +45,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **1.5M MLHD+ artist similarity pairs**
+- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 693K tags + 1.5M MLHD+ artist similarity pairs**
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
@@ -196,6 +201,7 @@ cd frontend && npm run dev
 
 | Date | Summary | Archive |
 |------|---------|---------|
+| 2026-01-14 | **MBID-First Complete Migration** (2.78M artists, 693K tags, user migration, MBID search APIs) | [archive/2026-01-14-mbid-complete-migration.md](archive/2026-01-14-mbid-complete-migration.md) |
 | 2026-01-14 | **MLHD+ Import** (1.5M artist similarity pairs from 583K Last.fm users, BigQuery integration) | [archive/2026-01-13-mlhd-import.md](archive/2026-01-13-mlhd-import.md) |
 | 2026-01-10 | Quiz Rework (5-step flow, 22 genres, multi-decade, vocal comfort/crowd pleaser prefs, smart artists) | [archive/2026-01-10-quiz-rework.md](archive/2026-01-10-quiz-rework.md) |
 | 2026-01-08 | Brand Sync & Theme Toggle (Generator branding, light/dark mode, homepage overhaul) | [archive/2026-01-08-brand-sync-theme-toggle.md](archive/2026-01-08-brand-sync-theme-toggle.md) |

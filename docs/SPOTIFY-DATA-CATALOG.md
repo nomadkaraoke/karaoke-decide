@@ -1,19 +1,35 @@
-# Spotify Data Catalog
+# Music Data Catalog
 
-This document describes all Spotify data available in BigQuery for use in features and recommendations.
+This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-01-09 (ETL complete)
+> **Last Updated:** 2026-01-14 (MusicBrainz ETL complete)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
 ## Data Sources
 
-All data comes from the [Anna's Archive Spotify July 2025 dataset](https://annas-archive.org/datasets/spotify_2025_07):
+1. **MusicBrainz Database Dumps** (Primary - refreshable):
+   - Full artist catalog from MusicBrainz (~2.78M artists)
+   - Community-curated tags/genres (~693K)
+   - MBID↔Spotify ID mappings (~376K)
 
-1. **Metadata Torrent** (~200GB): Track, album, artist metadata + audio features
-2. **Audio Analysis Torrent** (~3.88TB): Detailed audio analysis with sections, beats, bars, etc.
+2. **Spotify July 2025 Dataset** (Enrichment - static snapshot):
+   - From [Anna's Archive Spotify dataset](https://annas-archive.org/datasets/spotify_2025_07)
+   - **Metadata Torrent** (~200GB): Track, album, artist metadata + audio features
+   - **Audio Analysis Torrent** (~3.88TB): Detailed audio analysis with sections, beats, bars, etc.
 
 ## Table Summary
+
+### MusicBrainz Tables (Primary)
+
+| Table | Row Count | Description |
+|-------|-----------|-------------|
+| `mb_artists` | 2,780,016 | Full MusicBrainz artist catalog |
+| `mb_artist_tags` | 693,045 | Community-sourced tags/genres |
+| `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
+| `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
+
+### Spotify Tables (Enrichment)
 
 | Table | Row Count | Description |
 |-------|-----------|-------------|
@@ -28,7 +44,93 @@ All data comes from the [Anna's Archive Spotify July 2025 dataset](https://annas
 
 ---
 
-## Metadata Tables
+## MusicBrainz Tables
+
+### mb_artists
+
+Primary artist catalog from MusicBrainz database dumps.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `artist_mbid` | STRING | MusicBrainz UUID (primary key) |
+| `name` | STRING | Artist name |
+| `sort_name` | STRING | Name for alphabetical sorting |
+| `disambiguation` | STRING | Disambiguator (e.g., "UK rock band") |
+| `artist_type` | STRING | "Person", "Group", "Orchestra", etc. |
+| `begin_year` | INT64 | Year artist/band started |
+| `end_year` | INT64 | Year artist/band ended (if applicable) |
+| `area_name` | STRING | Country or region |
+| `gender` | STRING | For solo artists |
+| `name_normalized` | STRING | Lowercase normalized for search |
+
+**Example Query - Search artists:**
+```sql
+SELECT artist_mbid, name, disambiguation, artist_type
+FROM `nomadkaraoke.karaoke_decide.mb_artists`
+WHERE name_normalized LIKE 'radiohead%'
+LIMIT 10
+```
+
+### mb_artist_tags
+
+Community-sourced tags (genres, styles, descriptors).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `artist_mbid` | STRING | MusicBrainz UUID |
+| `tag_name` | STRING | Tag name (e.g., "alternative rock") |
+| `vote_count` | INT64 | Community vote count |
+
+**Example Query - Get top tags for an artist:**
+```sql
+SELECT tag_name, vote_count
+FROM `nomadkaraoke.karaoke_decide.mb_artist_tags`
+WHERE artist_mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711'  -- Radiohead
+ORDER BY vote_count DESC
+LIMIT 5
+```
+
+### mbid_spotify_mapping
+
+Maps MusicBrainz IDs to Spotify artist IDs.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `artist_mbid` | STRING | MusicBrainz UUID |
+| `spotify_artist_id` | STRING | Spotify artist ID |
+| `artist_name` | STRING | Artist name (for reference) |
+
+### mb_artists_normalized
+
+Pre-joined view for efficient artist search with Spotify enrichment.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `artist_mbid` | STRING | MusicBrainz UUID |
+| `artist_name` | STRING | Artist name |
+| `name_normalized` | STRING | Lowercase normalized |
+| `disambiguation` | STRING | Disambiguator |
+| `artist_type` | STRING | Type of artist |
+| `begin_year` | INT64 | Start year |
+| `area_name` | STRING | Country/region |
+| `spotify_artist_id` | STRING | Spotify ID (nullable) |
+| `popularity` | INT64 | Spotify popularity (default 50) |
+| `spotify_genres` | ARRAY<STRING> | Spotify genres |
+| `mb_tags` | ARRAY<STRING> | Top 5 MusicBrainz tags |
+
+**Example Query - Search with enrichment:**
+```sql
+SELECT artist_mbid, artist_name, popularity, mb_tags, spotify_genres
+FROM `nomadkaraoke.karaoke_decide.mb_artists_normalized`
+WHERE name_normalized LIKE 'green%'
+  AND popularity >= 60
+ORDER BY popularity DESC
+LIMIT 10
+```
+
+---
+
+## Spotify Metadata Tables
 
 ### spotify_tracks
 

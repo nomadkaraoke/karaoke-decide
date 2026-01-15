@@ -16,6 +16,7 @@ from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from backend.services.listenbrainz_service import ListenBrainzService
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
+from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 
 @dataclass
@@ -93,6 +94,7 @@ class QuizService:
         self.firestore = firestore
         self._bigquery_client = bigquery_client
         self._listenbrainz = listenbrainz
+        self._catalog_service: BigQueryCatalogService | None = None
 
     @property
     def bigquery(self) -> bigquery.Client:
@@ -107,6 +109,13 @@ class QuizService:
         if self._listenbrainz is None:
             self._listenbrainz = ListenBrainzService(self.settings, self.firestore)
         return self._listenbrainz
+
+    @property
+    def catalog(self) -> BigQueryCatalogService:
+        """Get or create BigQuery catalog service for MBID lookups."""
+        if self._catalog_service is None:
+            self._catalog_service = BigQueryCatalogService(self.bigquery)
+        return self._catalog_service
 
     async def get_quiz_songs(self, count: int = DEFAULT_QUIZ_SIZE) -> list[QuizSong]:
         """Get quiz songs for onboarding.
@@ -230,9 +239,19 @@ class QuizService:
         # This finds artists liked by users with similar taste
         collaborative_suggestions: dict[str, list[str]] = {}
         if all_seed_artists and len(all_seed_artists) >= self.MIN_SHARED_ARTISTS:
+            # MBID-First: Look up MBIDs for seed artists to enable more accurate matching
+            seed_artist_mbids: list[str] = []
+            try:
+                mbid_map = self.catalog.lookup_mbids_by_names(all_seed_artists)
+                seed_artist_mbids = [mbid_map.get(a.lower().strip(), "") for a in all_seed_artists]
+                seed_artist_mbids = [m for m in seed_artist_mbids if m]  # Filter empty
+            except Exception:
+                pass  # Fall back to name-based matching
+
             collaborative_suggestions = await self._get_collaborative_suggestions(
                 user_selected_artists=all_seed_artists,
                 exclude_artists=set(all_exclusions) if all_exclusions else set(),
+                user_artist_mbids=seed_artist_mbids if seed_artist_mbids else None,
             )
 
         # Fetch candidates with combined filters
@@ -586,17 +605,20 @@ class QuizService:
         self,
         user_selected_artists: list[str],
         exclude_artists: set[str],
+        user_artist_mbids: list[str] | None = None,
     ) -> dict[str, list[str]]:
         """Find artists liked by users with similar taste.
 
         MBID-First Architecture: Queries two data sources in parallel:
         1. Organic users (decide_users) - by artist name (quiz_artists_known)
-        2. Last.fm users (lastfm_users) - by artist name (artist_names_lower)
-           Future: Will query by MBID when mapping table is available
+        2. Last.fm users (lastfm_users) - by MBID if available, else artist name
+           Uses artist_mbids array for efficient MBID-based matching.
 
         Args:
             user_selected_artists: Artists the current user has selected.
             exclude_artists: Artists to exclude from suggestions.
+            user_artist_mbids: Optional list of MBIDs for the user's selected artists.
+                              Enables more accurate matching with Last.fm users.
 
         Returns:
             Dict mapping artist_name -> list of shared artists that connect them.
@@ -609,8 +631,14 @@ class QuizService:
         user_artists_lower = {a.lower() for a in user_selected_artists}
         exclude_lower = {a.lower() for a in exclude_artists}
 
+        # Filter to valid MBIDs (non-empty)
+        valid_mbids = [m for m in (user_artist_mbids or []) if m]
+
         # Query both user collections in parallel
-        organic_users, lastfm_users = await self._query_collaborative_sources(user_artists_lower)
+        organic_users, lastfm_users = await self._query_collaborative_sources(
+            user_artists_lower,
+            user_artist_mbids=valid_mbids if valid_mbids else None,
+        )
 
         # Find similar users and collect their artists
         # Structure: artist_name_lower -> list of (shared_artists, user_artists, source)
@@ -767,15 +795,21 @@ class QuizService:
     async def _query_collaborative_sources(
         self,
         user_artists_lower: set[str],
+        user_artist_mbids: list[str] | None = None,
     ) -> tuple[list[dict], list[dict]]:
         """Query both organic and Last.fm users for collaborative filtering.
 
+        MBID-First: When MBIDs are available, uses them for more accurate
+        Last.fm user matching. Falls back to name-based matching otherwise.
+
         Queries in parallel for efficiency:
         1. Organic users: Full scan of decide_users (small collection)
-        2. Last.fm users: Uses array_contains_any on artist_names_lower
+        2. Last.fm users: Uses array_contains_any on artist_mbids (preferred)
+           or artist_names_lower (fallback)
 
         Args:
             user_artists_lower: Set of lowercased artist names for matching.
+            user_artist_mbids: Optional list of MBIDs for MBID-based matching.
 
         Returns:
             Tuple of (organic_users, lastfm_users) document lists.
@@ -794,26 +828,42 @@ class QuizService:
                 return []
 
         async def query_lastfm() -> list[dict]:
-            """Query Last.fm users using array_contains_any.
+            """Query Last.fm users.
+
+            MBID-First: Prefers MBID-based matching for accuracy.
+            Falls back to name-based matching if no MBIDs available.
 
             Note: array_contains_any has a 30-value limit, so we use
             a subset of the user's artists for the initial filter.
             """
             try:
-                # Take up to 30 artists for array_contains_any query
-                query_artists = list(user_artists_lower)[:30]
-                if not query_artists:
-                    return []
+                # MBID-First: Use MBIDs if available for accurate matching
+                if user_artist_mbids and len(user_artist_mbids) > 0:
+                    # Take up to 30 MBIDs for array_contains_any query
+                    query_mbids = user_artist_mbids[:30]
 
-                # Use array_contains_any for efficient filtering
-                # This finds users who like AT LEAST ONE of the query artists
-                return await self.firestore.query_documents(
-                    self.LASTFM_USERS_COLLECTION,
-                    filters=[
-                        ("artist_names_lower", "array_contains_any", query_artists),
-                    ],
-                    limit=1000,
-                )
+                    # Query by MBID for precise matching
+                    return await self.firestore.query_documents(
+                        self.LASTFM_USERS_COLLECTION,
+                        filters=[
+                            ("artist_mbids", "array_contains_any", query_mbids),
+                        ],
+                        limit=1000,
+                    )
+                else:
+                    # Fallback: Name-based matching
+                    query_artists = list(user_artists_lower)[:30]
+                    if not query_artists:
+                        return []
+
+                    # Use array_contains_any on names for backwards compatibility
+                    return await self.firestore.query_documents(
+                        self.LASTFM_USERS_COLLECTION,
+                        filters=[
+                            ("artist_names_lower", "array_contains_any", query_artists),
+                        ],
+                        limit=1000,
+                    )
             except Exception:
                 return []
 
@@ -1453,6 +1503,9 @@ class QuizService:
     ) -> None:
         """Update user profile with quiz data.
 
+        MBID-First: Also resolves and stores MusicBrainz IDs for artists
+        to enable MBID-based collaborative filtering.
+
         Args:
             user_id: User's ID.
             known_song_ids: Song IDs from quiz.
@@ -1487,6 +1540,35 @@ class QuizService:
             else:
                 doc_id = user_id
 
+        # MBID-First: Resolve artist names to MBIDs
+        artist_mbids: list[str] = []
+        if known_artists:
+            mbid_map = self.catalog.lookup_mbids_by_names(known_artists)
+            # Collect MBIDs in order, using empty string for unresolved
+            for artist in known_artists:
+                normalized = artist.lower().strip()
+                # Try to find MBID in mapping (keys are normalized)
+                mbid = mbid_map.get(normalized, "")
+                if mbid:
+                    artist_mbids.append(mbid)
+
+        # MBID-First: Resolve Spotify IDs to MBIDs for manual artists
+        manual_artists_with_mbid: list[dict[str, Any]] = []
+        if manual_artists:
+            for a in manual_artists:
+                mbid = self.catalog.lookup_mbid_by_spotify_id(a.artist_id)
+                manual_artists_with_mbid.append(
+                    {
+                        "artist_id": a.artist_id,  # Spotify ID (backward compat)
+                        "artist_name": a.artist_name,
+                        "genres": a.genres or [],
+                        "mbid": mbid,  # MBID-First: Add MusicBrainz ID
+                    }
+                )
+                # Also add to mbids list if resolved
+                if mbid:
+                    artist_mbids.append(mbid)
+
         # Update quiz fields
         update_data: dict[str, Any] = {
             "quiz_completed_at": completed_at.isoformat(),
@@ -1494,6 +1576,12 @@ class QuizService:
             "quiz_artists_known": known_artists,
             "updated_at": completed_at.isoformat(),
         }
+
+        # MBID-First: Store resolved MBIDs for efficient collaborative filtering
+        if artist_mbids:
+            # Remove duplicates while preserving order
+            unique_mbids = list(dict.fromkeys(artist_mbids))
+            update_data["quiz_artist_mbids"] = unique_mbids
 
         # Legacy single decade
         if decade_preference is not None:
@@ -1516,8 +1604,10 @@ class QuizService:
         if crowd_pleaser_pref is not None:
             update_data["quiz_crowd_pleaser_pref"] = crowd_pleaser_pref
 
-        if manual_artists:
-            # Store as list of dicts with artist_id as primary key
+        if manual_artists_with_mbid:
+            update_data["quiz_manual_artists"] = manual_artists_with_mbid
+        elif manual_artists:
+            # Fallback if MBID lookup failed completely
             update_data["quiz_manual_artists"] = [
                 {
                     "artist_id": a.artist_id,
