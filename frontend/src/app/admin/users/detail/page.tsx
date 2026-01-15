@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { LoadingSpinner, Badge } from "@/components/ui";
 import {
@@ -13,6 +13,7 @@ import {
   ShieldIcon,
   CheckIcon,
   XIcon,
+  TrashIcon,
 } from "@/components/icons";
 
 interface UserDetail {
@@ -49,11 +50,30 @@ interface UserDetail {
 
 export default function UserDetailPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const userId = searchParams.get("id");
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!userId || !user) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await api.admin.deleteUser(userId);
+      router.push("/admin/users");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete user");
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const loadUser = async () => {
@@ -129,14 +149,77 @@ export default function UserDetailPage() {
           </h2>
           <p className="text-[var(--text-muted)] mt-1">{user.email || user.id}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {user.is_guest ? (
             <Badge variant="warning">Guest</Badge>
           ) : (
             <Badge variant="success">Verified</Badge>
           )}
+          {!user.is_admin && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+            >
+              <TrashIcon className="w-4 h-4" />
+              Delete
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
+              Delete User?
+            </h3>
+            <p className="text-[var(--text-muted)] mb-4">
+              This will permanently delete <strong>{user.email || user.id}</strong> and all their data including:
+            </p>
+            <ul className="text-sm text-[var(--text-muted)] mb-4 list-disc list-inside space-y-1">
+              <li>{user.data_summary.songs_count} songs</li>
+              <li>{user.data_summary.artists_count} artists</li>
+              <li>{user.data_summary.playlists_count} playlists</li>
+              <li>All connected services and sync jobs</li>
+            </ul>
+            <p className="text-red-400 text-sm mb-4">
+              This action cannot be undone.
+            </p>
+            {deleteError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {deleteError}
+              </div>
+            )}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--card-border)] transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="w-4 h-4" />
+                    Delete User
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* User info grid */}
       <div className="grid md:grid-cols-2 gap-6">

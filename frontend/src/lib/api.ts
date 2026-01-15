@@ -1072,5 +1072,12 @@ export const api = {
           error: string | null;
         }>;
       }>(`/api/admin/sync-jobs/${jobId}`),
+
+    deleteUser: (userId: string) =>
+      api.delete<{
+        message: string;
+        deleted_user_id: string;
+        deleted_user_email: string | null;
+      }>(`/api/admin/users/${userId}`),
   },
 };
