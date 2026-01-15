@@ -6,6 +6,8 @@ from karaoke_decide.services.bigquery_catalog import (
     ArtistMetadata,
     ArtistSearchResult,
     BigQueryCatalogService,
+    KaraokeRecordingLink,
+    RecordingSearchResult,
     SongResult,
 )
 
@@ -570,5 +572,335 @@ class TestMBIDLookups:
 
         service = BigQueryCatalogService()
         result = service.lookup_mbids_by_spotify_ids(["spotify123"])
+
+        assert result == {}
+
+
+class TestRecordingDataclasses:
+    """Tests for Recording dataclasses."""
+
+    def test_recording_search_result(self) -> None:
+        """Test RecordingSearchResult dataclass."""
+        result = RecordingSearchResult(
+            recording_mbid="a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            title="Bohemian Rhapsody",
+            artist_credit="Queen",
+            length_ms=354000,
+            disambiguation="studio version",
+            spotify_track_id="7tFiyTwD0nx5a1eklYtX2J",
+            spotify_popularity=85,
+        )
+        assert result.recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert result.title == "Bohemian Rhapsody"
+        assert result.artist_credit == "Queen"
+        assert result.length_ms == 354000
+        assert result.disambiguation == "studio version"
+        assert result.spotify_track_id == "7tFiyTwD0nx5a1eklYtX2J"
+        assert result.spotify_popularity == 85
+
+    def test_recording_search_result_null_enrichment(self) -> None:
+        """Test RecordingSearchResult with null Spotify enrichment."""
+        result = RecordingSearchResult(
+            recording_mbid="a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            title="Obscure Song",
+            artist_credit="Unknown Artist",
+            length_ms=None,
+            disambiguation=None,
+            spotify_track_id=None,
+            spotify_popularity=None,
+        )
+        assert result.spotify_track_id is None
+        assert result.spotify_popularity is None
+        assert result.length_ms is None
+
+    def test_karaoke_recording_link(self) -> None:
+        """Test KaraokeRecordingLink dataclass."""
+        link = KaraokeRecordingLink(
+            karaoke_id=12345,
+            recording_mbid="a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            spotify_track_id="7tFiyTwD0nx5a1eklYtX2J",
+            match_method="isrc",
+            match_confidence=0.95,
+        )
+        assert link.karaoke_id == 12345
+        assert link.recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert link.spotify_track_id == "7tFiyTwD0nx5a1eklYtX2J"
+        assert link.match_method == "isrc"
+        assert link.match_confidence == 0.95
+
+    def test_karaoke_recording_link_name_match(self) -> None:
+        """Test KaraokeRecordingLink with name match."""
+        link = KaraokeRecordingLink(
+            karaoke_id=12345,
+            recording_mbid="a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            spotify_track_id=None,
+            match_method="exact_name",
+            match_confidence=0.80,
+        )
+        assert link.spotify_track_id is None
+        assert link.match_method == "exact_name"
+
+
+class TestRecordingLookups:
+    """Tests for recording lookup methods."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_found(self, mock_client_class: MagicMock) -> None:
+        """Test searching recordings by title."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.recording_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.title = "Bohemian Rhapsody"
+        mock_row.artist_credit = "Queen"
+        mock_row.length_ms = 354000
+        mock_row.disambiguation = None
+        mock_row.spotify_track_id = "7tFiyTwD0nx5a1eklYtX2J"
+        mock_row.spotify_popularity = 85
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        results = service.search_recordings("bohemian")
+
+        assert len(results) == 1
+        assert isinstance(results[0], RecordingSearchResult)
+        assert results[0].title == "Bohemian Rhapsody"
+        assert results[0].recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_short_query(self, mock_client_class: MagicMock) -> None:
+        """Test recording search with too short query."""
+        service = BigQueryCatalogService()
+
+        results = service.search_recordings("b")
+        assert results == []
+
+        results = service.search_recordings("")
+        assert results == []
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        # Use unique query to avoid cache hit from previous tests
+        results = service.search_recordings("exception_test_query_xyz")
+
+        assert results == []
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_recording_by_mbid_found(self, mock_client_class: MagicMock) -> None:
+        """Test getting recording by MBID when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.recording_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.title = "Bohemian Rhapsody"
+        mock_row.artist_credit = "Queen"
+        mock_row.length_ms = 354000
+        mock_row.disambiguation = "studio version"
+        mock_row.spotify_track_id = "7tFiyTwD0nx5a1eklYtX2J"
+        mock_row.spotify_popularity = 85
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.get_recording_by_mbid("a74b1b7f-71a5-4011-9441-d0b5e4122711")
+
+        assert result is not None
+        assert result.recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert result.title == "Bohemian Rhapsody"
+        assert result.disambiguation == "studio version"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_recording_by_mbid_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test getting recording by MBID when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.get_recording_by_mbid("unknown-mbid")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_recording_by_mbid_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.get_recording_by_mbid("test-mbid")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_by_isrc_found(self, mock_client_class: MagicMock) -> None:
+        """Test ISRC lookup when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.isrc = "GBUM71029604"
+        mock_row.recording_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.title = "Bohemian Rhapsody"
+        mock_row.artist_credit = "Queen"
+        mock_row.length_ms = 354000
+        mock_row.disambiguation = None
+        mock_row.spotify_track_id = "7tFiyTwD0nx5a1eklYtX2J"
+        mock_row.spotify_popularity = 85
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_by_isrc("GBUM71029604")
+
+        assert result is not None
+        assert result.recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert result.title == "Bohemian Rhapsody"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_by_isrc_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test ISRC lookup when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_by_isrc("UNKNOWN12345")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recordings_by_isrcs_empty(self, mock_client_class: MagicMock) -> None:
+        """Test batch ISRC lookup with empty input."""
+        service = BigQueryCatalogService()
+        result = service.lookup_recordings_by_isrcs([])
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recordings_by_isrcs_batch(self, mock_client_class: MagicMock) -> None:
+        """Test batch ISRC lookup."""
+        mock_client = mock_client_class.return_value
+        mock_row1 = MagicMock()
+        mock_row1.isrc = "GBUM71029604"
+        mock_row1.recording_mbid = "mbid1"
+        mock_row1.title = "Song 1"
+        mock_row1.artist_credit = "Artist 1"
+        mock_row1.length_ms = 200000
+        mock_row1.disambiguation = None
+        mock_row1.spotify_track_id = "spotify1"
+        mock_row1.spotify_popularity = 80
+
+        mock_row2 = MagicMock()
+        mock_row2.isrc = "USRC17607839"
+        mock_row2.recording_mbid = "mbid2"
+        mock_row2.title = "Song 2"
+        mock_row2.artist_credit = "Artist 2"
+        mock_row2.length_ms = 300000
+        mock_row2.disambiguation = None
+        mock_row2.spotify_track_id = "spotify2"
+        mock_row2.spotify_popularity = 70
+
+        mock_client.query.return_value.result.return_value = [mock_row1, mock_row2]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recordings_by_isrcs(["GBUM71029604", "USRC17607839"])
+
+        assert len(result) == 2
+        assert "GBUM71029604" in result
+        assert "USRC17607839" in result
+        assert result["GBUM71029604"].title == "Song 1"
+        assert result["USRC17607839"].title == "Song 2"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recordings_by_isrcs_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recordings_by_isrcs(["GBUM71029604"])
+
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_mbid_by_spotify_track_id_found(self, mock_client_class: MagicMock) -> None:
+        """Test Spotify track ID to MBID lookup when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.spotify_track_id = "7tFiyTwD0nx5a1eklYtX2J"
+        mock_row.recording_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_mbid_by_spotify_track_id("7tFiyTwD0nx5a1eklYtX2J")
+
+        assert result == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_mbid_by_spotify_track_id_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test Spotify track ID to MBID lookup when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_mbid_by_spotify_track_id("unknown")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_mbids_by_spotify_track_ids_empty(self, mock_client_class: MagicMock) -> None:
+        """Test batch Spotify to MBID lookup with empty input."""
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_mbids_by_spotify_track_ids([])
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_recording_mbids_by_spotify_track_ids_batch(self, mock_client_class: MagicMock) -> None:
+        """Test batch Spotify to MBID lookup."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.spotify_track_id = "spotify123"
+        mock_row.recording_mbid = "mbid456"
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_recording_mbids_by_spotify_track_ids(["spotify123"])
+
+        assert result == {"spotify123": "mbid456"}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_karaoke_recording_links_empty(self, mock_client_class: MagicMock) -> None:
+        """Test karaoke links lookup with empty input."""
+        service = BigQueryCatalogService()
+        result = service.get_karaoke_recording_links([])
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_karaoke_recording_links_found(self, mock_client_class: MagicMock) -> None:
+        """Test karaoke links lookup when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.karaoke_id = 12345
+        mock_row.recording_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.spotify_track_id = "7tFiyTwD0nx5a1eklYtX2J"
+        mock_row.match_method = "isrc"
+        mock_row.match_confidence = 0.95
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.get_karaoke_recording_links([12345])
+
+        assert len(result) == 1
+        assert 12345 in result
+        assert isinstance(result[12345], KaraokeRecordingLink)
+        assert result[12345].recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert result[12345].match_method == "isrc"
+        assert result[12345].match_confidence == 0.95
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_karaoke_recording_links_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.get_karaoke_recording_links([12345])
 
         assert result == {}

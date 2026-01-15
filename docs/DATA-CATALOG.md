@@ -2,7 +2,7 @@
 
 This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-01-14 (MusicBrainz ETL complete)
+> **Last Updated:** 2026-01-15 (MusicBrainz recordings + karaoke linking complete)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
@@ -10,13 +10,26 @@ This document describes all music data available in BigQuery for use in features
 
 1. **MusicBrainz Database Dumps** (Primary - refreshable):
    - Full artist catalog from MusicBrainz (~2.78M artists)
+   - Recording catalog (~37.5M recordings)
    - Community-curated tags/genres (~693K)
    - MBID↔Spotify ID mappings (~376K)
+   - ⚠️ **TODO:** Automate monthly refresh via Cloud Scheduler + ETL pipeline
 
 2. **Spotify July 2025 Dataset** (Enrichment - static snapshot):
    - From [Anna's Archive Spotify dataset](https://annas-archive.org/datasets/spotify_2025_07)
    - **Metadata Torrent** (~200GB): Track, album, artist metadata + audio features
    - **Audio Analysis Torrent** (~3.88TB): Detailed audio analysis with sections, beats, bars, etc.
+
+3. **MLHD+ Artist Similarity** (Recommendations):
+   - Derived from Music Listening Histories Dataset (583K Last.fm users)
+   - 1.5M artist similarity pairs based on co-occurrence in listening histories
+   - Used for "Listeners of X also like Y" recommendations
+
+4. **Karaoke Catalog** (Core feature data):
+   - 275K karaoke songs from KaraokeNerds
+   - Links to MusicBrainz recordings (58.9% coverage)
+   - Source: Daily API export from karaokenerds.com (with permission)
+   - ⚠️ **TODO:** Currently a one-off dump - need to automate daily fetch and ETL
 
 ## Table Summary
 
@@ -25,9 +38,13 @@ This document describes all music data available in BigQuery for use in features
 | Table | Row Count | Description |
 |-------|-----------|-------------|
 | `mb_artists` | 2,780,016 | Full MusicBrainz artist catalog |
+| `mb_recordings` | 37,530,321 | MusicBrainz recording catalog |
 | `mb_artist_tags` | 693,045 | Community-sourced tags/genres |
+| `mb_recording_isrc` | 5,480,292 | ISRC codes for recordings |
 | `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
 | `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
+| `karaoke_recording_links` | 162,314 | Karaoke songs → MB recordings |
+| `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
 
 ### Spotify Tables (Enrichment)
 
@@ -41,6 +58,18 @@ This document describes all music data available in BigQuery for use in features
 | `spotify_audio_analysis_tracks` | **33.5M** | Track-level audio analysis summary |
 | `spotify_artists` | 15M | Artist metadata |
 | `spotify_artist_genres` | 2.2M | Artist-to-genre mapping (768 unique genres) |
+
+### MLHD+ Tables (Recommendations)
+
+| Table | Row Count | Description |
+|-------|-----------|-------------|
+| `mlhd_artist_similarity` | 1,505,697 | Artist pairs with similarity scores |
+
+### Karaoke Catalog
+
+| Table | Row Count | Description |
+|-------|-----------|-------------|
+| `karaokenerds_raw` | 275,809 | Full karaoke song catalog |
 
 ---
 
@@ -126,6 +155,91 @@ WHERE name_normalized LIKE 'green%'
   AND popularity >= 60
 ORDER BY popularity DESC
 LIMIT 10
+```
+
+### mb_recordings
+
+MusicBrainz recording catalog (songs/tracks).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `recording_mbid` | STRING | MusicBrainz UUID (primary key) |
+| `title` | STRING | Recording title |
+| `length_ms` | INT64 | Duration in milliseconds |
+| `artist_credit` | STRING | Display string (e.g., "Artist feat. Other") |
+| `artist_credit_id` | INT64 | FK for future use |
+| `disambiguation` | STRING | Disambiguator (e.g., "live version") |
+| `video` | BOOLEAN | Whether this is a video recording |
+| `name_normalized` | STRING | Lowercase normalized for search |
+
+**Example Query - Search recordings:**
+```sql
+SELECT recording_mbid, title, artist_credit
+FROM `nomadkaraoke.karaoke_decide.mb_recordings`
+WHERE name_normalized LIKE 'bohemian%'
+LIMIT 10
+```
+
+### mb_recording_isrc
+
+ISRC codes for MusicBrainz recordings (for cross-referencing with Spotify).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `isrc` | STRING | ISRC code (12 characters) |
+
+**Example Query - Find recording by ISRC:**
+```sql
+SELECT ri.recording_mbid, r.title, r.artist_credit
+FROM `nomadkaraoke.karaoke_decide.mb_recording_isrc` ri
+JOIN `nomadkaraoke.karaoke_decide.mb_recordings` r
+  ON ri.recording_mbid = r.recording_mbid
+WHERE ri.isrc = 'GBAYE0601498'  -- Bohemian Rhapsody
+```
+
+### karaoke_recording_links
+
+Links karaoke catalog songs to MusicBrainz recordings.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `karaoke_id` | INT64 | FK to karaokenerds_raw.Id |
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `spotify_track_id` | STRING | Spotify track ID (if matched via ISRC) |
+| `match_method` | STRING | "isrc" or "exact_name" |
+| `match_confidence` | FLOAT64 | 0.95 for ISRC, 0.80 for name match |
+
+**Coverage:** 162,314 / 275,809 karaoke songs (58.9%)
+
+**Example Query - Get linked recordings for karaoke songs:**
+```sql
+SELECT k.Artist, k.Title, krl.recording_mbid, krl.match_method
+FROM `nomadkaraoke.karaoke_decide.karaokenerds_raw` k
+JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
+  ON k.Id = krl.karaoke_id
+WHERE k.Artist = 'Queen'
+```
+
+### isrc_spotify_mapping (View)
+
+Cross-reference view joining MB recordings to Spotify tracks via ISRC.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `isrc` | STRING | Shared ISRC code |
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `spotify_track_id` | STRING | Spotify track ID |
+| `spotify_title` | STRING | Spotify track title |
+| `spotify_artist` | STRING | Spotify artist name |
+| `mb_title` | STRING | MusicBrainz recording title |
+| `mb_artist` | STRING | MusicBrainz artist credit |
+
+**Example Query - Find Spotify track for MB recording:**
+```sql
+SELECT *
+FROM `nomadkaraoke.karaoke_decide.isrc_spotify_mapping`
+WHERE recording_mbid = 'some-uuid'
 ```
 
 ---
@@ -461,6 +575,79 @@ WHERE af.key = 0  -- C
   AND t.popularity > 60
 ORDER BY t.popularity DESC
 LIMIT 20
+```
+
+---
+
+## MLHD+ Similarity Data
+
+### mlhd_artist_similarity
+
+Artist similarity pairs derived from Music Listening Histories Dataset (583K Last.fm users). Based on co-occurrence: artists that appear together in listening histories are considered similar.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `artist_mbid_0` | STRING | First artist MusicBrainz UUID |
+| `artist_mbid_1` | STRING | Second artist MusicBrainz UUID |
+| `similarity_score` | FLOAT64 | Similarity score (higher = more similar) |
+
+**Stats:** 1,505,697 artist pairs
+
+**Example Query - Find similar artists:**
+```sql
+SELECT
+    s.artist_mbid_1 as similar_artist_mbid,
+    a.name as similar_artist_name,
+    s.similarity_score
+FROM `nomadkaraoke.karaoke_decide.mlhd_artist_similarity` s
+JOIN `nomadkaraoke.karaoke_decide.mb_artists` a
+    ON s.artist_mbid_1 = a.artist_mbid
+WHERE s.artist_mbid_0 = '084308bd-1654-436f-ba03-df6697104e19'  -- Green Day
+ORDER BY s.similarity_score DESC
+LIMIT 10
+```
+
+---
+
+## Karaoke Catalog
+
+### karaokenerds_raw
+
+Full karaoke song catalog from KaraokeNerds.com (fetched via API with permission).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Id` | INT64 | Unique song ID |
+| `Artist` | STRING | Artist name |
+| `Title` | STRING | Song title |
+| `Brand` | STRING | Karaoke brand (Sunfly, Zoom, etc.) |
+| `DiscId` | STRING | Disc identifier |
+| `TrackNo` | INT64 | Track number on disc |
+
+**Stats:** 275,809 songs
+
+**Example Query - Search karaoke songs:**
+```sql
+SELECT Id, Artist, Title, Brand
+FROM `nomadkaraoke.karaoke_decide.karaokenerds_raw`
+WHERE LOWER(Artist) LIKE '%queen%'
+ORDER BY Title
+LIMIT 20
+```
+
+**Example Query - Get karaoke songs with MB recording links:**
+```sql
+SELECT
+    k.Artist,
+    k.Title,
+    k.Brand,
+    krl.recording_mbid,
+    krl.match_confidence
+FROM `nomadkaraoke.karaoke_decide.karaokenerds_raw` k
+LEFT JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
+    ON k.Id = krl.karaoke_id
+WHERE LOWER(k.Artist) = 'queen'
+ORDER BY k.Title
 ```
 
 ---

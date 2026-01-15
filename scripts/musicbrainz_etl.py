@@ -14,12 +14,17 @@ Usage:
     # Full pipeline (download, extract, transform, load)
     python scripts/musicbrainz_etl.py all
 
-    # Individual steps
+    # Individual steps - Artists
     python scripts/musicbrainz_etl.py download
     python scripts/musicbrainz_etl.py extract
     python scripts/musicbrainz_etl.py load-mapping  # Load existing MBID-Spotify mapping
     python scripts/musicbrainz_etl.py load-artists
     python scripts/musicbrainz_etl.py load-tags
+
+    # Individual steps - Recordings (Phase 7)
+    python scripts/musicbrainz_etl.py extract-recordings  # Extract recordings + ISRCs
+    python scripts/musicbrainz_etl.py load-recordings     # Load recordings to BigQuery
+    python scripts/musicbrainz_etl.py load-isrcs          # Load ISRCs to BigQuery
 
     # Check status
     python scripts/musicbrainz_etl.py status
@@ -80,6 +85,28 @@ class ArtistTagRecord:
     vote_count: int
 
 
+@dataclass
+class RecordingRecord:
+    """MusicBrainz recording record."""
+
+    recording_mbid: str
+    title: str
+    length_ms: int | None
+    artist_credit: str | None
+    artist_credit_id: int | None
+    disambiguation: str | None
+    video: bool
+    name_normalized: str
+
+
+@dataclass
+class RecordingISRCRecord:
+    """MusicBrainz recording ISRC record."""
+
+    recording_mbid: str
+    isrc: str
+
+
 # MusicBrainz PostgreSQL dump column definitions
 # See: https://musicbrainz.org/doc/MusicBrainz_Database/Schema
 
@@ -119,6 +146,33 @@ ARTIST_TAG_COLS = {"artist_id": 0, "tag_id": 1, "count": 2}
 # tag table columns (from mbdump-derived)
 # id, name, ref_count
 TAG_COLS = {"id": 0, "name": 1}
+
+# recording table columns (from mbdump)
+# id, gid, name, artist_credit, length, comment, edits_pending, last_updated, video
+RECORDING_COLS = {
+    "id": 0,
+    "gid": 1,  # MBID (UUID)
+    "name": 2,  # Recording title
+    "artist_credit": 3,  # FK to artist_credit.id
+    "length": 4,  # Duration in ms
+    "comment": 5,  # Disambiguation
+    "video": 8,  # Boolean
+}
+
+# isrc table columns (from mbdump)
+# id, recording, isrc, source, edits_pending, created
+ISRC_COLS = {
+    "id": 0,
+    "recording": 1,  # FK to recording.id
+    "isrc": 2,  # ISRC code (12 chars)
+}
+
+# artist_credit table columns (from mbdump)
+# id, name, artist_count, ref_count, created, edits_pending, gid
+ARTIST_CREDIT_COLS = {
+    "id": 0,
+    "name": 1,  # Display string "Artist feat. Other"
+}
 
 
 def ensure_work_dir() -> Path:
@@ -322,6 +376,102 @@ def extract_artist_tags(
             continue
 
 
+def extract_recordings(mbdump_path: Path) -> Generator[dict, None, None]:
+    """Extract recording records from mbdump.tar.bz2.
+
+    Builds artist_credit lookup for display names.
+    """
+    console.print("[blue]Loading artist_credit lookup...[/blue]")
+
+    # Build artist_credit_id -> name mapping
+    artist_credits: dict[str, str] = {}
+    for row in stream_tsv_from_tar(mbdump_path, "artist_credit"):
+        try:
+            credit_id = row[ARTIST_CREDIT_COLS["id"]]
+            credit_name = parse_string(row[ARTIST_CREDIT_COLS["name"]])
+            if credit_id and credit_name:
+                artist_credits[credit_id] = credit_name
+        except IndexError:
+            continue
+
+    console.print(f"  Artist credits: {len(artist_credits):,}")
+    console.print("[blue]Extracting recordings...[/blue]")
+
+    for row in stream_tsv_from_tar(mbdump_path, "recording"):
+        try:
+            mbid = row[RECORDING_COLS["gid"]]
+            title = parse_string(row[RECORDING_COLS["name"]])
+
+            if not mbid or not title:
+                continue
+
+            # Normalize title for search
+            normalized = re.sub(r"[^a-z0-9 ]", " ", title.lower())
+            normalized = re.sub(r"\s+", " ", normalized).strip()
+
+            artist_credit_id = row[RECORDING_COLS["artist_credit"]]
+
+            # Parse video field (position 8) - "t" for true, "f" for false
+            video_str = row[RECORDING_COLS["video"]] if len(row) > 8 else "f"
+            video = video_str == "t"
+
+            record = {
+                "recording_mbid": mbid,
+                "title": title,
+                "length_ms": parse_int(row[RECORDING_COLS["length"]]),
+                "artist_credit": artist_credits.get(artist_credit_id),
+                "artist_credit_id": parse_int(artist_credit_id),
+                "disambiguation": parse_string(row[RECORDING_COLS["comment"]]),
+                "video": video,
+                "name_normalized": normalized,
+            }
+
+            yield record
+
+        except IndexError:
+            continue
+
+
+def extract_recording_isrcs(mbdump_path: Path) -> Generator[dict, None, None]:
+    """Extract recording ISRC records from mbdump.tar.bz2.
+
+    Builds recording_id -> mbid mapping first.
+    """
+    console.print("[blue]Building recording ID to MBID mapping...[/blue]")
+
+    # Build recording_id -> mbid mapping
+    recording_id_to_mbid: dict[str, str] = {}
+    for row in stream_tsv_from_tar(mbdump_path, "recording"):
+        try:
+            recording_id = row[RECORDING_COLS["id"]]
+            mbid = row[RECORDING_COLS["gid"]]
+            if recording_id and mbid:
+                recording_id_to_mbid[recording_id] = mbid
+        except IndexError:
+            continue
+
+    console.print(f"  Mapped {len(recording_id_to_mbid):,} recordings")
+    console.print("[blue]Extracting ISRCs...[/blue]")
+
+    for row in stream_tsv_from_tar(mbdump_path, "isrc"):
+        try:
+            recording_id = row[ISRC_COLS["recording"]]
+            isrc = row[ISRC_COLS["isrc"]]
+
+            mbid = recording_id_to_mbid.get(recording_id)
+
+            if not mbid or not isrc:
+                continue
+
+            yield {
+                "recording_mbid": mbid,
+                "isrc": isrc.strip(),
+            }
+
+        except IndexError:
+            continue
+
+
 def write_ndjson(records: Generator[dict, None, None], output_path: Path, description: str) -> int:
     """Write records to NDJSON file with progress."""
     count = 0
@@ -403,6 +553,22 @@ MBID_SPOTIFY_MAPPING_SCHEMA = [
     bigquery.SchemaField("artist_mbid", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("spotify_artist_id", "STRING", mode="REQUIRED"),
     bigquery.SchemaField("artist_name", "STRING"),
+]
+
+MB_RECORDINGS_SCHEMA = [
+    bigquery.SchemaField("recording_mbid", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("title", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("length_ms", "INT64"),
+    bigquery.SchemaField("artist_credit", "STRING"),
+    bigquery.SchemaField("artist_credit_id", "INT64"),
+    bigquery.SchemaField("disambiguation", "STRING"),
+    bigquery.SchemaField("video", "BOOLEAN"),
+    bigquery.SchemaField("name_normalized", "STRING"),
+]
+
+MB_RECORDING_ISRC_SCHEMA = [
+    bigquery.SchemaField("recording_mbid", "STRING", mode="REQUIRED"),
+    bigquery.SchemaField("isrc", "STRING", mode="REQUIRED"),
 ]
 
 
@@ -512,6 +678,53 @@ def load_tags():
     load_to_bigquery(gcs_uri, "mb_artist_tags", MB_ARTIST_TAGS_SCHEMA)
 
 
+@cli.command("extract-recordings")
+def extract_recordings_cmd():
+    """Extract recordings and ISRCs from MusicBrainz dumps to NDJSON."""
+    work_dir = ensure_work_dir()
+    mbdump_path = work_dir / "mbdump.tar.bz2"
+
+    if not mbdump_path.exists():
+        console.print("[red]Dump not found. Run 'download' first.[/red]")
+        return
+
+    # Extract recordings
+    recordings_path = work_dir / "mb_recordings.ndjson"
+    write_ndjson(extract_recordings(mbdump_path), recordings_path, "Extracting recordings")
+
+    # Extract ISRCs
+    isrcs_path = work_dir / "mb_recording_isrc.ndjson"
+    write_ndjson(extract_recording_isrcs(mbdump_path), isrcs_path, "Extracting ISRCs")
+
+
+@cli.command("load-recordings")
+def load_recordings_cmd():
+    """Load extracted recordings to BigQuery."""
+    work_dir = ensure_work_dir()
+    recordings_path = work_dir / "mb_recordings.ndjson"
+
+    if not recordings_path.exists():
+        console.print("[red]Recordings file not found. Run 'extract-recordings' first.[/red]")
+        return
+
+    gcs_uri = upload_to_gcs(recordings_path, f"{GCS_PROCESSED_PREFIX}/mb_recordings.ndjson")
+    load_to_bigquery(gcs_uri, "mb_recordings", MB_RECORDINGS_SCHEMA)
+
+
+@cli.command("load-isrcs")
+def load_isrcs_cmd():
+    """Load extracted ISRCs to BigQuery."""
+    work_dir = ensure_work_dir()
+    isrcs_path = work_dir / "mb_recording_isrc.ndjson"
+
+    if not isrcs_path.exists():
+        console.print("[red]ISRCs file not found. Run 'extract-recordings' first.[/red]")
+        return
+
+    gcs_uri = upload_to_gcs(isrcs_path, f"{GCS_PROCESSED_PREFIX}/mb_recording_isrc.ndjson")
+    load_to_bigquery(gcs_uri, "mb_recording_isrc", MB_RECORDING_ISRC_SCHEMA)
+
+
 @cli.command()
 def status():
     """Check status of MusicBrainz data in BigQuery."""
@@ -521,6 +734,8 @@ def status():
         ("mb_artists", "Artist catalog"),
         ("mb_artist_tags", "Artist tags"),
         ("mbid_spotify_mapping", "MBID-Spotify mapping"),
+        ("mb_recordings", "Recording catalog"),
+        ("mb_recording_isrc", "Recording ISRCs"),
     ]
 
     table_display = Table(title="MusicBrainz Tables in BigQuery")

@@ -86,7 +86,7 @@ Creating `mb_artists_normalized` with pre-joined Spotify data and aggregated tag
 | `backend/services/quiz_service.py` | Store and query by MBIDs |
 | `docs/README.md` | Updated status |
 | `docs/MUSICBRAINZ-MIGRATION-PLAN.md` | Marked phases complete |
-| `docs/SPOTIFY-DATA-CATALOG.md` | Renamed to Music Data Catalog, added MB tables |
+| `docs/DATA-CATALOG.md` | Music Data Catalog with all BigQuery tables |
 
 ## Verification
 

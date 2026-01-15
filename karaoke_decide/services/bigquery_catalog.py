@@ -91,6 +91,37 @@ class TrackSearchResult:
     explicit: bool
 
 
+@dataclass
+class RecordingSearchResult:
+    """Recording search result with MBID as primary identifier.
+
+    Represents a MusicBrainz recording with optional Spotify enrichment.
+    """
+
+    recording_mbid: str  # Primary identifier (MusicBrainz UUID)
+    title: str
+    artist_credit: str | None  # Display string like "Artist feat. Other"
+    length_ms: int | None
+    disambiguation: str | None  # e.g., "live version", "acoustic"
+    # Enrichment from Spotify (optional, via ISRC)
+    spotify_track_id: str | None
+    spotify_popularity: int | None
+
+
+@dataclass
+class KaraokeRecordingLink:
+    """Link between a karaoke song and canonical recording(s).
+
+    Maps karaoke catalog songs to MusicBrainz recordings and/or Spotify tracks.
+    """
+
+    karaoke_id: int
+    recording_mbid: str | None  # MusicBrainz recording UUID
+    spotify_track_id: str | None  # Spotify track ID
+    match_method: str  # 'isrc', 'exact_name', 'fuzzy_name'
+    match_confidence: float  # 0.0-1.0
+
+
 class BigQueryCatalogService:
     """Service for querying song catalog from BigQuery."""
 
@@ -1157,4 +1188,340 @@ class BigQueryCatalogService:
             return {row.name_normalized: row.artist_mbid for row in results}
         except Exception as e:
             logger.warning(f"MBID name lookup failed: {e}")
+            return {}
+
+    # =========================================================================
+    # Recording/Song Methods (MBID-First) - Phase 7
+    # =========================================================================
+
+    # Cache for recording search
+    _recording_search_cache: dict[str, tuple[float, list["RecordingSearchResult"]]] = {}
+
+    def search_recordings(
+        self,
+        query: str,
+        limit: int = 10,
+        min_popularity: int = 0,
+    ) -> list[RecordingSearchResult]:
+        """Search recordings by title with Spotify enrichment.
+
+        Uses mb_recordings table with ISRC-based Spotify enrichment.
+
+        Args:
+            query: Search query (will be normalized)
+            limit: Maximum results to return (default 10)
+            min_popularity: Minimum Spotify popularity (0 for MB-only results)
+
+        Returns:
+            List of RecordingSearchResult sorted by popularity
+        """
+        if not query or len(query) < 2:
+            return []
+
+        normalized = _normalize_for_matching(query)
+        if not normalized:
+            return []
+
+        # Check cache first
+        cache_key = f"rec:{normalized}:{limit}:{min_popularity}"
+        now = time.time()
+        if cache_key in self._recording_search_cache:
+            cached_time, cached_results = self._recording_search_cache[cache_key]
+            if now - cached_time < self.CACHE_TTL:
+                logger.debug(f"Recording search cache hit for '{normalized}'")
+                return cached_results
+
+        # Query recordings with ISRC-based Spotify enrichment
+        sql = f"""
+            SELECT
+                r.recording_mbid,
+                r.title,
+                r.artist_credit,
+                r.length_ms,
+                r.disambiguation,
+                st.spotify_id AS spotify_track_id,
+                st.popularity AS spotify_popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings` r
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
+                ON r.recording_mbid = ri.recording_mbid
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
+                ON ri.isrc = st.isrc
+            WHERE r.name_normalized LIKE @query_prefix
+              AND (st.popularity >= @min_popularity OR st.popularity IS NULL)
+            ORDER BY COALESCE(st.popularity, 0) DESC
+            LIMIT @limit
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+
+            recording_results = [
+                RecordingSearchResult(
+                    recording_mbid=row.recording_mbid,
+                    title=row.title,
+                    artist_credit=row.artist_credit,
+                    length_ms=row.length_ms,
+                    disambiguation=row.disambiguation,
+                    spotify_track_id=row.spotify_track_id,
+                    spotify_popularity=row.spotify_popularity,
+                )
+                for row in results
+            ]
+
+            # Cache the results
+            self._recording_search_cache[cache_key] = (now, recording_results)
+
+            # Clean old cache entries periodically
+            if len(self._recording_search_cache) > 1000:
+                cutoff = now - self.CACHE_TTL
+                self._recording_search_cache = {k: v for k, v in self._recording_search_cache.items() if v[0] > cutoff}
+
+            return recording_results
+
+        except Exception as e:
+            logger.warning(f"Recording search failed (tables may not exist yet): {e}")
+            return []
+
+    def get_recording_by_mbid(self, mbid: str) -> RecordingSearchResult | None:
+        """Get recording by MusicBrainz ID.
+
+        Args:
+            mbid: MusicBrainz recording UUID
+
+        Returns:
+            RecordingSearchResult or None if not found
+        """
+        sql = f"""
+            SELECT
+                r.recording_mbid,
+                r.title,
+                r.artist_credit,
+                r.length_ms,
+                r.disambiguation,
+                st.spotify_id AS spotify_track_id,
+                st.popularity AS spotify_popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings` r
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
+                ON r.recording_mbid = ri.recording_mbid
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
+                ON ri.isrc = st.isrc
+            WHERE r.recording_mbid = @mbid
+            ORDER BY st.popularity DESC NULLS LAST
+            LIMIT 1
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("mbid", "STRING", mbid),
+            ]
+        )
+
+        try:
+            results = list(self.client.query(sql, job_config=job_config).result())
+            if not results:
+                return None
+
+            row = results[0]
+            return RecordingSearchResult(
+                recording_mbid=row.recording_mbid,
+                title=row.title,
+                artist_credit=row.artist_credit,
+                length_ms=row.length_ms,
+                disambiguation=row.disambiguation,
+                spotify_track_id=row.spotify_track_id,
+                spotify_popularity=row.spotify_popularity,
+            )
+        except Exception as e:
+            logger.warning(f"Get recording by MBID failed: {e}")
+            return None
+
+    def lookup_recording_by_isrc(self, isrc: str) -> RecordingSearchResult | None:
+        """Look up recording by ISRC code.
+
+        Args:
+            isrc: International Standard Recording Code (12 chars)
+
+        Returns:
+            RecordingSearchResult or None if not found
+        """
+        result = self.lookup_recordings_by_isrcs([isrc])
+        return result.get(isrc)
+
+    def lookup_recordings_by_isrcs(
+        self,
+        isrcs: list[str],
+    ) -> dict[str, RecordingSearchResult]:
+        """Batch lookup recordings by ISRC codes.
+
+        Args:
+            isrcs: List of ISRC codes
+
+        Returns:
+            Dict mapping ISRC to RecordingSearchResult
+        """
+        if not isrcs:
+            return {}
+
+        # Deduplicate and normalize ISRCs
+        unique_isrcs = list(set(isrc.strip().upper() for isrc in isrcs if isrc))
+        if not unique_isrcs:
+            return {}
+
+        sql = f"""
+            SELECT
+                ri.isrc,
+                r.recording_mbid,
+                r.title,
+                r.artist_credit,
+                r.length_ms,
+                r.disambiguation,
+                st.spotify_id AS spotify_track_id,
+                st.popularity AS spotify_popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
+            JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings` r
+                ON ri.recording_mbid = r.recording_mbid
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
+                ON ri.isrc = st.isrc
+            WHERE ri.isrc IN UNNEST(@isrcs)
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("isrcs", "STRING", unique_isrcs),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+            return {
+                row.isrc: RecordingSearchResult(
+                    recording_mbid=row.recording_mbid,
+                    title=row.title,
+                    artist_credit=row.artist_credit,
+                    length_ms=row.length_ms,
+                    disambiguation=row.disambiguation,
+                    spotify_track_id=row.spotify_track_id,
+                    spotify_popularity=row.spotify_popularity,
+                )
+                for row in results
+            }
+        except Exception as e:
+            logger.warning(f"Batch ISRC lookup failed: {e}")
+            return {}
+
+    def lookup_recording_mbid_by_spotify_track_id(
+        self,
+        spotify_track_id: str,
+    ) -> str | None:
+        """Look up recording MBID for a Spotify track via ISRC.
+
+        Goes: Spotify track → ISRC → MB recording MBID
+
+        Args:
+            spotify_track_id: Spotify track ID
+
+        Returns:
+            MusicBrainz recording UUID or None if not mapped
+        """
+        result = self.lookup_recording_mbids_by_spotify_track_ids([spotify_track_id])
+        return result.get(spotify_track_id)
+
+    def lookup_recording_mbids_by_spotify_track_ids(
+        self,
+        spotify_track_ids: list[str],
+    ) -> dict[str, str]:
+        """Batch lookup recording MBIDs for Spotify tracks via ISRC.
+
+        Args:
+            spotify_track_ids: List of Spotify track IDs
+
+        Returns:
+            Dict mapping Spotify track ID to MusicBrainz recording UUID
+        """
+        if not spotify_track_ids:
+            return {}
+
+        # Deduplicate
+        unique_ids = list(set(spotify_track_ids))
+
+        sql = f"""
+            SELECT
+                st.spotify_id AS spotify_track_id,
+                ri.recording_mbid
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
+            JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
+                ON st.isrc = ri.isrc
+            WHERE st.spotify_id IN UNNEST(@spotify_ids)
+              AND st.isrc IS NOT NULL
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("spotify_ids", "STRING", unique_ids),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+            return {row.spotify_track_id: row.recording_mbid for row in results}
+        except Exception as e:
+            logger.warning(f"Spotify to MBID lookup failed: {e}")
+            return {}
+
+    def get_karaoke_recording_links(
+        self,
+        karaoke_ids: list[int],
+    ) -> dict[int, KaraokeRecordingLink]:
+        """Get recording links for karaoke songs.
+
+        Looks up the pre-computed karaoke_recording_links table.
+
+        Args:
+            karaoke_ids: List of karaoke song IDs from karaokenerds_raw
+
+        Returns:
+            Dict mapping karaoke_id to KaraokeRecordingLink
+        """
+        if not karaoke_ids:
+            return {}
+
+        sql = f"""
+            SELECT
+                karaoke_id,
+                recording_mbid,
+                spotify_track_id,
+                match_method,
+                match_confidence
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaoke_recording_links`
+            WHERE karaoke_id IN UNNEST(@karaoke_ids)
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("karaoke_ids", "INT64", karaoke_ids),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+            return {
+                row.karaoke_id: KaraokeRecordingLink(
+                    karaoke_id=row.karaoke_id,
+                    recording_mbid=row.recording_mbid,
+                    spotify_track_id=row.spotify_track_id,
+                    match_method=row.match_method,
+                    match_confidence=row.match_confidence,
+                )
+                for row in results
+            }
+        except Exception as e:
+            logger.warning(f"Karaoke recording links lookup failed: {e}")
             return {}

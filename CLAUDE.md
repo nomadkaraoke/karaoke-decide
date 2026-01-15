@@ -130,7 +130,7 @@ When storing any music-related user data (artists, songs, preferences):
    - Frontend should use autocomplete components that return IDs
    - See `/api/catalog/artists?q=` and `/api/catalog/songs?q=` for search APIs
 
-5. **Reference the Spotify catalog docs** - See [docs/SPOTIFY-DATA-CATALOG.md](docs/SPOTIFY-DATA-CATALOG.md) for all available tables, schemas, and example queries.
+5. **Reference the data catalog** - See [docs/DATA-CATALOG.md](docs/DATA-CATALOG.md) for all available BigQuery tables, schemas, and example queries.
 
 **Why this matters:** Without IDs, we can't leverage our 230M audio features, 2.2M artist-genre mappings, or any cross-referencing. Plain text names are a dead end.
 
