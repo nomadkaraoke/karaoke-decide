@@ -311,47 +311,211 @@ function ArtistCard({ artist }: { artist: Artist }) {
 
 ## Migration Steps
 
-### Phase 1: Data Foundation ✅ PARTIAL (2026-01-14)
-- [ ] Create `mb_artists` table from MusicBrainz dump (NOT YET - blocked on another agent)
-- [ ] Create `mb_recordings` table (NOT YET)
-- [ ] Create `id_mappings` table (NOT YET)
+### Phase 1: Data Foundation ✅ COMPLETE (2026-01-14)
+- [x] Create `mb_artists` table from MusicBrainz dump (**2,780,016 artists**)
+- [x] Create `mb_artist_tags` table (**693,045 tags**)
+- [x] Create `mbid_spotify_mapping` table (**376,231 mappings**)
+- [x] Create `mb_artists_normalized` table (pre-joined for fast search)
+- [ ] Create `mb_recordings` table (future - not needed for current flow)
 - [x] **Discover: Last.fm API already returns MBIDs** (~80-87% coverage)
 
-### Phase 2: API Dual-Support (Not Started)
-- [ ] Update API models to include both IDs
-- [ ] Add MBID lookup endpoints
-- [ ] Keep Spotify ID endpoints working (backward compat)
-- [ ] Update search to return MBID-primary results
+### Phase 2: API Dual-Support ✅ COMPLETE (2026-01-14)
+- [x] Update API models to include both IDs (`ArtistSearchResultMBID`)
+- [x] Add MBID lookup endpoints (`search_artists_mbid`, `get_artist_by_mbid`)
+- [x] Add MBID batch lookup (`lookup_mbids_by_names`)
+- [x] Keep Spotify ID endpoints working (backward compat)
+- [x] Update search to return MBID-primary results
 
 ### Phase 3: Recommendation Migration ✅ COMPLETE (2026-01-14)
 - [x] Update `_get_collaborative_suggestions()` for MBID-first
   - Now queries BOTH `decide_users` AND `lastfm_users` in parallel
-  - Uses `artist_names_lower` for name-based matching (backwards compat)
-  - Ready for MBID queries when mapping table exists
+  - Uses MBID-based queries when available
+  - Falls back to name-based matching for backwards compat
 - [x] Update Last.fm import to store MBIDs properly
   - `scripts/lastfm_firestore_import.py` now extracts MBIDs from Last.fm API
   - Stores `artist_mbids` array for MBID-based queries
   - Maintains `artist_names_lower` for backwards compatibility
-- [ ] Integrate MLHD+ data (from other agent's work)
-- [x] Test recommendation quality (unit tests passing)
+- [ ] Integrate MLHD+ data (future enhancement)
+- [x] Test recommendation quality (144 unit tests passing)
 
-### Phase 4: User Data Migration (Not Started)
-- [ ] Add `quiz_artists_known_mbid` field
-- [ ] Migrate existing users' Spotify IDs → MBIDs
-- [ ] Update quiz submission to store MBIDs
-- [ ] Deprecate Spotify-only fields
+### Phase 4: User Data Migration ✅ COMPLETE (2026-01-14)
+- [x] Add `quiz_artist_mbids` field to user documents
+- [x] Create migration script (`scripts/migrate_users_to_mbid.py`)
+- [x] Migrate all existing users (16/16 = 100%)
+- [x] Update quiz submission to store MBIDs
+- [x] Enrich `quiz_manual_artists` with MBIDs
 
-### Phase 5: Frontend Update (Not Started)
-- [ ] Update TypeScript interfaces
-- [ ] Update artist selection components
-- [ ] Add disambiguation display where helpful
-- [ ] Test full flow
+### Phase 5: Public API Migration (Not Started)
 
-### Phase 6: Cleanup (Not Started)
-- [ ] Remove deprecated Spotify-only code paths
-- [ ] Archive old Spotify-primary tables
-- [x] Update documentation
-- [ ] Set up MusicBrainz dump refresh automation
+**Goal:** Update all public API endpoints to return MBID as primary identifier.
+
+**Files to modify:**
+
+| File | Changes |
+|------|---------|
+| `backend/api/routes/catalog.py` | Update `/artists` and `/artists/{id}` to return MBID-first |
+| `backend/api/routes/quiz.py` | Return MBIDs in artist suggestions |
+| `backend/api/routes/recommendations.py` | Include MBIDs in recommendation responses |
+| `backend/api/routes/my_data.py` | Return MBIDs in user artist data |
+| `backend/models/catalog.py` | Add `mbid` field to `ArtistResponse` model |
+
+**API Response Changes:**
+
+```python
+# Current response from /api/catalog/artists?q=radiohead
+{
+    "artists": [
+        {
+            "artist_id": "4Z8W4fKeB5YxbusRsdQVPb",  # Spotify ID as primary
+            "artist_name": "Radiohead",
+            "popularity": 79,
+            "genres": ["alternative rock", "art rock"]
+        }
+    ]
+}
+
+# Target response (MBID-first with Spotify enrichment)
+{
+    "artists": [
+        {
+            "mbid": "a74b1b7f-71a5-4011-9441-d0b5e4122711",  # MBID as primary
+            "name": "Radiohead",
+            "disambiguation": "UK rock band",
+            "artist_type": "Group",
+            "spotify_id": "4Z8W4fKeB5YxbusRsdQVPb",  # Enrichment (nullable)
+            "popularity": 79,  # From Spotify
+            "genres": ["alternative rock", "art rock"],  # From Spotify
+            "tags": ["alternative", "electronic", "experimental"]  # From MusicBrainz
+        }
+    ]
+}
+```
+
+**Backward Compatibility:**
+- Keep `artist_id` field as alias for `spotify_id` during transition
+- Accept both MBID and Spotify ID in path parameters
+- Add `X-API-Version` header for clients to opt into new format
+
+### Phase 6: Frontend Update (Not Started)
+
+**Goal:** Update frontend to use MBID as primary identifier while using Spotify for display enrichment.
+
+**Files to modify:**
+
+| File | Changes |
+|------|---------|
+| `frontend/src/types/api.ts` | Add `mbid` to Artist interface, make `artist_id` optional |
+| `frontend/src/components/ArtistCard.tsx` | Use MBID for keys/references, Spotify for images |
+| `frontend/src/components/ArtistSearch.tsx` | Store MBID on selection |
+| `frontend/src/app/quiz/components/ArtistSelection.tsx` | Submit MBIDs to backend |
+| `frontend/src/app/my-data/artists/page.tsx` | Display with MBID as key |
+
+**TypeScript Interface Changes:**
+
+```typescript
+// Current
+interface Artist {
+    artist_id: string;      // Spotify ID (required)
+    artist_name: string;
+    popularity: number;
+    genres: string[];
+}
+
+// Target
+interface Artist {
+    mbid: string;           // MusicBrainz ID (required, primary)
+    name: string;
+    disambiguation?: string;
+    artist_type?: string;
+    spotify_id?: string;    // For Spotify links/images (optional)
+    popularity?: number;
+    genres?: string[];      // From Spotify
+    tags?: string[];        // From MusicBrainz
+}
+```
+
+**Key Considerations:**
+- Artist images: Continue using Spotify CDN via `spotify_id` - MusicBrainz has no images
+- Links: Use `spotify_id` for "Open in Spotify" links
+- Internal references: Use `mbid` for all internal state, API calls, keys
+
+### Phase 7: Songs/Recordings Migration (Not Started)
+
+**Goal:** Create MusicBrainz recordings table and link to karaoke catalog.
+
+**Why this matters:** Currently songs are 100% Spotify-based. Without this, we can't:
+- Match karaoke songs to MusicBrainz recordings
+- Use MBID-based song recommendations
+- Link user "known songs" to canonical recordings
+
+**BigQuery Tables to Create:**
+
+```sql
+-- Primary recordings table (from MusicBrainz dumps)
+CREATE TABLE karaoke_decide.mb_recordings (
+    recording_mbid STRING NOT NULL,
+    title STRING NOT NULL,
+    length_ms INT64,
+    artist_credit STRING,           -- Display string "Artist feat. Other"
+    first_release_date DATE,
+
+    -- Enrichment (nullable)
+    spotify_track_id STRING,
+    isrc STRING,
+);
+
+-- Recording-Artist relationship
+CREATE TABLE karaoke_decide.mb_recording_artists (
+    recording_mbid STRING NOT NULL,
+    artist_mbid STRING NOT NULL,
+    credit_type STRING,             -- main, featured, remixer
+);
+
+-- ISRC mapping for cross-referencing
+CREATE TABLE karaoke_decide.isrc_mapping (
+    isrc STRING NOT NULL,
+    recording_mbid STRING,
+    spotify_track_id STRING,
+);
+```
+
+**Karaoke Catalog Linking:**
+- Match `karaokenerds_raw` songs to `mb_recordings` via:
+  1. ISRC (most reliable)
+  2. Artist name + title fuzzy match
+  3. Spotify track ID → MBID mapping
+
+**ETL Updates:**
+- Extend `scripts/musicbrainz_etl.py` to extract recordings
+- Create matching script for karaoke catalog
+
+### Phase 8: Cleanup & Automation (Not Started)
+
+**Goal:** Remove deprecated code paths and set up ongoing data freshness.
+
+**Code Cleanup:**
+- [ ] Remove Spotify-only search methods from `bigquery_catalog.py`
+- [ ] Remove `artist_id` field from API responses (after frontend migrated)
+- [ ] Clean up dual-write logic in quiz service
+- [ ] Remove backward-compat name-based queries
+
+**MusicBrainz Refresh Automation:**
+- [ ] Set up Cloud Scheduler job to run weekly
+- [ ] Download incremental dumps (not full dumps)
+- [ ] Update BigQuery tables with new/changed artists
+- [ ] Monitor for data quality issues
+
+**Incremental Update Strategy:**
+MusicBrainz provides daily "replication packets" (~10MB each) instead of re-downloading 6GB:
+```bash
+# Daily replication (much faster than full dump)
+curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
+```
+
+**Monitoring:**
+- [ ] Alert if MBID coverage drops below threshold
+- [ ] Track mapping quality metrics
+- [ ] Monitor query performance
 
 ## Risks & Mitigations
 
@@ -364,44 +528,99 @@ function ArtistCard({ artist }: { artist: Artist }) {
 
 ## Success Criteria
 
-1. **All new data** stored with MBID as primary key
-2. **All recommendations** flow through MBID-based logic
-3. **Spotify enrichment** available for 80%+ of popular artists
-4. **No user-facing breakage** during migration
-5. **MusicBrainz dump refresh** automated (weekly)
+**Phase 1-4 (COMPLETE):**
+- [x] All user quiz data stored with MBID as primary key
+- [x] Collaborative filtering uses MBID-based queries
+- [x] Spotify enrichment available for popular artists (376K mappings)
+- [x] No user-facing breakage during migration
+
+**Phase 5-8 (TODO):**
+- [ ] Public API returns MBID as primary identifier
+- [ ] Frontend uses MBID as primary key
+- [ ] Songs/recordings have MBID linkage
+- [ ] MusicBrainz dump refresh automated (weekly)
 
 ## Coordination with MLHD+ Import
 
-The other agent working on MLHD+ import should:
-1. Store all data keyed by MBID
-2. Create the `mb_artists` table from MusicBrainz dumps
-3. Build co-occurrence matrix with MBID pairs
-4. Set up automated refresh from MusicBrainz
+✅ MLHD+ import completed by another agent (PR #93):
+- 1.5M artist similarity pairs from 583K Last.fm users
+- Data keyed by MBID in `mlhd_artist_similarity` table
+- Integrated into quiz service for recommendations
 
-This migration plan assumes that work will provide the foundational MusicBrainz tables.
+## Design Decisions (Resolved)
 
-## Questions to Resolve
+| Question | Decision | Rationale |
+|----------|----------|-----------|
+| **Spotify fallback** | Yes, support Spotify-only artists | Some artists (new, indie) may not be in MusicBrainz yet |
+| **Image sources** | Continue using Spotify CDN | MusicBrainz has no images; Spotify images are high quality |
+| **Genre source** | Use both: Spotify `genres` + MusicBrainz `tags` | Spotify genres are algorithmic but consistent; MB tags are community-curated but noisier |
+| **Recording vs Track** | Use recordings only | Works-level abstraction is too complex for karaoke use case |
 
-1. **Spotify fallback:** If an artist has no MBID, do we still support them via Spotify-only?
-2. **Image sources:** MusicBrainz doesn't have artist images - continue using Spotify/Last.fm?
-3. **Genre source:** MusicBrainz has community tags, Spotify has algorithmic genres - which to prefer?
-4. **Recording vs Track:** MusicBrainz distinguishes recordings (performance) from works (composition) - how deep do we go?
+## Current State Summary (2026-01-14)
+
+**What's DONE (Phases 1-4):**
+| Component | Status | Details |
+|-----------|--------|---------|
+| BigQuery artist tables | ✅ Complete | 2.78M artists, 693K tags, 376K mappings |
+| Internal MBID APIs | ✅ Complete | `search_artists_mbid()`, `get_artist_by_mbid()`, etc. |
+| Quiz stores MBIDs | ✅ Complete | `quiz_artist_mbids` field in user documents |
+| User migration | ✅ Complete | 16/16 users backfilled |
+| Collaborative filtering | ✅ Complete | Queries by MBID when available |
+
+**What's NOT DONE (Phases 5-8):**
+| Component | Status | Impact |
+|-----------|--------|--------|
+| Public API responses | ❌ Still Spotify-first | External clients get Spotify IDs |
+| Frontend | ❌ Uses Spotify IDs | UI components reference Spotify |
+| Songs/Recordings | ❌ 100% Spotify | No `mb_recordings` table |
+| Karaoke catalog linking | ❌ Not started | Can't match karaoke songs to MBIDs |
+| Data refresh automation | ❌ Not started | Data will become stale |
+
+**Current Data Flow:**
+```
+User selects "Green Day" in quiz UI
+  → Frontend sends: { artist_name: "Green Day" }
+  → Backend internally resolves MBID for recommendations
+  → Backend stores: quiz_artist_mbids: ["084308bd-..."]
+  → Backend returns: { artist_id: "7oPftvlwr6VrsViSDV7fJY" }  # Spotify ID
+  → Frontend displays using Spotify data
+```
+
+**Target Data Flow (after Phases 5-6):**
+```
+User selects "Green Day" in quiz UI
+  → Frontend sends: { mbid: "084308bd-..." }
+  → Backend uses MBID directly for all operations
+  → Backend returns: { mbid: "084308bd-...", spotify_id: "7oPf..." }
+  → Frontend uses MBID as key, Spotify for images/links
+```
 
 ## Next Steps
 
+**Completed:**
 1. ~~**Update Last.fm import** - store MBIDs properly~~ ✅ DONE (2026-01-14)
 2. ~~**Update collaborative filtering** - query lastfm_users collection~~ ✅ DONE (2026-01-14)
-3. **Wait for MusicBrainz tables** - another agent to create `mb_artists` etc.
-4. **Create MBID↔Spotify mapping** - for bridging quiz artists to Last.fm users
-5. **Plan API versioning** - v1 (Spotify) vs v2 (MBID-first)?
-6. **Enable MBID-based queries** - switch from `artist_names_lower` to `artist_mbids`
+3. ~~**Create MusicBrainz tables**~~ ✅ DONE (2026-01-14)
+4. ~~**Create MBID↔Spotify mapping**~~ ✅ DONE (2026-01-14)
+5. ~~**Enable MBID-based queries**~~ ✅ DONE (2026-01-14)
+
+**Remaining (in recommended order):**
+6. **Phase 5: Public API Migration** - Update `/api/catalog/artists` etc. to return MBID-first
+7. **Phase 6: Frontend Update** - Update TypeScript interfaces and components
+8. **Phase 7: Songs/Recordings** - Create `mb_recordings` table, link karaoke catalog
+9. **Phase 8: Cleanup & Automation** - Remove deprecated code, set up refresh
+
+**Recommended approach for next agent:**
+- Phases 5+6 can be done together (API + Frontend in one PR)
+- Phase 7 is independent and can be parallelized
+- Phase 8 should wait until 5-7 are complete
 
 ## Implementation Notes (2026-01-14)
 
 ### Key Discovery
 Last.fm API responses include MBIDs directly (~80-87% coverage). We don't need MusicBrainz database import to start MBID-first architecture.
 
-### Changes Made
+### Session 1 Changes (Earlier)
 1. `scripts/lastfm_firestore_import.py` - Now MBID-first:
    - Extracts MBIDs from Last.fm API responses
    - Stores `artist_mbids` array for efficient queries
@@ -419,3 +638,41 @@ Last.fm API responses include MBIDs directly (~80-87% coverage). We don't need M
    - `test_queries_both_user_collections`
    - `test_includes_lastfm_users_in_suggestions`
    - `test_lastfm_users_use_array_contains_any`
+
+### Session 2 Changes (Complete Migration)
+
+**BigQuery Tables Created:**
+| Table | Rows | Description |
+|-------|------|-------------|
+| `mb_artists` | 2,780,016 | Full MusicBrainz artist catalog |
+| `mb_artist_tags` | 693,045 | Community-sourced tags/genres |
+| `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
+| `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
+
+**New Scripts:**
+- `scripts/musicbrainz_etl.py` - Full ETL pipeline for MusicBrainz dumps
+  - Downloads raw dumps from GCS (6.5GB mbdump.tar.bz2)
+  - Extracts artist, tags, and mapping data
+  - Loads to BigQuery with proper schemas
+- `scripts/migrate_users_to_mbid.py` - User migration script
+  - Backfills `quiz_artist_mbids` for existing users
+  - Enriches `quiz_manual_artists` with MBIDs
+
+**Code Changes:**
+1. `karaoke_decide/services/bigquery_catalog.py`:
+   - Added `ArtistSearchResultMBID` dataclass
+   - Added `search_artists_mbid()` - MBID-first artist search
+   - Added `get_artist_by_mbid()` - single artist lookup
+   - Added `lookup_mbids_by_names()` - batch name→MBID resolution
+   - Added `lookup_mbid_by_spotify_id()` - Spotify→MBID mapping
+
+2. `backend/services/quiz_service.py`:
+   - Quiz submission now resolves and stores MBIDs
+   - Stores `quiz_artist_mbids` array in user documents
+   - Enriches `quiz_manual_artists` with MBID field
+   - Collaborative filtering queries by MBID when available
+
+**User Migration:**
+- 16/16 users migrated (100%)
+- 73 total MBIDs resolved across all users
+- Empty arrays stored for users with unresolved artists

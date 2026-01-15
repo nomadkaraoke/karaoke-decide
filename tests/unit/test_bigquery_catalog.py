@@ -358,3 +358,217 @@ class TestArtistDataclasses:
         assert result.artist_name == "Radiohead"
         assert result.popularity == 82
         assert result.genres[0] == "alternative rock"
+
+
+class TestNormalization:
+    """Tests for text normalization."""
+
+    def test_normalize_for_matching_basic(self) -> None:
+        """Test basic normalization."""
+        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
+
+        assert _normalize_for_matching("Green Day") == "green day"
+        assert _normalize_for_matching("RADIOHEAD") == "radiohead"
+
+    def test_normalize_for_matching_punctuation(self) -> None:
+        """Test normalization removes punctuation."""
+        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
+
+        assert _normalize_for_matching("AC/DC") == "ac dc"
+        assert _normalize_for_matching("Guns N' Roses") == "guns n roses"
+
+    def test_normalize_for_matching_empty(self) -> None:
+        """Test normalization handles empty input."""
+        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
+
+        assert _normalize_for_matching("") == ""
+        assert _normalize_for_matching(None) == ""  # type: ignore[arg-type]
+
+    def test_normalize_for_matching_public_method(self) -> None:
+        """Test public normalize_for_matching method."""
+        service = BigQueryCatalogService.__new__(BigQueryCatalogService)
+        assert service.normalize_for_matching("Green Day") == "green day"
+
+
+class TestMBIDLookups:
+    """Tests for MBID lookup methods."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_spotify_ids_empty(self, mock_client_class: MagicMock) -> None:
+        """Test bulk MBID lookup with empty input."""
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_spotify_ids([])
+        assert result == {}
+        # Should not make any queries
+        mock_client_class.return_value.query.assert_not_called()
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_spotify_ids_success(self, mock_client_class: MagicMock) -> None:
+        """Test bulk MBID lookup with results."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.spotify_artist_id = "4Z8W4fKeB5YxbusRsdQVPb"
+        mock_row.artist_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_spotify_ids(["4Z8W4fKeB5YxbusRsdQVPb"])
+
+        assert result == {"4Z8W4fKeB5YxbusRsdQVPb": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}
+        mock_client.query.assert_called_once()
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbid_by_spotify_id_uses_bulk(self, mock_client_class: MagicMock) -> None:
+        """Test single MBID lookup delegates to bulk method."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.spotify_artist_id = "test123"
+        mock_row.artist_mbid = "mbid456"
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbid_by_spotify_id("test123")
+
+        assert result == "mbid456"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbid_by_spotify_id_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test single MBID lookup when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbid_by_spotify_id("unknown")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_names_empty(self, mock_client_class: MagicMock) -> None:
+        """Test name lookup with empty input."""
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_names([])
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_names_success(self, mock_client_class: MagicMock) -> None:
+        """Test name lookup with results."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.name_normalized = "radiohead"
+        mock_row.artist_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_names(["Radiohead"])
+
+        assert result == {"radiohead": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}
+        mock_client.query.assert_called_once()
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_artist_by_mbid_found(self, mock_client_class: MagicMock) -> None:
+        """Test getting artist by MBID when found."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.artist_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.artist_name = "Radiohead"
+        mock_row.disambiguation = "UK rock band"
+        mock_row.artist_type = "Group"
+        mock_row.spotify_artist_id = "4Z8W4fKeB5YxbusRsdQVPb"
+        mock_row.popularity = 80
+        mock_row.spotify_genres = ["alternative rock", "art rock"]
+        mock_row.tags = ["rock", "alternative"]
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.get_artist_by_mbid("a74b1b7f-71a5-4011-9441-d0b5e4122711")
+
+        assert result is not None
+        assert result.artist_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        assert result.artist_name == "Radiohead"
+        assert result.disambiguation == "UK rock band"
+        assert result.popularity == 80
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_artist_by_mbid_not_found(self, mock_client_class: MagicMock) -> None:
+        """Test getting artist by MBID when not found."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        result = service.get_artist_by_mbid("unknown-mbid")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_artist_by_mbid_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.get_artist_by_mbid("test-mbid")
+
+        assert result is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_artist_by_mbid_null_fields(self, mock_client_class: MagicMock) -> None:
+        """Test getting artist with null optional fields."""
+        mock_client = mock_client_class.return_value
+        mock_row = MagicMock()
+        mock_row.artist_mbid = "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+        mock_row.artist_name = "Unknown Artist"
+        mock_row.disambiguation = None
+        mock_row.artist_type = None
+        mock_row.spotify_artist_id = None
+        mock_row.popularity = None  # Should default to 50
+        mock_row.spotify_genres = None
+        mock_row.tags = None
+        mock_client.query.return_value.result.return_value = [mock_row]
+
+        service = BigQueryCatalogService()
+        result = service.get_artist_by_mbid("a74b1b7f-71a5-4011-9441-d0b5e4122711")
+
+        assert result is not None
+        assert result.popularity == 50  # Default
+        assert result.tags == []  # Empty list
+        assert result.spotify_genres is None
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_spotify_ids_deduplicates(self, mock_client_class: MagicMock) -> None:
+        """Test that duplicate Spotify IDs are deduplicated."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        # Pass duplicates
+        service.lookup_mbids_by_spotify_ids(["id1", "id1", "id2", "id2"])
+
+        # Verify the query was called with deduplicated list
+        mock_client.query.assert_called_once()
+        call_args = mock_client.query.call_args
+        config = call_args[1]["job_config"]
+        # ArrayQueryParameter uses .values not .value
+        params = {p.name: p.values for p in config.query_parameters}
+        assert len(params["spotify_ids"]) == 2
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_names_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_names(["Radiohead"])
+
+        assert result == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_lookup_mbids_by_spotify_ids_handles_exception(self, mock_client_class: MagicMock) -> None:
+        """Test that exception is handled gracefully."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.side_effect = Exception("BigQuery error")
+
+        service = BigQueryCatalogService()
+        result = service.lookup_mbids_by_spotify_ids(["spotify123"])
+
+        assert result == {}

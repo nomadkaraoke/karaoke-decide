@@ -60,6 +60,25 @@ class ArtistSearchResult:
 
 
 @dataclass
+class ArtistSearchResultMBID:
+    """Artist search result with MBID as primary identifier.
+
+    Used for MBID-first search where MusicBrainz ID is the canonical identifier.
+    Spotify data is enrichment (optional).
+    """
+
+    artist_mbid: str  # Primary identifier (MusicBrainz UUID)
+    artist_name: str
+    disambiguation: str | None  # e.g., "UK rock band"
+    artist_type: str | None  # Person, Group, Orchestra, etc.
+    popularity: int  # From Spotify if mapped, else 50
+    tags: list[str]  # MusicBrainz community tags (genres)
+    # Enrichment from Spotify (optional)
+    spotify_artist_id: str | None
+    spotify_genres: list[str] | None
+
+
+@dataclass
 class TrackSearchResult:
     """Track search result for autocomplete."""
 
@@ -85,6 +104,15 @@ class BigQueryCatalogService:
 
     def __init__(self, client: bigquery.Client | None = None):
         self.client = client or bigquery.Client(project=self.PROJECT_ID)
+
+    @staticmethod
+    def normalize_for_matching(text: str) -> str:
+        """Normalize text for matching. Public wrapper around module-level function.
+
+        Use this when looking up results from lookup_mbids_by_names() to ensure
+        consistent key normalization.
+        """
+        return _normalize_for_matching(text)
 
     def search_songs(
         self,
@@ -833,3 +861,241 @@ class BigQueryCatalogService:
             self._track_search_cache = {k: v for k, v in self._track_search_cache.items() if v[0] > cutoff}
 
         return track_results
+
+    # =========================================================================
+    # MBID-First Search Methods (MusicBrainz as source of truth)
+    # =========================================================================
+
+    # Cache for MBID search
+    _mbid_search_cache: dict[str, tuple[float, list["ArtistSearchResultMBID"]]] = {}
+
+    def search_artists_mbid(
+        self,
+        query: str,
+        limit: int = 10,
+        min_popularity: int = 0,
+    ) -> list[ArtistSearchResultMBID]:
+        """Search artists using MusicBrainz as source of truth.
+
+        Uses the mb_artists table with Spotify enrichment for popularity.
+        MusicBrainz has more comprehensive artist coverage than Spotify.
+
+        Args:
+            query: Search query (will be normalized)
+            limit: Maximum results to return (default 10)
+            min_popularity: Minimum popularity score (0-100, default 0 to include all MB artists)
+
+        Returns:
+            List of ArtistSearchResultMBID sorted by popularity
+        """
+        if not query or len(query) < 2:
+            return []
+
+        normalized = _normalize_for_matching(query)
+        if not normalized:
+            return []
+
+        # Check cache first
+        cache_key = f"mbid:{normalized}:{limit}:{min_popularity}"
+        now = time.time()
+        if cache_key in self._mbid_search_cache:
+            cached_time, cached_results = self._mbid_search_cache[cache_key]
+            if now - cached_time < self.CACHE_TTL:
+                logger.debug(f"MBID search cache hit for '{normalized}'")
+                return cached_results
+
+        # Query from pre-joined normalized table for performance
+        sql = f"""
+            SELECT
+                artist_mbid,
+                artist_name,
+                disambiguation,
+                artist_type,
+                name_normalized,
+                spotify_artist_id,
+                popularity,
+                spotify_genres,
+                mb_tags AS tags
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
+            WHERE name_normalized LIKE @query_prefix
+              AND popularity >= @min_popularity
+            ORDER BY popularity DESC
+            LIMIT @limit
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
+                bigquery.ScalarQueryParameter("limit", "INT64", limit),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+
+            artist_results = [
+                ArtistSearchResultMBID(
+                    artist_mbid=row.artist_mbid,
+                    artist_name=row.artist_name,
+                    disambiguation=row.disambiguation,
+                    artist_type=row.artist_type,
+                    popularity=row.popularity or 50,
+                    tags=list(row.tags) if row.tags else [],
+                    spotify_artist_id=row.spotify_artist_id,
+                    spotify_genres=list(row.spotify_genres)[:5] if row.spotify_genres else None,
+                )
+                for row in results
+            ]
+
+            # Cache the results
+            self._mbid_search_cache[cache_key] = (now, artist_results)
+
+            # Clean old cache entries periodically
+            if len(self._mbid_search_cache) > 1000:
+                cutoff = now - self.CACHE_TTL
+                self._mbid_search_cache = {k: v for k, v in self._mbid_search_cache.items() if v[0] > cutoff}
+
+            return artist_results
+
+        except Exception as e:
+            # If MusicBrainz tables don't exist yet, fall back gracefully
+            logger.warning(f"MBID search failed (tables may not exist yet): {e}")
+            return []
+
+    def get_artist_by_mbid(self, mbid: str) -> ArtistSearchResultMBID | None:
+        """Get artist by MusicBrainz ID.
+
+        Args:
+            mbid: MusicBrainz artist UUID
+
+        Returns:
+            ArtistSearchResultMBID or None if not found
+        """
+        sql = f"""
+            SELECT
+                artist_mbid,
+                artist_name,
+                disambiguation,
+                artist_type,
+                spotify_artist_id,
+                popularity,
+                spotify_genres,
+                mb_tags AS tags
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
+            WHERE artist_mbid = @mbid
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("mbid", "STRING", mbid),
+            ]
+        )
+
+        try:
+            results = list(self.client.query(sql, job_config=job_config).result())
+            if not results:
+                return None
+
+            row = results[0]
+            return ArtistSearchResultMBID(
+                artist_mbid=row.artist_mbid,
+                artist_name=row.artist_name,
+                disambiguation=row.disambiguation,
+                artist_type=row.artist_type,
+                popularity=row.popularity or 50,
+                tags=list(row.tags) if row.tags else [],
+                spotify_artist_id=row.spotify_artist_id,
+                spotify_genres=list(row.spotify_genres)[:5] if row.spotify_genres else None,
+            )
+        except Exception as e:
+            logger.warning(f"Get artist by MBID failed: {e}")
+            return None
+
+    def lookup_mbid_by_spotify_id(self, spotify_artist_id: str) -> str | None:
+        """Look up MBID for a Spotify artist ID.
+
+        Args:
+            spotify_artist_id: Spotify artist ID
+
+        Returns:
+            MusicBrainz artist UUID or None if not mapped
+        """
+        result = self.lookup_mbids_by_spotify_ids([spotify_artist_id])
+        return result.get(spotify_artist_id)
+
+    def lookup_mbids_by_spotify_ids(self, spotify_artist_ids: list[str]) -> dict[str, str]:
+        """Look up MBIDs for multiple Spotify artist IDs in a single query.
+
+        Args:
+            spotify_artist_ids: List of Spotify artist IDs
+
+        Returns:
+            Dict mapping Spotify artist ID to MusicBrainz artist UUID
+        """
+        if not spotify_artist_ids:
+            return {}
+
+        # Deduplicate
+        unique_ids = list(set(spotify_artist_ids))
+
+        sql = f"""
+            SELECT spotify_artist_id, artist_mbid
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mbid_spotify_mapping`
+            WHERE spotify_artist_id IN UNNEST(@spotify_ids)
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("spotify_ids", "STRING", unique_ids),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+            return {row.spotify_artist_id: row.artist_mbid for row in results}
+        except Exception as e:
+            logger.warning(f"Bulk MBID lookup failed: {e}")
+            return {}
+
+    def lookup_mbids_by_names(self, artist_names: list[str]) -> dict[str, str]:
+        """Look up MBIDs for multiple artist names.
+
+        Uses normalized name matching against MusicBrainz catalog.
+
+        Args:
+            artist_names: List of artist names to look up
+
+        Returns:
+            Dict mapping normalized artist name to MBID
+        """
+        if not artist_names:
+            return {}
+
+        # Normalize names for lookup
+        normalized_names = [_normalize_for_matching(name) for name in artist_names]
+        normalized_names = [n for n in normalized_names if n]
+
+        if not normalized_names:
+            return {}
+
+        sql = f"""
+            SELECT
+                name_normalized,
+                artist_mbid
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists`
+            WHERE name_normalized IN UNNEST(@names)
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("names", "STRING", normalized_names),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+            return {row.name_normalized: row.artist_mbid for row in results}
+        except Exception as e:
+            logger.warning(f"MBID name lookup failed: {e}")
+            return {}
