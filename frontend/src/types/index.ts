@@ -300,3 +300,94 @@ export interface SongLinksResponse {
   title: string;
   links: KaraokeLink[];
 }
+
+// ============================================================================
+// Artist Types (MBID-first)
+// ============================================================================
+
+/**
+ * Artist search result from catalog API.
+ * MBID-first: MusicBrainz ID is the primary identifier when available.
+ */
+export interface ArtistSearchResult {
+  // Primary identifier (MusicBrainz)
+  mbid: string | null;
+  name: string;
+
+  // MusicBrainz metadata
+  disambiguation: string | null;
+  artist_type: string | null;
+  tags: string[];
+
+  // Spotify enrichment
+  spotify_id: string | null;
+  popularity: number;
+  genres: string[];
+
+  // Backward compatibility (deprecated)
+  artist_id?: string; // Use mbid or spotify_id instead
+  artist_name?: string; // Use name instead
+}
+
+/**
+ * Compact artist entry from the index endpoint for client-side search.
+ * Uses short field names to minimize payload size.
+ */
+export interface ArtistIndexEntry {
+  m: string | null; // mbid (MusicBrainz ID, primary)
+  i: string | null; // spotify_id (for images, backward compat)
+  n: string; // name
+  p: number; // popularity
+}
+
+/**
+ * Artist response from quiz endpoints.
+ */
+export interface QuizArtist {
+  mbid: string | null;
+  name: string;
+  song_count: number;
+  top_songs: string[];
+  total_brand_count: number;
+  primary_decade: string;
+  spotify_id: string | null;
+  genres: string[];
+  tags: string[];
+  image_url: string | null;
+  suggestion_reason: SuggestionReason | null;
+}
+
+export interface SuggestionReason {
+  type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  display_text: string;
+  related_to: string | null;
+}
+
+/**
+ * Artist from user's data (My Data page).
+ */
+export interface UserArtist {
+  mbid: string | null;
+  artist_name: string;
+  sources: string[];
+  spotify_id: string | null;
+  spotify_rank: number | null;
+  spotify_time_range: string | null;
+  popularity: number | null;
+  genres: string[];
+  lastfm_rank: number | null;
+  lastfm_playcount: number | null;
+  tags: string[];
+  is_excluded: boolean;
+  is_manual: boolean;
+}
+
+/**
+ * Manual artist input for quiz submission.
+ */
+export interface ManualArtistInput {
+  mbid: string | null; // Primary identifier
+  artist_id: string | null; // Spotify ID (backward compat)
+  artist_name: string;
+  genres: string[];
+}

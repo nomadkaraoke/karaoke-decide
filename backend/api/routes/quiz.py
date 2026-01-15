@@ -52,14 +52,26 @@ class SuggestionReasonResponse(BaseModel):
 
 
 class QuizArtistResponse(BaseModel):
-    """Artist presented in the onboarding quiz."""
+    """Artist presented in the onboarding quiz.
 
-    name: str
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional enrichment for images and external links.
+    """
+
+    # Primary identifier (MusicBrainz)
+    mbid: str | None = None  # MusicBrainz artist UUID (primary when available)
+    name: str  # Artist name
+
+    # Karaoke catalog data
     song_count: int
     top_songs: list[str]
     total_brand_count: int
     primary_decade: str
-    genres: list[str] = []
+
+    # Enrichment (optional)
+    spotify_id: str | None = None  # Spotify artist ID (for images, links)
+    genres: list[str] = []  # Spotify algorithmic genres
+    tags: list[str] = []  # MusicBrainz community tags
     image_url: str | None = None
     suggestion_reason: SuggestionReasonResponse | None = None
 
@@ -92,9 +104,16 @@ class DecadeArtistsResponse(BaseModel):
 
 
 class ManualArtistInput(BaseModel):
-    """Artist manually entered by user via autocomplete search."""
+    """Artist manually entered by user via autocomplete search.
 
-    artist_id: str = Field(..., description="Spotify artist ID")
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional for backward compatibility and image lookup.
+    """
+
+    # Primary identifier (MusicBrainz) - preferred when available
+    mbid: str | None = Field(None, description="MusicBrainz artist UUID (primary)")
+    # Backward compat / enrichment
+    artist_id: str | None = Field(None, description="Spotify artist ID (deprecated, use mbid)")
     artist_name: str = Field(..., description="Artist name for display")
     genres: list[str] = Field(default_factory=list, description="Artist genres")
 
@@ -301,12 +320,15 @@ async def get_quiz_artists(
     return QuizArtistsResponse(
         artists=[
             QuizArtistResponse(
+                mbid=artist.mbid,
                 name=artist.name,
                 song_count=artist.song_count,
                 top_songs=artist.top_songs,
                 total_brand_count=artist.total_brand_count,
                 primary_decade=artist.primary_decade,
+                spotify_id=artist.spotify_id,
                 genres=artist.genres,
+                tags=artist.tags,
                 image_url=artist.image_url,
             )
             for artist in artists
@@ -352,12 +374,15 @@ async def get_smart_quiz_artists(
     return QuizArtistsResponse(
         artists=[
             QuizArtistResponse(
+                mbid=artist.mbid,
                 name=artist.name,
                 song_count=artist.song_count,
                 top_songs=artist.top_songs,
                 total_brand_count=artist.total_brand_count,
                 primary_decade=artist.primary_decade,
+                spotify_id=artist.spotify_id,
                 genres=artist.genres,
+                tags=artist.tags,
                 image_url=artist.image_url,
                 suggestion_reason=SuggestionReasonResponse(
                     type=artist.suggestion_reason.type,
@@ -426,11 +451,13 @@ async def submit_quiz(
     will add new songs and update preferences.
     """
     # Convert Pydantic models to dataclasses for service layer
+    # MBID-first: Pass both mbid (primary) and artist_id (Spotify, for backward compat)
     manual_artists_data = (
         [
             ManualArtist(
-                artist_id=a.artist_id,
                 artist_name=a.artist_name,
+                mbid=a.mbid,
+                artist_id=a.artist_id,
                 genres=a.genres,
             )
             for a in request.manual_artists

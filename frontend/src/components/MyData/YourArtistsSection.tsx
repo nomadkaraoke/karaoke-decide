@@ -12,23 +12,36 @@ import {
 import { Button, Input, LoadingPulse } from "@/components/ui";
 
 interface UserArtist {
+  mbid?: string | null;
   artist_name: string;
   sources: string[];
+  spotify_id?: string | null;
   spotify_rank: number | null;
   spotify_time_range: string | null;
   lastfm_rank: number | null;
   lastfm_playcount: number | null;
   popularity: number | null;
   genres: string[];
+  tags?: string[];
   is_excluded: boolean;
   is_manual: boolean;
 }
 
+/**
+ * MBID-first artist suggestion from catalog search.
+ */
 interface ArtistSuggestion {
-  artist_id: string;
-  artist_name: string;
+  mbid: string | null;
+  name: string;
+  disambiguation?: string | null;
+  artist_type?: string | null;
+  tags?: string[];
+  spotify_id: string | null;
   popularity: number;
   genres: string[];
+  // Backward compat (deprecated)
+  artist_id?: string;
+  artist_name?: string;
 }
 
 interface Props {
@@ -124,10 +137,10 @@ export function YourArtistsSection({
     };
   }, []);
 
-  // Handle suggestion selection
+  // Handle suggestion selection (MBID-first)
   const selectSuggestion = (suggestion: ArtistSuggestion) => {
     setSelectedSuggestion(suggestion);
-    setNewArtist(suggestion.artist_name);
+    setNewArtist(suggestion.name);
     setShowSuggestions(false);
     setSuggestions([]);
     inputRef.current?.focus();
@@ -184,10 +197,10 @@ export function YourArtistsSection({
     try {
       setIsAdding(true);
       setAddError(null);
-      // Pass spotify_artist_id if we selected from autocomplete
+      // Pass spotify_artist_id if we selected from autocomplete (MBID-first uses spotify_id)
       await api.my.addDataArtist(
         newArtist.trim(),
-        selectedSuggestion?.artist_id
+        selectedSuggestion?.spotify_id ?? undefined
       );
       setNewArtist("");
       setSelectedSuggestion(null);
@@ -301,7 +314,7 @@ export function YourArtistsSection({
                     error={addError || undefined}
                     autoComplete="off"
                   />
-                  {/* Autocomplete dropdown */}
+                  {/* Autocomplete dropdown (MBID-first) */}
                   {showSuggestions && suggestions.length > 0 && (
                     <div
                       ref={suggestionsRef}
@@ -309,7 +322,7 @@ export function YourArtistsSection({
                     >
                       {suggestions.map((suggestion, index) => (
                         <button
-                          key={suggestion.artist_id}
+                          key={suggestion.mbid || suggestion.spotify_id || suggestion.name}
                           type="button"
                           onClick={() => selectSuggestion(suggestion)}
                           className={`w-full px-3 py-2 text-left transition-colors ${
@@ -320,7 +333,7 @@ export function YourArtistsSection({
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-[var(--text)]">
-                              {suggestion.artist_name}
+                              {suggestion.name}
                             </span>
                             {suggestion.popularity > 0 && (
                               <span className="text-xs text-[var(--text-subtle)]">

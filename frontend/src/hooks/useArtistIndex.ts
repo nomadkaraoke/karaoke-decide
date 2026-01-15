@@ -4,16 +4,29 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Fuse from "fuse.js";
 import { api } from "@/lib/api";
 
+/**
+ * Compact artist entry from the index endpoint.
+ * MBID-first: Uses short field names to minimize payload size.
+ */
 export interface IndexedArtist {
-  i: string; // artist_id
-  n: string; // artist_name
+  m: string | null; // mbid (MusicBrainz ID, primary)
+  i: string | null; // spotify_id (for images, backward compat)
+  n: string; // name
   p: number; // popularity
 }
 
+/**
+ * Artist search result returned by the hook.
+ * MBID-first: MusicBrainz ID is the primary identifier when available.
+ */
 export interface ArtistSearchResult {
-  artist_id: string;
-  artist_name: string;
+  mbid: string | null; // MusicBrainz ID (primary)
+  spotify_id: string | null; // Spotify ID (for images)
+  name: string;
   popularity: number;
+  // Backward compatibility (deprecated)
+  artist_id?: string;
+  artist_name?: string;
 }
 
 interface UseArtistIndexReturn {
@@ -133,10 +146,15 @@ export function useArtistIndex(): UseArtistIndexReturn {
 
       const results = globalIndex.search(query.trim(), { limit });
 
+      // MBID-first: Return new format with backward compat aliases
       return results.map((result) => ({
-        artist_id: result.item.i,
-        artist_name: result.item.n,
+        mbid: result.item.m,
+        spotify_id: result.item.i,
+        name: result.item.n,
         popularity: result.item.p,
+        // Backward compatibility (deprecated)
+        artist_id: result.item.i || result.item.m || "",
+        artist_name: result.item.n,
       }));
     },
     []

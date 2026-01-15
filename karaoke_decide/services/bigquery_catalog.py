@@ -727,6 +727,64 @@ class BigQueryCatalogService:
         logger.info(f"Loaded {len(artist_list)} artists for index")
         return artist_list
 
+    def get_artist_index_mbid(
+        self,
+        min_popularity: int = 30,
+    ) -> list[ArtistSearchResultMBID]:
+        """Get all artists with MBIDs above a popularity threshold for client-side search.
+
+        Uses MusicBrainz as source of truth with Spotify enrichment.
+        Returns a large list of artists for building a client-side search index.
+
+        Args:
+            min_popularity: Minimum popularity score (0-100, default 30)
+
+        Returns:
+            List of ArtistSearchResultMBID sorted by popularity (highest first)
+        """
+        logger.info(f"Loading MBID artist index with min_popularity={min_popularity}")
+
+        sql = f"""
+            SELECT
+                artist_mbid,
+                artist_name,
+                spotify_artist_id,
+                popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
+            WHERE popularity >= @min_popularity
+            ORDER BY popularity DESC
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
+            ]
+        )
+
+        try:
+            results = self.client.query(sql, job_config=job_config).result()
+
+            artist_list = [
+                ArtistSearchResultMBID(
+                    artist_mbid=row.artist_mbid,
+                    artist_name=row.artist_name,
+                    disambiguation=None,  # Skip to reduce payload
+                    artist_type=None,  # Skip to reduce payload
+                    popularity=row.popularity or 50,
+                    tags=[],  # Skip to reduce payload
+                    spotify_artist_id=row.spotify_artist_id,
+                    spotify_genres=None,  # Skip to reduce payload
+                )
+                for row in results
+            ]
+
+            logger.info(f"Loaded {len(artist_list)} MBID artists for index")
+            return artist_list
+
+        except Exception as e:
+            logger.warning(f"MBID artist index failed (tables may not exist): {e}")
+            return []
+
     def search_artists(
         self,
         query: str,
