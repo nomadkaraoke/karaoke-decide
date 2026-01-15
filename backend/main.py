@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
         allow_origins=[
             "http://localhost:3000",
             "https://decide.nomadkaraoke.com",
+            "https://status.nomadkaraoke.com",
         ],
         allow_credentials=True,
         allow_methods=["*"],
