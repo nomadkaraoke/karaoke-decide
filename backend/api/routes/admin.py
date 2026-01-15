@@ -143,42 +143,44 @@ async def list_users(
     Note: "verified" filter uses email existence as the criteria because some
     early users may not have the is_guest field set. Verified users always
     have an email; guests never do.
-    """
-    # Query from decide_users collection (karaoke-decide only)
-    # No need to filter by user_id since this collection only has karaoke-decide users
-    filters: list[tuple[str, str, object]] = []
 
-    if filter == "verified":
-        # Use email existence as proxy for verified status
-        # Verified users always have email, guests never do
-        filters.append(("email", "!=", None))
-    elif filter == "guests":
+    Filtering is done client-side for verified/search to avoid requiring
+    Firestore composite indexes (acceptable for admin-only with limited users).
+    """
+    # Determine if we need client-side filtering
+    # Verified filter and search both require client-side filtering
+    needs_client_filter = filter == "verified" or search
+
+    # Build Firestore filters (only for guests filter which has an existing index)
+    filters: list[tuple[str, str, object]] = []
+    if filter == "guests":
         filters.append(("is_guest", "==", True))
 
-    # Note: Firestore doesn't support LIKE queries for partial text search.
-    # For email search, we fetch up to 500 docs and filter client-side.
-    # This is acceptable for admin-only functionality with limited user base.
-    # Future improvement: Add indexed normalized_email field for range queries,
-    # or integrate Algolia/Elasticsearch for full-text search.
-
-    # Get total count for pagination
-    total = await firestore.count_documents("decide_users", filters=filters if filters else None)
-
-    # Get users with pagination
+    # Get users - fetch more if we need to filter client-side
     user_docs = await firestore.query_documents(
         "decide_users",
         filters=filters if filters else None,
         order_by="created_at",
         order_direction="DESCENDING",
-        limit=limit if not search else 500,  # Get more if searching
-        offset=offset if not search else 0,
+        limit=limit if not needs_client_filter else 500,
+        offset=offset if not needs_client_filter else 0,
     )
 
     users = []
     for doc in user_docs:
+        email = doc.get("email")
+
+        # Apply verified filter client-side (users with email are verified)
+        if filter == "verified" and not email:
+            continue
+
+        # Apply email search filter client-side
+        if search and (not email or search.lower() not in email.lower()):
+            continue
+
         user_item = UserListItem(
             id=doc.get("user_id", ""),
-            email=doc.get("email"),
+            email=email,
             display_name=doc.get("display_name"),
             is_guest=doc.get("is_guest", False),
             is_admin=doc.get("is_admin", False),
@@ -187,19 +189,15 @@ async def list_users(
             quiz_completed_at=_parse_datetime(doc.get("quiz_completed_at")),
             total_songs_known=doc.get("total_songs_known", 0),
         )
-
-        # Apply email search filter client-side
-        if search:
-            email = doc.get("email") or ""
-            if search.lower() not in email.lower():
-                continue
-
         users.append(user_item)
 
-    # Apply pagination after search filtering
-    if search:
+    # Calculate total and apply pagination for client-side filtered results
+    if needs_client_filter:
         total = len(users)
         users = users[offset : offset + limit]
+    else:
+        # For server-side filtered results, get count from Firestore
+        total = await firestore.count_documents("decide_users", filters=filters if filters else None)
 
     return UserListResponse(
         users=users,
