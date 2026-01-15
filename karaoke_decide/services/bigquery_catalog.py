@@ -105,6 +105,15 @@ class BigQueryCatalogService:
     def __init__(self, client: bigquery.Client | None = None):
         self.client = client or bigquery.Client(project=self.PROJECT_ID)
 
+    @staticmethod
+    def normalize_for_matching(text: str) -> str:
+        """Normalize text for matching. Public wrapper around module-level function.
+
+        Use this when looking up results from lookup_mbids_by_names() to ensure
+        consistent key normalization.
+        """
+        return _normalize_for_matching(text)
+
     def search_songs(
         self,
         query: str,
@@ -1012,25 +1021,42 @@ class BigQueryCatalogService:
         Returns:
             MusicBrainz artist UUID or None if not mapped
         """
+        result = self.lookup_mbids_by_spotify_ids([spotify_artist_id])
+        return result.get(spotify_artist_id)
+
+    def lookup_mbids_by_spotify_ids(self, spotify_artist_ids: list[str]) -> dict[str, str]:
+        """Look up MBIDs for multiple Spotify artist IDs in a single query.
+
+        Args:
+            spotify_artist_ids: List of Spotify artist IDs
+
+        Returns:
+            Dict mapping Spotify artist ID to MusicBrainz artist UUID
+        """
+        if not spotify_artist_ids:
+            return {}
+
+        # Deduplicate
+        unique_ids = list(set(spotify_artist_ids))
+
         sql = f"""
-            SELECT artist_mbid
+            SELECT spotify_artist_id, artist_mbid
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mbid_spotify_mapping`
-            WHERE spotify_artist_id = @spotify_id
-            LIMIT 1
+            WHERE spotify_artist_id IN UNNEST(@spotify_ids)
         """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
-                bigquery.ScalarQueryParameter("spotify_id", "STRING", spotify_artist_id),
+                bigquery.ArrayQueryParameter("spotify_ids", "STRING", unique_ids),
             ]
         )
 
         try:
-            results = list(self.client.query(sql, job_config=job_config).result())
-            return results[0].artist_mbid if results else None
+            results = self.client.query(sql, job_config=job_config).result()
+            return {row.spotify_artist_id: row.artist_mbid for row in results}
         except Exception as e:
-            logger.warning(f"MBID lookup failed: {e}")
-            return None
+            logger.warning(f"Bulk MBID lookup failed: {e}")
+            return {}
 
     def lookup_mbids_by_names(self, artist_names: list[str]) -> dict[str, str]:
         """Look up MBIDs for multiple artist names.

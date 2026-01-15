@@ -243,7 +243,8 @@ class QuizService:
             seed_artist_mbids: list[str] = []
             try:
                 mbid_map = self.catalog.lookup_mbids_by_names(all_seed_artists)
-                seed_artist_mbids = [mbid_map.get(a.lower().strip(), "") for a in all_seed_artists]
+                # Use same normalization as lookup_mbids_by_names for consistent keys
+                seed_artist_mbids = [mbid_map.get(self.catalog.normalize_for_matching(a), "") for a in all_seed_artists]
                 seed_artist_mbids = [m for m in seed_artist_mbids if m]  # Filter empty
             except Exception:
                 pass  # Fall back to name-based matching
@@ -1544,19 +1545,23 @@ class QuizService:
         artist_mbids: list[str] = []
         if known_artists:
             mbid_map = self.catalog.lookup_mbids_by_names(known_artists)
-            # Collect MBIDs in order, using empty string for unresolved
+            # Collect MBIDs in order, using same normalization as lookup_mbids_by_names
             for artist in known_artists:
-                normalized = artist.lower().strip()
+                normalized = self.catalog.normalize_for_matching(artist)
                 # Try to find MBID in mapping (keys are normalized)
                 mbid = mbid_map.get(normalized, "")
                 if mbid:
                     artist_mbids.append(mbid)
 
-        # MBID-First: Resolve Spotify IDs to MBIDs for manual artists
+        # MBID-First: Resolve Spotify IDs to MBIDs for manual artists (bulk lookup)
         manual_artists_with_mbid: list[dict[str, Any]] = []
         if manual_artists:
+            # Bulk lookup all Spotify IDs in one query
+            spotify_ids = [a.artist_id for a in manual_artists]
+            spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
+
             for a in manual_artists:
-                mbid = self.catalog.lookup_mbid_by_spotify_id(a.artist_id)
+                mbid = spotify_to_mbid.get(a.artist_id)
                 manual_artists_with_mbid.append(
                     {
                         "artist_id": a.artist_id,  # Spotify ID (backward compat)
