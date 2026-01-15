@@ -1317,3 +1317,32 @@ useEffect(() => {
 BATCH_SIZE = 20  # Not 500!
 MAX_ITEMS_PER_DOC = 500  # Limit array sizes too
 ```
+
+---
+
+### 2026-01-15: Cloud Run OOM from Loading Too Many Firestore Documents
+
+**Context:** The `/api/quiz/artists/smart` endpoint was returning 503 errors in production. Cloud Run logs showed "Memory limit of 512 MiB exceeded with 519 MiB used."
+
+**Lesson:** Collaborative filtering code was loading too much data into memory:
+- 10,000 organic users from Firestore
+- 1,000 Last.fm users from Firestore
+
+Each user document contained arrays of hundreds of artists. The combined memory exceeded Cloud Run's 512Mi limit, causing the container to be killed mid-request (503 error, not timeout).
+
+**Recommendation:**
+- Limit Firestore query results to what you actually need
+- For collaborative filtering, a sample of 200-500 users is often sufficient
+- Monitor Cloud Run memory usage in production logs
+- Use `gcloud logging read 'resource.type="cloud_run_revision" AND severity>=ERROR'` to find OOM errors
+
+```python
+# BAD - loads way more data than needed
+return await firestore.query_documents(collection, filters=[], limit=10000)
+
+# GOOD - limit to what collaborative filtering actually requires
+MAX_USERS_FOR_COLLAB = 500  # Only need MIN_SIMILAR_USERS=5 matches
+return await firestore.query_documents(collection, filters=[], limit=MAX_USERS_FOR_COLLAB)
+```
+
+**Memory calculation:** If each user has ~500 artists × 100 bytes = 50KB per user, then 10,000 users = 500MB just for artist arrays. Add overhead and you exceed 512Mi easily.
