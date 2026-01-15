@@ -439,7 +439,7 @@ interface Artist {
 - Links: Use `spotify_id` for "Open in Spotify" links
 - Internal references: Use `mbid` for all internal state, API calls, keys
 
-### Phase 7: Songs/Recordings Migration (Not Started)
+### Phase 7: Songs/Recordings Migration (In Progress)
 
 **Goal:** Create MusicBrainz recordings table and link to karaoke catalog.
 
@@ -448,46 +448,70 @@ interface Artist {
 - Use MBID-based song recommendations
 - Link user "known songs" to canonical recordings
 
-**BigQuery Tables to Create:**
+**Code Implementation:** ✅ COMPLETE (2026-01-14)
+
+- [x] `scripts/musicbrainz_etl.py` - Extended with recording extraction
+  - Added `extract-recordings` command (extracts 37.5M recordings + 5.3M ISRCs)
+  - Added `load-recordings` and `load-isrcs` commands
+- [x] `karaoke_decide/services/bigquery_catalog.py` - Added recording lookup methods
+  - `RecordingSearchResult` and `KaraokeRecordingLink` dataclasses
+  - `search_recordings()`, `get_recording_by_mbid()`, `lookup_recording_by_isrc()`
+  - `lookup_recording_mbid_by_spotify_track_id()`, `get_karaoke_recording_links()`
+- [x] `scripts/link_karaoke_to_recordings.py` - New karaoke linking script
+  - ISRC-based matching (confidence: 0.95)
+  - Exact name matching fallback (confidence: 0.80)
+- [x] `tests/unit/test_bigquery_catalog.py` - Added recording tests
+
+**ETL Execution:** ⏳ PENDING
+
+```bash
+# Run ETL (estimated 4-5 hours)
+python scripts/musicbrainz_etl.py download  # If not cached
+python scripts/musicbrainz_etl.py extract-recordings
+python scripts/musicbrainz_etl.py load-recordings
+python scripts/musicbrainz_etl.py load-isrcs
+
+# After recordings loaded, run karaoke linking
+python scripts/link_karaoke_to_recordings.py run
+```
+
+**BigQuery Tables:**
 
 ```sql
--- Primary recordings table (from MusicBrainz dumps)
+-- Primary recordings table
 CREATE TABLE karaoke_decide.mb_recordings (
     recording_mbid STRING NOT NULL,
     title STRING NOT NULL,
     length_ms INT64,
-    artist_credit STRING,           -- Display string "Artist feat. Other"
-    first_release_date DATE,
-
-    -- Enrichment (nullable)
-    spotify_track_id STRING,
-    isrc STRING,
+    artist_credit STRING,
+    artist_credit_id INT64,
+    disambiguation STRING,
+    video BOOLEAN,
+    name_normalized STRING,
 );
 
--- Recording-Artist relationship
-CREATE TABLE karaoke_decide.mb_recording_artists (
+-- ISRC codes for recordings
+CREATE TABLE karaoke_decide.mb_recording_isrc (
     recording_mbid STRING NOT NULL,
-    artist_mbid STRING NOT NULL,
-    credit_type STRING,             -- main, featured, remixer
+    isrc STRING NOT NULL,
 );
 
--- ISRC mapping for cross-referencing
-CREATE TABLE karaoke_decide.isrc_mapping (
-    isrc STRING NOT NULL,
+-- Karaoke catalog links
+CREATE TABLE karaoke_decide.karaoke_recording_links (
+    karaoke_id INT64 NOT NULL,
     recording_mbid STRING,
     spotify_track_id STRING,
+    match_method STRING NOT NULL,
+    match_confidence FLOAT64,
 );
 ```
 
-**Karaoke Catalog Linking:**
-- Match `karaokenerds_raw` songs to `mb_recordings` via:
-  1. ISRC (most reliable)
-  2. Artist name + title fuzzy match
-  3. Spotify track ID → MBID mapping
-
-**ETL Updates:**
-- Extend `scripts/musicbrainz_etl.py` to extract recordings
-- Create matching script for karaoke catalog
+**Expected Data:**
+| Table | Rows | Status |
+|-------|------|--------|
+| `mb_recordings` | ~37.5M | Pending ETL |
+| `mb_recording_isrc` | ~5.3M | Pending ETL |
+| `karaoke_recording_links` | ~275K | Pending linking |
 
 ### Phase 8: Cleanup & Automation (Not Started)
 
@@ -572,8 +596,8 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 |-----------|--------|--------|
 | Public API responses | ❌ Still Spotify-first | External clients get Spotify IDs |
 | Frontend | ❌ Uses Spotify IDs | UI components reference Spotify |
-| Songs/Recordings | ❌ 100% Spotify | No `mb_recordings` table |
-| Karaoke catalog linking | ❌ Not started | Can't match karaoke songs to MBIDs |
+| Songs/Recordings (Phase 7) | 🔄 Code complete, ETL pending | `mb_recordings` table not yet loaded |
+| Karaoke catalog linking | 🔄 Script ready, pending ETL | Can run after recordings loaded |
 | Data refresh automation | ❌ Not started | Data will become stale |
 
 **Current Data Flow:**
