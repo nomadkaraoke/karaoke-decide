@@ -2,7 +2,7 @@
 
 This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-01-14 (MusicBrainz ETL complete)
+> **Last Updated:** 2026-01-15 (MusicBrainz recordings + karaoke linking complete)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
@@ -25,9 +25,13 @@ This document describes all music data available in BigQuery for use in features
 | Table | Row Count | Description |
 |-------|-----------|-------------|
 | `mb_artists` | 2,780,016 | Full MusicBrainz artist catalog |
+| `mb_recordings` | 37,530,321 | MusicBrainz recording catalog |
 | `mb_artist_tags` | 693,045 | Community-sourced tags/genres |
+| `mb_recording_isrc` | 5,480,292 | ISRC codes for recordings |
 | `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
 | `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
+| `karaoke_recording_links` | 162,314 | Karaoke songs → MB recordings |
+| `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
 
 ### Spotify Tables (Enrichment)
 
@@ -126,6 +130,91 @@ WHERE name_normalized LIKE 'green%'
   AND popularity >= 60
 ORDER BY popularity DESC
 LIMIT 10
+```
+
+### mb_recordings
+
+MusicBrainz recording catalog (songs/tracks).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `recording_mbid` | STRING | MusicBrainz UUID (primary key) |
+| `title` | STRING | Recording title |
+| `length_ms` | INT64 | Duration in milliseconds |
+| `artist_credit` | STRING | Display string (e.g., "Artist feat. Other") |
+| `artist_credit_id` | INT64 | FK for future use |
+| `disambiguation` | STRING | Disambiguator (e.g., "live version") |
+| `video` | BOOLEAN | Whether this is a video recording |
+| `name_normalized` | STRING | Lowercase normalized for search |
+
+**Example Query - Search recordings:**
+```sql
+SELECT recording_mbid, title, artist_credit
+FROM `nomadkaraoke.karaoke_decide.mb_recordings`
+WHERE name_normalized LIKE 'bohemian%'
+LIMIT 10
+```
+
+### mb_recording_isrc
+
+ISRC codes for MusicBrainz recordings (for cross-referencing with Spotify).
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `isrc` | STRING | ISRC code (12 characters) |
+
+**Example Query - Find recording by ISRC:**
+```sql
+SELECT ri.recording_mbid, r.title, r.artist_credit
+FROM `nomadkaraoke.karaoke_decide.mb_recording_isrc` ri
+JOIN `nomadkaraoke.karaoke_decide.mb_recordings` r
+  ON ri.recording_mbid = r.recording_mbid
+WHERE ri.isrc = 'GBAYE0601498'  -- Bohemian Rhapsody
+```
+
+### karaoke_recording_links
+
+Links karaoke catalog songs to MusicBrainz recordings.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `karaoke_id` | INT64 | FK to karaokenerds_raw.Id |
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `spotify_track_id` | STRING | Spotify track ID (if matched via ISRC) |
+| `match_method` | STRING | "isrc" or "exact_name" |
+| `match_confidence` | FLOAT64 | 0.95 for ISRC, 0.80 for name match |
+
+**Coverage:** 162,314 / 275,809 karaoke songs (58.9%)
+
+**Example Query - Get linked recordings for karaoke songs:**
+```sql
+SELECT k.Artist, k.Title, krl.recording_mbid, krl.match_method
+FROM `nomadkaraoke.karaoke_decide.karaokenerds_raw` k
+JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
+  ON k.Id = krl.karaoke_id
+WHERE k.Artist = 'Queen'
+```
+
+### isrc_spotify_mapping (View)
+
+Cross-reference view joining MB recordings to Spotify tracks via ISRC.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `isrc` | STRING | Shared ISRC code |
+| `recording_mbid` | STRING | MusicBrainz recording UUID |
+| `spotify_track_id` | STRING | Spotify track ID |
+| `spotify_title` | STRING | Spotify track title |
+| `spotify_artist` | STRING | Spotify artist name |
+| `mb_title` | STRING | MusicBrainz recording title |
+| `mb_artist` | STRING | MusicBrainz artist credit |
+
+**Example Query - Find Spotify track for MB recording:**
+```sql
+SELECT *
+FROM `nomadkaraoke.karaoke_decide.isrc_spotify_mapping`
+WHERE recording_mbid = 'some-uuid'
 ```
 
 ---

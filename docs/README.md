@@ -12,12 +12,14 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2026-01-15)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE** + MLHD+ Import ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE (Phases 1-7)** + MLHD+ Import ✅
 
 ### ✅ What's Working
 - **MBID-First Architecture COMPLETE (2026-01-15):**
   - **BigQuery MusicBrainz tables:** 2.78M artists, 693K tags, 376K Spotify mappings
+  - **MusicBrainz recordings (Phase 7):** 37.5M recordings, 5.5M ISRCs, 162K karaoke songs linked (58.9% coverage)
   - **MBID search APIs:** `search_artists_mbid()`, `get_artist_by_mbid()`, `lookup_mbids_by_names()`
+  - **Recording lookup APIs:** `search_recordings()`, `lookup_recording_by_isrc()`, `get_karaoke_recording_links()`
   - **Quiz stores MBIDs:** `quiz_artist_mbids` array in user documents
   - **Collaborative filtering:** Queries by MBID when available, falls back to name matching
   - **User migration complete:** 16/16 users backfilled with MBIDs (100%)
@@ -47,7 +49,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Enhanced Recommendations:** Categorized sections (Artists You Know, Create Your Own, Crowd Pleasers) with rich filters
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
-- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 693K tags + 1.5M MLHD+ artist similarity pairs**
+- **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 37.5M recordings + 5.5M ISRCs + 693K tags + 1.5M MLHD+ artist similarity pairs**
 - **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
