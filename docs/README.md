@@ -74,7 +74,7 @@ See [PLAN.md](PLAN.md) for complete implementation phases.
 | [VISION.md](VISION.md) | Product goals and user stories |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data schemas, BigQuery setup |
 | [BRAND-STYLE-GUIDE.md](BRAND-STYLE-GUIDE.md) | **Brand reference** - Colors, typography, themes for UI work |
-| [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) | **Spotify data reference** - All tables, schemas, queries for LLM agents |
+| [DATA-CATALOG.md](DATA-CATALOG.md) | **Music data reference** - All BigQuery tables, schemas, queries for LLM agents |
 | [MUSICBRAINZ-MIGRATION-PLAN.md](MUSICBRAINZ-MIGRATION-PLAN.md) | **MBID-first migration** - Moving from Spotify IDs to MBIDs as primary |
 | [FIRESTORE-IMPORT-PLAN.md](FIRESTORE-IMPORT-PLAN.md) | **Last.fm import** - 10K users with MBID-first schema |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup, testing, deployment |
@@ -120,7 +120,7 @@ cd frontend && npm run dev
 | `karaoke_decide.mlhd_artist_similarity` | **1.5M** | MLHD+ artist similarity (from 583K Last.fm users) |
 | `karaoke_decide.mbid_spotify_mapping` | 376K | MusicBrainz ID to Spotify ID mapping |
 
-> See [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) for detailed schemas, queries, and feature ideas.
+> See [DATA-CATALOG.md](DATA-CATALOG.md) for detailed schemas, queries, and feature ideas.
 
 ### Live Endpoints
 - `GET /api/health` - Basic health check
