@@ -18,7 +18,7 @@ def auth_settings() -> BackendSettings:
         jwt_secret="test-jwt-secret-key-for-testing",
         jwt_algorithm="HS256",
         jwt_expiration_hours=24,
-        magic_link_expiration_minutes=15,
+        magic_link_expiration_minutes=1440,
         frontend_url="http://localhost:3000",
     )
 
