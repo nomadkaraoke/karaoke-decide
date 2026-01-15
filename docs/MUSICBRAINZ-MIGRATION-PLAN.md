@@ -447,7 +447,7 @@ interface Artist {
 - Links: Use `spotify_id` for "Open in Spotify" links
 - Internal references: Use `mbid` for all internal state, API calls, keys
 
-### Phase 7: Songs/Recordings Migration (In Progress)
+### Phase 7: Songs/Recordings Migration ✅ COMPLETE (2026-01-15)
 
 **Goal:** Create MusicBrainz recordings table and link to karaoke catalog.
 
@@ -459,7 +459,7 @@ interface Artist {
 **Code Implementation:** ✅ COMPLETE (2026-01-14)
 
 - [x] `scripts/musicbrainz_etl.py` - Extended with recording extraction
-  - Added `extract-recordings` command (extracts 37.5M recordings + 5.3M ISRCs)
+  - Added `extract-recordings` command (extracts 37.5M recordings + 5.5M ISRCs)
   - Added `load-recordings` and `load-isrcs` commands
 - [x] `karaoke_decide/services/bigquery_catalog.py` - Added recording lookup methods
   - `RecordingSearchResult` and `KaraokeRecordingLink` dataclasses
@@ -470,18 +470,13 @@ interface Artist {
   - Exact name matching fallback (confidence: 0.80)
 - [x] `tests/unit/test_bigquery_catalog.py` - Added recording tests
 
-**ETL Execution:** ⏳ PENDING
+**ETL Execution:** ✅ COMPLETE (2026-01-15)
 
-```bash
-# Run ETL (estimated 4-5 hours)
-python scripts/musicbrainz_etl.py download  # If not cached
-python scripts/musicbrainz_etl.py extract-recordings
-python scripts/musicbrainz_etl.py load-recordings
-python scripts/musicbrainz_etl.py load-isrcs
-
-# After recordings loaded, run karaoke linking
-python scripts/link_karaoke_to_recordings.py run
-```
+- [x] Extracted 37,530,321 recordings from MusicBrainz dump
+- [x] Extracted 5,480,292 ISRCs with recording linkage
+- [x] Loaded both tables to BigQuery
+- [x] Created `isrc_spotify_mapping` view (17M ISRC matches)
+- [x] Ran karaoke linking pipeline
 
 **BigQuery Tables:**
 
@@ -514,12 +509,19 @@ CREATE TABLE karaoke_decide.karaoke_recording_links (
 );
 ```
 
-**Expected Data:**
+**Final Data:**
 | Table | Rows | Status |
 |-------|------|--------|
-| `mb_recordings` | ~37.5M | Pending ETL |
-| `mb_recording_isrc` | ~5.3M | Pending ETL |
-| `karaoke_recording_links` | ~275K | Pending linking |
+| `mb_recordings` | 37,530,321 | ✅ Loaded |
+| `mb_recording_isrc` | 5,480,292 | ✅ Loaded |
+| `isrc_spotify_mapping` | 17,012,103 | ✅ View created |
+| `karaoke_recording_links` | 162,314 | ✅ Linked |
+
+**Karaoke Catalog Coverage:**
+- **Total karaoke songs:** 275,809
+- **Linked via ISRC:** 96,070 (0.95 confidence)
+- **Linked via name match:** 66,244 (0.80 confidence)
+- **Total linked:** 162,314 (58.9% coverage)
 
 ### Phase 8: Cleanup & Automation (Not Started)
 
@@ -573,10 +575,14 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 - [x] All unit tests pass (163 unit, 403 backend)
 - [x] TypeScript compiles without errors (excluding pre-existing E2E issues)
 
-**Phase 7-8 (TODO):**
-- [ ] Songs/recordings migration to MBID-based schema
-- [ ] Songs/recordings have MBID linkage
+**Phase 7 (COMPLETE - 2026-01-15):**
+- [x] Songs/recordings migration to MBID-based schema (37.5M recordings)
+- [x] Songs/recordings have MBID linkage (5.5M ISRCs)
+- [x] Karaoke catalog linked to recordings (162K links, 58.9% coverage)
+
+**Phase 8 (TODO):**
 - [ ] MusicBrainz dump refresh automated (weekly)
+- [ ] Remove deprecated Spotify-only code paths
 
 ## Coordination with MLHD+ Import
 
@@ -594,9 +600,9 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 | **Genre source** | Use both: Spotify `genres` + MusicBrainz `tags` | Spotify genres are algorithmic but consistent; MB tags are community-curated but noisier |
 | **Recording vs Track** | Use recordings only | Works-level abstraction is too complex for karaoke use case |
 
-## Current State Summary (2026-01-14)
+## Current State Summary (2026-01-15)
 
-**What's DONE (Phases 1-4):**
+**What's DONE (Phases 1-7):**
 | Component | Status | Details |
 |-----------|--------|---------|
 | BigQuery artist tables | ✅ Complete | 2.78M artists, 693K tags, 376K mappings |
@@ -604,27 +610,28 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 | Quiz stores MBIDs | ✅ Complete | `quiz_artist_mbids` field in user documents |
 | User migration | ✅ Complete | 16/16 users backfilled |
 | Collaborative filtering | ✅ Complete | Queries by MBID when available |
+| Public API responses | ✅ Complete | MBID-first with Spotify enrichment |
+| Frontend | ✅ Complete | TypeScript interfaces updated for MBID |
+| BigQuery recordings | ✅ Complete | 37.5M recordings, 5.5M ISRCs |
+| Karaoke catalog linking | ✅ Complete | 162K links (58.9% coverage) |
 
-**What's NOT DONE (Phases 5-8):**
+**What's NOT DONE (Phase 8):**
 | Component | Status | Impact |
 |-----------|--------|--------|
-| Public API responses | ❌ Still Spotify-first | External clients get Spotify IDs |
-| Frontend | ❌ Uses Spotify IDs | UI components reference Spotify |
-| Songs/Recordings (Phase 7) | 🔄 Code complete, ETL pending | `mb_recordings` table not yet loaded |
-| Karaoke catalog linking | 🔄 Script ready, pending ETL | Can run after recordings loaded |
 | Data refresh automation | ❌ Not started | Data will become stale |
+| Deprecated code cleanup | ❌ Not started | Technical debt |
 
-**Current Data Flow:**
+**Current Data Flow (MBID-First):**
 ```
 User selects "Green Day" in quiz UI
-  → Frontend sends: { artist_name: "Green Day" }
-  → Backend internally resolves MBID for recommendations
+  → Frontend sends: { mbid: "084308bd-..." }
+  → Backend uses MBID directly for all operations
   → Backend stores: quiz_artist_mbids: ["084308bd-..."]
-  → Backend returns: { artist_id: "7oPftvlwr6VrsViSDV7fJY" }  # Spotify ID
-  → Frontend displays using Spotify data
+  → Backend returns: { mbid: "084308bd-...", spotify_id: "7oPf..." }
+  → Frontend uses MBID as key, Spotify for images/links
 ```
 
-**Target Data Flow (after Phases 5-6):**
+**Target Data Flow (after Phase 8):**
 ```
 User selects "Green Day" in quiz UI
   → Frontend sends: { mbid: "084308bd-..." }
@@ -641,17 +648,19 @@ User selects "Green Day" in quiz UI
 3. ~~**Create MusicBrainz tables**~~ ✅ DONE (2026-01-14)
 4. ~~**Create MBID↔Spotify mapping**~~ ✅ DONE (2026-01-14)
 5. ~~**Enable MBID-based queries**~~ ✅ DONE (2026-01-14)
+6. ~~**Phase 5: Public API Migration**~~ ✅ DONE (2026-01-15)
+7. ~~**Phase 6: Frontend Update**~~ ✅ DONE (2026-01-15)
+8. ~~**Phase 7: Songs/Recordings**~~ ✅ DONE (2026-01-15)
+   - 37.5M recordings loaded to BigQuery
+   - 5.5M ISRCs for cross-referencing
+   - 162K karaoke songs linked (58.9% coverage)
 
-**Remaining (in recommended order):**
-6. **Phase 5: Public API Migration** - Update `/api/catalog/artists` etc. to return MBID-first
-7. **Phase 6: Frontend Update** - Update TypeScript interfaces and components
-8. **Phase 7: Songs/Recordings** - Create `mb_recordings` table, link karaoke catalog
-9. **Phase 8: Cleanup & Automation** - Remove deprecated code, set up refresh
+**Remaining:**
+9. **Phase 8: Cleanup & Automation** - Remove deprecated code, set up weekly refresh
 
 **Recommended approach for next agent:**
-- Phases 5+6 can be done together (API + Frontend in one PR)
-- Phase 7 is independent and can be parallelized
-- Phase 8 should wait until 5-7 are complete
+- Phase 8 can now proceed - all prerequisites are complete
+- Consider implementing incremental MusicBrainz replication packets (daily ~10MB) instead of full dumps
 
 ## Implementation Notes (2026-01-14)
 
