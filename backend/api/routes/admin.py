@@ -59,7 +59,8 @@ async def get_admin_stats(
     # User stats - count from decide_users collection (karaoke-decide only)
     # The decide_users collection was created to separate from karaoke-gen's gen_users
     total_users = await firestore.count_documents("decide_users")
-    verified_users = await firestore.count_documents("decide_users", filters=[("is_guest", "==", False)])
+    # Use email existence as proxy for verified status (some users may not have is_guest field)
+    verified_users = await firestore.count_documents("decide_users", filters=[("email", "!=", None)])
     guest_users = await firestore.count_documents("decide_users", filters=[("is_guest", "==", True)])
 
     # Active users (synced in last 7 days)
@@ -134,16 +135,23 @@ async def list_users(
     firestore: FirestoreServiceDep,
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    filter: Literal["all", "verified", "guests"] = Query(default="all"),
+    filter: Literal["all", "verified", "guests"] = Query(default="verified"),
     search: str | None = Query(default=None, description="Search by email"),
 ) -> UserListResponse:
-    """List users with pagination and filtering."""
+    """List users with pagination and filtering.
+
+    Note: "verified" filter uses email existence as the criteria because some
+    early users may not have the is_guest field set. Verified users always
+    have an email; guests never do.
+    """
     # Query from decide_users collection (karaoke-decide only)
     # No need to filter by user_id since this collection only has karaoke-decide users
     filters: list[tuple[str, str, object]] = []
 
     if filter == "verified":
-        filters.append(("is_guest", "==", False))
+        # Use email existence as proxy for verified status
+        # Verified users always have email, guests never do
+        filters.append(("email", "!=", None))
     elif filter == "guests":
         filters.append(("is_guest", "==", True))
 
