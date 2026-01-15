@@ -266,7 +266,7 @@ class TestAdminUsersList:
         admin_client: TestClient,
         mock_admin_firestore_service: MagicMock,
     ) -> None:
-        """Admin should be able to list users."""
+        """Admin should be able to list users (default filter is verified)."""
         mock_admin_firestore_service.count_documents = AsyncMock(return_value=50)
         mock_admin_firestore_service.query_documents = AsyncMock(
             return_value=[
@@ -285,16 +285,28 @@ class TestAdminUsersList:
                     "user_id": "user2",
                     "email": "user2@example.com",
                     "display_name": "User Two",
-                    "is_guest": True,
+                    "is_guest": False,
                     "is_admin": False,
                     "created_at": datetime(2024, 1, 2, tzinfo=UTC),
                     "last_sync_at": None,
                     "quiz_completed_at": None,
                     "total_songs_known": 5,
                 },
+                {
+                    "user_id": "guest1",
+                    "email": None,  # Guest has no email - filtered out by default
+                    "display_name": None,
+                    "is_guest": True,
+                    "is_admin": False,
+                    "created_at": datetime(2024, 1, 3, tzinfo=UTC),
+                    "last_sync_at": None,
+                    "quiz_completed_at": None,
+                    "total_songs_known": 0,
+                },
             ]
         )
 
+        # Default filter is "verified" - guests are filtered out client-side
         response = admin_client.get(
             "/api/admin/users",
             headers={"Authorization": "Bearer test-token"},
@@ -302,11 +314,12 @@ class TestAdminUsersList:
         assert response.status_code == 200
 
         data = response.json()
-        assert data["total"] == 50
+        # Total is calculated client-side for verified filter (only users with email)
+        assert data["total"] == 2
         assert len(data["users"]) == 2
         assert data["users"][0]["id"] == "user1"
         assert data["users"][0]["email"] == "user1@example.com"
-        assert data["users"][1]["is_guest"] is True
+        # Guest user is filtered out (no email)
 
     def test_list_users_with_filter(
         self,
@@ -323,26 +336,29 @@ class TestAdminUsersList:
         )
         assert response.status_code == 200
 
-        # Verify filter was applied (email existence as proxy for verified status)
+        # Verified filter is now client-side (no Firestore filter)
+        # to avoid requiring composite index
         call_args = mock_admin_firestore_service.query_documents.call_args
-        assert call_args[1].get("filters") == [("email", "!=", None)]
+        assert call_args[1].get("filters") is None  # No server-side filter for verified
 
     def test_list_users_with_pagination(
         self,
         admin_client: TestClient,
         mock_admin_firestore_service: MagicMock,
     ) -> None:
-        """Admin should be able to paginate users."""
+        """Admin should be able to paginate users (with filter=all for server-side pagination)."""
         mock_admin_firestore_service.count_documents = AsyncMock(return_value=100)
         mock_admin_firestore_service.query_documents = AsyncMock(return_value=[])
 
+        # Use filter=all to test server-side pagination
+        # (verified filter uses client-side pagination)
         response = admin_client.get(
-            "/api/admin/users?limit=10&offset=20",
+            "/api/admin/users?filter=all&limit=10&offset=20",
             headers={"Authorization": "Bearer test-token"},
         )
         assert response.status_code == 200
 
-        # Verify pagination was applied
+        # Verify pagination was applied server-side
         call_args = mock_admin_firestore_service.query_documents.call_args
         assert call_args[1].get("limit") == 10
         assert call_args[1].get("offset") == 20
