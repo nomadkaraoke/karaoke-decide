@@ -233,15 +233,18 @@ async def add_artist(
 ) -> AddArtistResponse:
     """Add an artist manually to user's preferences.
 
-    The artist will be stored in the same list as quiz-selected artists
-    and used in the recommendation engine.
+    MBID-first: The artist will be stored with MusicBrainz ID as the primary
+    identifier when available. The artist will be stored in the same list as
+    quiz-selected artists and used in the recommendation engine.
 
-    If spotify_artist_id is provided (from autocomplete), the artist will
-    be stored with Spotify metadata (genres, popularity).
+    If mbid is provided (from autocomplete), the artist will be stored with
+    MusicBrainz metadata. If spotify_artist_id is also provided, it will be
+    used for additional enrichment (images, popularity).
     """
     result = await user_data_service.add_artist(
         user.id,
         request.artist_name,
+        mbid=request.mbid,
         spotify_artist_id=request.spotify_artist_id,
     )
     return AddArtistResponse(**result)

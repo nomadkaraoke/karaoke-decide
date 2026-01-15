@@ -382,17 +382,22 @@ class UserDataService:
         self,
         user_id: str,
         artist_name: str,
+        mbid: str | None = None,
         spotify_artist_id: str | None = None,
     ) -> dict[str, Any]:
         """Add an artist manually to user's preferences.
 
+        MBID-first: MusicBrainz ID is the primary identifier when available.
+        Spotify ID is optional for backward compatibility and metadata enrichment.
+
         Stores in quiz_artists_known array in user document.
-        If spotify_artist_id is provided, also stores enriched artist data
-        in user_artists collection with Spotify metadata.
+        If mbid or spotify_artist_id is provided, also stores enriched artist data
+        in user_artists collection with metadata.
 
         Args:
             user_id: User ID
             artist_name: Artist name to add
+            mbid: Optional MusicBrainz artist UUID (primary identifier)
             spotify_artist_id: Optional Spotify artist ID for metadata enrichment
 
         Returns:
@@ -426,9 +431,9 @@ class UserDataService:
                 merge=True,
             )
 
-        # If spotify_artist_id provided, store enriched data in user_artists
-        if spotify_artist_id:
-            await self._store_artist_with_metadata(user_id, artist_name, spotify_artist_id)
+        # If mbid or spotify_artist_id provided, store enriched data in user_artists
+        if mbid or spotify_artist_id:
+            await self._store_artist_with_metadata(user_id, artist_name, mbid, spotify_artist_id)
 
         # Return updated artist list
         user_doc, _ = await self._get_user_document(user_id)
@@ -441,17 +446,20 @@ class UserDataService:
         self,
         user_id: str,
         artist_name: str,
-        spotify_artist_id: str,
+        mbid: str | None,
+        spotify_artist_id: str | None,
     ) -> None:
-        """Store artist with Spotify metadata in user_artists collection.
+        """Store artist with metadata in user_artists collection.
 
+        MBID-first: Stores MusicBrainz ID as primary identifier with Spotify enrichment.
         Looks up the artist in the normalized BigQuery table to get genres
         and popularity, then stores in Firestore.
 
         Args:
             user_id: User ID
             artist_name: Artist name
-            spotify_artist_id: Spotify artist ID
+            mbid: MusicBrainz artist UUID (primary identifier)
+            spotify_artist_id: Spotify artist ID (for images/metadata enrichment)
         """
         now = datetime.now(UTC)
 
@@ -464,9 +472,16 @@ class UserDataService:
             "user_id": user_id,
             "source": "manual",
             "artist_name": artist_name,
-            "spotify_artist_id": spotify_artist_id,
             "updated_at": now.isoformat(),
         }
+
+        # MBID-first: Store MusicBrainz ID as primary identifier
+        if mbid:
+            artist_data["mbid"] = mbid
+
+        # Store Spotify ID for metadata enrichment
+        if spotify_artist_id:
+            artist_data["spotify_artist_id"] = spotify_artist_id
 
         # Look up metadata from BigQuery
         if self._bigquery_catalog:

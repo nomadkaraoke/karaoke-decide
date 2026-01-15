@@ -1,7 +1,7 @@
 """Catalog routes for browsing karaoke songs."""
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 
 from backend.services.karaoke_link_service import (
     KaraokeLinkService,
@@ -102,23 +102,17 @@ class ArtistSearchResult(BaseModel):
     genres: list[str] = []  # Spotify algorithmic genres
 
     # Backward compatibility aliases (deprecated, will be removed)
+    @computed_field
     @property
     def artist_id(self) -> str:
         """Deprecated: Use mbid or spotify_id instead."""
         return self.spotify_id or self.mbid or ""
 
+    @computed_field
     @property
     def artist_name(self) -> str:
         """Deprecated: Use name instead."""
         return self.name
-
-    class Config:
-        """Allow property access during serialization."""
-
-        # Include computed fields in serialization for backward compat
-        json_schema_extra = {
-            "deprecated_fields": ["artist_id", "artist_name"],
-        }
 
 
 class ArtistSearchResponse(BaseModel):
