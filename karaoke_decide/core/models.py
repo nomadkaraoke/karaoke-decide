@@ -214,14 +214,26 @@ class SuggestionReason(BaseModel):
 
 
 class QuizArtist(BaseModel):
-    """Artist presented in the onboarding quiz."""
+    """Artist presented in the onboarding quiz.
 
-    name: str  # Artist name (used as ID)
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional enrichment for images and external links.
+    """
+
+    # Primary identifier (MusicBrainz)
+    mbid: str | None = None  # MusicBrainz artist UUID (primary when available)
+    name: str  # Artist name
+
+    # Karaoke catalog data
     song_count: int  # Number of karaoke songs by this artist
     top_songs: list[str]  # Top 3 song titles for preview
     total_brand_count: int  # Sum of brand counts across all songs
     primary_decade: str  # Most common decade for their songs
+
+    # Enrichment (optional)
+    spotify_id: str | None = None  # Spotify artist ID (for images, links)
     genres: list[str] = Field(default_factory=list)  # Genres from Spotify
+    tags: list[str] = Field(default_factory=list)  # MusicBrainz community tags
     image_url: str | None = None  # Artist image URL (from Spotify)
     suggestion_reason: SuggestionReason | None = None  # Why this artist is suggested
 

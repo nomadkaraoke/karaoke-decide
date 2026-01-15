@@ -10,17 +10,19 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **API:** https://decide.nomadkaraoke.com/api (proxied via Cloudflare Worker)
 - **Repo:** github.com/nomadkaraoke/karaoke-decide
 
-## Current Status (2026-01-14)
+## Current Status (2026-01-15)
 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE** + MLHD+ Import ✅
 
 ### ✅ What's Working
-- **MBID-First Architecture COMPLETE (2026-01-14):**
+- **MBID-First Architecture COMPLETE (2026-01-15):**
   - **BigQuery MusicBrainz tables:** 2.78M artists, 693K tags, 376K Spotify mappings
   - **MBID search APIs:** `search_artists_mbid()`, `get_artist_by_mbid()`, `lookup_mbids_by_names()`
   - **Quiz stores MBIDs:** `quiz_artist_mbids` array in user documents
   - **Collaborative filtering:** Queries by MBID when available, falls back to name matching
   - **User migration complete:** 16/16 users backfilled with MBIDs (100%)
+  - **Public API updated (phases 5-6):** All artist endpoints return MBID-first responses
+  - **Frontend updated:** TypeScript types and components use MBID as primary identifier
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
 - **Light/Dark Theme:** Full theme toggle support - system preference detection + manual toggle in header
 - **Homepage Overhaul:** Problem-focused hero, two user paths (quiz vs data sources), Generator integration section

@@ -345,19 +345,24 @@ function ArtistCard({ artist }: { artist: Artist }) {
 - [x] Update quiz submission to store MBIDs
 - [x] Enrich `quiz_manual_artists` with MBIDs
 
-### Phase 5: Public API Migration (Not Started)
+### Phase 5: Public API Migration ✅ COMPLETE (2026-01-15)
 
 **Goal:** Update all public API endpoints to return MBID as primary identifier.
 
-**Files to modify:**
+**Completed Changes:**
 
 | File | Changes |
 |------|---------|
-| `backend/api/routes/catalog.py` | Update `/artists` and `/artists/{id}` to return MBID-first |
-| `backend/api/routes/quiz.py` | Return MBIDs in artist suggestions |
-| `backend/api/routes/recommendations.py` | Include MBIDs in recommendation responses |
-| `backend/api/routes/my_data.py` | Return MBIDs in user artist data |
-| `backend/models/catalog.py` | Add `mbid` field to `ArtistResponse` model |
+| `backend/api/routes/catalog.py` | ✅ Updated `ArtistSearchResult` model with MBID-first fields (mbid, name, disambiguation, artist_type, tags, spotify_id) |
+| `backend/api/routes/catalog.py` | ✅ Updated `/api/catalog/artists` endpoint to use `search_artists_mbid()` with Spotify fallback |
+| `backend/api/routes/catalog.py` | ✅ Updated `/api/catalog/artists/index` endpoint to return compact MBID-first format (m, i, n, p fields) |
+| `backend/api/routes/quiz.py` | ✅ Updated `QuizArtistResponse` with mbid, spotify_id, tags fields |
+| `backend/api/routes/quiz.py` | ✅ Updated `ManualArtistInput` to accept mbid as primary identifier |
+| `backend/api/routes/my_data.py` | ✅ Updated `UserArtistResponse` with mbid, spotify_id, tags fields |
+| `backend/api/routes/my_data.py` | ✅ Updated `AddArtistRequest` to accept mbid |
+| `backend/services/quiz_service.py` | ✅ Updated `ManualArtist` dataclass with mbid field |
+| `karaoke_decide/services/bigquery_catalog.py` | ✅ Added `get_artist_index_mbid()` for MBID-first index |
+| `karaoke_decide/core/models.py` | ✅ Updated `QuizArtist` with mbid, spotify_id, tags fields |
 
 **API Response Changes:**
 
@@ -396,19 +401,22 @@ function ArtistCard({ artist }: { artist: Artist }) {
 - Accept both MBID and Spotify ID in path parameters
 - Add `X-API-Version` header for clients to opt into new format
 
-### Phase 6: Frontend Update (Not Started)
+### Phase 6: Frontend Update ✅ COMPLETE (2026-01-15)
 
 **Goal:** Update frontend to use MBID as primary identifier while using Spotify for display enrichment.
 
-**Files to modify:**
+**Completed Changes:**
 
 | File | Changes |
 |------|---------|
-| `frontend/src/types/api.ts` | Add `mbid` to Artist interface, make `artist_id` optional |
-| `frontend/src/components/ArtistCard.tsx` | Use MBID for keys/references, Spotify for images |
-| `frontend/src/components/ArtistSearch.tsx` | Store MBID on selection |
-| `frontend/src/app/quiz/components/ArtistSelection.tsx` | Submit MBIDs to backend |
-| `frontend/src/app/my-data/artists/page.tsx` | Display with MBID as key |
+| `frontend/src/types/index.ts` | ✅ Added MBID-first types: `ArtistSearchResult`, `ArtistIndexEntry`, `QuizArtist`, `UserArtist`, `ManualArtistInput` |
+| `frontend/src/lib/api.ts` | ✅ Updated API client types for `searchArtists`, `getArtistIndex`, `getSmartArtists`, `quiz.submit` |
+| `frontend/src/components/ArtistSearchAutocomplete.tsx` | ✅ Updated `SearchableArtist`, `SelectedArtist` interfaces; use `getArtistUniqueId()` for deduplication |
+| `frontend/src/components/QuizArtistCard.tsx` | ✅ Updated `QuizArtist` interface with mbid, spotify_id, tags |
+| `frontend/src/hooks/useArtistIndex.ts` | ✅ Updated `IndexedArtist`, `ArtistSearchResult` to include mbid, spotify_id |
+| `frontend/src/hooks/useInfiniteArtists.ts` | ✅ Updated `QuizArtist`, `SuggestionReason` types for MBID-first |
+| `frontend/src/app/quiz/page.tsx` | ✅ Updated quiz page with `getArtistUniqueId()` helper; map manual artists with mbid in submission |
+| `frontend/src/components/MyData/YourArtistsSection.tsx` | ✅ Updated `ArtistSuggestion`, `UserArtist` interfaces for MBID-first |
 
 **TypeScript Interface Changes:**
 
@@ -534,9 +542,15 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 - [x] Spotify enrichment available for popular artists (376K mappings)
 - [x] No user-facing breakage during migration
 
-**Phase 5-8 (TODO):**
-- [ ] Public API returns MBID as primary identifier
-- [ ] Frontend uses MBID as primary key
+**Phase 5-6 (COMPLETE - 2026-01-15):**
+- [x] Public API returns MBID as primary identifier
+- [x] Frontend uses MBID as primary key for artist references
+- [x] Backward compatibility maintained with deprecated field aliases
+- [x] All unit tests pass (163 unit, 403 backend)
+- [x] TypeScript compiles without errors (excluding pre-existing E2E issues)
+
+**Phase 7-8 (TODO):**
+- [ ] Songs/recordings migration to MBID-based schema
 - [ ] Songs/recordings have MBID linkage
 - [ ] MusicBrainz dump refresh automated (weekly)
 

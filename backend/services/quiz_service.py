@@ -38,10 +38,15 @@ class QuizSubmitResult:
 
 @dataclass
 class ManualArtist:
-    """Artist selected by user via autocomplete search (with Spotify ID)."""
+    """Artist selected by user via autocomplete search.
 
-    artist_id: str
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional for backward compatibility and image lookup.
+    """
+
     artist_name: str
+    mbid: str | None = None  # MusicBrainz ID (primary when available)
+    artist_id: str | None = None  # Spotify ID (deprecated, for backward compat)
     genres: list[str] | None = None
 
 
@@ -1556,12 +1561,15 @@ class QuizService:
         # MBID-First: Resolve Spotify IDs to MBIDs for manual artists (bulk lookup)
         manual_artists_with_mbid: list[dict[str, Any]] = []
         if manual_artists:
-            # Bulk lookup all Spotify IDs in one query
-            spotify_ids = [a.artist_id for a in manual_artists]
+            # Bulk lookup all Spotify IDs in one query (filter out None values)
+            spotify_ids = [a.artist_id for a in manual_artists if a.artist_id]
             spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
 
             for a in manual_artists:
-                manual_mbid: str | None = spotify_to_mbid.get(a.artist_id)
+                # Look up MBID from Spotify ID mapping (use artist's mbid if already provided)
+                manual_mbid: str | None = a.mbid
+                if not manual_mbid and a.artist_id:
+                    manual_mbid = spotify_to_mbid.get(a.artist_id)
                 manual_artists_with_mbid.append(
                     {
                         "artist_id": a.artist_id,  # Spotify ID (backward compat)

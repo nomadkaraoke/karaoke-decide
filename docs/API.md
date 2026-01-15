@@ -287,6 +287,8 @@ Get karaoke links for a specific song. Returns URLs to find or create karaoke vi
 
 Search artists by name for autocomplete. Returns artists sorted by popularity.
 
+**MBID-first:** Uses MusicBrainz as primary identifier with Spotify enrichment.
+
 **Query Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -298,19 +300,41 @@ Search artists by name for autocomplete. Returns artists sorted by popularity.
 {
   "artists": [
     {
-      "artist_id": "1dfeR4HaWDbWqFHLkxsg1d",
-      "artist_name": "Queen",
+      "mbid": "0383dadf-2a4e-4d10-a46a-e9e041da8eb3",
+      "name": "Queen",
+      "disambiguation": "UK rock group",
+      "artist_type": "Group",
+      "tags": ["rock", "classic rock", "glam rock"],
+      "spotify_id": "1dfeR4HaWDbWqFHLkxsg1d",
       "popularity": 88,
-      "genres": ["rock", "classic rock", "glam rock"]
+      "genres": ["rock", "classic rock", "glam rock"],
+      "artist_id": "1dfeR4HaWDbWqFHLkxsg1d",
+      "artist_name": "Queen"
     }
   ],
   "total": 1
 }
 ```
 
+**Response Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| mbid | string\|null | MusicBrainz artist UUID (primary identifier) |
+| name | string | Artist name |
+| disambiguation | string\|null | Descriptive text to distinguish same-named artists |
+| artist_type | string\|null | Person, Group, Orchestra, etc. |
+| tags | array | MusicBrainz community tags |
+| spotify_id | string\|null | Spotify artist ID (for images/links) |
+| popularity | int | Spotify popularity (0-100) |
+| genres | array | Spotify algorithmic genres |
+| artist_id | string | **Deprecated:** Use `mbid` or `spotify_id` |
+| artist_name | string | **Deprecated:** Use `name` |
+
 ### GET /api/catalog/artists/index
 
 Get the full artist index for client-side autocomplete. Returns ~24K popular artists (popularity >= 50) in a compact format optimized for download to the browser.
+
+**MBID-first:** Uses MusicBrainz as primary identifier with Spotify enrichment.
 
 This endpoint is designed to be cached aggressively. Response is ~600KB with brotli compression. The frontend uses Fuse.js for instant fuzzy search against this index.
 
@@ -319,6 +343,7 @@ This endpoint is designed to be cached aggressively. Response is ~600KB with bro
 {
   "artists": [
     {
+      "m": "ab67616d-0000-0000-0000-000000000000",
       "i": "4q3ewBCX7sLwd24euuV69X",
       "n": "Bad Bunny",
       "p": 100
@@ -329,8 +354,9 @@ This endpoint is designed to be cached aggressively. Response is ~600KB with bro
 ```
 
 **Compact format keys:**
-- `i` - artist_id (Spotify ID)
-- `n` - artist_name
+- `m` - mbid (MusicBrainz ID, primary - may be null for Spotify-only)
+- `i` - spotify_id (for images/backward compat)
+- `n` - name
 - `p` - popularity (0-100)
 
 ### GET /api/catalog/stats
@@ -971,6 +997,8 @@ Get aggregated summary of user's data.
 
 Get user's artists from all sources (sync + quiz + manual), merged when same artist appears in multiple sources.
 
+**MBID-first:** MusicBrainz ID is the primary identifier when available.
+
 **Requires:** Bearer token
 
 **Query Parameters:**
@@ -984,26 +1012,32 @@ Get user's artists from all sources (sync + quiz + manual), merged when same art
 {
   "artists": [
     {
+      "mbid": "0383dadf-2a4e-4d10-a46a-e9e041da8eb3",
       "artist_name": "Queen",
       "sources": ["spotify", "lastfm"],
+      "spotify_id": "1dfeR4HaWDbWqFHLkxsg1d",
       "spotify_rank": 1,
       "spotify_time_range": "medium_term",
       "lastfm_rank": 5,
       "lastfm_playcount": 847,
       "popularity": 90,
       "genres": ["rock", "glam rock"],
+      "tags": ["classic rock", "british"],
       "is_excluded": false,
       "is_manual": false
     },
     {
+      "mbid": null,
       "artist_name": "ABBA",
       "sources": ["quiz"],
+      "spotify_id": null,
       "spotify_rank": null,
       "spotify_time_range": null,
       "lastfm_rank": null,
       "lastfm_playcount": null,
       "popularity": null,
       "genres": [],
+      "tags": [],
       "is_excluded": false,
       "is_manual": true
     }
@@ -1015,9 +1049,19 @@ Get user's artists from all sources (sync + quiz + manual), merged when same art
 }
 ```
 
+**Response Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| mbid | string\|null | MusicBrainz artist UUID (primary identifier) |
+| artist_name | string | Artist name |
+| spotify_id | string\|null | Spotify artist ID (for images/links) |
+| tags | array | MusicBrainz community tags |
+
 ### POST /api/my/data/artists
 
-Add an artist manually. If `spotify_artist_id` is provided (from autocomplete), the artist will be stored with Spotify metadata (genres, popularity).
+Add an artist manually to user's preferences.
+
+**MBID-first:** MusicBrainz ID is the primary identifier when available.
 
 **Requires:** Bearer token
 
@@ -1025,11 +1069,19 @@ Add an artist manually. If `spotify_artist_id` is provided (from autocomplete), 
 ```json
 {
   "artist_name": "Elton John",
+  "mbid": "b83bc61f-8451-4a5d-8b8e-7e9ed295e822",
   "spotify_artist_id": "3PhoLpVuITZKcymswpck5b"
 }
 ```
 
-The `spotify_artist_id` field is optional. If provided, the artist will be enriched with Spotify metadata during storage.
+**Request Fields:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| artist_name | string | Yes | Artist name to add |
+| mbid | string | No | MusicBrainz artist UUID (primary identifier) |
+| spotify_artist_id | string | No | Spotify artist ID for metadata enrichment |
+
+If `mbid` is provided (from autocomplete), the artist will be stored with MusicBrainz metadata. If `spotify_artist_id` is also provided, it will be used for additional enrichment (images, popularity).
 
 **Response:**
 ```json

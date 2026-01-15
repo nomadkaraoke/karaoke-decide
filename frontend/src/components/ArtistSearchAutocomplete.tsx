@@ -6,17 +6,38 @@ import { Input } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useArtistIndex } from "@/hooks/useArtistIndex";
 
+/**
+ * Artist from search results.
+ * MBID-first: MusicBrainz ID is the primary identifier when available.
+ */
 export interface SearchableArtist {
-  artist_id: string;
-  artist_name: string;
+  // Primary identifier (MusicBrainz)
+  mbid: string | null;
+  name: string;
+
+  // Spotify enrichment (optional)
+  spotify_id: string | null;
   popularity: number;
   genres: string[];
+
+  // Backward compatibility (deprecated)
+  artist_id?: string; // Use mbid or spotify_id instead
+  artist_name?: string; // Use name instead
 }
 
+/**
+ * Selected artist for submission.
+ * MBID-first: MusicBrainz ID is the primary identifier when available.
+ */
 export interface SelectedArtist {
-  artist_id: string;
-  artist_name: string;
+  mbid: string | null; // Primary identifier
+  spotify_id: string | null; // For images, backward compat
+  name: string;
   genres: string[];
+
+  // Backward compatibility (deprecated)
+  artist_id?: string; // Use mbid or spotify_id instead
+  artist_name?: string; // Use name instead
 }
 
 interface ArtistSearchAutocompleteProps {
@@ -59,6 +80,7 @@ export function ArtistSearchAutocomplete({
   }, []);
 
   // Client-side search (instant)
+  // MBID-first: Map local index results to new format
   const handleLocalSearch = useCallback(
     (query: string) => {
       if (!query.trim() || !indexReady) {
@@ -69,10 +91,15 @@ export function ArtistSearchAutocomplete({
 
       const results = searchIndex(query, 8);
       const mapped: SearchableArtist[] = results.map((r) => ({
-        artist_id: r.artist_id,
-        artist_name: r.artist_name,
+        // MBID-first: Use mbid as primary, spotify_id for images
+        mbid: r.mbid,
+        name: r.name,
+        spotify_id: r.spotify_id,
         popularity: r.popularity,
         genres: [], // Local index doesn't include genres
+        // Backward compat (deprecated)
+        artist_id: r.spotify_id || r.mbid || "",
+        artist_name: r.name,
       }));
 
       setSearchResults(mapped);
@@ -82,6 +109,11 @@ export function ArtistSearchAutocomplete({
     [indexReady, searchIndex]
   );
 
+  // Helper to get unique ID for an artist (MBID-first)
+  const getArtistUniqueId = (artist: SearchableArtist): string => {
+    return artist.mbid || artist.spotify_id || artist.name;
+  };
+
   // API search (for niche artists not in local index)
   const handleApiSearch = useCallback(async (query: string) => {
     if (!query.trim()) return;
@@ -89,11 +121,11 @@ export function ArtistSearchAutocomplete({
     setIsApiSearching(true);
     try {
       const response = await api.catalog.searchArtists(query, 15);
-      // Merge with existing results, deduplicate by ID
+      // Merge with existing results, deduplicate by MBID-first unique ID
       setSearchResults((prev) => {
-        const existingIds = new Set(prev.map((a) => a.artist_id));
+        const existingIds = new Set(prev.map((a) => getArtistUniqueId(a)));
         const newArtists = response.artists.filter(
-          (a) => !existingIds.has(a.artist_id)
+          (a: SearchableArtist) => !existingIds.has(getArtistUniqueId(a))
         );
         return [...prev, ...newArtists];
       });
@@ -138,10 +170,15 @@ export function ArtistSearchAutocomplete({
   };
 
   const handleSelectArtist = (artist: SearchableArtist) => {
+    // MBID-first: Pass both mbid (primary) and spotify_id (for images)
     const selectedArtist: SelectedArtist = {
-      artist_id: artist.artist_id,
-      artist_name: artist.artist_name,
+      mbid: artist.mbid,
+      spotify_id: artist.spotify_id,
+      name: artist.name,
       genres: artist.genres,
+      // Backward compat (deprecated)
+      artist_id: artist.spotify_id || artist.mbid || "",
+      artist_name: artist.name,
     };
     onSelect(selectedArtist);
     setSearchQuery("");
@@ -207,11 +244,13 @@ export function ArtistSearchAutocomplete({
           ) : (
             <div className="py-2">
               {searchResults.map((artist) => {
-                const isSelected = selectedArtistIds.has(artist.artist_id);
+                // MBID-first: Use unique ID for key and selection check
+                const uniqueId = getArtistUniqueId(artist);
+                const isSelected = selectedArtistIds.has(uniqueId);
                 const genresDisplay = formatGenres(artist.genres);
                 return (
                   <button
-                    key={artist.artist_id}
+                    key={uniqueId}
                     onClick={() => handleSelectArtist(artist)}
                     disabled={isSelected}
                     className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
@@ -222,7 +261,7 @@ export function ArtistSearchAutocomplete({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-[var(--text)] font-medium truncate">
-                        {artist.artist_name}
+                        {artist.name}
                       </div>
                       {genresDisplay && (
                         <div className="text-[var(--text-muted)] text-sm truncate">

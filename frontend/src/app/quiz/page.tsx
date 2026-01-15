@@ -14,20 +14,41 @@ import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
 
 interface SuggestionReason {
-  type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
   display_text: string;
   related_to: string | null;
 }
 
+/**
+ * Quiz artist with MBID-first identifiers.
+ * MBID is the primary identifier when available.
+ */
 interface QuizArtist {
+  // Primary identifier (MusicBrainz)
+  mbid?: string | null;
   name: string;
+
+  // Karaoke catalog data
   song_count: number;
   top_songs: string[];
   total_brand_count: number;
   primary_decade: string;
+
+  // Enrichment (optional)
+  spotify_id?: string | null;
   genres?: string[];
+  tags?: string[];
   image_url: string | null;
   suggestion_reason?: SuggestionReason | null;
+}
+
+/** Helper to get unique ID for an artist (MBID-first) */
+function getArtistUniqueId(artist: QuizArtist | SelectedArtist): string {
+  if ("mbid" in artist && artist.mbid) return artist.mbid;
+  if ("spotify_id" in artist && artist.spotify_id) return artist.spotify_id;
+  // SelectedArtist has artist_id for backward compat
+  if ("artist_id" in artist && artist.artist_id) return artist.artist_id;
+  return artist.name;
 }
 
 type EnergyPreference = "chill" | "medium" | "high" | null;
@@ -309,7 +330,7 @@ export default function QuizPage() {
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.artist_name) : undefined,
+        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: Array.from(allExcluded),
         count: 50,
@@ -369,6 +390,14 @@ export default function QuizPage() {
     try {
       setIsSubmitting(true);
 
+      // Map manual artists to API format (MBID-first)
+      const mappedManualArtists = manualArtists.map((a) => ({
+        mbid: a.mbid,
+        artist_id: a.spotify_id || a.artist_id, // Spotify ID for backward compat
+        artist_name: a.name,
+        genres: a.genres,
+      }));
+
       // Submit main quiz data with all new fields
       await api.quiz.submit({
         known_artists: Array.from(selectedArtists),
@@ -377,7 +406,7 @@ export default function QuizPage() {
         genres: Array.from(selectedGenres),
         vocal_comfort_pref: vocalComfortPref,
         crowd_pleaser_pref: crowdPleaserPref,
-        manual_artists: manualArtists,
+        manual_artists: mappedManualArtists,
       });
 
       // Submit enjoy singing songs if any
@@ -407,16 +436,17 @@ export default function QuizPage() {
     await handleSubmit();
   };
 
-  // Step 4: Manual artist handlers
+  // Step 4: Manual artist handlers (MBID-first unique ID)
   const handleAddManualArtist = (artist: SelectedArtist) => {
+    const newId = getArtistUniqueId(artist);
     // Don't add duplicates
-    if (!manualArtists.some((a) => a.artist_id === artist.artist_id)) {
+    if (!manualArtists.some((a) => getArtistUniqueId(a) === newId)) {
       setManualArtists((prev) => [...prev, artist]);
     }
   };
 
-  const handleRemoveManualArtist = (artistId: string) => {
-    setManualArtists((prev) => prev.filter((a) => a.artist_id !== artistId));
+  const handleRemoveManualArtist = (artistUniqueId: string) => {
+    setManualArtists((prev) => prev.filter((a) => getArtistUniqueId(a) !== artistUniqueId));
   };
 
   // Step 4: Enjoy singing handlers
@@ -797,26 +827,29 @@ export default function QuizPage() {
               </h2>
               <ArtistSearchAutocomplete
                 onSelect={handleAddManualArtist}
-                selectedArtistIds={new Set(manualArtists.map((a) => a.artist_id))}
+                selectedArtistIds={new Set(manualArtists.map((a) => getArtistUniqueId(a)))}
                 placeholder="Search for artists you like..."
                 className="mb-3"
               />
               {manualArtists.length > 0 && (
                 <div className="flex flex-wrap gap-2">
-                  {manualArtists.map((artist) => (
-                    <span
-                      key={artist.artist_id}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] text-sm font-medium"
-                    >
-                      {artist.artist_name}
-                      <button
-                        onClick={() => handleRemoveManualArtist(artist.artist_id)}
-                        className="hover:text-[var(--text)] transition-colors"
+                  {manualArtists.map((artist) => {
+                    const uniqueId = getArtistUniqueId(artist);
+                    return (
+                      <span
+                        key={uniqueId}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] text-sm font-medium"
                       >
-                        <XIcon className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
+                        {artist.name}
+                        <button
+                          onClick={() => handleRemoveManualArtist(uniqueId)}
+                          className="hover:text-[var(--text)] transition-colors"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

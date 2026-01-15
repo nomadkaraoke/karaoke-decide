@@ -8,13 +8,25 @@ interface SuggestionReason {
   related_to: string | null;
 }
 
+/**
+ * Quiz artist with MBID-first identifiers.
+ * MBID is the primary identifier when available.
+ */
 interface QuizArtist {
+  // Primary identifier (MusicBrainz)
+  mbid?: string | null;
   name: string;
+
+  // Karaoke catalog data
   song_count: number;
   top_songs: string[];
   total_brand_count: number;
   primary_decade: string;
+
+  // Enrichment (optional)
+  spotify_id?: string | null;
   genres?: string[];
+  tags?: string[];
   image_url: string | null;
   suggestion_reason?: SuggestionReason | null;
 }
