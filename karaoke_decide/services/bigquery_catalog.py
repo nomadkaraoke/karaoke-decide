@@ -721,6 +721,7 @@ class BigQueryCatalogService:
                 popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
             WHERE popularity >= @min_popularity
+              AND spotify_artist_id IS NOT NULL
             ORDER BY popularity DESC
         """
 
