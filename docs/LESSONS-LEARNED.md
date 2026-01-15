@@ -1275,3 +1275,45 @@ useEffect(() => {
 ```
 
 **Key insight:** State changes during async operations can trigger multiple useEffects. Consider all state that affects routing decisions and handle them in a single, comprehensive redirect useEffect.
+
+
+---
+
+### 2026-01-14: Last.fm API Returns MBIDs Directly
+
+**Context:** Planning MBID-first architecture for collaborative filtering. Initially assumed we'd need to import MusicBrainz database dumps to get MBIDs.
+
+**Lesson:** The Last.fm API `user.getTopArtists` endpoint returns MBIDs directly for ~80% of artists. No separate MusicBrainz import needed for basic MBID support.
+
+```json
+{
+  "name": "Radiohead",
+  "mbid": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+  "playcount": "1234"
+}
+```
+
+**Recommendation:**
+- Check if upstream APIs already provide the IDs you need before building complex import pipelines
+- Last.fm MBID coverage is ~80% - sufficient for collaborative filtering
+- Store MBIDs as primary identifiers, keep names for backwards compatibility and display
+
+---
+
+### 2026-01-14: Firestore Batch Payload Limits for Large Documents
+
+**Context:** Importing 10K Last.fm users with up to 1000 artists each. Each user document is ~150KB. Initial batch size of 500 docs exceeded Firestore's 10MB payload limit.
+
+**Lesson:** Firestore batch commits have a 10MB total payload limit, not just a 500-document limit. Large documents require smaller batch sizes.
+
+**Recommendation:**
+- Calculate approximate document size: `artists_count × ~150 bytes`
+- For 500 artists × 150 bytes = 75KB per doc
+- Safe batch size: `10MB ÷ 75KB ≈ 130 docs` (use 50-100 for safety margin)
+- Monitor for `InvalidArgument: Request payload size exceeds the limit` errors
+
+```python
+# For large documents with many array elements
+BATCH_SIZE = 20  # Not 500!
+MAX_ITEMS_PER_DOC = 500  # Limit array sizes too
+```

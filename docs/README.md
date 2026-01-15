@@ -12,9 +12,10 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ## Current Status (2026-01-14)
 
-**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + MLHD+ Import ✅
+**Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + MBID-First + MLHD+ Import ✅
 
 ### ✅ What's Working
+- **MBID-First Architecture (NEW 2026-01-14):** Last.fm users now imported with MusicBrainz IDs as primary identifier. Collaborative filtering queries both organic users AND 10K+ Last.fm users in parallel.
 - **Brand Sync:** UI now matches Nomad Karaoke Generator branding (same colors, typography, layout patterns)
 - **Light/Dark Theme:** Full theme toggle support - system preference detection + manual toggle in header
 - **Homepage Overhaul:** Problem-focused hero, two user paths (quiz vs data sources), Generator integration section
@@ -24,10 +25,11 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
 - **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
 - **Better Artist Selection:** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
-- **Collaborative Recommendations:** Artists are suggested based on three sources of similarity data:
-  - **Karaoke singers:** "Singers who like Green Day also chose" - from our own quiz data (users who selected similar artists)
-  - **Music fans:** "Fans of Green Day also like" - from ListenBrainz API (general music listener patterns)
-  - **MLHD+ (NEW):** "Listeners of Green Day also like" - from 583K Last.fm users' listening history (1.5M artist pairs)
+- **Collaborative Recommendations:** Artists are suggested based on four sources of similarity data:
+  - **Last.fm users (Firestore):** 10K+ users with real listening history (MBID-first, ~78% MBID coverage)
+  - **MLHD+ (BigQuery):** 1.5M artist pairs from 583K Last.fm users - "Listeners of X also like"
+  - **Karaoke singers:** "Singers who like Green Day also chose" - from our own quiz data
+  - **Music fans:** "Fans of Green Day also like" - from ListenBrainz API
 - **Admin Dashboard:** Internal admin panel for user management, sync job monitoring, system stats
 - **Frontend:** Live at decide.nomadkaraoke.com with real-time search
 - **Backend API:** Deployed on Cloud Run with BigQuery + Secret Manager integration
@@ -64,6 +66,8 @@ See [PLAN.md](PLAN.md) for complete implementation phases.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, data schemas, BigQuery setup |
 | [BRAND-STYLE-GUIDE.md](BRAND-STYLE-GUIDE.md) | **Brand reference** - Colors, typography, themes for UI work |
 | [SPOTIFY-DATA-CATALOG.md](SPOTIFY-DATA-CATALOG.md) | **Spotify data reference** - All tables, schemas, queries for LLM agents |
+| [MUSICBRAINZ-MIGRATION-PLAN.md](MUSICBRAINZ-MIGRATION-PLAN.md) | **MBID-first migration** - Moving from Spotify IDs to MBIDs as primary |
+| [FIRESTORE-IMPORT-PLAN.md](FIRESTORE-IMPORT-PLAN.md) | **Last.fm import** - 10K users with MBID-first schema |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Local setup, testing, deployment |
 | [API.md](API.md) | Backend endpoint documentation |
 | [TESTING.md](TESTING.md) | **Testing guide** - SOLID, test types, coverage, Playwright |
