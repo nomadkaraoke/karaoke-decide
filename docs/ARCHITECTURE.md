@@ -156,7 +156,7 @@ sung_records:
 
 1. **OAuth Tokens**: Encrypted at rest in Firestore, refreshed automatically
 2. **JWT Tokens**: Short-lived (1 week), signed with secret from Secret Manager
-3. **Magic Links**: Single-use, expire in 15 minutes
+3. **Magic Links**: Single-use, expire in 24 hours
 4. **API Rate Limiting**: 100 requests/minute per user
 5. **CORS**: Restricted to known domains
 

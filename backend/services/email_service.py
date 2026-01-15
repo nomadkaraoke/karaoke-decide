@@ -98,7 +98,7 @@ class EmailService:
 
             <div style="background: #f9fafb; border-radius: 8px; padding: 30px; margin-bottom: 30px;">
                 <h2 style="margin-top: 0;">Sign in to your account</h2>
-                <p>Click the button below to sign in. This link will expire in 15 minutes.</p>
+                <p>Click the button below to sign in. This link will expire in 24 hours.</p>
 
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="{magic_link_url}"
