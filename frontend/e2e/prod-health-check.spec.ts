@@ -42,8 +42,8 @@ test.describe("Production Health Checks", () => {
       const response = await request.get("/api/catalog/artists/index");
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
-      // Should have thousands of artists
-      expect(data.length).toBeGreaterThan(1000);
+      // Should have thousands of artists (response is { artists: [], count: X })
+      expect(data.count || data.artists?.length || data.length).toBeGreaterThan(1000);
     });
   });
 
