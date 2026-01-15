@@ -199,7 +199,8 @@ class TestAdminStats:
             if collection == "decide_users":
                 filter_dict = {f[0]: f[2] for f in filters} if filters else {}
                 # Stats queries use decide_users collection (karaoke-decide only)
-                if filter_dict.get("is_guest") is False:
+                # Verified users are counted by email existence (not is_guest field)
+                if "email" in filter_dict:  # email != None filter for verified
                     return 60
                 if filter_dict.get("is_guest") is True:
                     return 40
@@ -322,9 +323,9 @@ class TestAdminUsersList:
         )
         assert response.status_code == 200
 
-        # Verify filter was applied (no user_id filter since decide_users only has karaoke-decide users)
+        # Verify filter was applied (email existence as proxy for verified status)
         call_args = mock_admin_firestore_service.query_documents.call_args
-        assert call_args[1].get("filters") == [("is_guest", "==", False)]
+        assert call_args[1].get("filters") == [("email", "!=", None)]
 
     def test_list_users_with_pagination(
         self,
