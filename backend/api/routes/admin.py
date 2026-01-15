@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel
 
 from backend.api.deps import AdminUser, AuthServiceDep, FirestoreServiceDep
 from backend.models.admin import (
@@ -290,6 +291,75 @@ async def get_user_detail(
             songs_count=songs_count,
             playlists_count=playlists_count,
         ),
+    )
+
+
+class AdminDeleteUserResponse(BaseModel):
+    """Response after admin deletes a user."""
+
+    message: str
+    deleted_user_id: str
+    deleted_user_email: str | None
+
+
+@router.delete("/users/{user_id}", response_model=AdminDeleteUserResponse)
+async def admin_delete_user(
+    user_id: str,
+    admin: AdminUser,
+    auth_service: AuthServiceDep,
+    firestore: FirestoreServiceDep,
+) -> AdminDeleteUserResponse:
+    """Delete a user and all their associated data (admin only).
+
+    This permanently deletes:
+    - The user account
+    - All saved songs (user_songs)
+    - All saved artists (user_artists)
+    - Connected music services
+    - Sync jobs
+
+    This action cannot be undone.
+
+    Use cases:
+    - Cleaning up test accounts
+    - GDPR data deletion requests
+    - Removing spam/abuse accounts
+    """
+    # First get the user to confirm they exist and get their email for logging
+    user_doc = None
+    if user_id.startswith("guest_"):
+        user_doc = await firestore.get_document("decide_users", user_id)
+    else:
+        user_docs = await firestore.query_documents(
+            "decide_users",
+            filters=[("user_id", "==", user_id)],
+            limit=1,
+        )
+        user_doc = user_docs[0] if user_docs else None
+
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    user_email = user_doc.get("email")
+
+    # Use auth service to delete user and associated data
+    deleted = await auth_service.delete_user(user_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user",
+        )
+
+    logger.info(f"Admin {admin.email} deleted user {user_id} ({user_email})")
+
+    return AdminDeleteUserResponse(
+        message="User and all associated data deleted successfully",
+        deleted_user_id=user_id,
+        deleted_user_email=user_email,
     )
 
 
