@@ -236,23 +236,36 @@ export const api = {
         }>;
       }>(`/api/catalog/songs/${songId}/links`),
 
+    // MBID-first artist search
     searchArtists: (query: string, limit: number = 10) =>
       api.get<{
         artists: Array<{
-          artist_id: string;
-          artist_name: string;
+          // MBID-first: Primary identifier
+          mbid: string | null;
+          name: string;
+          // MusicBrainz metadata
+          disambiguation: string | null;
+          artist_type: string | null;
+          tags: string[];
+          // Spotify enrichment
+          spotify_id: string | null;
           popularity: number;
           genres: string[];
+          // Backward compat (deprecated)
+          artist_id?: string;
+          artist_name?: string;
         }>;
         total: number;
       }>(`/api/catalog/artists?q=${encodeURIComponent(query)}&limit=${limit}`),
 
     // Full artist index for client-side search (~168K artists, ~4MB compressed)
+    // MBID-first: Uses compact field names to minimize payload
     getArtistIndex: () =>
       api.get<{
         artists: Array<{
-          i: string; // artist_id
-          n: string; // artist_name
+          m: string | null; // mbid (MusicBrainz ID, primary)
+          i: string | null; // spotify_id (for images, backward compat)
+          n: string; // name
           p: number; // popularity
         }>;
         count: number;
@@ -586,8 +599,10 @@ export const api = {
       genres?: string[];
       vocal_comfort_pref?: "easy" | "challenging" | "any" | null;
       crowd_pleaser_pref?: "hits" | "deep_cuts" | "any" | null;
+      // MBID-first: Pass mbid (primary) and artist_id (Spotify, for backward compat)
       manual_artists?: Array<{
-        artist_id: string;
+        mbid?: string | null; // MusicBrainz ID (primary)
+        artist_id?: string | null; // Spotify ID (deprecated, backward compat)
         artist_name: string;
         genres?: string[];
       }>;
@@ -608,15 +623,21 @@ export const api = {
     }) =>
       api.post<{
         artists: Array<{
+          // MBID-first: Primary identifier
+          mbid: string | null;
           name: string;
+          // Karaoke catalog data
           song_count: number;
           top_songs: string[];
           total_brand_count: number;
           primary_decade: string;
+          // Enrichment
+          spotify_id: string | null;
           genres: string[];
+          tags: string[];
           image_url: string | null;
           suggestion_reason: {
-            type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+            type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
             display_text: string;
             related_to: string | null;
           } | null;

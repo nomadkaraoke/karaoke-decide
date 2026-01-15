@@ -38,10 +38,15 @@ class QuizSubmitResult:
 
 @dataclass
 class ManualArtist:
-    """Artist selected by user via autocomplete search (with Spotify ID)."""
+    """Artist selected by user via autocomplete search.
 
-    artist_id: str
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional for backward compatibility and image lookup.
+    """
+
     artist_name: str
+    mbid: str | None = None  # MusicBrainz ID (primary when available)
+    artist_id: str | None = None  # Spotify ID (deprecated, for backward compat)
     genres: list[str] | None = None
 
 

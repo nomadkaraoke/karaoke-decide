@@ -4,18 +4,29 @@ import { useCallback, useRef, useState } from "react";
 import { api } from "@/lib/api";
 
 interface SuggestionReason {
-  type: "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
+  type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
   display_text: string;
   related_to: string | null;
 }
 
+/**
+ * Quiz artist with MBID-first identifiers.
+ */
 export interface QuizArtist {
+  // Primary identifier (MusicBrainz)
+  mbid: string | null;
   name: string;
+
+  // Karaoke catalog data
   song_count: number;
   top_songs: string[];
   total_brand_count: number;
   primary_decade: string;
+
+  // Enrichment (optional)
+  spotify_id: string | null;
   genres: string[];
+  tags: string[];
   image_url: string | null;
   suggestion_reason: SuggestionReason | null;
 }
@@ -23,7 +34,7 @@ export interface QuizArtist {
 interface UseInfiniteArtistsParams {
   genres: string[];
   decades: string[];
-  manualArtists: { artist_name: string }[];
+  manualArtists: { name: string }[];
   enjoySongs: { artist: string }[];
   selectedArtists: Set<string>;
   initialBatchSize?: number;
@@ -83,7 +94,7 @@ export function useInfiniteArtists({
       const response = await api.quiz.getSmartArtists({
         genres: genres.length > 0 ? genres.filter((g) => g !== "other") : undefined,
         decades: decades.length > 0 ? decades : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists.map((a) => a.artist_name) : undefined,
+        manual_artists: manualArtists.length > 0 ? manualArtists.map((a) => a.name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: Array.from(selectedArtists),
         count: initialBatchSize,
@@ -122,7 +133,7 @@ export function useInfiniteArtists({
       const response = await api.quiz.getSmartArtists({
         genres: genres.length > 0 ? genres.filter((g) => g !== "other") : undefined,
         decades: decades.length > 0 ? decades : undefined,
-        manual_artists: manualArtists.length > 0 ? manualArtists.map((a) => a.artist_name) : undefined,
+        manual_artists: manualArtists.length > 0 ? manualArtists.map((a) => a.name) : undefined,
         manual_song_artists: songArtists.length > 0 ? songArtists : undefined,
         exclude: Array.from(allExcluded),
         count: loadMoreSize,

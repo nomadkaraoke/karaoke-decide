@@ -66,16 +66,34 @@ class DataSummaryResponse(BaseModel):
 
 
 class UserArtistResponse(BaseModel):
-    """An artist from user's data with merged source information."""
+    """An artist from user's data with merged source information.
 
-    artist_name: str
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional enrichment for images and external links.
+    """
+
+    # Primary identifier (MusicBrainz)
+    mbid: str | None = None  # MusicBrainz artist UUID (primary when available)
+    artist_name: str  # Canonical name
+
+    # Source information
     sources: list[str]  # All sources where this artist appears: spotify, lastfm, quiz
+
+    # Spotify-specific data
+    spotify_id: str | None = None  # Spotify artist ID (for images, links)
     spotify_rank: int | None = None  # Position in Spotify top artists (1-50)
     spotify_time_range: str | None = None  # short_term, medium_term, long_term
-    lastfm_rank: int | None = None  # Position in Last.fm top artists
-    lastfm_playcount: int | None = None  # Actual listen count from Last.fm
     popularity: int | None = None  # Spotify global popularity score (0-100)
     genres: list[str] = []  # Artist genres from Spotify
+
+    # Last.fm-specific data
+    lastfm_rank: int | None = None  # Position in Last.fm top artists
+    lastfm_playcount: int | None = None  # Actual listen count from Last.fm
+
+    # MusicBrainz-specific data
+    tags: list[str] = []  # MusicBrainz community tags
+
+    # User preferences
     is_excluded: bool = False  # Whether hidden from recommendations
     is_manual: bool = False  # Whether added manually (vs synced)
 
@@ -99,9 +117,14 @@ class ExcludeArtistResponse(BaseModel):
 
 
 class AddArtistRequest(BaseModel):
-    """Request to add an artist manually."""
+    """Request to add an artist manually.
+
+    MBID-first: MusicBrainz ID is the primary identifier when available.
+    Spotify ID is optional for backward compatibility and metadata enrichment.
+    """
 
     artist_name: str = Field(..., min_length=1, max_length=200)
+    mbid: str | None = Field(None, description="MusicBrainz artist UUID (primary)")
     spotify_artist_id: str | None = Field(None, description="Spotify artist ID for metadata enrichment")
 
 
