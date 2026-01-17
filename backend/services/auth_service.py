@@ -555,7 +555,9 @@ class AuthService:
             )
             if not docs:
                 return
-            doc_id = docs[0].get("id", user_id)
+            doc = docs[0]
+            # Document ID is either hashed email (registered) or user_id (legacy)
+            doc_id = self._hash_email(doc["email"]) if doc.get("email") else user_id
 
         # Update user document with collected email
         update_data = {

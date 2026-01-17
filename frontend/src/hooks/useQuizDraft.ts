@@ -65,13 +65,16 @@ export function useQuizDraft(): UseQuizDraftReturn {
 
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pendingDraftRef = useRef<QuizDraft | null>(null);
+  const isOnlineRef = useRef(true);
 
   // Initialize from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     // Check online status
-    setIsOnline(navigator.onLine);
+    const online = navigator.onLine;
+    setIsOnline(online);
+    isOnlineRef.current = online;
 
     // Load draft from localStorage
     try {
@@ -87,12 +90,16 @@ export function useQuizDraft(): UseQuizDraftReturn {
     // Listen for online/offline events
     const handleOnline = () => {
       setIsOnline(true);
+      isOnlineRef.current = true;
       // Trigger sync on reconnect if there's a pending draft
       if (pendingDraftRef.current) {
         syncToBackend(pendingDraftRef.current);
       }
     };
-    const handleOffline = () => setIsOnline(false);
+    const handleOffline = () => {
+      setIsOnline(false);
+      isOnlineRef.current = false;
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -111,7 +118,8 @@ export function useQuizDraft(): UseQuizDraftReturn {
    * Sync draft to backend (debounced)
    */
   const syncToBackend = useCallback(async (draftToSync: QuizDraft) => {
-    if (!isOnline) return;
+    // Use ref to avoid stale closure
+    if (!isOnlineRef.current) return;
 
     try {
       setIsSyncing(true);
@@ -144,7 +152,7 @@ export function useQuizDraft(): UseQuizDraftReturn {
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline]);
+  }, []);
 
   /**
    * Save draft to localStorage immediately and schedule backend sync
