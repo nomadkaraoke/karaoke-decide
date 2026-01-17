@@ -1311,6 +1311,7 @@ class QuizService:
         user_id: str,
         known_song_ids: list[str] | None = None,
         known_artists: list[str] | None = None,
+        artist_affinities: list[tuple[str, Literal["occasionally", "like", "love"]]] | None = None,
         decade_preference: str | None = None,
         decade_preferences: list[str] | None = None,
         energy_preference: Literal["chill", "medium", "high"] | None = None,
@@ -1327,7 +1328,9 @@ class QuizService:
         Args:
             user_id: User's ID.
             known_song_ids: List of song IDs the user recognized (legacy).
-            known_artists: List of artist names the user knows.
+            known_artists: List of artist names the user knows (legacy).
+            artist_affinities: List of (artist_name, affinity) tuples where affinity
+                is "occasionally", "like", or "love".
             decade_preference: User's preferred decade - legacy single (e.g., "1980s").
             decade_preferences: User's preferred decades - multi-select.
             energy_preference: User's preferred energy level.
@@ -1343,6 +1346,17 @@ class QuizService:
         songs_added = 0
         known_song_ids = known_song_ids or []
         known_artists = known_artists or []
+
+        # If artist_affinities is provided, merge with known_artists for backward compat
+        # Artist affinities takes precedence (new format with affinity levels)
+        if artist_affinities:
+            affinity_artists = [name for name, _ in artist_affinities]
+            # Combine with known_artists, deduplicate
+            all_artists_lower = {a.lower() for a in known_artists}
+            for artist in affinity_artists:
+                if artist.lower() not in all_artists_lower:
+                    known_artists.append(artist)
+                    all_artists_lower.add(artist.lower())
 
         # If artists were selected, get their top songs
         if known_artists:
@@ -1417,6 +1431,7 @@ class QuizService:
             user_id=user_id,
             known_song_ids=known_song_ids,
             known_artists=known_artists,
+            artist_affinities=artist_affinities,
             decade_preference=decade_preference,
             decade_preferences=decade_preferences,
             energy_preference=energy_preference,
@@ -1429,7 +1444,10 @@ class QuizService:
 
         return QuizSubmitResult(
             songs_added=songs_added,
-            recommendations_ready=len(known_song_ids) > 0 or len(known_artists) > 0 or len(manual_artists or []) > 0,
+            recommendations_ready=len(known_song_ids) > 0
+            or len(known_artists) > 0
+            or len(manual_artists or []) > 0
+            or len(artist_affinities or []) > 0,
         )
 
     def _get_songs_by_artists(self, artist_names: list[str], limit_per_artist: int = 5) -> list[dict]:
@@ -1508,6 +1526,7 @@ class QuizService:
         user_id: str,
         known_song_ids: list[str],
         known_artists: list[str],
+        artist_affinities: list[tuple[str, Literal["occasionally", "like", "love"]]] | None,
         decade_preference: str | None,
         decade_preferences: list[str] | None,
         energy_preference: Literal["chill", "medium", "high"] | None,
@@ -1526,6 +1545,7 @@ class QuizService:
             user_id: User's ID.
             known_song_ids: Song IDs from quiz.
             known_artists: Artist names from quiz.
+            artist_affinities: List of (artist_name, affinity) tuples.
             decade_preference: Legacy single decade preference.
             decade_preferences: Multi-select decade preferences.
             energy_preference: Energy preference.
@@ -1640,6 +1660,12 @@ class QuizService:
                 for a in manual_artists
             ]
 
+        # Store artist affinities (new format with affinity levels)
+        if artist_affinities:
+            update_data["quiz_artist_affinities"] = [
+                {"artist_name": name, "affinity": affinity} for name, affinity in artist_affinities
+            ]
+
         await self.firestore.update_document(
             self.USERS_COLLECTION,
             doc_id,
@@ -1656,6 +1682,77 @@ class QuizService:
             SHA-256 hash of lowercase email.
         """
         return hashlib.sha256(email.lower().encode()).hexdigest()
+
+    async def save_progress(
+        self,
+        user_id: str,
+        step: int,
+        genres: list[str] | None = None,
+        decades: list[str] | None = None,
+        artist_affinities: list[tuple[str, Literal["occasionally", "like", "love"]]] | None = None,
+        manual_artists: list[dict[str, Any]] | None = None,
+        enjoy_songs: list[dict[str, Any]] | None = None,
+        energy_preference: Literal["chill", "medium", "high"] | None = None,
+        vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None,
+        crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None,
+    ) -> None:
+        """Save quiz progress for auto-save.
+
+        This stores progress in a subcollection so users can resume
+        their quiz if they close the browser.
+
+        Args:
+            user_id: User's ID.
+            step: Current quiz step (1-5).
+            genres: Selected genre IDs.
+            decades: Selected decade preferences.
+            artist_affinities: List of (artist_name, affinity) tuples.
+            manual_artists: Manually added artists.
+            enjoy_songs: Songs marked as enjoy singing.
+            energy_preference: Energy preference.
+            vocal_comfort_pref: Vocal comfort preference.
+            crowd_pleaser_pref: Crowd pleaser preference.
+        """
+        now = datetime.now(UTC)
+
+        progress_data: dict[str, Any] = {
+            "step": step,
+            "updated_at": now.isoformat(),
+        }
+
+        if genres is not None:
+            progress_data["genres"] = genres
+
+        if decades is not None:
+            progress_data["decades"] = decades
+
+        if artist_affinities is not None:
+            progress_data["artist_affinities"] = [
+                {"artist_name": name, "affinity": affinity} for name, affinity in artist_affinities
+            ]
+
+        if manual_artists is not None:
+            progress_data["manual_artists"] = manual_artists
+
+        if enjoy_songs is not None:
+            progress_data["enjoy_songs"] = enjoy_songs
+
+        if energy_preference is not None:
+            progress_data["energy_preference"] = energy_preference
+
+        if vocal_comfort_pref is not None:
+            progress_data["vocal_comfort_pref"] = vocal_comfort_pref
+
+        if crowd_pleaser_pref is not None:
+            progress_data["crowd_pleaser_pref"] = crowd_pleaser_pref
+
+        # Store progress in a user-specific document
+        # Using user_id as the document ID for easy upsert
+        await self.firestore.set_document(
+            "quiz_progress",
+            user_id,
+            progress_data,
+        )
 
     async def get_quiz_status(self, user_id: str) -> QuizStatus:
         """Get user's quiz completion status.

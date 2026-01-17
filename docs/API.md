@@ -693,13 +693,83 @@ Get quiz songs for onboarding (legacy). Returns popular karaoke songs for users 
 }
 ```
 
-### POST /api/quiz/submit
+### PUT /api/quiz/progress
 
-Submit quiz responses with known artists or songs and preferences.
+Save partial quiz progress for auto-save functionality. Allows frontend to persist quiz progress as the user fills in the form, enabling resume if they close the browser.
 
 **Requires:** Bearer token
 
-**Request (Artist-based - recommended):**
+**Request:**
+```json
+{
+  "step": 3,
+  "genres": ["rock", "pop"],
+  "decades": ["1980s", "1990s"],
+  "artist_affinities": [
+    {"artist_name": "Queen", "affinity": "love"},
+    {"artist_name": "ABBA", "affinity": "like"}
+  ],
+  "manual_artists": [
+    {"artist_id": "abc123", "artist_name": "Green Day", "genres": ["punk rock"]}
+  ],
+  "enjoy_songs": [],
+  "energy_preference": "high",
+  "vocal_comfort_pref": "easy",
+  "crowd_pleaser_pref": "hits"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| step | int | Current quiz step (1-5) |
+| genres | list[str] | Selected genre IDs |
+| decades | list[str] | Selected decades |
+| artist_affinities | list[obj] | Artists with affinity level |
+| manual_artists | list[obj] | Manually added artists |
+| enjoy_songs | list[obj] | Songs user enjoys singing |
+| energy_preference | str | "chill", "medium", or "high" |
+| vocal_comfort_pref | str | "easy", "challenging", or "any" |
+| crowd_pleaser_pref | str | "hits", "deep_cuts", or "any" |
+
+**Affinity Levels:**
+| Level | Description | Recommendation Weight |
+|-------|-------------|----------------------|
+| occasionally | Listen to sometimes | 1x |
+| like | Generally enjoy | 2x |
+| love | Absolutely love | 3x |
+
+**Response:**
+```json
+{
+  "saved": true
+}
+```
+
+**Notes:**
+- Progress is stored per-user and overwrites previous progress
+- Frontend debounces calls (3 second idle threshold)
+- Progress is cleared when quiz is submitted
+
+### POST /api/quiz/submit
+
+Submit quiz responses with artist affinities and preferences.
+
+**Requires:** Bearer token
+
+**Request (with affinity - recommended):**
+```json
+{
+  "artist_affinities": [
+    {"artist_name": "Queen", "affinity": "love"},
+    {"artist_name": "ABBA", "affinity": "like"},
+    {"artist_name": "Elton John", "affinity": "occasionally"}
+  ],
+  "decade_preference": "1980s",
+  "energy_preference": "high"
+}
+```
+
+**Request (legacy - plain artist list):**
 ```json
 {
   "known_artists": ["Queen", "ABBA", "Elton John"],
@@ -715,6 +785,7 @@ Submit quiz responses with known artists or songs and preferences.
   "decade_preference": "1980s",
   "energy_preference": "high"
 }
+```
 
 **Response:**
 ```json
@@ -724,6 +795,11 @@ Submit quiz responses with known artists or songs and preferences.
   "recommendations_ready": true
 }
 ```
+
+**Notes:**
+- `artist_affinities` is the recommended format with three affinity levels
+- `known_artists` still supported for backwards compatibility (treated as "like" affinity)
+- Affinity weights influence recommendation scoring
 
 ### GET /api/quiz/status
 

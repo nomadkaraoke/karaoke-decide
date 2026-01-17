@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowRightIcon } from "@/components/icons";
+import { ArrowRightIcon, ChevronRightIcon } from "@/components/icons";
 
 interface StickyFinishBarProps {
   selectedCount: number;
   onFinish: () => void;
   onSkip: () => void;
+  onBack?: () => void;
   isSubmitting: boolean;
 }
 
@@ -17,6 +18,7 @@ export function StickyFinishBar({
   selectedCount,
   onFinish,
   onSkip,
+  onBack,
   isSubmitting,
 }: StickyFinishBarProps) {
   const hasSelections = selectedCount > 0;
@@ -32,22 +34,37 @@ export function StickyFinishBar({
     >
       <div className="max-w-3xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between gap-4">
-          {/* Selection count */}
-          <div className="flex items-center gap-2">
-            {hasSelections ? (
-              <>
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--brand-pink)] text-sm font-semibold">
-                  {selectedCount}
-                </span>
-                <span className="text-[var(--text)] text-sm sm:text-base">
-                  {selectedCount === 1 ? "artist" : "artists"} selected
-                </span>
-              </>
-            ) : (
-              <span className="text-[var(--text-muted)] text-sm sm:text-base">
-                Select artists you know
-              </span>
+          {/* Left side: Back button + Selection count */}
+          <div className="flex items-center gap-3">
+            {/* Back button */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                aria-label="Back"
+                className="flex items-center gap-1 px-3 py-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors text-sm"
+              >
+                <ChevronRightIcon className="w-4 h-4 transform rotate-180" aria-hidden="true" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
             )}
+
+            {/* Selection count */}
+            <div className="flex items-center gap-2">
+              {hasSelections ? (
+                <>
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-[var(--brand-pink)] text-sm font-semibold">
+                    {selectedCount}
+                  </span>
+                  <span className="text-[var(--text)] text-sm sm:text-base hidden sm:inline">
+                    {selectedCount === 1 ? "artist" : "artists"} selected
+                  </span>
+                </>
+              ) : (
+                <span className="text-[var(--text-muted)] text-sm sm:text-base hidden sm:inline">
+                  Select artists you know
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Action buttons */}
@@ -58,7 +75,7 @@ export function StickyFinishBar({
               disabled={isSubmitting}
               className="text-[var(--text-muted)] hover:text-[var(--text)] text-sm transition-colors disabled:opacity-50"
             >
-              Skip for now
+              Skip
             </button>
 
             {/* Finish button */}
@@ -83,7 +100,7 @@ export function StickyFinishBar({
                 </>
               ) : (
                 <>
-                  See Recommendations
+                  Finish Quiz
                   <ArrowRightIcon className="w-4 h-4" />
                 </>
               )}

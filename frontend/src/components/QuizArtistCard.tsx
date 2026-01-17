@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, MicrophoneIcon } from "@/components/icons";
+import { MicrophoneIcon } from "@/components/icons";
 
 interface SuggestionReason {
   type: "fans_also_like" | "similar_artist" | "genre_match" | "decade_match" | "popular_choice";
@@ -31,10 +31,18 @@ interface QuizArtist {
   suggestion_reason?: SuggestionReason | null;
 }
 
+/**
+ * Affinity levels for artist selection:
+ * - occasionally: Listen to sometimes (weight: 1x)
+ * - like: Generally enjoy (weight: 2x)
+ * - love: Absolutely love (weight: 3x)
+ */
+export type ArtistAffinity = "occasionally" | "like" | "love";
+
 interface QuizArtistCardProps {
   artist: QuizArtist;
-  isSelected: boolean;
-  onToggle: () => void;
+  affinity: ArtistAffinity | null;
+  onAffinityChange: (affinity: ArtistAffinity | null) => void;
   index: number;
 }
 
@@ -85,55 +93,60 @@ function ReasonBadge({ reason }: { reason: SuggestionReason }) {
   );
 }
 
+const AFFINITY_OPTIONS: Array<{
+  value: ArtistAffinity;
+  label: string;
+  emoji: string;
+  description: string;
+}> = [
+  { value: "occasionally", label: "Occasionally", emoji: "🎵", description: "Listen sometimes" },
+  { value: "like", label: "Like", emoji: "❤️", description: "Generally enjoy" },
+  { value: "love", label: "LOVE", emoji: "🔥", description: "Absolutely love" },
+];
+
 export function QuizArtistCard({
   artist,
-  isSelected,
-  onToggle,
+  affinity,
+  onAffinityChange,
   index,
 }: QuizArtistCardProps) {
   const displayGenres = artist.genres?.slice(0, 3) || [];
+  const hasAffinity = affinity !== null;
+
+  const handleAffinityClick = (value: ArtistAffinity) => {
+    // Toggle: if clicking the same level, deselect; otherwise set new level
+    if (affinity === value) {
+      onAffinityChange(null);
+    } else {
+      onAffinityChange(value);
+    }
+  };
 
   return (
-    <button
+    <div
       data-testid={`artist-card-${index}`}
-      onClick={onToggle}
       className={`
         relative w-full p-4 rounded-xl text-left transition-all duration-200
         ${
-          isSelected
-            ? "bg-gradient-to-r from-[var(--brand-pink)]/20 to-[var(--brand-purple)]/20 border-[var(--brand-pink)]/50 border-2 scale-[1.02]"
-            : "bg-[var(--secondary)] border border-[var(--card-border)] hover:border-[var(--text-subtle)] hover:bg-[var(--card)]"
+          hasAffinity
+            ? "bg-gradient-to-r from-[var(--brand-pink)]/20 to-[var(--brand-purple)]/20 border-[var(--brand-pink)]/50 border-2"
+            : "bg-[var(--secondary)] border border-[var(--card-border)]"
         }
       `}
       style={{
         animationDelay: `${index * 50}ms`,
       }}
     >
-      {/* Selection indicator */}
-      <div
-        className={`
-          absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center
-          transition-all duration-200
-          ${
-            isSelected
-              ? "bg-[var(--brand-pink)] scale-100"
-              : "bg-[var(--secondary)] scale-90"
-          }
-        `}
-      >
-        {isSelected && <CheckIcon className="w-4 h-4 text-[var(--text)]" />}
-      </div>
-
-      <div className="flex items-start gap-4 pr-8">
+      <div className="flex items-start gap-4">
         {/* Artist avatar placeholder */}
         <div
           className={`
-            w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0
-            ${isSelected ? "bg-[var(--brand-pink)]/30" : "bg-[var(--secondary)]"}
+            w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0
+            ${hasAffinity ? "bg-[var(--brand-pink)]/30" : "bg-[var(--secondary)]"}
           `}
         >
           <MicrophoneIcon
-            className={`w-6 h-6 ${isSelected ? "text-[var(--brand-pink)]" : "text-[var(--text-muted)]"}`}
+            className={`w-5 h-5 ${hasAffinity ? "text-[var(--brand-pink)]" : "text-[var(--text-muted)]"}`}
           />
         </div>
 
@@ -182,8 +195,33 @@ export function QuizArtistCard({
               </div>
             </div>
           )}
+
+          {/* Affinity buttons */}
+          <div className="flex gap-2 mt-3">
+            {AFFINITY_OPTIONS.map((option) => {
+              const isActive = affinity === option.value;
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => handleAffinityClick(option.value)}
+                  title={option.description}
+                  className={`
+                    flex-1 py-2 px-2 rounded-lg text-center transition-all duration-200
+                    ${
+                      isActive
+                        ? "bg-[var(--brand-pink)] text-white shadow-sm scale-[1.02]"
+                        : "bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)] hover:border-[var(--brand-pink)]/50 hover:text-[var(--text)]"
+                    }
+                  `}
+                >
+                  <span className="text-base block">{option.emoji}</span>
+                  <span className="text-xs font-medium block mt-0.5">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
-    </button>
+    </div>
   );
 }

@@ -285,6 +285,41 @@ async def logout(user: CurrentUser) -> dict[str, str]:
     return {"message": "Successfully logged out"}
 
 
+class CollectEmailRequest(BaseModel):
+    """Request to collect email for a guest user."""
+
+    email: EmailStr
+
+
+class CollectEmailResponse(BaseModel):
+    """Response after collecting email."""
+
+    message: str
+    user_id: str
+
+
+@router.post("/collect-email", response_model=CollectEmailResponse)
+async def collect_email(
+    request: CollectEmailRequest,
+    user: CurrentUser,
+    auth_service: AuthServiceDep,
+) -> CollectEmailResponse:
+    """Collect email for a guest user.
+
+    Associates the email with the guest session without requiring
+    email verification. User can verify later if they want to
+    access their account from another device.
+
+    This is typically called after quiz submission to capture the
+    user's email before showing recommendations.
+    """
+    await auth_service.collect_email(user.id, request.email)
+    return CollectEmailResponse(
+        message="Email collected",
+        user_id=user.id,
+    )
+
+
 class DeleteAccountResponse(BaseModel):
     """Response after deleting account."""
 
