@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { QuizArtistCard } from "@/components/QuizArtistCard";
+import { QuizArtistCard, ArtistAffinity } from "@/components/QuizArtistCard";
 import { StickyFinishBar } from "@/components/StickyFinishBar";
 import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAutocomplete";
 import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
-import { SparklesIcon, CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon, LastfmIcon, SpotifyIcon } from "@/components/icons";
+import { PostQuizEmailModal } from "@/components/PostQuizEmailModal";
+import { CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon, LastfmIcon, SpotifyIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
 
@@ -109,12 +110,12 @@ const GENRES: Genre[] = [
   { id: "other", label: "Other / Not Sure", exampleArtists: ["I'll browse recommendations"], emoji: "❓" },
 ];
 
-// 5-step quiz:
-// Step 1: Genres (required)
-// Step 2: Favorite Eras - multi-select decades (optional)
-// Step 3: Quick Preferences - energy + vocal comfort + crowd pleaser (optional)
-// Step 4: Music You Know - manual artist/song entry (optional)
-// Step 5: Artists You Know - smart artist selection (optional)
+// 5-step quiz (redesigned flow):
+// Step 1: How It Works (intro) - explains the quiz, sets expectations
+// Step 2: What Kind of Music? (genres required + decades optional combined)
+// Step 3: Artists You Know (manual entry) - triggers smart artist pre-calc on continue
+// Step 4: Karaoke Preferences (prefs + songs you love to sing) - buys time for pre-calc
+// Step 5: Know Any of These? (smart suggestions) - loads instantly from pre-calc
 type QuizStep = 1 | 2 | 3 | 4 | 5;
 
 // Type for songs user enjoys singing in the quiz
@@ -143,7 +144,8 @@ export default function QuizPage() {
   // User selections
   const [selectedGenres, setSelectedGenres] = useState<Set<string>>(new Set());
   const [selectedDecades, setSelectedDecades] = useState<Set<string>>(new Set());
-  const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set());
+  // Artist affinity: Map of artist name -> affinity level (occasionally/like/love)
+  const [artistAffinity, setArtistAffinity] = useState<Map<string, ArtistAffinity>>(new Map());
   const [energyPreference, setEnergyPreference] = useState<EnergyPreference>(null);
   const [vocalComfortPref, setVocalComfortPref] = useState<VocalComfortPref>(null);
   const [crowdPleaserPref, setCrowdPleaserPref] = useState<CrowdPleaserPref>(null);
@@ -156,6 +158,9 @@ export default function QuizPage() {
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreArtists, setHasMoreArtists] = useState(true);
 
@@ -168,8 +173,8 @@ export default function QuizPage() {
   const preloadHasMoreRef = useRef<boolean>(true);
   const isPreloadingRef = useRef<boolean>(false);
 
-  // Pre-load artists based on genres/decades only (called when entering step 4)
-  // This allows step 5 to load instantly
+  // Pre-load artists based on genres/decades/manual artists (called when exiting step 3)
+  // This allows step 5 to load instantly since step 4 buys time
   const preloadArtists = useCallback(async () => {
     // Don't preload if already preloading or already have data
     if (isPreloadingRef.current || preloadedArtistsRef.current !== null) return;
@@ -179,7 +184,8 @@ export default function QuizPage() {
       const response = await api.quiz.getSmartArtists({
         genres: selectedGenres.size > 0 ? Array.from(selectedGenres).filter(g => g !== "other") : undefined,
         decades: selectedDecades.size > 0 ? Array.from(selectedDecades) : undefined,
-        // Don't include manual artists/songs - those will be used for subsequent loads
+        // Include manual artists for better "fans also like" suggestions
+        manual_artists: manualArtists.length > 0 ? manualArtists.map(a => a.name) : undefined,
         count: 50,
       });
 
@@ -191,7 +197,7 @@ export default function QuizPage() {
     } finally {
       isPreloadingRef.current = false;
     }
-  }, [selectedGenres, selectedDecades]);
+  }, [selectedGenres, selectedDecades, manualArtists]);
 
   // Load smart artists for step 5 - uses pre-loaded data if available
   const loadSmartArtists = useCallback(async () => {
@@ -264,12 +270,11 @@ export default function QuizPage() {
     }
   }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
 
-  // Pre-load artists when entering step 4 (so step 5 loads instantly)
-  useEffect(() => {
-    if (isAuthenticated && step === 4) {
-      preloadArtists();
-    }
-  }, [isAuthenticated, step, preloadArtists]);
+  // Handler for continuing from step 3 - triggers preload and advances
+  const handleContinueFromStep3 = () => {
+    preloadArtists();
+    setStep(4);
+  };
 
   // Load smart artists when entering step 5 (uses pre-loaded data if available)
   useEffect(() => {
@@ -278,13 +283,13 @@ export default function QuizPage() {
     }
   }, [isAuthenticated, step, loadSmartArtists]);
 
-  const toggleArtist = (artistName: string) => {
-    setSelectedArtists((prev) => {
-      const next = new Set(prev);
-      if (next.has(artistName)) {
+  const handleArtistAffinityChange = (artistName: string, affinity: ArtistAffinity | null) => {
+    setArtistAffinity((prev) => {
+      const next = new Map(prev);
+      if (affinity === null) {
         next.delete(artistName);
       } else {
-        next.add(artistName);
+        next.set(artistName, affinity);
       }
       return next;
     });
@@ -321,10 +326,10 @@ export default function QuizPage() {
       setIsLoadingMore(true);
       const songArtists = enjoySongs.map((s) => s.artist);
 
-      // Exclude all artists we've shown + selected artists
+      // Exclude all artists we've shown + artists with affinity set
       const allExcluded = new Set([
         ...Array.from(shownArtistNamesRef.current),
-        ...Array.from(selectedArtists),
+        ...Array.from(artistAffinity.keys()),
       ]);
 
       const response = await api.quiz.getSmartArtists({
@@ -355,7 +360,7 @@ export default function QuizPage() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, hasMoreArtists, selectedGenres, selectedDecades, manualArtists, enjoySongs, selectedArtists]);
+  }, [isLoadingMore, hasMoreArtists, selectedGenres, selectedDecades, manualArtists, enjoySongs, artistAffinity]);
 
   // Infinite scroll: Observe when user scrolls near bottom to load more
   useEffect(() => {
@@ -398,9 +403,14 @@ export default function QuizPage() {
         genres: a.genres,
       }));
 
+      // Convert artist affinity Map to array format for API
+      const artistAffinityArray = Array.from(artistAffinity.entries()).map(
+        ([artist_name, affinity]) => ({ artist_name, affinity })
+      );
+
       // Submit main quiz data with all new fields
       await api.quiz.submit({
-        known_artists: Array.from(selectedArtists),
+        artist_affinities: artistAffinityArray,
         decade_preferences: Array.from(selectedDecades),
         energy_preference: energyPreference,
         genres: Array.from(selectedGenres),
@@ -424,11 +434,31 @@ export default function QuizPage() {
 
       // Refresh quiz status so other components know quiz is completed
       await refreshQuizStatus();
-      // Go to recommendations
-      router.push("/recommendations");
+
+      // Show generating state, then email modal
+      setIsSubmitting(false);
+      setIsGenerating(true);
+      // Short delay to show "generating" state before showing email modal
+      setTimeout(() => {
+        setShowEmailModal(true);
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
       setIsSubmitting(false);
+      setIsGenerating(false);
+    }
+  };
+
+  const handleEmailSubmit = async (email: string) => {
+    try {
+      setIsEmailSubmitting(true);
+      // Collect email
+      await api.auth.collectEmail(email);
+      // Navigate to recommendations
+      router.push("/recommendations");
+    } catch (err) {
+      setIsEmailSubmitting(false);
+      throw err; // Let the modal handle displaying the error
     }
   };
 
@@ -513,15 +543,76 @@ export default function QuizPage() {
           ))}
         </div>
 
-        {/* Step 1: Genre Selection */}
+        {/* Step 1: How It Works (Intro) */}
         {step === 1 && (
           <>
             <div className="text-center mb-8">
+              <div className="text-5xl mb-4">🎤</div>
               <h1 data-testid="quiz-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                What music do you like?
+                Let&apos;s find your perfect karaoke songs
               </h1>
               <p className="text-[var(--text)]/60">
-                Select your favorite genres to get personalized recommendations.
+                Answer a few quick questions so we can personalize your recommendations.
+              </p>
+            </div>
+
+            {/* Info bullets */}
+            <div className="space-y-4 mb-8">
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+                <span className="text-2xl flex-shrink-0">✨</span>
+                <div>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">Tell us about your music taste</h3>
+                  <p className="text-sm text-[var(--text)]/60">
+                    We&apos;ll ask about genres, decades, and artists you like.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+                <span className="text-2xl flex-shrink-0">📊</span>
+                <div>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">More info = better recommendations</h3>
+                  <p className="text-sm text-[var(--text)]/60">
+                    The more you share, the better we can personalize your song suggestions.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+                <span className="text-2xl flex-shrink-0">⏭️</span>
+                <div>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">Skip if you&apos;re in a hurry</h3>
+                  <p className="text-sm text-[var(--text)]/60">
+                    All questions after genres are optional - skip ahead anytime.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="sticky bottom-4">
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                onClick={() => setStep(2)}
+                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
+              >
+                Get Started
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 2: What Kind of Music (Genres + Decades combined) */}
+        {step === 2 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 data-testid="music-taste-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
+                What kind of music do you listen to?
+              </h1>
+              <p className="text-[var(--text)]/60">
+                Select your favorite genres to get started.
               </p>
             </div>
 
@@ -562,7 +653,7 @@ export default function QuizPage() {
             </div>
 
             {/* Selection count */}
-            <div className="text-center mb-4">
+            <div className="text-center mb-6">
               <span data-testid="genre-selection-count" className="text-[var(--text)]/40 text-sm">
                 {selectedGenres.size === 0
                   ? "Select at least one genre"
@@ -570,37 +661,18 @@ export default function QuizPage() {
               </span>
             </div>
 
-            {/* Navigation */}
-            <div className="sticky bottom-4">
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                onClick={() => setStep(2)}
-                disabled={selectedGenres.size === 0}
-                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
-              >
-                Continue
-              </Button>
-            </div>
-          </>
-        )}
+            {/* Divider */}
+            <div className="border-t border-[var(--card-border)] my-6" />
 
-        {/* Step 2: Favorite Eras (Multi-select Decades) */}
-        {step === 2 && (
-          <>
-            <div className="text-center mb-8">
-              <h1 data-testid="decades-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Favorite eras
-              </h1>
-              <p className="text-[var(--text)]/60">
-                Optional: Select the decades of music you enjoy most.
+            {/* Decades section */}
+            <div className="mb-6">
+              <h2 data-testid="decades-heading" className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
+                Favorite eras (optional)
+              </h2>
+              <p className="text-[var(--text)]/50 text-sm mb-4">
+                Select the decades of music you enjoy most.
               </p>
-            </div>
-
-            {/* Decade grid - multi-select */}
-            <div data-testid="decade-section" className="mb-8">
-              <div className="grid grid-cols-4 gap-2">
+              <div data-testid="decade-section" className="grid grid-cols-4 gap-2">
                 {DECADES.map((d) => (
                   <button
                     key={d}
@@ -622,15 +694,13 @@ export default function QuizPage() {
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Selection count */}
-            <div className="text-center mb-4">
-              <span className="text-[var(--text)]/40 text-sm">
-                {selectedDecades.size === 0
-                  ? "No era preference (all decades)"
-                  : `${selectedDecades.size} era${selectedDecades.size > 1 ? "s" : ""} selected`}
-              </span>
+              {selectedDecades.size > 0 && (
+                <div className="text-center mt-2">
+                  <span className="text-[var(--text)]/40 text-xs">
+                    {selectedDecades.size} era{selectedDecades.size > 1 ? "s" : ""} selected
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Navigation */}
@@ -648,6 +718,134 @@ export default function QuizPage() {
                 size="lg"
                 className="flex-1"
                 onClick={() => setStep(3)}
+                disabled={selectedGenres.size === 0}
+                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
+              >
+                Continue
+              </Button>
+            </div>
+
+            {/* Skip link - only if genres selected */}
+            {selectedGenres.size > 0 && (
+              <div className="text-center mt-4">
+                <button
+                  onClick={handleSkipToRecommendations}
+                  disabled={isSubmitting}
+                  className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
+                >
+                  {isSubmitting ? "Loading..." : "Skip to recommendations →"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Step 3: Artists You Know (Manual Entry - triggers pre-calc on continue) */}
+        {step === 3 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 data-testid="artists-you-know-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
+                Artists You Know
+              </h1>
+              <p className="text-[var(--text)]/60">
+                The more artists you add, the better your recommendations.
+              </p>
+            </div>
+
+            {/* Manual Artist Entry */}
+            <div className="mb-6">
+              <ArtistSearchAutocomplete
+                onSelect={handleAddManualArtist}
+                selectedArtistIds={new Set(manualArtists.map((a) => getArtistUniqueId(a)))}
+                placeholder="Search for artists you know..."
+                className="mb-3"
+              />
+              {manualArtists.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {manualArtists.map((artist) => {
+                    const uniqueId = getArtistUniqueId(artist);
+                    return (
+                      <span
+                        key={uniqueId}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] text-sm font-medium"
+                      >
+                        {artist.name}
+                        <button
+                          onClick={() => handleRemoveManualArtist(uniqueId)}
+                          className="hover:text-[var(--text)] transition-colors"
+                        >
+                          <XIcon className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Artist count */}
+            {manualArtists.length > 0 && (
+              <div className="text-center mb-6">
+                <span className="text-[var(--text)]/40 text-sm">
+                  {manualArtists.length} artist{manualArtists.length > 1 ? "s" : ""} added
+                </span>
+              </div>
+            )}
+
+            {/* Import listening history CTA */}
+            <div className="mb-6 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0">📥</span>
+                <div>
+                  <h2 className="font-semibold text-[var(--text)] mb-1">
+                    Have listening history in Last.fm or Spotify?
+                  </h2>
+                  <p className="text-[var(--text)]/60 text-sm mb-3">
+                    Import it for even better recommendations!
+                  </p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-[var(--text)]/50">
+                      <LastfmIcon className="w-4 h-4 text-[#d51007] flex-shrink-0" />
+                      <span><span className="text-[var(--text)]/70">Last.fm</span> — direct import</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[var(--text)]/50">
+                      <SpotifyIcon className="w-4 h-4 text-[#1DB954] flex-shrink-0" />
+                      <span><span className="text-[var(--text)]/70">ListenBrainz</span> — imports from Spotify</span>
+                    </div>
+                  </div>
+                  <p className="text-[var(--text)]/40 text-xs mt-3">
+                    After the quiz, go to Settings → Connected Services to sync.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Hint when empty */}
+            {manualArtists.length === 0 && (
+              <div className="text-center py-4 mb-6">
+                <p className="text-[var(--text)]/40 text-sm">
+                  Adding artists helps us find songs you&apos;ll love to sing.
+                  <br />
+                  You can skip this step if you prefer.
+                </p>
+              </div>
+            )}
+
+            {/* Navigation */}
+            <div className="flex gap-3 sticky bottom-4">
+              <Button
+                variant="secondary"
+                size="lg"
+                className="flex-1"
+                onClick={() => setStep(2)}
+              >
+                Back
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1"
+                onClick={handleContinueFromStep3}
                 rightIcon={<ChevronRightIcon className="w-5 h-5" />}
               >
                 Continue
@@ -667,15 +865,15 @@ export default function QuizPage() {
           </>
         )}
 
-        {/* Step 3: Quick Preferences (Energy + Vocal Comfort + Crowd Pleaser) */}
-        {step === 3 && (
+        {/* Step 4: Karaoke Preferences + Songs You Love to Sing */}
+        {step === 4 && (
           <>
             <div className="text-center mb-8">
               <h1 data-testid="preferences-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Quick preferences
+                Karaoke Preferences
               </h1>
               <p className="text-[var(--text)]/60">
-                Optional: Help us fine-tune your recommendations.
+                Help us understand your karaoke style.
               </p>
             </div>
 
@@ -743,7 +941,7 @@ export default function QuizPage() {
             </div>
 
             {/* Crowd Pleaser preference */}
-            <div data-testid="crowd-pleaser-section" className="mb-8">
+            <div data-testid="crowd-pleaser-section" className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
                 Song Discovery
               </h2>
@@ -774,91 +972,17 @@ export default function QuizPage() {
               </div>
             </div>
 
-            {/* Navigation */}
-            <div className="flex gap-3 sticky bottom-4">
-              <Button
-                variant="secondary"
-                size="lg"
-                className="flex-1"
-                onClick={() => setStep(2)}
-              >
-                Back
-              </Button>
-              <Button
-                variant="primary"
-                size="lg"
-                className="flex-1"
-                onClick={() => setStep(4)}
-                rightIcon={<ChevronRightIcon className="w-5 h-5" />}
-              >
-                Continue
-              </Button>
-            </div>
-
-            {/* Skip link */}
-            <div className="text-center mt-4">
-              <button
-                onClick={handleSkipToRecommendations}
-                disabled={isSubmitting}
-                className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
-              >
-                {isSubmitting ? "Loading..." : "Skip to recommendations →"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Step 4: Music You Know (Manual Artist/Song Entry) */}
-        {step === 4 && (
-          <>
-            <div className="text-center mb-8">
-              <h1 data-testid="music-you-know-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Music you know
-              </h1>
-              <p className="text-[var(--text)]/60">
-                Optional: Tell us about artists and songs you already love.
-              </p>
-            </div>
-
-            {/* Manual Artist Entry */}
-            <div className="mb-6">
-              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Artists you like
-              </h2>
-              <ArtistSearchAutocomplete
-                onSelect={handleAddManualArtist}
-                selectedArtistIds={new Set(manualArtists.map((a) => getArtistUniqueId(a)))}
-                placeholder="Search for artists you like..."
-                className="mb-3"
-              />
-              {manualArtists.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {manualArtists.map((artist) => {
-                    const uniqueId = getArtistUniqueId(artist);
-                    return (
-                      <span
-                        key={uniqueId}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--brand-pink)]/20 text-[var(--brand-pink)] text-sm font-medium"
-                      >
-                        {artist.name}
-                        <button
-                          onClick={() => handleRemoveManualArtist(uniqueId)}
-                          className="hover:text-[var(--text)] transition-colors"
-                        >
-                          <XIcon className="w-3 h-3" />
-                        </button>
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Divider */}
+            <div className="border-t border-[var(--card-border)] my-6" />
 
             {/* Songs I Enjoy Singing */}
             <div className="mb-6">
-              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Songs you love to sing
+              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
+                Songs You Love to Sing (optional)
               </h2>
+              <p className="text-[var(--text)]/50 text-sm mb-3">
+                Add songs you&apos;ve sung before and enjoyed.
+              </p>
               <SongSearchAutocomplete
                 onSelect={handleAddEnjoySong}
                 selectedSongIds={new Set(enjoySongs.map((s) => s.song_id))}
@@ -873,14 +997,12 @@ export default function QuizPage() {
                   <h3 className="text-sm font-medium text-[var(--text)]/70">
                     Songs Added ({enjoySongs.length})
                   </h3>
-                  {enjoySongs.length > 0 && (
-                    <button
-                      onClick={() => setEnjoySongs([])}
-                      className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
-                    >
-                      Clear all
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEnjoySongs([])}
+                    className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
+                  >
+                    Clear all
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {enjoySongs.map((song) => (
@@ -920,40 +1042,6 @@ export default function QuizPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* Import listening history info */}
-            <div className="mb-6 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
-              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
-                Have listening history?
-              </h2>
-              <p className="text-[var(--text)]/60 text-sm mb-3">
-                After completing the quiz, you can import your listening history from:
-              </p>
-              <ul className="text-[var(--text)]/50 text-sm space-y-2">
-                <li className="flex items-center gap-2">
-                  <LastfmIcon className="w-4 h-4 text-[#d51007] flex-shrink-0" />
-                  <span><span className="text-[var(--text)]/70">Last.fm</span> — direct import</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <SpotifyIcon className="w-4 h-4 text-[#1DB954] flex-shrink-0" />
-                  <span><span className="text-[var(--text)]/70">ListenBrainz</span> — imports from Spotify, Libre.fm, PanoScrobbler, and Maloja</span>
-                </li>
-              </ul>
-              <p className="text-[var(--text)]/40 text-xs mt-3">
-                Go to Settings → Connected Services after creating an account.
-              </p>
-            </div>
-
-            {/* Hint when empty */}
-            {manualArtists.length === 0 && enjoySongs.length === 0 && (
-              <div className="text-center py-6 mb-6">
-                <p className="text-[var(--text)]/40 text-sm">
-                  Adding artists and songs helps us find better recommendations.
-                  <br />
-                  You can skip this step if you prefer.
-                </p>
               </div>
             )}
 
@@ -1013,15 +1101,15 @@ export default function QuizPage() {
           </>
         )}
 
-        {/* Step 5: Artists You Know (Smart Selection - informed by previous steps) */}
+        {/* Step 5: Know Any of These? (Smart Suggestions - final step, loads from pre-calc) */}
         {step === 5 && (
           <>
             <div className="text-center mb-8">
-              <h1 data-testid="artist-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Know any of these artists?
+              <h1 data-testid="smart-artists-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
+                Know Any of These Artists?
               </h1>
               <p className="text-[var(--text)]/60">
-                Optional: Based on your preferences, you might know these artists.
+                Based on your preferences, you might know these artists.
               </p>
             </div>
 
@@ -1039,11 +1127,11 @@ export default function QuizPage() {
                 {/* Selection count and clear button */}
                 <div className="flex items-center justify-between mb-4">
                   <span data-testid="artist-selection-count" className="text-[var(--text)]/60 text-sm">
-                    {selectedArtists.size} selected
+                    {artistAffinity.size} selected
                   </span>
-                  {selectedArtists.size > 0 && (
+                  {artistAffinity.size > 0 && (
                     <button
-                      onClick={() => setSelectedArtists(new Set())}
+                      onClick={() => setArtistAffinity(new Map())}
                       className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
                     >
                       Clear all
@@ -1061,8 +1149,8 @@ export default function QuizPage() {
                     <QuizArtistCard
                       key={artist.name}
                       artist={artist}
-                      isSelected={selectedArtists.has(artist.name)}
-                      onToggle={() => toggleArtist(artist.name)}
+                      affinity={artistAffinity.get(artist.name) ?? null}
+                      onAffinityChange={(newAffinity) => handleArtistAffinityChange(artist.name, newAffinity)}
                       index={index}
                     />
                   ))}
@@ -1086,27 +1174,37 @@ export default function QuizPage() {
                   </div>
                 </div>
 
-                {/* Sticky finish bar */}
+                {/* Sticky finish bar with back button */}
                 <StickyFinishBar
-                  selectedCount={selectedArtists.size}
+                  selectedCount={artistAffinity.size}
                   onFinish={handleSubmit}
                   onSkip={handleSkipToRecommendations}
+                  onBack={() => setStep(4)}
                   isSubmitting={isSubmitting}
                 />
-
-                {/* Back button - fixed in corner for easy access */}
-                <button
-                  onClick={() => setStep(4)}
-                  className="fixed bottom-20 left-4 z-50 p-2 rounded-full bg-[var(--secondary)] border border-[var(--card-border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
-                  title="Go back"
-                >
-                  <ChevronRightIcon className="w-5 h-5 transform rotate-180" />
-                </button>
               </>
             )}
           </>
         )}
       </div>
+
+      {/* Generating recommendations overlay */}
+      {isGenerating && !showEmailModal && (
+        <div className="fixed inset-0 bg-[var(--background)]/95 z-50 flex items-center justify-center">
+          <div className="text-center">
+            <LoaderIcon className="w-12 h-12 animate-spin text-[var(--brand-pink)] mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-[var(--text)]">Generating your recommendations...</h2>
+            <p className="text-[var(--text-muted)] mt-2">This only takes a moment</p>
+          </div>
+        </div>
+      )}
+
+      {/* Post-quiz email collection modal */}
+      <PostQuizEmailModal
+        isOpen={showEmailModal}
+        onEmailSubmit={handleEmailSubmit}
+        isSubmitting={isEmailSubmitting}
+      />
     </main>
   );
 }

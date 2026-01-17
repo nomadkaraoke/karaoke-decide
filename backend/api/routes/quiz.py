@@ -118,6 +118,19 @@ class ManualArtistInput(BaseModel):
     genres: list[str] = Field(default_factory=list, description="Artist genres")
 
 
+class ArtistAffinityEntry(BaseModel):
+    """Artist with user's affinity level.
+
+    Affinity levels:
+    - occasionally: Listen to sometimes (weight: 1x)
+    - like: Generally enjoy (weight: 2x)
+    - love: Absolutely love (weight: 3x)
+    """
+
+    artist_name: str = Field(..., description="Artist name")
+    affinity: Literal["occasionally", "like", "love"] = Field(..., description="User's affinity level for this artist")
+
+
 class QuizSubmitRequest(BaseModel):
     """Request to submit quiz responses."""
 
@@ -127,7 +140,11 @@ class QuizSubmitRequest(BaseModel):
     )
     known_artists: list[str] = Field(
         default_factory=list,
-        description="List of artist names the user knows",
+        description="List of artist names the user knows (legacy, use artist_affinities instead)",
+    )
+    artist_affinities: list[ArtistAffinityEntry] = Field(
+        default_factory=list,
+        description="Artists with affinity level (occasionally/like/love)",
     )
     decade_preference: str | None = Field(
         None,
@@ -174,6 +191,32 @@ class QuizStatusResponse(BaseModel):
     completed: bool
     completed_at: str | None
     songs_known_count: int
+
+
+class EnjoySongProgressEntry(BaseModel):
+    """Song in progress for auto-save."""
+
+    song_id: str
+    artist: str
+    title: str
+    singing_tags: list[str] = Field(default_factory=list)
+    singing_energy: str | None = None
+    vocal_comfort: str | None = None
+    notes: str | None = None
+
+
+class QuizProgressRequest(BaseModel):
+    """Request to save partial quiz progress (auto-save)."""
+
+    step: int = Field(..., ge=1, le=5, description="Current quiz step (1-5)")
+    genres: list[str] = Field(default_factory=list)
+    decades: list[str] = Field(default_factory=list)
+    artist_affinities: list[ArtistAffinityEntry] = Field(default_factory=list)
+    manual_artists: list[ManualArtistInput] = Field(default_factory=list)
+    enjoy_songs: list[EnjoySongProgressEntry] = Field(default_factory=list)
+    energy_preference: Literal["chill", "medium", "high"] | None = None
+    vocal_comfort_pref: Literal["easy", "challenging", "any"] | None = None
+    crowd_pleaser_pref: Literal["hits", "deep_cuts", "any"] | None = None
 
 
 class EnjoySongEntry(BaseModel):
@@ -466,10 +509,16 @@ async def submit_quiz(
         else None
     )
 
+    # Convert artist_affinities to service format
+    artist_affinities_data = (
+        [(a.artist_name, a.affinity) for a in request.artist_affinities] if request.artist_affinities else None
+    )
+
     result = await quiz_service.submit_quiz(
         user_id=user.id,
         known_song_ids=request.known_song_ids,
         known_artists=request.known_artists,
+        artist_affinities=artist_affinities_data,
         decade_preference=request.decade_preference,
         decade_preferences=request.decade_preferences,
         energy_preference=request.energy_preference,
@@ -509,6 +558,60 @@ async def get_quiz_status(
         completed_at=status.completed_at.isoformat() if status.completed_at else None,
         songs_known_count=status.songs_known_count,
     )
+
+
+# -----------------------------------------------------------------------------
+# Save Quiz Progress (Auto-save)
+# -----------------------------------------------------------------------------
+
+
+@router.put("/progress")
+async def save_quiz_progress(
+    request: QuizProgressRequest,
+    user: CurrentUser,
+    quiz_service: QuizServiceDep,
+) -> dict:
+    """Save partial quiz progress (upsert, idempotent).
+
+    Called by the frontend auto-save hook to persist quiz progress
+    as the user fills in the quiz. This allows users to resume
+    if they close the browser or navigate away.
+
+    Saves to a separate quiz_progress document, not the main user document.
+    The progress is merged into the user's profile on quiz submit.
+    """
+    await quiz_service.save_progress(
+        user_id=user.id,
+        step=request.step,
+        genres=request.genres,
+        decades=request.decades,
+        artist_affinities=[(a.artist_name, a.affinity) for a in request.artist_affinities],
+        manual_artists=[
+            {
+                "mbid": a.mbid,
+                "artist_id": a.artist_id,
+                "artist_name": a.artist_name,
+                "genres": a.genres,
+            }
+            for a in request.manual_artists
+        ],
+        enjoy_songs=[
+            {
+                "song_id": s.song_id,
+                "artist": s.artist,
+                "title": s.title,
+                "singing_tags": s.singing_tags,
+                "singing_energy": s.singing_energy,
+                "vocal_comfort": s.vocal_comfort,
+                "notes": s.notes,
+            }
+            for s in request.enjoy_songs
+        ],
+        energy_preference=request.energy_preference,
+        vocal_comfort_pref=request.vocal_comfort_pref,
+        crowd_pleaser_pref=request.crowd_pleaser_pref,
+    )
+    return {"saved": True}
 
 
 # -----------------------------------------------------------------------------

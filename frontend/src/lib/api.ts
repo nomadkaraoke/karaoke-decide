@@ -167,6 +167,9 @@ export const api = {
     upgradeGuest: (email: string) =>
       api.post<{ message: string }>("/api/auth/upgrade", { email }),
 
+    collectEmail: (email: string) =>
+      api.post<{ message: string; user_id: string }>("/api/auth/collect-email", { email }),
+
     getMe: () =>
       api.get<{
         id: string;
@@ -593,6 +596,10 @@ export const api = {
     submit: (data: {
       known_song_ids?: string[];
       known_artists?: string[];
+      artist_affinities?: Array<{
+        artist_name: string;
+        affinity: "occasionally" | "like" | "love";
+      }>;
       decade_preference?: string | null;
       decade_preferences?: string[];
       energy_preference?: "chill" | "medium" | "high" | null;
@@ -651,6 +658,38 @@ export const api = {
         completed_at: string | null;
         songs_known_count: number;
       }>("/api/quiz/status"),
+
+    saveProgress: (data: {
+      step: number;
+      genres?: string[];
+      decades?: string[];
+      artist_affinities?: Array<{
+        artist_name: string;
+        affinity: "occasionally" | "like" | "love";
+      }>;
+      manual_artists?: Array<{
+        mbid?: string | null;
+        artist_id?: string | null;
+        artist_name: string;
+        genres?: string[];
+      }>;
+      enjoy_songs?: Array<{
+        song_id: string;
+        artist: string;
+        title: string;
+        singing_tags?: string[];
+        singing_energy?: string | null;
+        vocal_comfort?: string | null;
+        notes?: string | null;
+      }>;
+      energy_preference?: "chill" | "medium" | "high" | null;
+      vocal_comfort_pref?: "easy" | "challenging" | "any" | null;
+      crowd_pleaser_pref?: "hits" | "deep_cuts" | "any" | null;
+    }) =>
+      apiRequest<{ saved: boolean }>("/api/quiz/progress", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
 
     /**
      * Submit songs the user enjoys singing (quiz step 4)

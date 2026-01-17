@@ -530,6 +530,47 @@ class AuthService:
 
         return migrated
 
+    async def collect_email(self, user_id: str, email: str) -> None:
+        """Collect email for a user (typically a guest user).
+
+        Associates the email with the user session without requiring
+        email verification. The user can verify later if they want to
+        access their account from another device.
+
+        Args:
+            user_id: User's ID (user_xxx or guest_xxx format)
+            email: Email address to associate
+        """
+        now = datetime.now(UTC)
+
+        # Find the user document
+        if user_id.startswith("guest_"):
+            doc_id = user_id
+        else:
+            # Query to find the user document
+            docs = await self.firestore.query_documents(
+                self.USERS_COLLECTION,
+                filters=[("user_id", "==", user_id)],
+                limit=1,
+            )
+            if not docs:
+                return
+            doc_id = docs[0].get("id", user_id)
+
+        # Update user document with collected email
+        update_data = {
+            "email": email.lower(),
+            "email_collected_at": now.isoformat(),
+            "email_verified": False,
+            "updated_at": now.isoformat(),
+        }
+
+        await self.firestore.update_document(
+            self.USERS_COLLECTION,
+            doc_id,
+            update_data,
+        )
+
     async def update_user_profile(
         self,
         user_id: str,
