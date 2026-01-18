@@ -8,8 +8,8 @@ import { QuizArtistCard, ArtistAffinity } from "@/components/QuizArtistCard";
 import { StickyFinishBar } from "@/components/StickyFinishBar";
 import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAutocomplete";
 import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
+import { useQuizDraft } from "@/hooks/useQuizDraft";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
-import { PostQuizEmailModal } from "@/components/PostQuizEmailModal";
 import { CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon, LastfmIcon, SpotifyIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
@@ -110,13 +110,14 @@ const GENRES: Genre[] = [
   { id: "other", label: "Other / Not Sure", exampleArtists: ["I'll browse recommendations"], emoji: "❓" },
 ];
 
-// 5-step quiz (redesigned flow):
+// 6-step quiz (redesigned flow):
 // Step 1: How It Works (intro) - explains the quiz, sets expectations
 // Step 2: What Kind of Music? (genres required + decades optional combined)
 // Step 3: Artists You Know (manual entry) - triggers smart artist pre-calc on continue
 // Step 4: Karaoke Preferences (prefs + songs you love to sing) - buys time for pre-calc
 // Step 5: Know Any of These? (smart suggestions) - loads instantly from pre-calc
-type QuizStep = 1 | 2 | 3 | 4 | 5;
+// Step 6: Email + Generating (collect email while recommendations generate)
+type QuizStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 // Type for songs user enjoys singing in the quiz
 interface EnjoySongSelection extends SelectedSong {
@@ -136,6 +137,11 @@ export default function QuizPage() {
     startGuestSession,
     refreshQuizStatus,
   } = useAuth();
+
+  // Draft persistence hook
+  const { draft, saveDraft, clearDraft } = useQuizDraft();
+  const hasRestoredDraft = useRef(false);
+
   const [step, setStep] = useState<QuizStep>(1);
   const [quizArtists, setQuizArtists] = useState<QuizArtist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,14 +165,72 @@ export default function QuizPage() {
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [recommendationsReady, setRecommendationsReady] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreArtists, setHasMoreArtists] = useState(true);
 
   // Refs for infinite scroll
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const shownArtistNamesRef = useRef<Set<string>>(new Set());
+
+  // Restore state from draft on mount (only once)
+  // draft: undefined = loading, null = no draft, QuizDraft = has draft
+  useEffect(() => {
+    // Still loading from localStorage, wait
+    if (draft === undefined) return;
+
+    // Already restored, skip
+    if (hasRestoredDraft.current) return;
+
+    // Mark as restored (whether we have a draft or not)
+    hasRestoredDraft.current = true;
+
+    // If we have a draft, restore the state
+    if (draft) {
+      setStep(draft.step);
+      setSelectedGenres(new Set(draft.selectedGenres));
+      setSelectedDecades(new Set(draft.selectedDecades));
+      setArtistAffinity(new Map(Object.entries(draft.artistAffinity)));
+      setManualArtists(draft.manualArtists);
+      setEnjoySongs(draft.enjoySongs as EnjoySongSelection[]);
+      setEnergyPreference(draft.energyPreference);
+      setVocalComfortPref(draft.vocalComfortPref);
+      setCrowdPleaserPref(draft.crowdPleaserPref);
+    }
+  }, [draft]);
+
+  // Save draft when state changes (after initial restore)
+  useEffect(() => {
+    // Don't save until we've restored (or confirmed no draft exists)
+    if (!hasRestoredDraft.current) return;
+
+    saveDraft({
+      step,
+      selectedGenres: Array.from(selectedGenres),
+      selectedDecades: Array.from(selectedDecades),
+      artistAffinity: Object.fromEntries(artistAffinity),
+      manualArtists,
+      enjoySongs,
+      energyPreference,
+      vocalComfortPref,
+      crowdPleaserPref,
+    });
+  }, [
+    step,
+    selectedGenres,
+    selectedDecades,
+    artistAffinity,
+    manualArtists,
+    enjoySongs,
+    energyPreference,
+    vocalComfortPref,
+    crowdPleaserPref,
+    saveDraft,
+  ]);
 
   // Pre-loading state: load artists based on genres/decades while user is on step 4
   const preloadedArtistsRef = useRef<QuizArtist[] | null>(null);
@@ -264,11 +328,17 @@ export default function QuizPage() {
   }, [authLoading, isAuthenticated, startGuestSession]);
 
   // Redirect users who have already completed the quiz
+  // But not if we're on step 6 (email collection + generating)
   useEffect(() => {
-    if (!authLoading && !quizStatusLoading && isAuthenticated && hasCompletedQuiz) {
+    if (!authLoading && !quizStatusLoading && isAuthenticated && hasCompletedQuiz && step !== 6) {
       router.push("/recommendations");
     }
-  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
+  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, step, router]);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [step]);
 
   // Handler for continuing from step 3 - triggers preload and advances
   const handleContinueFromStep3 = () => {
@@ -408,6 +478,11 @@ export default function QuizPage() {
         ([artist_name, affinity]) => ({ artist_name, affinity })
       );
 
+      // Move to step 6 immediately to show generating state
+      setStep(6);
+      setIsSubmitting(false);
+      setIsGenerating(true);
+
       // Submit main quiz data with all new fields
       await api.quiz.submit({
         artist_affinities: artistAffinityArray,
@@ -435,13 +510,12 @@ export default function QuizPage() {
       // Refresh quiz status so other components know quiz is completed
       await refreshQuizStatus();
 
-      // Show generating state, then email modal
-      setIsSubmitting(false);
-      setIsGenerating(true);
-      // Short delay to show "generating" state before showing email modal
-      setTimeout(() => {
-        setShowEmailModal(true);
-      }, 500);
+      // Clear the saved draft since quiz is complete
+      clearDraft();
+
+      // Mark recommendations as ready
+      setIsGenerating(false);
+      setRecommendationsReady(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
       setIsSubmitting(false);
@@ -449,17 +523,33 @@ export default function QuizPage() {
     }
   };
 
-  const handleEmailSubmit = async (email: string) => {
+  const handleEmailSubmit = async () => {
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email.trim()) {
+      setEmailError("Please enter your email");
+      return;
+    }
+    if (!emailRegex.test(email.trim())) {
+      setEmailError("Please enter a valid email");
+      return;
+    }
+
     try {
       setIsEmailSubmitting(true);
+      setEmailError(null);
       // Collect email
-      await api.auth.collectEmail(email);
-      // Navigate to recommendations
-      router.push("/recommendations");
+      await api.auth.collectEmail(email.trim());
+      setEmailSubmitted(true);
+      setIsEmailSubmitting(false);
     } catch (err) {
       setIsEmailSubmitting(false);
-      throw err; // Let the modal handle displaying the error
+      setEmailError(err instanceof Error ? err.message : "Failed to save email");
     }
+  };
+
+  const handleViewRecommendations = () => {
+    router.push("/recommendations");
   };
 
   const handleSkipToRecommendations = async () => {
@@ -519,7 +609,8 @@ export default function QuizPage() {
   };
 
   // Show loading while auth is being checked or redirecting
-  if (authLoading || quizStatusLoading || !isAuthenticated || hasCompletedQuiz) {
+  // But not if we're on step 6 (email collection + generating)
+  if (authLoading || quizStatusLoading || !isAuthenticated || (hasCompletedQuiz && step !== 6)) {
     return <LoadingOverlay message="Starting quiz..." />;
   }
 
@@ -528,7 +619,7 @@ export default function QuizPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Progress indicator */}
         <div data-testid="progress-indicator" className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3, 4, 5].map((s) => (
+          {[1, 2, 3, 4, 5, 6].map((s) => (
             <div
               key={s}
               data-testid={`progress-dot-${s}`}
@@ -612,8 +703,32 @@ export default function QuizPage() {
                 What kind of music do you listen to?
               </h1>
               <p className="text-[var(--text)]/60">
-                Select your favorite genres to get started.
+                Select your favorite decades and genres to get started.
               </p>
+            </div>
+
+            {/* Decades section */}
+            <div data-testid="decade-section" className="grid grid-cols-4 gap-2 mb-6">
+              {DECADES.map((d) => (
+                <button
+                  key={d}
+                  data-testid={`decade-${d}`}
+                  onClick={() => toggleDecade(d)}
+                  className={`
+                    py-4 px-2 rounded-xl text-center transition-all
+                    ${
+                      selectedDecades.has(d)
+                        ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border-2"
+                        : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--primary)]/50"
+                    }
+                  `}
+                >
+                  <span className="text-sm font-medium text-[var(--text)]">{d}</span>
+                  {selectedDecades.has(d) && (
+                    <CheckIcon className="w-3 h-3 text-[var(--brand-pink)] mx-auto mt-1" />
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* Genre grid */}
@@ -659,48 +774,6 @@ export default function QuizPage() {
                   ? "Select at least one genre"
                   : `${selectedGenres.size} genre${selectedGenres.size > 1 ? "s" : ""} selected`}
               </span>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-[var(--card-border)] my-6" />
-
-            {/* Decades section */}
-            <div className="mb-6">
-              <h2 data-testid="decades-heading" className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Favorite eras (optional)
-              </h2>
-              <p className="text-[var(--text)]/50 text-sm mb-4">
-                Select the decades of music you enjoy most.
-              </p>
-              <div data-testid="decade-section" className="grid grid-cols-4 gap-2">
-                {DECADES.map((d) => (
-                  <button
-                    key={d}
-                    data-testid={`decade-${d}`}
-                    onClick={() => toggleDecade(d)}
-                    className={`
-                      py-4 px-2 rounded-xl text-center transition-all
-                      ${
-                        selectedDecades.has(d)
-                          ? "bg-[var(--brand-pink)]/20 border-[var(--brand-pink)]/50 border-2"
-                          : "bg-[var(--card)] border border-[var(--card-border)] hover:border-[var(--primary)]/50"
-                      }
-                    `}
-                  >
-                    <span className="text-sm font-medium text-[var(--text)]">{d}</span>
-                    {selectedDecades.has(d) && (
-                      <CheckIcon className="w-3 h-3 text-[var(--brand-pink)] mx-auto mt-1" />
-                    )}
-                  </button>
-                ))}
-              </div>
-              {selectedDecades.size > 0 && (
-                <div className="text-center mt-2">
-                  <span className="text-[var(--text)]/40 text-xs">
-                    {selectedDecades.size} era{selectedDecades.size > 1 ? "s" : ""} selected
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Navigation */}
@@ -877,6 +950,75 @@ export default function QuizPage() {
               </p>
             </div>
 
+            {/* Songs I Enjoy Singing */}
+            <div className="mb-6">
+              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
+                Songs You Love to Sing
+              </h2>
+              <p className="text-[var(--text)]/50 text-sm mb-3">
+                Add songs you&apos;ve sung before and enjoyed and tell us why!
+              </p>
+              <SongSearchAutocomplete
+                onSelect={handleAddEnjoySong}
+                selectedSongIds={new Set(enjoySongs.map((s) => s.song_id))}
+                placeholder="Search for songs you love singing..."
+              />
+            </div>
+
+            {/* Selected songs */}
+            {enjoySongs.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-[var(--text)]/70">
+                    Songs Added ({enjoySongs.length})
+                  </h3>
+                  <button
+                    onClick={() => setEnjoySongs([])}
+                    className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {enjoySongs.map((song) => (
+                    <div
+                      key={song.song_id}
+                      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)]"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[var(--text)] font-medium truncate block">
+                          {song.title}
+                        </span>
+                        <span className="text-[var(--text-muted)] text-sm truncate block">
+                          {song.artist}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleEditEnjoySong(song)}
+                        className={`
+                          px-3 py-1.5 rounded-lg text-sm font-medium transition-colors
+                          ${
+                            song.singing_tags && song.singing_tags.length > 0
+                              ? "bg-[var(--brand-pink)]/20 text-[var(--brand-pink)]"
+                              : "border border-[var(--brand-pink)] text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10"
+                          }
+                        `}
+                      >
+                        {song.singing_tags && song.singing_tags.length > 0 ? "Edit" : "Why?"}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveEnjoySong(song.song_id)}
+                        className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                        title="Remove song"
+                      >
+                        <XIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Energy preference */}
             <div data-testid="energy-section" className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
@@ -971,79 +1113,6 @@ export default function QuizPage() {
                 ))}
               </div>
             </div>
-
-            {/* Divider */}
-            <div className="border-t border-[var(--card-border)] my-6" />
-
-            {/* Songs I Enjoy Singing */}
-            <div className="mb-6">
-              <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
-                Songs You Love to Sing (optional)
-              </h2>
-              <p className="text-[var(--text)]/50 text-sm mb-3">
-                Add songs you&apos;ve sung before and enjoyed.
-              </p>
-              <SongSearchAutocomplete
-                onSelect={handleAddEnjoySong}
-                selectedSongIds={new Set(enjoySongs.map((s) => s.song_id))}
-                placeholder="Search for songs you love singing..."
-              />
-            </div>
-
-            {/* Selected songs */}
-            {enjoySongs.length > 0 && (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-[var(--text)]/70">
-                    Songs Added ({enjoySongs.length})
-                  </h3>
-                  <button
-                    onClick={() => setEnjoySongs([])}
-                    className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {enjoySongs.map((song) => (
-                    <div
-                      key={song.song_id}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)]"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[var(--text)] font-medium truncate">
-                            {song.title}
-                          </span>
-                          {(song.singing_tags && song.singing_tags.length > 0) && (
-                            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand-pink)]/20 text-[var(--brand-pink)]">
-                              Tagged
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[var(--text-muted)] text-sm truncate block">
-                          {song.artist}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleEditEnjoySong(song)}
-                        className="p-2 rounded-full text-[var(--text-subtle)] hover:text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10 transition-colors"
-                        title="Add details about why you love this song"
-                      >
-                        <MicrophoneIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleRemoveEnjoySong(song.song_id)}
-                        className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                        title="Remove song"
-                      >
-                        <XIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Navigation */}
             <div className="flex gap-3 sticky bottom-4">
@@ -1186,25 +1255,136 @@ export default function QuizPage() {
             )}
           </>
         )}
+
+        {/* Step 6: Email Collection + Generating Recommendations */}
+        {step === 6 && (
+          <>
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
+                Almost There!
+              </h1>
+              <p className="text-[var(--text)]/60">
+                Enter your email to save your recommendations.
+              </p>
+            </div>
+
+            {/* Generation Progress */}
+            <div className="mb-8 p-6 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+              <div className="flex items-center gap-4">
+                {isGenerating ? (
+                  <>
+                    <LoaderIcon className="w-8 h-8 animate-spin text-[var(--brand-pink)] flex-shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-[var(--text)]">Generating your recommendations...</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Analyzing your music taste</p>
+                      {/* Progress bar */}
+                      <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
+                        <div className="h-full bg-[var(--brand-pink)] rounded-full animate-pulse" style={{ width: "60%" }} />
+                      </div>
+                    </div>
+                  </>
+                ) : recommendationsReady ? (
+                  <>
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                      <CheckIcon className="w-5 h-5 text-green-500" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-[var(--text)]">Recommendations ready!</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Your personalized song list is waiting</p>
+                      {/* Completed progress bar */}
+                      <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full" style={{ width: "100%" }} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-full bg-[var(--secondary)] flex items-center justify-center flex-shrink-0">
+                      <span className="text-[var(--text-muted)]">⏳</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-[var(--text)]">Waiting to generate...</h3>
+                      <p className="text-sm text-[var(--text-muted)]">This will start shortly</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Email Input */}
+            <div className="mb-8">
+              <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
+                Your Email
+              </label>
+              {emailSubmitted ? (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+                  <CheckIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-[var(--text)] font-medium">Email saved!</p>
+                    <p className="text-sm text-[var(--text-muted)]">{email}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-3">
+                    <input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setEmailError(null);
+                      }}
+                      placeholder="you@example.com"
+                      className={`
+                        flex-1 px-4 py-3 rounded-xl bg-[var(--card)] border text-[var(--text)]
+                        placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-pink)]
+                        ${emailError ? "border-red-500" : "border-[var(--card-border)]"}
+                      `}
+                      disabled={isEmailSubmitting}
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleEmailSubmit}
+                      disabled={isEmailSubmitting || !email.trim()}
+                    >
+                      {isEmailSubmitting ? "Saving..." : "Save"}
+                    </Button>
+                  </div>
+                  {emailError && (
+                    <p className="mt-2 text-sm text-red-500">{emailError}</p>
+                  )}
+                  <p className="mt-3 text-xs text-[var(--text-muted)]">
+                    We&apos;ll send you updates about your recommendations. No spam, ever.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {/* View Recommendations Button */}
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              onClick={handleViewRecommendations}
+              disabled={!emailSubmitted || !recommendationsReady}
+              rightIcon={<ChevronRightIcon className="w-5 h-5" />}
+            >
+              {!recommendationsReady
+                ? "Generating recommendations..."
+                : !emailSubmitted
+                  ? "Enter your email to continue"
+                  : "View My Recommendations"}
+            </Button>
+
+            {!emailSubmitted && recommendationsReady && (
+              <p className="text-center mt-3 text-sm text-[var(--text-muted)]">
+                Please enter your email above to see your recommendations
+              </p>
+            )}
+          </>
+        )}
       </div>
-
-      {/* Generating recommendations overlay */}
-      {isGenerating && !showEmailModal && (
-        <div className="fixed inset-0 bg-[var(--background)]/95 z-50 flex items-center justify-center">
-          <div className="text-center">
-            <LoaderIcon className="w-12 h-12 animate-spin text-[var(--brand-pink)] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[var(--text)]">Generating your recommendations...</h2>
-            <p className="text-[var(--text-muted)] mt-2">This only takes a moment</p>
-          </div>
-        </div>
-      )}
-
-      {/* Post-quiz email collection modal */}
-      <PostQuizEmailModal
-        isOpen={showEmailModal}
-        onEmailSubmit={handleEmailSubmit}
-        isSubmitting={isEmailSubmitting}
-      />
     </main>
   );
 }

@@ -8,7 +8,7 @@ import type { SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 const STORAGE_KEY = "quiz_draft_v1";
 const DEBOUNCE_MS = 3000;
 
-export type QuizStep = 1 | 2 | 3 | 4 | 5;
+export type QuizStep = 1 | 2 | 3 | 4 | 5 | 6;
 export type EnergyPreference = "chill" | "medium" | "high" | null;
 export type VocalComfortPref = "easy" | "challenging" | "any" | null;
 export type CrowdPleaserPref = "hits" | "deep_cuts" | "any" | null;
@@ -40,7 +40,8 @@ export interface QuizDraft {
 }
 
 export interface UseQuizDraftReturn {
-  draft: QuizDraft | null;
+  /** undefined = loading, null = no draft, QuizDraft = has draft */
+  draft: QuizDraft | null | undefined;
   saveDraft: (draft: Partial<QuizDraft>) => void;
   clearDraft: () => void;
   isSyncing: boolean;
@@ -58,7 +59,8 @@ export interface UseQuizDraftReturn {
  * - Clear localStorage on successful quiz submit
  */
 export function useQuizDraft(): UseQuizDraftReturn {
-  const [draft, setDraft] = useState<QuizDraft | null>(null);
+  // undefined = loading, null = no draft, QuizDraft = has draft
+  const [draft, setDraft] = useState<QuizDraft | null | undefined>(undefined);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncError, setLastSyncError] = useState<Error | null>(null);
   const [isOnline, setIsOnline] = useState(true);
@@ -82,9 +84,13 @@ export function useQuizDraft(): UseQuizDraftReturn {
       if (stored) {
         const parsed = JSON.parse(stored) as QuizDraft;
         setDraft(parsed);
+      } else {
+        // Explicitly set null to indicate "no draft" (vs undefined = "loading")
+        setDraft(null);
       }
     } catch (err) {
       console.warn("Failed to load quiz draft from localStorage:", err);
+      setDraft(null); // On error, treat as no draft
     }
 
     // Listen for online/offline events

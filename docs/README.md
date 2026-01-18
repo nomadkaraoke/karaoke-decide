@@ -32,7 +32,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Landing Page:** Clean value prop + CTA, smart redirect (quiz if not completed, recommendations if completed)
 - **Music I Know:** Unified tabbed view (Artists | Songs | Services) replacing scattered data pages
 - **Settings Page:** Profile, preferences, services link, logout, danger zone
-- **Quiz Flow:** Enhanced 5-step quiz (Genres → Eras → Preferences → Music You Know → Artists) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, and smart artist suggestions
+- **Quiz Flow:** Enhanced 6-step quiz (Genres → Eras → Preferences → Music You Know → Artists → Email) with 22 genres, multi-decade selection, vocal comfort/crowd pleaser preferences, manual artist entry, smart artist suggestions, and email collection before showing recommendations
 - **Better Artist Selection:** Quiz step 5 now has infinite scroll (no more jarring list changes), suggestion reason badges ("Similar to Green Day", "Based on punk"), and a sticky finish bar that's always accessible while scrolling
 - **Collaborative Recommendations:** Artists are suggested based on four sources of similarity data:
   - **Last.fm users (Firestore):** 10K+ users with real listening history (MBID-first, ~78% MBID coverage)
@@ -50,7 +50,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Playlists:** Full CRUD for user karaoke playlists (Phase 6 Part 1)
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
 - **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 37.5M recordings + 5.5M ISRCs + 693K tags + 1.5M MLHD+ artist similarity pairs**
-- **CI/Testing:** 135 unit tests, 320 backend tests, E2E tests with Playwright
+- **CI/Testing:** 185 unit tests, 403 backend tests, E2E tests with Playwright
 - **Email Delivery:** SendGrid configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
 - **Spotify Audio Analysis ETL:** Complete! 33.5M tracks + 325M sections from 3.88TB torrent (backed up to GCS)
