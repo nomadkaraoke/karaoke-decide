@@ -39,6 +39,7 @@ export function StickyFinishBar({
             {/* Back button */}
             {onBack && (
               <button
+                data-testid="sticky-back-button"
                 onClick={onBack}
                 aria-label="Back"
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors text-sm"
