@@ -8,7 +8,7 @@ import type { SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 const STORAGE_KEY = "quiz_draft_v1";
 const DEBOUNCE_MS = 3000;
 
-export type QuizStep = 1 | 2 | 3 | 4 | 5;
+export type QuizStep = 1 | 2 | 3 | 4 | 5 | 6;
 export type EnergyPreference = "chill" | "medium" | "high" | null;
 export type VocalComfortPref = "easy" | "challenging" | "any" | null;
 export type CrowdPleaserPref = "hits" | "deep_cuts" | "any" | null;
