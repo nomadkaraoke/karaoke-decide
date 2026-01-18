@@ -1260,7 +1260,7 @@ export default function QuizPage() {
         {step === 6 && (
           <>
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
+              <h1 data-testid="email-step-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
                 Almost There!
               </h1>
               <p className="text-[var(--text)]/60">
@@ -1269,7 +1269,7 @@ export default function QuizPage() {
             </div>
 
             {/* Generation Progress */}
-            <div className="mb-8 p-6 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
+            <div data-testid="generation-progress" className="mb-8 p-6 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
               <div className="flex items-center gap-4">
                 {isGenerating ? (
                   <>
@@ -1329,6 +1329,7 @@ export default function QuizPage() {
                   <div className="flex gap-3">
                     <input
                       id="email"
+                      data-testid="email-input"
                       type="email"
                       value={email}
                       onChange={(e) => {
@@ -1344,6 +1345,7 @@ export default function QuizPage() {
                       disabled={isEmailSubmitting}
                     />
                     <Button
+                      data-testid="email-save-button"
                       variant="secondary"
                       onClick={handleEmailSubmit}
                       disabled={isEmailSubmitting || !email.trim()}
@@ -1363,6 +1365,7 @@ export default function QuizPage() {
 
             {/* View Recommendations Button */}
             <Button
+              data-testid="view-recommendations-button"
               variant="primary"
               size="lg"
               className="w-full"
