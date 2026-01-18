@@ -178,20 +178,19 @@ export default function QuizPage() {
   const shownArtistNamesRef = useRef<Set<string>>(new Set());
 
   // Restore state from draft on mount (only once)
-  // We need a small delay to let useQuizDraft load from localStorage first
+  // draft: undefined = loading, null = no draft, QuizDraft = has draft
   useEffect(() => {
-    // Give the hook time to load from localStorage before deciding there's no draft
-    const timer = setTimeout(() => {
-      if (!hasRestoredDraft.current) {
-        hasRestoredDraft.current = true;
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    // Still loading from localStorage, wait
+    if (draft === undefined) return;
 
-  useEffect(() => {
-    if (draft && !hasRestoredDraft.current) {
-      hasRestoredDraft.current = true;
+    // Already restored, skip
+    if (hasRestoredDraft.current) return;
+
+    // Mark as restored (whether we have a draft or not)
+    hasRestoredDraft.current = true;
+
+    // If we have a draft, restore the state
+    if (draft) {
       setStep(draft.step);
       setSelectedGenres(new Set(draft.selectedGenres));
       setSelectedDecades(new Set(draft.selectedDecades));
