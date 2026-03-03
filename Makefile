@@ -38,19 +38,21 @@ cli:
 	poetry run karaoke-decide $(ARGS)
 
 # Testing
+TEST_TIMEOUT ?= 300
+
 test: test-unit test-backend
 
 test-unit:
-	poetry run pytest tests/unit -v --tb=short
+	timeout $(TEST_TIMEOUT) poetry run pytest tests/unit -v --tb=short
 
 test-backend:
-	poetry run pytest backend/tests -v --tb=short --ignore=backend/tests/emulator
+	timeout $(TEST_TIMEOUT) poetry run pytest backend/tests -v --tb=short --ignore=backend/tests/emulator
 
 test-e2e:
 	@echo "Starting emulators..."
 	@./scripts/start-emulators.sh
 	@echo "Running e2e tests..."
-	poetry run pytest backend/tests/emulator -v --tb=short || (./scripts/stop-emulators.sh && exit 1)
+	timeout $(TEST_TIMEOUT) poetry run pytest backend/tests/emulator -v --tb=short || (./scripts/stop-emulators.sh && exit 1)
 	@./scripts/stop-emulators.sh
 	@echo "Emulators stopped."
 
