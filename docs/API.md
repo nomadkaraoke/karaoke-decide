@@ -359,6 +359,52 @@ This endpoint is designed to be cached aggressively. Response is ~600KB with bro
 - `n` - name
 - `p` - popularity (0-100)
 
+### GET /api/catalog/tracks
+
+Search tracks for autocomplete. Searches Spotify first, then supplements with MusicBrainz recordings when results are sparse (e.g., deep cuts not in Spotify's catalog).
+
+**Query parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| q | string | Yes | Search query (min 2 characters) |
+| artist | string | No | Filter by artist name (unicode-aware, e.g., "Maximo Park" matches "Maxïmo Park") |
+| limit | integer | No | Max results (1-50, default 10) |
+
+**Response:**
+```json
+{
+  "tracks": [
+    {
+      "track_id": "6rqhFgbbKwnb9MLmUQDhG6",
+      "track_name": "Apply Some Pressure",
+      "artist_name": "Maxïmo Park",
+      "artist_id": "0kfQafj4QiWiXaM0EGWbhV",
+      "popularity": 55,
+      "duration_ms": 228000,
+      "explicit": false,
+      "recording_mbid": null
+    },
+    {
+      "track_id": "mb:a74b1b7f-71a5-4011-9441-d0b5e4122711",
+      "track_name": "Limassol",
+      "artist_name": "Maxïmo Park",
+      "artist_id": "",
+      "popularity": 0,
+      "duration_ms": 215000,
+      "explicit": false,
+      "recording_mbid": "a74b1b7f-71a5-4011-9441-d0b5e4122711"
+    }
+  ],
+  "total": 2
+}
+```
+
+**Notes:**
+- `track_id` is a Spotify track ID when available, or `"mb:{recording_mbid}"` for MusicBrainz-only tracks
+- `recording_mbid` is set for tracks sourced from MusicBrainz
+- When `artist` is provided, the popularity threshold is lowered to surface less popular tracks
+
 ### GET /api/catalog/stats
 
 Get catalog statistics.
