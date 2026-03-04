@@ -132,6 +132,7 @@ class TrackSearchResult(BaseModel):
     popularity: int
     duration_ms: int
     explicit: bool
+    recording_mbid: str | None = None
 
 
 class TrackSearchResponse(BaseModel):
@@ -425,16 +426,18 @@ async def search_artists(
 @router.get("/tracks", response_model=TrackSearchResponse)
 async def search_tracks(
     q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
+    artist: str | None = Query(None, description="Filter results by artist name"),
     limit: int = Query(10, ge=1, le=50, description="Maximum results"),
 ) -> TrackSearchResponse:
     """Search tracks for autocomplete.
 
-    Returns tracks matching the query prefix (title or artist), sorted by popularity.
-    Uses the Spotify track catalog for comprehensive track data.
+    Returns tracks matching the query prefix on title, sorted by popularity.
+    When artist is provided, results are filtered to that artist and
+    supplemented with MusicBrainz recordings for deep cuts not in Spotify.
 
     This endpoint is public (no auth required) for quick autocomplete.
     """
-    results = get_catalog_service().search_tracks(q, limit=limit)
+    results = get_catalog_service().search_tracks_combined(q, artist=artist, limit=limit)
     return TrackSearchResponse(
         tracks=[
             TrackSearchResult(
@@ -445,6 +448,7 @@ async def search_tracks(
                 popularity=r.popularity,
                 duration_ms=r.duration_ms,
                 explicit=r.explicit,
+                recording_mbid=r.recording_mbid,
             )
             for r in results
         ],

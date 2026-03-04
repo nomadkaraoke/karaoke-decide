@@ -3,6 +3,7 @@
 import logging
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 
 from google.cloud import bigquery
@@ -26,6 +27,20 @@ def _normalize_for_matching(text: str) -> str:
     # Collapse multiple whitespace
     result = re.sub(r"\s+", " ", result)
     return result.strip()
+
+
+def _normalize_unicode(text: str) -> str:
+    """Normalize unicode characters before standard matching normalization.
+
+    Decomposes accented characters (ï→i, é→e) via NFD decomposition and
+    strips combining marks, then applies standard matching normalization.
+    This ensures "Maxïmo Park" and "Maximo Park" both normalize to "maximo park".
+    """
+    if not text:
+        return ""
+    decomposed = unicodedata.normalize("NFD", text)
+    stripped = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return _normalize_for_matching(stripped)
 
 
 @dataclass
@@ -89,6 +104,7 @@ class TrackSearchResult:
     popularity: int
     duration_ms: int
     explicit: bool
+    recording_mbid: str | None = None
 
 
 @dataclass
@@ -869,17 +885,20 @@ class BigQueryCatalogService:
     def search_tracks(
         self,
         query: str,
+        artist: str | None = None,
         limit: int = 10,
         min_popularity: int = 30,
     ) -> list[TrackSearchResult]:
-        """Search tracks by title or artist for autocomplete.
+        """Search tracks by title for autocomplete, optionally filtered by artist.
 
         Uses the pre-computed spotify_tracks_normalized table for fast
-        prefix matching. Searches both track title and artist name.
-        Results are sorted by popularity (highest first).
+        prefix matching. When artist is provided, searches only title and
+        filters by artist, with a lower popularity threshold to surface
+        less popular tracks.
 
         Args:
-            query: Search query (will be normalized)
+            query: Search query for track title (will be normalized)
+            artist: Optional artist name to filter by (prefix match)
             limit: Maximum results to return (default 10)
             min_popularity: Minimum popularity score (0-100, default 30 for faster queries)
 
@@ -893,8 +912,14 @@ class BigQueryCatalogService:
         if not normalized:
             return []
 
+        normalized_artist = _normalize_unicode(artist) if artist else None
+
+        # When filtering by artist, lower the popularity threshold so we can
+        # find less popular tracks (e.g. deep cuts, B-sides).
+        effective_min_popularity = 0 if normalized_artist else min_popularity
+
         # Check cache first
-        cache_key = f"{normalized}:{limit}:{min_popularity}"
+        cache_key = f"{normalized}:{normalized_artist or ''}:{limit}:{effective_min_popularity}"
         now = time.time()
         if cache_key in self._track_search_cache:
             cached_time, cached_results = self._track_search_cache[cache_key]
@@ -902,30 +927,56 @@ class BigQueryCatalogService:
                 logger.debug(f"Track search cache hit for '{normalized}'")
                 return cached_results
 
-        # Search both title and artist with popularity filter
-        sql = f"""
-            SELECT DISTINCT
-                track_id,
-                track_name,
-                artist_name,
-                artist_id,
-                popularity,
-                duration_ms,
-                explicit
-            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
-            WHERE (normalized_title LIKE @query_prefix OR normalized_artist LIKE @query_prefix)
-              AND popularity >= @min_popularity
-            ORDER BY popularity DESC
-            LIMIT @limit
-        """
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
-                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ]
-        )
+        if normalized_artist:
+            # When artist is provided, search title only and filter by artist
+            sql = f"""
+                SELECT DISTINCT
+                    track_id,
+                    track_name,
+                    artist_name,
+                    artist_id,
+                    popularity,
+                    duration_ms,
+                    explicit
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
+                WHERE normalized_title LIKE @query_prefix
+                  AND normalized_artist LIKE @artist_prefix
+                  AND popularity >= @min_popularity
+                ORDER BY popularity DESC
+                LIMIT @limit
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                    bigquery.ScalarQueryParameter("artist_prefix", "STRING", f"{normalized_artist}%"),
+                    bigquery.ScalarQueryParameter("min_popularity", "INT64", effective_min_popularity),
+                    bigquery.ScalarQueryParameter("limit", "INT64", limit),
+                ]
+            )
+        else:
+            # No artist filter: search both title and artist fields
+            sql = f"""
+                SELECT DISTINCT
+                    track_id,
+                    track_name,
+                    artist_name,
+                    artist_id,
+                    popularity,
+                    duration_ms,
+                    explicit
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks_normalized`
+                WHERE (normalized_title LIKE @query_prefix OR normalized_artist LIKE @query_prefix)
+                  AND popularity >= @min_popularity
+                ORDER BY popularity DESC
+                LIMIT @limit
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+                    bigquery.ScalarQueryParameter("min_popularity", "INT64", effective_min_popularity),
+                    bigquery.ScalarQueryParameter("limit", "INT64", limit),
+                ]
+            )
 
         results = self.client.query(sql, job_config=job_config).result()
 
@@ -951,6 +1002,68 @@ class BigQueryCatalogService:
             self._track_search_cache = {k: v for k, v in self._track_search_cache.items() if v[0] > cutoff}
 
         return track_results
+
+    def search_tracks_combined(
+        self,
+        query: str,
+        artist: str | None = None,
+        limit: int = 10,
+    ) -> list[TrackSearchResult]:
+        """Search tracks with Spotify-first, MusicBrainz supplement strategy.
+
+        Searches Spotify first (fast, has popularity/duration/explicit data),
+        then supplements with MusicBrainz recordings when Spotify results are
+        sparse. This keeps autocomplete fast for common tracks while surfacing
+        deep cuts and B-sides via MB.
+
+        Args:
+            query: Search query for track title
+            artist: Optional artist name to filter by
+            limit: Maximum results to return
+
+        Returns:
+            List of TrackSearchResult sorted by popularity, combining both sources
+        """
+        # Phase 1: Search Spotify
+        spotify_results = self.search_tracks(query, artist=artist, limit=limit, min_popularity=0)
+
+        if len(spotify_results) >= limit:
+            return spotify_results
+
+        # Phase 2: Supplement with MusicBrainz
+        remaining = limit - len(spotify_results)
+        mb_results = self.search_recordings(query, artist=artist, limit=remaining * 2)
+
+        # Deduplicate: skip MB results that already appear in Spotify results (by spotify_track_id)
+        spotify_track_ids = {r.track_id for r in spotify_results}
+
+        combined = list(spotify_results)
+        for mb in mb_results:
+            if len(combined) >= limit:
+                break
+            # Skip if this MB recording's Spotify match is already in results
+            if mb.spotify_track_id and mb.spotify_track_id in spotify_track_ids:
+                continue
+
+            # Convert RecordingSearchResult → TrackSearchResult
+            track_id = mb.spotify_track_id if mb.spotify_track_id else f"mb:{mb.recording_mbid}"
+            combined.append(
+                TrackSearchResult(
+                    track_id=track_id,
+                    track_name=mb.title,
+                    artist_name=mb.artist_credit or "",
+                    artist_id="",
+                    popularity=mb.spotify_popularity or 0,
+                    duration_ms=mb.length_ms or 0,
+                    explicit=False,
+                    recording_mbid=mb.recording_mbid,
+                )
+            )
+            # Track for dedup
+            if mb.spotify_track_id:
+                spotify_track_ids.add(mb.spotify_track_id)
+
+        return combined
 
     # =========================================================================
     # MBID-First Search Methods (MusicBrainz as source of truth)
@@ -1200,15 +1313,20 @@ class BigQueryCatalogService:
     def search_recordings(
         self,
         query: str,
+        artist: str | None = None,
         limit: int = 10,
         min_popularity: int = 0,
     ) -> list[RecordingSearchResult]:
         """Search recordings by title with Spotify enrichment.
 
         Uses mb_recordings table with ISRC-based Spotify enrichment.
+        When artist is provided, filters by artist using runtime unicode
+        normalization (NORMALIZE + strip combining marks) to handle
+        accented characters like "Maxïmo Park".
 
         Args:
             query: Search query (will be normalized)
+            artist: Optional artist name to filter by (unicode-aware prefix match)
             limit: Maximum results to return (default 10)
             min_popularity: Minimum Spotify popularity (0 for MB-only results)
 
@@ -1222,14 +1340,27 @@ class BigQueryCatalogService:
         if not normalized:
             return []
 
+        normalized_artist = _normalize_unicode(artist) if artist else None
+
         # Check cache first
-        cache_key = f"rec:{normalized}:{limit}:{min_popularity}"
+        cache_key = f"rec:{normalized}:{normalized_artist or ''}:{limit}:{min_popularity}"
         now = time.time()
         if cache_key in self._recording_search_cache:
             cached_time, cached_results = self._recording_search_cache[cache_key]
             if now - cached_time < self.CACHE_TTL:
                 logger.debug(f"Recording search cache hit for '{normalized}'")
                 return cached_results
+
+        # Build artist filter clause for runtime unicode normalization
+        artist_clause = ""
+        if normalized_artist:
+            # Runtime unicode normalization on artist_credit:
+            # NORMALIZE(text, NFD) decomposes accented chars, then strip combining marks
+            artist_clause = """
+              AND TRIM(REGEXP_REPLACE(REGEXP_REPLACE(
+                  LOWER(REGEXP_REPLACE(NORMALIZE(r.artist_credit, NFD), r'\\pM', '')),
+                  r'[^a-z0-9 ]', ' '), r' +', ' ')) LIKE @artist_prefix
+            """
 
         # Query recordings with ISRC-based Spotify enrichment
         sql = f"""
@@ -1248,17 +1379,20 @@ class BigQueryCatalogService:
                 ON ri.isrc = st.isrc
             WHERE r.name_normalized LIKE @query_prefix
               AND (st.popularity >= @min_popularity OR st.popularity IS NULL)
+              {artist_clause}
             ORDER BY COALESCE(st.popularity, 0) DESC
             LIMIT @limit
         """
 
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
-                bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ]
-        )
+        params = [
+            bigquery.ScalarQueryParameter("query_prefix", "STRING", f"{normalized}%"),
+            bigquery.ScalarQueryParameter("min_popularity", "INT64", min_popularity),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+        if normalized_artist:
+            params.append(bigquery.ScalarQueryParameter("artist_prefix", "STRING", f"{normalized_artist}%"))
+
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
 
         try:
             results = self.client.query(sql, job_config=job_config).result()

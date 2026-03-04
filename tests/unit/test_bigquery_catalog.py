@@ -9,6 +9,9 @@ from karaoke_decide.services.bigquery_catalog import (
     KaraokeRecordingLink,
     RecordingSearchResult,
     SongResult,
+    TrackSearchResult,
+    _normalize_for_matching,
+    _normalize_unicode,
 )
 
 
@@ -367,21 +370,18 @@ class TestNormalization:
 
     def test_normalize_for_matching_basic(self) -> None:
         """Test basic normalization."""
-        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
 
         assert _normalize_for_matching("Green Day") == "green day"
         assert _normalize_for_matching("RADIOHEAD") == "radiohead"
 
     def test_normalize_for_matching_punctuation(self) -> None:
         """Test normalization removes punctuation."""
-        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
 
         assert _normalize_for_matching("AC/DC") == "ac dc"
         assert _normalize_for_matching("Guns N' Roses") == "guns n roses"
 
     def test_normalize_for_matching_empty(self) -> None:
         """Test normalization handles empty input."""
-        from karaoke_decide.services.bigquery_catalog import _normalize_for_matching
 
         assert _normalize_for_matching("") == ""
         assert _normalize_for_matching(None) == ""  # type: ignore[arg-type]
@@ -904,3 +904,336 @@ class TestRecordingLookups:
         result = service.get_karaoke_recording_links([12345])
 
         assert result == {}
+
+
+class TestNormalizeUnicode:
+    """Tests for _normalize_unicode helper."""
+
+    def test_ascii_passthrough(self) -> None:
+        """Test that plain ASCII text normalizes normally."""
+        assert _normalize_unicode("Maximo Park") == "maximo park"
+
+    def test_unicode_decomposition(self) -> None:
+        """Test that accented characters are decomposed (ï→i, é→e)."""
+        assert _normalize_unicode("Maxïmo Park") == "maximo park"
+        assert _normalize_unicode("Beyoncé") == "beyonce"
+        assert _normalize_unicode("Sigur Rós") == "sigur ros"
+
+    def test_both_inputs_match(self) -> None:
+        """Test that unicode and ASCII variants produce identical results."""
+        assert _normalize_unicode("Maxïmo Park") == _normalize_unicode("Maximo Park")
+        assert _normalize_unicode("Beyoncé") == _normalize_unicode("Beyonce")
+
+    def test_empty_input(self) -> None:
+        """Test empty/None input."""
+        assert _normalize_unicode("") == ""
+        assert _normalize_unicode(None) == ""  # type: ignore[arg-type]
+
+    def test_punctuation_removed(self) -> None:
+        """Test that punctuation is still removed after unicode normalization."""
+        assert _normalize_unicode("Guns N' Rosés") == "guns n roses"
+
+
+class TestSearchTracksWithArtist:
+    """Tests for search_tracks with artist filtering."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_tracks_with_unicode_artist(self, mock_client_class: MagicMock) -> None:
+        """Test that unicode artist names are normalized for Spotify search."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_tracks("limassol", artist="Maxïmo Park")
+
+        call_args = mock_client.query.call_args
+        config = call_args[1]["job_config"]
+        params = {p.name: p.value for p in config.query_parameters}
+
+        # Unicode ï should be decomposed to i
+        assert params["artist_prefix"] == "maximo park%"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_tracks_with_artist(self, mock_client_class: MagicMock) -> None:
+        """Test that artist filter generates correct SQL with artist_prefix param."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_tracks("apply some pressure", artist="Maximo Park")
+
+        mock_client.query.assert_called_once()
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        config = call_args[1]["job_config"]
+        params = {p.name: p.value for p in config.query_parameters}
+
+        assert "normalized_artist LIKE @artist_prefix" in sql
+        assert "normalized_title LIKE @query_prefix" in sql
+        assert params["artist_prefix"] == "maximo park%"
+        assert params["query_prefix"] == "apply some pressure%"
+        assert params["min_popularity"] == 0  # Lowered when artist provided
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_tracks_without_artist(self, mock_client_class: MagicMock) -> None:
+        """Test backward compat: no artist uses OR on title/artist."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_tracks("back in black")
+
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        params = {p.name: p.value for p in call_args[1]["job_config"].query_parameters}
+
+        assert "normalized_title LIKE @query_prefix OR normalized_artist LIKE @query_prefix" in sql
+        assert "artist_prefix" not in params
+        assert params["min_popularity"] == 30  # Default threshold
+
+
+class TestSearchRecordingsWithArtist:
+    """Tests for search_recordings with artist filtering."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_with_artist(self, mock_client_class: MagicMock) -> None:
+        """Test that artist filter adds unicode-aware WHERE clause."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_recordings("limassol", artist="Maximo Park")
+
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        config = call_args[1]["job_config"]
+        params = {p.name: p.value for p in config.query_parameters}
+
+        assert "NORMALIZE(r.artist_credit, NFD)" in sql
+        assert "artist_prefix" in params
+        assert params["artist_prefix"] == "maximo park%"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_without_artist(self, mock_client_class: MagicMock) -> None:
+        """Test backward compat: no artist clause when artist not provided."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_recordings("bohemian_unique_test")
+
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        params = {p.name: p.value for p in call_args[1]["job_config"].query_parameters}
+
+        assert "NORMALIZE" not in sql
+        assert "artist_prefix" not in params
+
+
+class TestSearchTracksCombined:
+    """Tests for search_tracks_combined orchestration."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_spotify_sufficient(self, mock_client_class: MagicMock) -> None:
+        """When Spotify returns enough results, MB is not called."""
+        service = BigQueryCatalogService()
+
+        spotify_results = [
+            TrackSearchResult(
+                track_id=f"spotify:{i}",
+                track_name=f"Track {i}",
+                artist_name="Artist",
+                artist_id="aid",
+                popularity=80 - i,
+                duration_ms=200000,
+                explicit=False,
+            )
+            for i in range(10)
+        ]
+
+        with (
+            patch.object(service, "search_tracks", return_value=spotify_results) as mock_st,
+            patch.object(service, "search_recordings") as mock_sr,
+        ):
+            results = service.search_tracks_combined("track", limit=10)
+
+            mock_st.assert_called_once_with("track", artist=None, limit=10, min_popularity=0)
+            mock_sr.assert_not_called()
+            assert len(results) == 10
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_mb_supplement(self, mock_client_class: MagicMock) -> None:
+        """When Spotify is sparse, MB fills the gaps."""
+        service = BigQueryCatalogService()
+
+        spotify_results = [
+            TrackSearchResult(
+                track_id="spotify:1",
+                track_name="Track 1",
+                artist_name="Artist",
+                artist_id="aid",
+                popularity=80,
+                duration_ms=200000,
+                explicit=False,
+            )
+        ]
+
+        mb_results = [
+            RecordingSearchResult(
+                recording_mbid="mbid-1",
+                title="Track 2",
+                artist_credit="Artist",
+                length_ms=180000,
+                disambiguation=None,
+                spotify_track_id=None,
+                spotify_popularity=None,
+            ),
+            RecordingSearchResult(
+                recording_mbid="mbid-2",
+                title="Track 3",
+                artist_credit="Artist",
+                length_ms=200000,
+                disambiguation=None,
+                spotify_track_id="spotify:3",
+                spotify_popularity=50,
+            ),
+        ]
+
+        with (
+            patch.object(service, "search_tracks", return_value=spotify_results),
+            patch.object(service, "search_recordings", return_value=mb_results),
+        ):
+            results = service.search_tracks_combined("track", artist="Artist", limit=5)
+
+            assert len(results) == 3
+            # First result is from Spotify
+            assert results[0].track_id == "spotify:1"
+            assert results[0].recording_mbid is None
+            # Second is MB-only (no spotify match)
+            assert results[1].track_id == "mb:mbid-1"
+            assert results[1].recording_mbid == "mbid-1"
+            # Third is MB with Spotify enrichment
+            assert results[2].track_id == "spotify:3"
+            assert results[2].recording_mbid == "mbid-2"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_dedup(self, mock_client_class: MagicMock) -> None:
+        """MB tracks already in Spotify results are skipped."""
+        service = BigQueryCatalogService()
+
+        spotify_results = [
+            TrackSearchResult(
+                track_id="spotify:1",
+                track_name="Same Track",
+                artist_name="Artist",
+                artist_id="aid",
+                popularity=80,
+                duration_ms=200000,
+                explicit=False,
+            )
+        ]
+
+        mb_results = [
+            RecordingSearchResult(
+                recording_mbid="mbid-dup",
+                title="Same Track",
+                artist_credit="Artist",
+                length_ms=200000,
+                disambiguation=None,
+                spotify_track_id="spotify:1",  # Same as Spotify result
+                spotify_popularity=80,
+            ),
+            RecordingSearchResult(
+                recording_mbid="mbid-new",
+                title="New Track",
+                artist_credit="Artist",
+                length_ms=180000,
+                disambiguation=None,
+                spotify_track_id=None,
+                spotify_popularity=None,
+            ),
+        ]
+
+        with (
+            patch.object(service, "search_tracks", return_value=spotify_results),
+            patch.object(service, "search_recordings", return_value=mb_results),
+        ):
+            results = service.search_tracks_combined("track", limit=5)
+
+            assert len(results) == 2
+            assert results[0].track_id == "spotify:1"
+            assert results[1].track_id == "mb:mbid-new"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_both_empty(self, mock_client_class: MagicMock) -> None:
+        """When both Spotify and MB return nothing, result is empty."""
+        service = BigQueryCatalogService()
+
+        with (
+            patch.object(service, "search_tracks", return_value=[]),
+            patch.object(service, "search_recordings", return_value=[]),
+        ):
+            results = service.search_tracks_combined("nonexistent", artist="Nobody", limit=10)
+
+            assert results == []
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_artist_forwarded_to_both(self, mock_client_class: MagicMock) -> None:
+        """Artist param is forwarded to both search_tracks and search_recordings."""
+        service = BigQueryCatalogService()
+
+        with (
+            patch.object(service, "search_tracks", return_value=[]) as mock_st,
+            patch.object(service, "search_recordings", return_value=[]) as mock_sr,
+        ):
+            service.search_tracks_combined("track", artist="Artist X", limit=5)
+
+            mock_st.assert_called_once_with("track", artist="Artist X", limit=5, min_popularity=0)
+            mock_sr.assert_called_once_with("track", artist="Artist X", limit=10)
+
+
+class TestTrackSearchRoute:
+    """Tests for the /tracks route endpoint."""
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_artist_param_forwarded(self, mock_client_class: MagicMock) -> None:
+        """Test that artist param is accepted and forwarded to service."""
+
+        from backend.api.routes.catalog import search_tracks
+
+        mock_service = MagicMock()
+        mock_service.search_tracks_combined.return_value = [
+            TrackSearchResult(
+                track_id="spotify:1",
+                track_name="Test Track",
+                artist_name="Test Artist",
+                artist_id="aid",
+                popularity=80,
+                duration_ms=200000,
+                explicit=False,
+                recording_mbid=None,
+            )
+        ]
+
+        import backend.api.routes.catalog as catalog_module
+
+        original = catalog_module._catalog_service
+        catalog_module._catalog_service = mock_service
+
+        import asyncio
+
+        try:
+            result = asyncio.get_event_loop().run_until_complete(
+                search_tracks(q="test", artist="Test Artist", limit=10)
+            )
+        except RuntimeError:
+            # No event loop in test context, create one
+            result = asyncio.new_event_loop().run_until_complete(
+                search_tracks(q="test", artist="Test Artist", limit=10)
+            )
+        finally:
+            catalog_module._catalog_service = original
+
+        mock_service.search_tracks_combined.assert_called_once_with("test", artist="Test Artist", limit=10)
+        assert len(result.tracks) == 1
+        assert result.tracks[0].track_id == "spotify:1"
