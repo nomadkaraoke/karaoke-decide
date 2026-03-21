@@ -2,7 +2,7 @@
 
 This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-01-15 (MusicBrainz recordings + karaoke linking complete)
+> **Last Updated:** 2026-03-21 (Divebar catalog, KN community tracks, automated ETL pipelines)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
@@ -26,10 +26,19 @@ This document describes all music data available in BigQuery for use in features
    - Used for "Listeners of X also like Y" recommendations
 
 4. **Karaoke Catalog** (Core feature data):
-   - 275K karaoke songs from KaraokeNerds
+   - 281,007 karaoke songs from KaraokeNerds (refreshed daily)
+   - 58,825 community tracks with YouTube URLs (refreshed daily)
    - Links to MusicBrainz recordings (58.9% coverage)
-   - Source: Daily API export from karaokenerds.com (with permission)
-   - ⚠️ **TODO:** Currently a one-off dump - need to automate daily fetch and ETL
+   - Source: Daily automated ETL from karaokenerds.com API
+   - ✅ Automated daily via Cloud Function `kn-data-sync` in `nomadkaraoke` project
+   - Raw exports archived in `gs://nomadkaraoke-kn-data/`
+
+5. **Divebar Community Karaoke** (Community track catalog):
+   - 48,533 karaoke files from 62 community brands (refreshed daily)
+   - Formats: ZIP (20K), MP4 (20K), CDG+MP3 (7K), AVI (664), MKV (110)
+   - Source: [diveBar Karaoke Google Drive](https://drive.google.com/drive/folders/1zxnSZcE03gzy0YVGOdnTrEIi8It_3Wu8)
+   - ✅ Automated daily via Cloud Function `divebar-mirror` in `nomadkaraoke` project
+   - Cross-referenced with KN catalog: 85,826 matches (17,124 KN songs ↔ 22,863 Divebar files)
 
 ## Table Summary
 
@@ -69,7 +78,15 @@ This document describes all music data available in BigQuery for use in features
 
 | Table | Row Count | Description |
 |-------|-----------|-------------|
-| `karaokenerds_raw` | 275,809 | Full karaoke song catalog |
+| `karaokenerds_raw` | 281,007 | Full karaoke song catalog (daily refresh) |
+| `karaokenerds_community` | 58,825 | Community tracks with YouTube URLs (daily refresh) |
+
+### Divebar Community Catalog
+
+| Table | Row Count | Description |
+|-------|-----------|-------------|
+| `divebar_catalog` | 48,533 | Indexed files from Divebar Google Drive (daily refresh) |
+| `kn_divebar_xref` | 85,826 | Cross-reference: KN songs ↔ Divebar files (daily rebuild) |
 
 ---
 
@@ -613,7 +630,8 @@ LIMIT 10
 
 ### karaokenerds_raw
 
-Full karaoke song catalog from KaraokeNerds.com (fetched via API with permission).
+Full karaoke song catalog from KaraokeNerds.com.
+Daily automated refresh via Cloud Function `kn-data-sync`.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -624,7 +642,7 @@ Full karaoke song catalog from KaraokeNerds.com (fetched via API with permission
 | `DiscId` | STRING | Disc identifier |
 | `TrackNo` | INT64 | Track number on disc |
 
-**Stats:** 275,809 songs
+**Stats:** 281,007 songs
 
 **Example Query - Search karaoke songs:**
 ```sql
@@ -649,6 +667,122 @@ LEFT JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
 WHERE LOWER(k.Artist) = 'queen'
 ORDER BY k.Title
 ```
+
+### karaokenerds_community
+
+Community karaoke tracks from KaraokeNerds with YouTube URLs and brand codes.
+Daily automated refresh via Cloud Function `kn-data-sync`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `Artist` | STRING | Artist name |
+| `Title` | STRING | Song title |
+| `Brand` | STRING | Single community brand code (e.g., "NOMAD", "WTF") |
+| `Watch` | STRING | YouTube short URL (youtu.be) |
+| `Created` | STRING | Creation date (ISO 8601, nullable) |
+| `Id` | INT64 | Always 0 (not a real identifier) |
+
+**Stats:** 58,825 tracks from 157 unique brands
+
+**Example Query - Find community tracks for a song:**
+```sql
+SELECT Artist, Title, Brand, Watch
+FROM `nomadkaraoke.karaoke_decide.karaokenerds_community`
+WHERE LOWER(Artist) LIKE '%queen%' AND LOWER(Title) LIKE '%bohemian%'
+```
+
+---
+
+## Divebar Community Catalog
+
+### divebar_catalog
+
+Indexed karaoke files from the [diveBar Karaoke Google Drive](https://drive.google.com/drive/folders/1zxnSZcE03gzy0YVGOdnTrEIi8It_3Wu8),
+a community-maintained collection of 62 indie/DIY karaoke brands.
+Daily automated refresh via Cloud Function `divebar-mirror`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `file_id` | STRING | Google Drive file ID |
+| `brand` | STRING | Brand folder name (e.g., "WTF Karaoke Videos") |
+| `brand_code` | STRING | Extracted brand code (e.g., "WTF", "NOMAD") |
+| `artist` | STRING | Parsed artist name |
+| `title` | STRING | Parsed song title |
+| `disc_id` | STRING | Disc/track ID if present |
+| `filename` | STRING | Original filename |
+| `format` | STRING | File format (mp4, zip, cdg, mp3, etc.) |
+| `subfolder` | STRING | Subfolder within brand (e.g., "CDG", "MP4") |
+| `file_size` | INT64 | File size in bytes |
+| `drive_path` | STRING | Full path within the Drive folder |
+| `drive_md5` | STRING | MD5 checksum from Drive |
+| `artist_normalized` | STRING | Lowercase, stripped for matching |
+| `title_normalized` | STRING | Lowercase, stripped for matching |
+| `synced_at` | TIMESTAMP | When this file was last synced |
+
+**Stats:** 48,533 files from 62 brands
+
+**Example Query - Search Divebar catalog:**
+```sql
+SELECT brand, artist, title, format, file_size
+FROM `nomadkaraoke.karaoke_decide.divebar_catalog`
+WHERE LOWER(CONCAT(COALESCE(artist, ''), ' ', COALESCE(title, '')))
+    LIKE '%bohemian rhapsody%'
+ORDER BY brand, title
+```
+
+**Example Query - Format distribution by brand:**
+```sql
+SELECT brand, format, COUNT(*) as file_count
+FROM `nomadkaraoke.karaoke_decide.divebar_catalog`
+GROUP BY brand, format
+ORDER BY file_count DESC
+LIMIT 20
+```
+
+### kn_divebar_xref
+
+Cross-reference linking KaraokeNerds catalog entries to Divebar files.
+Daily automated rebuild via Cloud Function `divebar-lookup`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `kn_id` | INT64 | KaraokeNerds song ID (FK to karaokenerds_raw.Id) |
+| `divebar_file_id` | STRING | Drive file ID (FK to divebar_catalog.file_id) |
+| `match_type` | STRING | 'exact' or 'brand_match' |
+| `confidence` | FLOAT64 | Match confidence (0.0-1.0) |
+| `matched_at` | TIMESTAMP | When this match was created |
+
+**Stats:** 85,826 matches (17,124 unique KN songs ↔ 22,863 unique Divebar files)
+
+**Example Query - Find Divebar versions of a KN song:**
+```sql
+SELECT k.Artist, k.Title, d.brand, d.format, d.file_size, x.match_type, x.confidence
+FROM `nomadkaraoke.karaoke_decide.kn_divebar_xref` x
+JOIN `nomadkaraoke.karaoke_decide.karaokenerds_raw` k ON x.kn_id = k.Id
+JOIN `nomadkaraoke.karaoke_decide.divebar_catalog` d ON x.divebar_file_id = d.file_id
+WHERE LOWER(k.Artist) = 'queen' AND LOWER(k.Title) = 'bohemian rhapsody'
+```
+
+---
+
+## ETL Pipelines
+
+Daily automated data pipelines running as Cloud Functions in the `nomadkaraoke` GCP project:
+
+| Pipeline | Cloud Function | Schedule | Data Flow |
+|----------|---------------|----------|-----------|
+| KN Full Catalog | `kn-data-sync` (mode=full) | Daily 4:30 AM ET | KN API → GCS archive → BigQuery `karaokenerds_raw` |
+| KN Community | `kn-data-sync` (mode=community) | Daily 3:05 AM ET | KN API → GCS archive → BigQuery `karaokenerds_community` |
+| Divebar Mirror | `divebar-mirror` | Daily 2:00 AM ET | Google Drive API → BigQuery `divebar_catalog` |
+| Cross-Reference | `divebar-lookup` (xref_rebuild) | Daily 6:00 AM ET | BigQuery join → `kn_divebar_xref` |
+
+**GCS Archives:**
+- KN exports: `gs://nomadkaraoke-kn-data/{full,community}/` (date-stamped + latest pointer, 1-year retention)
+- Legacy KN exports: `gs://projectbread-karaokay.appspot.com/karaokenerds-data/` (still running in parallel, to be decommissioned)
+
+**API Key:** KaraokeNerds API key stored in Secret Manager as `karaokenerds-api-key`
+
+**Infrastructure:** All pipelines are Pulumi-managed in `karaoke-gen/infrastructure/`
 
 ---
 
