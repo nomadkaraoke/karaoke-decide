@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from google.cloud import firestore  # type: ignore[attr-defined]
+from google.cloud import firestore
 
 from backend.config import BackendSettings
 
@@ -33,7 +33,8 @@ class FirestoreService:
         doc_ref = self.collection(collection).document(doc_id)
         doc = await doc_ref.get()
         if doc.exists:
-            return {"id": doc.id, **doc.to_dict()}
+            data = doc.to_dict() or {}
+            return {"id": doc.id, **data}
         return None
 
     async def set_document(
@@ -79,7 +80,7 @@ class FirestoreService:
         Returns:
             List of document dictionaries with IDs
         """
-        query = self.collection(collection)
+        query: firestore.AsyncCollectionReference | firestore.AsyncQuery = self.collection(collection)
 
         if filters:
             for field, op, value in filters:
@@ -97,7 +98,8 @@ class FirestoreService:
 
         docs = []
         async for doc in query.stream():
-            docs.append({"id": doc.id, **doc.to_dict()})
+            data = doc.to_dict() or {}
+            docs.append({"id": doc.id, **data})
 
         return docs
 
@@ -107,7 +109,7 @@ class FirestoreService:
         filters: list[tuple[str, str, Any]] | None = None,
     ) -> int:
         """Count documents matching filters."""
-        query = self.collection(collection)
+        query: firestore.AsyncCollectionReference | firestore.AsyncQuery = self.collection(collection)
 
         if filters:
             for field, op, value in filters:
@@ -115,7 +117,7 @@ class FirestoreService:
 
         # Use count aggregation
         count_query = query.count()
-        result = await count_query.get()
+        result = await count_query.get()  # type: ignore[call-arg]
         return int(result[0][0].value)
 
     async def delete_document_atomically(self, collection: str, doc_id: str) -> dict[str, Any] | None:
@@ -144,7 +146,8 @@ class FirestoreService:
 
             # Delete within transaction
             transaction.delete(doc_ref)
-            return {"id": doc.id, **doc.to_dict()}
+            data = doc.to_dict() or {}
+            return {"id": doc.id, **data}
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await delete_in_transaction(transaction)
