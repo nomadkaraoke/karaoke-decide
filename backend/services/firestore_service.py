@@ -117,7 +117,7 @@ class FirestoreService:
 
         # Use count aggregation
         count_query = query.count()
-        result = await count_query.get()
+        result = await count_query.get()  # type: ignore[call-arg]
         return int(result[0][0].value)
 
     async def delete_document_atomically(self, collection: str, doc_id: str) -> dict[str, Any] | None:
