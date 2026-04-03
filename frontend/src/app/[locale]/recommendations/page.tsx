@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Recommendation } from "@/types";
@@ -14,15 +15,6 @@ import { Button, LoadingPulse, EmptyState } from "@/components/ui";
 // Filter types
 type KaraokeFilter = "all" | "karaoke" | "generate";
 type PopularityFilter = "any" | "hidden-gems" | "somewhat-known" | "popular" | "chart-toppers";
-
-// Popularity filter ranges
-const POPULARITY_RANGES: Record<PopularityFilter, { min?: number; max?: number; label: string }> = {
-  any: { label: "Any popularity" },
-  "hidden-gems": { max: 30, label: "Hidden gems" },
-  "somewhat-known": { min: 30, max: 50, label: "Somewhat known" },
-  popular: { min: 50, max: 70, label: "Popular" },
-  "chart-toppers": { min: 70, label: "Chart toppers" },
-};
 
 // Duration constants (in ms)
 const SHORT_DURATION = 3 * 60 * 1000; // 3 minutes
@@ -37,6 +29,7 @@ interface CategorizedData {
 
 export default function RecommendationsPage() {
   const router = useRouter();
+  const t = useTranslations("recommendations");
   const { hasCompletedQuiz, quizStatusLoading } = useAuth();
   const [data, setData] = useState<CategorizedData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +44,15 @@ export default function RecommendationsPage() {
 
   // Collapsed sections
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  // Popularity filter ranges - use translated labels
+  const POPULARITY_RANGES: Record<PopularityFilter, { min?: number; max?: number; label: string }> = {
+    any: { label: t("anyPopularity") },
+    "hidden-gems": { max: 30, label: t("hiddenGems") },
+    "somewhat-known": { min: 30, max: 50, label: t("somewhatKnown") },
+    popular: { min: 50, max: 70, label: t("popular") },
+    "chart-toppers": { min: 70, label: t("chartToppers") },
+  };
 
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => {
@@ -123,11 +125,12 @@ export default function RecommendationsPage() {
       setData(response);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load recommendations"
+        err instanceof Error ? err.message : t("failedToLoadRecs")
       );
     } finally {
       setIsLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [karaokeFilter, popularityFilter, excludeExplicit, classicsOnly, durationFilter]);
 
   useEffect(() => {
@@ -216,10 +219,10 @@ export default function RecommendationsPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
               <SparklesIcon className="w-7 h-7 text-[var(--brand-gold)]" />
-              Recommendations
+              {t("title")}
             </h1>
             <p className="text-[var(--text-muted)] text-sm mt-1">
-              Songs you might love, based on your music taste
+              {t("subtitle")}
             </p>
           </div>
 
@@ -230,10 +233,10 @@ export default function RecommendationsPage() {
                 <div>
                   <h3 className="text-[var(--text)] font-semibold flex items-center gap-2">
                     <span className="text-xl">✨</span>
-                    Get personalized recommendations
+                    {t("getPersonalized")}
                   </h3>
                   <p className="text-[var(--text-muted)] text-sm mt-1">
-                    Take a quick 30-second quiz to tell us your music taste
+                    {t("takeQuickQuiz")}
                   </p>
                 </div>
                 <Button
@@ -242,7 +245,7 @@ export default function RecommendationsPage() {
                   onClick={() => router.push("/quiz")}
                   className="whitespace-nowrap"
                 >
-                  Take Quiz
+                  {t("takeQuiz")}
                 </Button>
               </div>
             </div>
@@ -251,10 +254,10 @@ export default function RecommendationsPage() {
           {/* Filters */}
           <div className="bg-[var(--card)] rounded-xl p-4 mb-6 border border-[var(--card-border)]">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-[var(--text)]">Filters</span>
+              <span className="text-sm font-medium text-[var(--text)]">{t("filters")}</span>
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear all
+                  {t("clearAllFilters")}
                 </Button>
               )}
             </div>
@@ -262,21 +265,21 @@ export default function RecommendationsPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {/* Karaoke availability filter */}
               <div>
-                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Show</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">{t("showLabel")}</label>
                 <select
                   value={karaokeFilter}
                   onChange={(e) => setKaraokeFilter(e.target.value as KaraokeFilter)}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
-                  <option value="all">All songs</option>
-                  <option value="karaoke">Karaoke ready</option>
-                  <option value="generate">Generate only</option>
+                  <option value="all">{t("allSongs")}</option>
+                  <option value="karaoke">{t("karaokeReady")}</option>
+                  <option value="generate">{t("generateOnly")}</option>
                 </select>
               </div>
 
               {/* Popularity filter */}
               <div>
-                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Popularity</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">{t("popularityLabel")}</label>
                 <select
                   value={popularityFilter}
                   onChange={(e) => setPopularityFilter(e.target.value as PopularityFilter)}
@@ -292,7 +295,7 @@ export default function RecommendationsPage() {
 
               {/* Duration filter */}
               <div>
-                <label className="text-xs text-[var(--text-subtle)] mb-1 block">Duration</label>
+                <label className="text-xs text-[var(--text-subtle)] mb-1 block">{t("durationLabel")}</label>
                 <select
                   value={durationFilter}
                   onChange={(e) =>
@@ -300,10 +303,10 @@ export default function RecommendationsPage() {
                   }
                   className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
-                  <option value="any">Any length</option>
-                  <option value="short">Short (&lt;3 min)</option>
-                  <option value="medium">Medium (3-5 min)</option>
-                  <option value="long">Long (&gt;5 min)</option>
+                  <option value="any">{t("anyLength")}</option>
+                  <option value="short">{t("shortDuration")}</option>
+                  <option value="medium">{t("mediumDuration")}</option>
+                  <option value="long">{t("longDuration")}</option>
                 </select>
               </div>
             </div>
@@ -317,7 +320,7 @@ export default function RecommendationsPage() {
                   onChange={(e) => setExcludeExplicit(e.target.checked)}
                   className="w-4 h-4 rounded bg-[var(--secondary)] border-[var(--card-border)] text-[#1ed760] focus:ring-[#1ed760]/50"
                 />
-                Hide explicit
+                {t("hideExplicit")}
               </label>
               <label className="flex items-center gap-2 text-sm text-[var(--text-muted)] cursor-pointer">
                 <input
@@ -326,7 +329,7 @@ export default function RecommendationsPage() {
                   onChange={(e) => setClassicsOnly(e.target.checked)}
                   className="w-4 h-4 rounded bg-[var(--secondary)] border-[var(--card-border)] text-[#1ed760] focus:ring-[#1ed760]/50"
                 />
-                Classics only
+                {t("classicsOnly")}
               </label>
             </div>
           </div>
@@ -341,20 +344,20 @@ export default function RecommendationsPage() {
               </div>
               <p className="text-[var(--text-muted)] mb-4">{error}</p>
               <Button onClick={loadRecommendations} variant="secondary">
-                Try again
+                {t("tryAgain")}
               </Button>
             </div>
           ) : !data || data.total_count === 0 ? (
             <EmptyState
               icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-              title="No recommendations yet"
-              description="Connect your music services or take the quiz to get personalized recommendations."
+              title={t("noRecsYet")}
+              description={t("noRecsDescription")}
               action={{
-                label: "Connect Services",
+                label: t("connectServices"),
                 onClick: () => router.push("/services"),
               }}
               secondaryAction={{
-                label: "Take the Quiz",
+                label: t("takeTheQuiz"),
                 onClick: () => router.push("/quiz"),
               }}
             />
@@ -362,35 +365,35 @@ export default function RecommendationsPage() {
             <>
               {/* Categorized sections */}
               {renderSection(
-                "From Artists You Know",
-                "Karaoke songs by artists in your library",
+                t("fromArtistsYouKnow"),
+                t("fromArtistsSubtitle"),
                 data.from_artists_you_know,
                 "artists",
                 !hasCompletedQuiz
-                  ? "Take the quiz above to tell us your favorite artists"
+                  ? t("fromArtistsEmptyQuiz")
                   : hasActiveFilters
-                    ? "No karaoke songs from your artists match the current filters"
-                    : "Connect Spotify or Last.fm to see songs from artists you know"
+                    ? t("fromArtistsEmptyFilters")
+                    : t("fromArtistsEmptyServices")
               )}
 
               {renderSection(
-                "Create Your Own Karaoke",
-                "Songs from your library - generate with AI",
+                t("createYourOwn"),
+                t("createYourOwnSubtitle"),
                 data.create_your_own,
                 "create",
                 !hasCompletedQuiz
-                  ? "Take the quiz to unlock personalized song suggestions"
+                  ? t("createYourOwnEmptyQuiz")
                   : hasActiveFilters
-                    ? "No songs match the current filters"
-                    : "Connect your music services to see songs you can generate karaoke for"
+                    ? t("createYourOwnEmptyFilters")
+                    : t("createYourOwnEmptyServices")
               )}
 
               {renderSection(
-                "Crowd Pleasers",
-                "Popular karaoke songs everyone knows",
+                t("crowdPleasers"),
+                t("crowdPleasersSubtitle"),
                 data.crowd_pleasers,
                 "crowd",
-                "No crowd pleasers match the current filters"
+                t("crowdPleasersEmpty")
               )}
 
               {/* Footer */}
@@ -401,14 +404,14 @@ export default function RecommendationsPage() {
                     className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <MusicIcon className="w-4 h-4" />
-                    View my songs
+                    {t("viewMySongs")}
                   </Link>
                   <Link
                     href="/services"
                     className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <LinkIcon className="w-4 h-4" />
-                    Sync more music
+                    {t("syncMoreMusic")}
                   </Link>
                 </div>
               </div>

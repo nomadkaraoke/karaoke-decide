@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import {
@@ -36,6 +37,9 @@ interface KnownSong {
 }
 
 export default function KnownSongsPage() {
+  const t = useTranslations("knownSongs");
+  const tCommon = useTranslations("common");
+
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<CatalogSong[]>([]);
@@ -86,14 +90,14 @@ export default function KnownSongsPage() {
         }
       } catch (err) {
         setListError(
-          err instanceof Error ? err.message : "Failed to load known songs"
+          err instanceof Error ? err.message : t("failedToLoadKnownSongs")
         );
       } finally {
         setIsLoading(false);
         setIsLoadingMore(false);
       }
     },
-    []
+    [t]
   );
 
   useEffect(() => {
@@ -225,10 +229,10 @@ export default function KnownSongsPage() {
             <div>
               <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
                 <MicrophoneIcon className="w-7 h-7 text-[var(--brand-pink)]" />
-                Songs I Know
+                {t("title")}
               </h1>
               <p className="text-[var(--text-muted)] text-sm mt-1">
-                Add songs you already love singing to improve recommendations
+                {t("subtitle")}
               </p>
             </div>
           </div>
@@ -241,7 +245,7 @@ export default function KnownSongsPage() {
               </div>
               <Input
                 type="text"
-                placeholder="Search for songs to add..."
+                placeholder={t("searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-12"
@@ -262,12 +266,12 @@ export default function KnownSongsPage() {
                   </p>
                 ) : searchResults.length === 0 ? (
                   <p className="text-[var(--text-subtle)] text-sm text-center py-4">
-                    No songs found for &quot;{searchQuery}&quot;
+                    {t("noSongsFound", { query: searchQuery })}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     <p className="text-[var(--text-muted)] text-sm mb-2">
-                      Search results ({searchResults.length})
+                      {t("searchResults", { count: searchResults.length })}
                     </p>
                     {searchResults.map((song) => {
                       const isAdded = addedSongIds.has(song.id);
@@ -305,17 +309,17 @@ export default function KnownSongsPage() {
                             {isAdded ? (
                               <>
                                 <CheckIcon className="w-4 h-4" />
-                                Added
+                                {t("added")}
                               </>
                             ) : isAdding ? (
                               <>
                                 <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
-                                Adding
+                                {t("adding")}
                               </>
                             ) : (
                               <>
                                 <PlusIcon className="w-4 h-4" />
-                                Add
+                                {t("add")}
                               </>
                             )}
                           </button>
@@ -335,10 +339,10 @@ export default function KnownSongsPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--text)]">
-                My Known Songs
+                {t("myKnownSongs")}
               </h2>
               {total > 0 && (
-                <span className="text-[var(--text-subtle)] text-sm">{total} songs</span>
+                <span className="text-[var(--text-subtle)] text-sm">{t("totalSongs", { count: total })}</span>
               )}
             </div>
 
@@ -351,16 +355,16 @@ export default function KnownSongsPage() {
                 </div>
                 <p className="text-[var(--text-muted)] mb-4">{listError}</p>
                 <Button onClick={() => loadKnownSongs(1)} variant="secondary">
-                  Try again
+                  {tCommon("tryAgain")}
                 </Button>
               </div>
             ) : knownSongs.length === 0 ? (
               <EmptyState
                 icon={<MicrophoneIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-                title="No known songs yet"
-                description="Search above to add songs you know and love to sing!"
+                title={t("noKnownSongsYet")}
+                description={t("noKnownSongsDesc")}
                 action={{
-                  label: "View Recommendations",
+                  label: t("viewRecommendations"),
                   onClick: () => (window.location.href = "/recommendations"),
                 }}
               />
@@ -391,7 +395,7 @@ export default function KnownSongsPage() {
                           onClick={() => handleRemoveSong(song)}
                           disabled={isRemoving}
                           className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                          title="Remove from known songs"
+                          title={t("removeFromKnown")}
                           data-testid="remove-song-button"
                         >
                           {isRemoving ? (
@@ -413,7 +417,7 @@ export default function KnownSongsPage() {
                       onClick={handleLoadMore}
                       isLoading={isLoadingMore}
                     >
-                      Load More
+                      {tCommon("loadMore")}
                     </Button>
                   </div>
                 )}
@@ -429,7 +433,7 @@ export default function KnownSongsPage() {
                 className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 <SparklesIcon className="w-4 h-4" />
-                View recommendations based on your songs
+                {t("viewRecsBasedOnSongs")}
               </Link>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -42,6 +43,7 @@ interface DataSummary {
 
 export default function MyDataPage() {
   const { isGuest } = useAuth();
+  const t = useTranslations("myData");
   const [summary, setSummary] = useState<DataSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,11 +63,11 @@ export default function MyDataPage() {
       const response = await api.my.getDataSummary();
       setSummary(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data summary");
+      setError(err instanceof Error ? err.message : t("failedToLoadSummary"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadSummary();
@@ -105,16 +107,16 @@ export default function MyDataPage() {
             <div>
               <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
                 <DatabaseIcon className="w-7 h-7 text-[var(--brand-blue)]" />
-                My Data
+                {t("title")}
               </h1>
               <p className="text-[var(--text-muted)] text-sm mt-1">
-                Everything we know about your music taste
+                {t("subtitle")}
               </p>
             </div>
             <Link href="/recommendations">
               <Button variant="secondary" size="sm">
                 <SparklesIcon className="w-4 h-4" />
-                Recommendations
+                {t("recommendations")}
               </Button>
             </Link>
           </div>
@@ -127,7 +129,7 @@ export default function MyDataPage() {
                 onClick={loadSummary}
                 className="ml-2 underline hover:no-underline"
               >
-                Retry
+                {t("retry")}
               </button>
             </div>
           )}
@@ -144,19 +146,19 @@ export default function MyDataPage() {
                       {connectedServices}
                     </p>
                     <p className="text-xs text-[var(--text-subtle)]">
-                      Service{connectedServices !== 1 ? "s" : ""}
+                      {connectedServices !== 1 ? t("servicesPlural") : t("servicesSingular")}
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-center">
                     <p className="text-2xl font-bold text-[var(--text)]">{totalArtists}</p>
                     <p className="text-xs text-[var(--text-subtle)]">
-                      Artist{totalArtists !== 1 ? "s" : ""}
+                      {totalArtists !== 1 ? t("artistsPlural") : t("artistsSingular")}
                     </p>
                   </div>
                   <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-center">
                     <p className="text-2xl font-bold text-[var(--text)]">{totalSongs}</p>
                     <p className="text-xs text-[var(--text-subtle)]">
-                      Song{totalSongs !== 1 ? "s" : ""}
+                      {totalSongs !== 1 ? t("songsPlural") : t("songsSingular")}
                     </p>
                   </div>
                 </div>
@@ -199,10 +201,10 @@ export default function MyDataPage() {
                     </div>
                     <div>
                       <h2 className="font-semibold text-[var(--text-subtle)]">
-                        Feedback & Refinements
+                        {t("feedbackTitle")}
                       </h2>
                       <p className="text-sm text-[var(--text-subtle)]">
-                        Coming soon: Love/hide songs, vocal range, more!
+                        {t("feedbackDesc")}
                       </p>
                     </div>
                   </div>
@@ -212,23 +214,23 @@ export default function MyDataPage() {
               {/* Footer help text */}
               <div className="mt-8 text-center text-sm text-[var(--text-subtle)]">
                 <p>
-                  This data powers your personalized karaoke recommendations.
+                  {t("dataPowersRecs")}
                 </p>
                 <p className="mt-1">
                   {isGuest ? (
                     <>
                       <Link href="/login" className="text-[var(--brand-blue)] hover:underline">
-                        Create an account
+                        {t("createAccountToSync")}
                       </Link>{" "}
-                      to sync your music services.
+                      {t("toSyncServices")}
                     </>
                   ) : (
                     <>
-                      More data = better recommendations.{" "}
+                      {t("moreDataBetterRecs")}{" "}
                       <Link href="/quiz" className="text-[var(--brand-blue)] hover:underline">
-                        Take the quiz
+                        {t("takeTheQuiz")}
                       </Link>{" "}
-                      or connect more services.
+                      {t("orConnectMore")}
                     </>
                   )}
                 </p>

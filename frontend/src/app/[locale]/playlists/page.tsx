@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import {
@@ -21,6 +22,8 @@ function PlaylistsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("id");
+  const t = useTranslations("playlists");
+  const tCommon = useTranslations("common");
 
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<Playlist | null>(null);
@@ -52,12 +55,12 @@ function PlaylistsContent() {
       setPlaylists(response.playlists);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load playlists"
+        err instanceof Error ? err.message : t("failedToLoadPlaylists")
       );
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadPlaylistDetail = useCallback(async (playlistId: string) => {
     try {
@@ -68,12 +71,12 @@ function PlaylistsContent() {
       setEditName(data.name);
       setEditDescription(data.description || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load playlist");
+      setError(err instanceof Error ? err.message : t("failedToLoadPlaylist"));
       setSelectedPlaylist(null);
     } finally {
       setIsLoadingDetail(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadPlaylists();
@@ -102,7 +105,7 @@ function PlaylistsContent() {
       setNewPlaylistDescription("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create playlist"
+        err instanceof Error ? err.message : t("failedToCreatePlaylist")
       );
     } finally {
       setIsCreating(false);
@@ -119,7 +122,7 @@ function PlaylistsContent() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to delete playlist"
+        err instanceof Error ? err.message : t("failedToDeletePlaylist")
       );
     } finally {
       setDeletingId(null);
@@ -141,7 +144,7 @@ function PlaylistsContent() {
       );
       setShowEditModal(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update playlist");
+      setError(err instanceof Error ? err.message : t("failedToUpdatePlaylist"));
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +166,7 @@ function PlaylistsContent() {
         prev.map((p) => (p.id === updated.id ? updated : p))
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove song");
+      setError(err instanceof Error ? err.message : t("failedToRemoveSong"));
     } finally {
       setRemovingSongId(null);
     }
@@ -198,7 +201,7 @@ function PlaylistsContent() {
             className="inline-flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] mb-4 transition-colors"
           >
             <ChevronRightIcon className="w-4 h-4 rotate-180" />
-            Back to Playlists
+            {t("backToPlaylists")}
           </Link>
 
           {isLoadingDetail ? (
@@ -210,16 +213,16 @@ function PlaylistsContent() {
               </div>
               <p className="text-[var(--text-muted)] mb-4">{error}</p>
               <Button onClick={() => loadPlaylistDetail(selectedId)} variant="secondary">
-                Try again
+                {tCommon("tryAgain")}
               </Button>
             </div>
           ) : !selectedPlaylist ? (
             <EmptyState
               icon={<PlaylistIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-              title="Playlist not found"
-              description="This playlist may have been deleted."
+              title={t("playlistNotFound")}
+              description={t("playlistNotFoundDesc")}
               action={{
-                label: "View All Playlists",
+                label: t("viewAllPlaylists"),
                 onClick: () => router.push("/playlists"),
               }}
             />
@@ -237,8 +240,7 @@ function PlaylistsContent() {
                         {selectedPlaylist.name}
                       </h1>
                       <p className="text-[var(--text-muted)] text-sm mt-1">
-                        {selectedPlaylist.song_count} song
-                        {selectedPlaylist.song_count !== 1 ? "s" : ""}
+                        {t("songCount", { count: selectedPlaylist.song_count })}
                       </p>
                       {selectedPlaylist.description && (
                         <p className="text-[var(--text-subtle)] text-sm mt-2">
@@ -251,18 +253,18 @@ function PlaylistsContent() {
                     <button
                       onClick={() => setShowEditModal(true)}
                       className="p-2 text-[var(--text-subtle)] hover:text-[var(--text)] transition-colors"
-                      title="Edit playlist"
+                      title={t("editPlaylist")}
                     >
                       <EditIcon className="w-5 h-5" />
                     </button>
                     <button
                       onClick={() => {
-                        if (window.confirm(`Delete "${selectedPlaylist.name}"? This cannot be undone.`)) {
+                        if (window.confirm(t("deleteConfirm", { name: selectedPlaylist.name }))) {
                           handleDeletePlaylist(selectedPlaylist.id);
                         }
                       }}
                       className="p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
-                      title="Delete playlist"
+                      title={t("deletePlaylist")}
                     >
                       <TrashIcon className="w-5 h-5" />
                     </button>
@@ -274,14 +276,14 @@ function PlaylistsContent() {
               {selectedPlaylist.song_ids.length === 0 ? (
                 <EmptyState
                   icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-                  title="No songs yet"
-                  description="Add songs from your library or recommendations."
+                  title={t("noSongsYet")}
+                  description={t("noSongsDesc")}
                   action={{
-                    label: "Browse My Songs",
+                    label: t("browseMySongs"),
                     onClick: () => router.push("/my-songs"),
                   }}
                   secondaryAction={{
-                    label: "Get Recommendations",
+                    label: t("getRecommendations"),
                     onClick: () => router.push("/recommendations"),
                   }}
                 />
@@ -298,10 +300,10 @@ function PlaylistsContent() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-[var(--text)] font-medium truncate">
-                            Song ID: {songId}
+                            {t("songIdLabel", { id: songId })}
                           </p>
                           <p className="text-[var(--text-muted)] text-sm">
-                            Song details will be loaded from catalog
+                            {t("songDetailsWillLoad")}
                           </p>
                         </div>
                       </div>
@@ -311,13 +313,13 @@ function PlaylistsContent() {
                           size="sm"
                           onClick={() => openKaraokeSearch(songId)}
                         >
-                          Sing
+                          {t("sing")}
                         </Button>
                         <button
                           onClick={() => handleRemoveSong(songId)}
                           className="p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
                           disabled={removingSongId === songId}
-                          title="Remove from playlist"
+                          title={t("removeFromPlaylist")}
                         >
                           {removingSongId === songId ? (
                             <span className="w-4 h-4 block animate-pulse">...</span>
@@ -339,13 +341,13 @@ function PlaylistsContent() {
                     className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
                     <MusicIcon className="w-4 h-4" />
-                    Add from My Songs
+                    {t("addFromMySongs")}
                   </Link>
                   <Link
                     href="/recommendations"
                     className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                   >
-                    Add from Recommendations
+                    {t("addFromRecs")}
                   </Link>
                 </div>
               </div>
@@ -358,30 +360,30 @@ function PlaylistsContent() {
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
               <h2 className="text-xl font-bold text-[var(--text)] mb-4">
-                Edit Playlist
+                {t("editPlaylistTitle")}
               </h2>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-[var(--text-muted)] mb-2">Name</label>
+                  <label className="block text-sm text-[var(--text-muted)] mb-2">{t("nameLabel")}</label>
                   <Input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Playlist name"
+                    placeholder={t("playlistNamePlaceholder")}
                     autoFocus
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm text-[var(--text-muted)] mb-2">
-                    Description (optional)
+                    {t("descriptionLabel")}
                   </label>
                   <Input
                     type="text"
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder="Playlist description"
+                    placeholder={t("playlistDescriptionPlaceholder")}
                   />
                 </div>
               </div>
@@ -396,7 +398,7 @@ function PlaylistsContent() {
                     setEditDescription(selectedPlaylist.description || "");
                   }}
                 >
-                  Cancel
+                  {tCommon("cancel")}
                 </Button>
                 <Button
                   variant="primary"
@@ -405,7 +407,7 @@ function PlaylistsContent() {
                   disabled={!editName.trim()}
                   isLoading={isSaving}
                 >
-                  Save
+                  {tCommon("save")}
                 </Button>
               </div>
             </div>
@@ -424,11 +426,11 @@ function PlaylistsContent() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
               <PlaylistIcon className="w-7 h-7 text-[var(--brand-pink)]" />
-              My Playlists
+              {t("title")}
             </h1>
             {playlists.length > 0 && (
               <p className="text-[var(--text-muted)] text-sm mt-1">
-                {playlists.length} playlist{playlists.length !== 1 ? "s" : ""}
+                {t("playlistCount", { count: playlists.length })}
               </p>
             )}
           </div>
@@ -438,7 +440,7 @@ function PlaylistsContent() {
             onClick={() => setShowCreateModal(true)}
           >
             <PlusIcon className="w-4 h-4" />
-            New Playlist
+            {t("newPlaylist")}
           </Button>
         </div>
 
@@ -452,16 +454,16 @@ function PlaylistsContent() {
             </div>
             <p className="text-[var(--text-muted)] mb-4">{error}</p>
             <Button onClick={loadPlaylists} variant="secondary">
-              Try again
+              {tCommon("tryAgain")}
             </Button>
           </div>
         ) : playlists.length === 0 ? (
           <EmptyState
             icon={<PlaylistIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-            title="No playlists yet"
-            description="Create your first playlist to organize your favorite karaoke songs."
+            title={t("noPlaylistsYet")}
+            description={t("noPlaylistsDesc")}
             action={{
-              label: "Create Playlist",
+              label: t("createPlaylist"),
               onClick: () => setShowCreateModal(true),
             }}
           />
@@ -485,9 +487,7 @@ function PlaylistsContent() {
                         {playlist.name}
                       </h3>
                       <p className="text-sm text-[var(--text-muted)]">
-                        {playlist.song_count} song
-                        {playlist.song_count !== 1 ? "s" : ""} &bull; Updated{" "}
-                        {formatDate(playlist.updated_at)}
+                        {t("songCount", { count: playlist.song_count })} &bull; {t("updated", { date: formatDate(playlist.updated_at) })}
                       </p>
                       {playlist.description && (
                         <p className="text-sm text-[var(--text-subtle)] truncate mt-1">
@@ -501,9 +501,7 @@ function PlaylistsContent() {
                     onClick={(e) => {
                       e.preventDefault();
                       if (
-                        window.confirm(
-                          `Delete "${playlist.name}"? This cannot be undone.`
-                        )
+                        window.confirm(t("deleteConfirm", { name: playlist.name }))
                       ) {
                         handleDeletePlaylist(playlist.id);
                       }
@@ -532,13 +530,13 @@ function PlaylistsContent() {
                 className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 <MusicIcon className="w-4 h-4" />
-                My Songs
+                {t("addFromMySongs")}
               </Link>
               <Link
                 href="/recommendations"
                 className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
-                Discover Songs
+                {t("discoverSongs")}
               </Link>
             </div>
           </div>
@@ -550,30 +548,30 @@ function PlaylistsContent() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div className="bg-[var(--card)] rounded-2xl p-6 w-full max-w-md border border-[var(--card-border)]">
             <h2 className="text-xl font-bold text-[var(--text)] mb-4">
-              Create New Playlist
+              {t("createNewPlaylist")}
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-[var(--text-muted)] mb-2">Name</label>
+                <label className="block text-sm text-[var(--text-muted)] mb-2">{t("nameLabel")}</label>
                 <Input
                   type="text"
                   value={newPlaylistName}
                   onChange={(e) => setNewPlaylistName(e.target.value)}
-                  placeholder="My Awesome Playlist"
+                  placeholder={t("namePlaceholder")}
                   autoFocus
                 />
               </div>
 
               <div>
                 <label className="block text-sm text-[var(--text-muted)] mb-2">
-                  Description (optional)
+                  {t("descriptionLabel")}
                 </label>
                 <Input
                   type="text"
                   value={newPlaylistDescription}
                   onChange={(e) => setNewPlaylistDescription(e.target.value)}
-                  placeholder="Songs for Friday night karaoke"
+                  placeholder={t("descriptionPlaceholder")}
                 />
               </div>
             </div>
@@ -588,7 +586,7 @@ function PlaylistsContent() {
                   setNewPlaylistDescription("");
                 }}
               >
-                Cancel
+                {tCommon("cancel")}
               </Button>
               <Button
                 variant="primary"
@@ -597,7 +595,7 @@ function PlaylistsContent() {
                 disabled={!newPlaylistName.trim()}
                 isLoading={isCreating}
               >
-                Create
+                {tCommon("create")}
               </Button>
             </div>
           </div>
@@ -608,6 +606,8 @@ function PlaylistsContent() {
 }
 
 export default function PlaylistsPage() {
+  const t = useTranslations("playlists");
+
   return (
     <ProtectedPage>
       <Suspense
@@ -615,7 +615,7 @@ export default function PlaylistsPage() {
           <main className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <LoaderIcon className="w-10 h-10 text-[var(--brand-pink)] animate-spin mx-auto" />
-              <p className="text-[var(--text-muted)] mt-4">Loading playlists...</p>
+              <p className="text-[var(--text-muted)] mt-4">{t("loadingPlaylists")}</p>
             </div>
           </main>
         }

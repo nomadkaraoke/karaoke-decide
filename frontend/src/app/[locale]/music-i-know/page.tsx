@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -76,6 +77,7 @@ interface ConnectedService {
 
 export default function MusicIKnowPage() {
   const { isGuest } = useAuth();
+  const t = useTranslations("musicIKnow");
   const [activeTab, setActiveTab] = useState<Tab>("artists");
 
   // Summary stats
@@ -116,9 +118,9 @@ export default function MusicIKnowPage() {
   }, []);
 
   const tabs = [
-    { id: "artists" as Tab, label: "Artists", count: stats.artists },
-    { id: "songs" as Tab, label: "Songs", count: stats.songs },
-    { id: "services" as Tab, label: "Services", count: stats.services },
+    { id: "artists" as Tab, label: t("artistsTab"), count: stats.artists },
+    { id: "songs" as Tab, label: t("songsTab"), count: stats.songs },
+    { id: "services" as Tab, label: t("servicesTab"), count: stats.services },
   ];
 
   return (
@@ -130,16 +132,16 @@ export default function MusicIKnowPage() {
             <div>
               <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
                 <MusicIcon className="w-7 h-7 text-[var(--brand-pink)]" />
-                Music I Know
+                {t("title")}
               </h1>
               <p className="text-[var(--text-muted)] text-sm mt-1">
-                Artists and songs that power your recommendations
+                {t("subtitle")}
               </p>
             </div>
             <Link href="/recommendations">
               <Button variant="secondary" size="sm">
                 <SparklesIcon className="w-4 h-4" />
-                Get Recs
+                {t("getRecs")}
               </Button>
             </Link>
           </div>
@@ -188,18 +190,18 @@ export default function MusicIKnowPage() {
           {/* Footer CTA */}
           <div className="mt-8 pt-6 border-t border-[var(--card-border)] text-center">
             <p className="text-sm text-[var(--text-subtle)] mb-3">
-              More music data = better recommendations
+              {t("moreDataBetterRecs")}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Link href="/quiz">
                 <Button variant="secondary" size="sm">
-                  Take Quiz
+                  {t("takeQuiz")}
                 </Button>
               </Link>
               <Link href="/recommendations">
                 <Button variant="primary" size="sm">
                   <SparklesIcon className="w-4 h-4" />
-                  Get Recommendations
+                  {t("getRecommendations")}
                 </Button>
               </Link>
             </div>
@@ -212,6 +214,8 @@ export default function MusicIKnowPage() {
 
 // ============ ARTISTS TAB ============
 function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void }) {
+  const t = useTranslations("musicIKnow");
+  const tCommon = useTranslations("common");
   const [artists, setArtists] = useState<UserArtist[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -243,12 +247,12 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       setHasMore(response.has_more);
       onCountChange(response.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load artists");
+      setError(err instanceof Error ? err.message : t("failedToLoadArtists"));
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [onCountChange]);
+  }, [onCountChange, t]);
 
   useEffect(() => {
     loadArtists(1);
@@ -264,7 +268,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       setNewArtist("");
       await loadArtists(1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add artist");
+      setError(err instanceof Error ? err.message : t("failedToAddArtist"));
     } finally {
       setIsAdding(false);
     }
@@ -282,7 +286,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
         return newTotal;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove artist");
+      setError(err instanceof Error ? err.message : t("failedToRemoveArtist"));
     } finally {
       setActionInProgress(null);
     }
@@ -299,7 +303,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
         )
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to exclude artist");
+      setError(err instanceof Error ? err.message : t("failedToExcludeArtist"));
     } finally {
       setActionInProgress(null);
     }
@@ -316,7 +320,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
         )
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to include artist");
+      setError(err instanceof Error ? err.message : t("failedToIncludeArtist"));
     } finally {
       setActionInProgress(null);
     }
@@ -332,9 +336,9 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
   const getTimeRangeLabel = (range: string | null) => {
     if (!range) return null;
     switch (range) {
-      case "short_term": return "4 weeks";
-      case "medium_term": return "6 months";
-      case "long_term": return "all time";
+      case "short_term": return t("spotifyTimeRangeShort");
+      case "medium_term": return t("spotifyTimeRangeMedium");
+      case "long_term": return t("spotifyTimeRangeLong");
       default: return range;
     }
   };
@@ -352,7 +356,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
             <PlusIcon className="w-4 h-4 text-[var(--text-subtle)]" />
           </div>
           <Input
-            placeholder="Add an artist you like..."
+            placeholder={t("addArtistPlaceholder")}
             value={newArtist}
             onChange={(e) => setNewArtist(e.target.value)}
             className="pl-10"
@@ -364,7 +368,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
           isLoading={isAdding}
           disabled={!newArtist.trim()}
         >
-          Add
+          {tCommon("add")}
         </Button>
       </form>
 
@@ -372,7 +376,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       {error && (
         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+          <button onClick={() => setError(null)} className="ml-2 underline">{tCommon("dismiss")}</button>
         </div>
       )}
 
@@ -380,15 +384,15 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       {artists.length === 0 ? (
         <EmptyState
           icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-          title="No artists yet"
-          description="Add artists you like or take the quiz to get started"
-          action={{ label: "Take Quiz", onClick: () => window.location.href = "/quiz" }}
+          title={t("noArtistsYet")}
+          description={t("noArtistsDesc")}
+          action={{ label: t("takeQuiz"), onClick: () => window.location.href = "/quiz" }}
         />
       ) : (
         <>
           {/* Header with count */}
           <div className="flex items-center justify-between text-sm text-[var(--text-muted)]">
-            <span>Showing {artists.length} of {total} artists</span>
+            <span>{t("showingOf", { current: artists.length, total })}</span>
           </div>
 
           {/* Artist Rows - Compact single-line layout */}
@@ -415,7 +419,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                     {/* Hidden badge */}
                     {isExcluded && (
                       <span className="text-[10px] text-orange-400/80 bg-orange-400/10 px-1 py-0.5 rounded shrink-0">
-                        Hidden
+                        {t("hidden")}
                       </span>
                     )}
 
@@ -478,7 +482,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                         onClick={() => handleRemoveArtist(artist.artist_name)}
                         disabled={isProcessing}
                         className="p-1.5 rounded text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
-                        title="Remove artist"
+                        title={t("removeArtist")}
                       >
                         {isProcessing ? (
                           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -491,7 +495,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                         onClick={() => handleIncludeArtist(artist.artist_name)}
                         disabled={isProcessing}
                         className="p-1.5 rounded text-[var(--text-subtle)] hover:text-green-400 hover:bg-green-400/10 transition-colors shrink-0"
-                        title="Unhide from recommendations"
+                        title={t("unhideFromRecs")}
                       >
                         {isProcessing ? (
                           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -504,7 +508,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                         onClick={() => handleExcludeArtist(artist.artist_name)}
                         disabled={isProcessing}
                         className="p-1.5 rounded text-[var(--text-subtle)] hover:text-orange-400 hover:bg-orange-400/10 transition-colors shrink-0"
-                        title="Hide from recommendations"
+                        title={t("hideFromRecs")}
                       >
                         {isProcessing ? (
                           <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -527,7 +531,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
                 onClick={() => loadArtists(page + 1, true)}
                 isLoading={isLoadingMore}
               >
-                Load More ({artists.length} of {total})
+                {t("loadMoreCount", { current: artists.length, total })}
               </Button>
             </div>
           )}
@@ -539,6 +543,8 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
 
 // ============ SONGS TAB ============
 function SongsTab({ onCountChange }: { onCountChange: (count: number) => void }) {
+  const t = useTranslations("musicIKnow");
+  const tCommon = useTranslations("common");
   const [knownSongs, setKnownSongs] = useState<KnownSong[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -585,12 +591,12 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
         setAddedSongIds(songIds);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load songs");
+      setError(err instanceof Error ? err.message : t("failedToLoadSongs"));
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [onCountChange]);
+  }, [onCountChange, t]);
 
   useEffect(() => {
     loadKnownSongs(1);
@@ -688,7 +694,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
           </div>
           <Input
             type="text"
-            placeholder="Search songs to add..."
+            placeholder={t("searchSongsToAdd")}
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10"
@@ -704,7 +710,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
               </div>
             ) : searchResults.length === 0 ? (
               <p className="text-[var(--text-subtle)] text-sm text-center py-4">
-                No songs found for &quot;{searchQuery}&quot;
+                {t("noSongsFoundFor", { query: searchQuery })}
               </p>
             ) : (
               <div className="flex flex-col gap-2">
@@ -733,11 +739,11 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                         }`}
                       >
                         {isAdded ? (
-                          <><CheckIcon className="w-4 h-4" /> Added</>
+                          <><CheckIcon className="w-4 h-4" /> {tCommon("add")}</>
                         ) : isAdding ? (
-                          <><div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> Adding</>
+                          <><div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" /> {tCommon("add")}</>
                         ) : (
-                          <><PlusIcon className="w-4 h-4" /> Add</>
+                          <><PlusIcon className="w-4 h-4" /> {tCommon("add")}</>
                         )}
                       </button>
                     </div>
@@ -763,14 +769,14 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
       {knownSongs.length === 0 && !searchQuery ? (
         <EmptyState
           icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-          title="No songs yet"
-          description="Search above to add songs you know and love to sing!"
+          title={t("noSongsYet")}
+          description={t("noSongsYetDesc")}
         />
       ) : knownSongs.length > 0 && (
         <>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-[var(--text-muted)]">My Songs</h2>
-            <span className="text-[var(--text-subtle)] text-sm">{total} songs</span>
+            <h2 className="text-sm font-medium text-[var(--text-muted)]">{t("mySongs")}</h2>
+            <span className="text-[var(--text-subtle)] text-sm">{t("totalSongs", { count: total })}</span>
           </div>
 
           <div className="flex flex-col gap-2">
@@ -788,7 +794,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                       <h3 className="text-[var(--text)] font-medium truncate">{song.title}</h3>
                       {song.enjoy_singing && (
                         <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--brand-pink)]/20 text-[var(--brand-pink)]">
-                          Love singing
+                          {t("loveSinging")}
                         </span>
                       )}
                     </div>
@@ -802,7 +808,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                         ? "text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10"
                         : "text-[var(--text-subtle)] hover:text-[var(--brand-pink)] hover:bg-[var(--brand-pink)]/10"
                     }`}
-                    title={song.enjoy_singing ? "Edit singing details" : "I enjoy singing this"}
+                    title={song.enjoy_singing ? t("editSinging") : t("markAsEnjoy")}
                   >
                     <MicrophoneIcon className="w-4 h-4" />
                   </button>
@@ -811,7 +817,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
                     onClick={() => handleRemoveSong(song)}
                     disabled={isRemoving}
                     className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                    title="Remove song"
+                    title={t("removeSong")}
                   >
                     {isRemoving ? (
                       <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
@@ -827,7 +833,7 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
           {hasMore && (
             <div className="text-center">
               <Button variant="secondary" onClick={() => loadKnownSongs(page + 1, true)} isLoading={isLoadingMore}>
-                Load More
+                {tCommon("loadMore")}
               </Button>
             </div>
           )}
@@ -867,6 +873,7 @@ function ServicesTab({
   isGuest: boolean;
   onCountChange: (count: number) => void;
 }) {
+  const t = useTranslations("musicIKnow");
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -889,11 +896,11 @@ function ServicesTab({
         setIsSyncing(true);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load services");
+      setError(err instanceof Error ? err.message : t("failedToLoadServices"));
     } finally {
       setIsLoading(false);
     }
-  }, [onCountChange]);
+  }, [onCountChange, t]);
 
   useEffect(() => {
     if (!isGuest) loadServices();
@@ -911,7 +918,7 @@ function ServicesTab({
       const response = await api.services.connectSpotify();
       window.location.href = response.auth_url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect Spotify");
+      setError(err instanceof Error ? err.message : t("failedToConnectSpotify"));
     }
   };
 
@@ -924,7 +931,7 @@ function ServicesTab({
       setLastfmUsername("");
       await loadServices();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect Last.fm");
+      setError(err instanceof Error ? err.message : t("failedToConnectLastfm"));
     } finally {
       setIsConnectingLastfm(false);
     }
@@ -936,7 +943,7 @@ function ServicesTab({
       await api.services.disconnect(serviceType);
       await loadServices();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to disconnect ${serviceType}`);
+      setError(err instanceof Error ? err.message : t("failedToDisconnect", { service: serviceType }));
     } finally {
       setDisconnecting(null);
     }
@@ -957,7 +964,7 @@ function ServicesTab({
         if (response.active_job?.status === "completed") {
           setIsSyncing(false);
           const totalMatched = response.active_job.results?.reduce((sum, r) => sum + r.tracks_matched, 0) || 0;
-          setSyncMessage(`Sync complete! Found ${totalMatched} karaoke songs.`);
+          setSyncMessage(t("syncComplete", { count: totalMatched }));
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         } else if (response.active_job?.status === "failed") {
           setIsSyncing(false);
@@ -968,7 +975,7 @@ function ServicesTab({
 
       pollIntervalRef.current = setInterval(checkStatus, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start sync");
+      setError(err instanceof Error ? err.message : t("failedToStartSync"));
       setIsSyncing(false);
     }
   };
@@ -984,12 +991,12 @@ function ServicesTab({
         <div className="w-16 h-16 rounded-full bg-[var(--card)] flex items-center justify-center mx-auto mb-4">
           <SpotifyIcon className="w-8 h-8 text-[var(--text-subtle)]" />
         </div>
-        <h3 className="text-lg font-medium text-[var(--text)] mb-2">Connect Your Music Services</h3>
+        <h3 className="text-lg font-medium text-[var(--text)] mb-2">{t("connectYourServices")}</h3>
         <p className="text-[var(--text-muted)] text-sm mb-6 max-w-sm mx-auto">
-          Create an account to connect Spotify and Last.fm for personalized recommendations based on your listening history.
+          {t("connectServicesGuestDesc")}
         </p>
         <Link href="/login">
-          <Button variant="primary">Create Account</Button>
+          <Button variant="primary">{t("createAccount")}</Button>
         </Link>
       </div>
     );
@@ -1022,33 +1029,33 @@ function ServicesTab({
             <SpotifyIcon className="w-5 h-5 text-[#1DB954]" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-[var(--text)]">Spotify</h3>
+            <h3 className="font-medium text-[var(--text)]">{t("spotify")}</h3>
             {isConnected("spotify") && (
               <p className="text-xs text-[var(--text-muted)]">{getService("spotify")?.service_username}</p>
             )}
           </div>
           {isConnected("spotify") ? (
-            <Badge variant="success">Connected</Badge>
+            <Badge variant="success">{t("connected")}</Badge>
           ) : (
-            <Badge variant="default">Not connected</Badge>
+            <Badge variant="default">{t("notConnected")}</Badge>
           )}
         </div>
 
         {isConnected("spotify") ? (
           <div className="space-y-2">
             <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
-              <span>{getService("spotify")?.tracks_synced || 0} tracks</span>
+              <span>{t("tracks", { count: getService("spotify")?.tracks_synced || 0 })}</span>
               {getService("spotify")?.last_sync_at && (
-                <span>Last sync: {formatDate(getService("spotify")!.last_sync_at!)}</span>
+                <span>{t("lastSync", { date: formatDate(getService("spotify")!.last_sync_at!) })}</span>
               )}
             </div>
             <Button variant="danger" size="sm" onClick={() => handleDisconnect("spotify")} isLoading={disconnecting === "spotify"}>
-              Disconnect
+              {t("disconnect")}
             </Button>
           </div>
         ) : (
           <Button variant="primary" size="sm" onClick={handleConnectSpotify} leftIcon={<SpotifyIcon className="w-4 h-4" />}>
-            Connect Spotify
+            {t("connectSpotify")}
           </Button>
         )}
       </div>
@@ -1060,34 +1067,34 @@ function ServicesTab({
             <LastfmIcon className="w-5 h-5 text-[#ff4444]" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-[var(--text)]">Last.fm</h3>
+            <h3 className="font-medium text-[var(--text)]">{t("lastfm")}</h3>
             {isConnected("lastfm") && (
               <p className="text-xs text-[var(--text-muted)]">{getService("lastfm")?.service_username}</p>
             )}
           </div>
           {isConnected("lastfm") ? (
-            <Badge variant="success">Connected</Badge>
+            <Badge variant="success">{t("connected")}</Badge>
           ) : (
-            <Badge variant="default">Not connected</Badge>
+            <Badge variant="default">{t("notConnected")}</Badge>
           )}
         </div>
 
         {isConnected("lastfm") ? (
           <div className="space-y-2">
             <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
-              <span>{getService("lastfm")?.tracks_synced || 0} tracks</span>
+              <span>{t("tracks", { count: getService("lastfm")?.tracks_synced || 0 })}</span>
               {getService("lastfm")?.last_sync_at && (
-                <span>Last sync: {formatDate(getService("lastfm")!.last_sync_at!)}</span>
+                <span>{t("lastSync", { date: formatDate(getService("lastfm")!.last_sync_at!) })}</span>
               )}
             </div>
             <Button variant="danger" size="sm" onClick={() => handleDisconnect("lastfm")} isLoading={disconnecting === "lastfm"}>
-              Disconnect
+              {t("disconnect")}
             </Button>
           </div>
         ) : (
           <form onSubmit={handleConnectLastfm} className="space-y-2">
             <Input
-              placeholder="Your Last.fm username"
+              placeholder={t("lastfmPlaceholder")}
               value={lastfmUsername}
               onChange={(e) => setLastfmUsername(e.target.value)}
             />
@@ -1099,7 +1106,7 @@ function ServicesTab({
               disabled={!lastfmUsername.trim()}
               leftIcon={<LastfmIcon className="w-4 h-4" />}
             >
-              Connect Last.fm
+              {t("connectLastfm")}
             </Button>
           </form>
         )}
@@ -1110,9 +1117,9 @@ function ServicesTab({
         <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-medium text-[var(--text)] text-sm">Sync listening history</h3>
+              <h3 className="font-medium text-[var(--text)] text-sm">{t("syncListeningHistory")}</h3>
               <p className="text-xs text-[var(--text-subtle)]">
-                {isSyncing ? "Syncing in background..." : "Fetch latest from services"}
+                {isSyncing ? t("syncingInBackground") : t("fetchLatest")}
               </p>
             </div>
             <Button
@@ -1123,7 +1130,7 @@ function ServicesTab({
               disabled={isSyncing}
               leftIcon={<RefreshIcon className="w-4 h-4" />}
             >
-              {isSyncing ? "Syncing..." : "Sync Now"}
+              {isSyncing ? t("syncing") : t("syncNow")}
             </Button>
           </div>
         </div>
@@ -1133,7 +1140,7 @@ function ServicesTab({
       {isConnected("spotify") && !isConnected("lastfm") && (
         <div className="p-3 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
           <p className="text-xs text-[var(--text-muted)]">
-            <strong className="text-[#ff4444]">Tip:</strong> Connect Last.fm for better recommendations based on your full listening history.
+            <strong className="text-[#ff4444]">{t("tip")}</strong> {t("lastfmTip")}
           </p>
         </div>
       )}

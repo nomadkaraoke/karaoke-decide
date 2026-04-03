@@ -438,6 +438,7 @@
     "playlistNamePlaceholder": "Playlist name",
     "playlistDescriptionPlaceholder": "Playlist description",
     "discoverSongs": "Discover Songs",
+    "getRecommendations": "Get Recommendations",
     "loadingPlaylists": "Loading playlists...",
     "failedToLoadPlaylists": "Failed to load playlists",
     "failedToLoadPlaylist": "Failed to load playlist",
