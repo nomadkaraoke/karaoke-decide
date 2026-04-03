@@ -44,7 +44,7 @@ class EmailService:
         Raises:
             RuntimeError: If email service is not configured in production
         """
-        magic_link_url = f"{self.settings.frontend_url}/auth/verify?token={token}"
+        magic_link_url = f"{self.settings.frontend_url}/en/auth/verify?token={token}"
 
         # Check if SendGrid is configured
         if not self.is_configured:
@@ -229,7 +229,7 @@ class EmailService:
                 <p>Head over to the app to explore personalized karaoke recommendations based on your music taste!</p>
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="{frontend_url}/my/songs"
+                    <a href="{frontend_url}/en/my/songs"
                        style="display: inline-block; background: #7c3aed; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600;">
                         View My Songs
                     </a>
