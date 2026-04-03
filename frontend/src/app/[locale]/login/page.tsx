@@ -11,18 +11,18 @@ import { MailIcon, CheckIcon, MicrophoneIcon } from "@/components/icons";
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("auth");
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isGuest, isLoading, requestUpgrade } = useAuth();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but let guests through to upgrade)
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    if (!isLoading && isAuthenticated && !isGuest) {
       router.push("/my-songs");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isGuest, isLoading, router]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,7 +30,11 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await api.auth.requestMagicLink(email);
+      if (isGuest) {
+        await requestUpgrade(email);
+      } else {
+        await api.auth.requestMagicLink(email);
+      }
       setIsSuccess(true);
     } catch (err) {
       setError(
