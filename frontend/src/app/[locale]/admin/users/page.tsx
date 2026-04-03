@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { LoadingSpinner, Badge } from "@/components/ui";
 import {
@@ -26,6 +27,7 @@ interface User {
 type FilterType = "all" | "verified" | "guests";
 
 export default function AdminUsersPage() {
+  const t = useTranslations("admin");
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +37,12 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(0);
   const limit = 20;
+
+  const filterLabels: Record<FilterType, string> = {
+    all: t("all"),
+    verified: t("verified"),
+    guests: t("guests"),
+  };
 
   const loadUsers = useCallback(async () => {
     try {
@@ -49,7 +57,7 @@ export default function AdminUsersPage() {
       setUsers(data.users);
       setTotal(data.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users");
+      setError(err instanceof Error ? err.message : t("failedToLoadUsers"));
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +77,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-[var(--text)]">Users</h2>
+      <h2 className="text-2xl font-bold text-[var(--text)]">{t("users")}</h2>
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
@@ -79,7 +87,7 @@ export default function AdminUsersPage() {
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-subtle)]" />
             <input
               type="text"
-              placeholder="Search by email..."
+              placeholder={t("searchByEmail")}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] placeholder-white/40 focus:outline-none focus:border-[var(--card-border)]"
@@ -102,7 +110,7 @@ export default function AdminUsersPage() {
                   : "bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)]"
               }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {filterLabels[f]}
             </button>
           ))}
         </div>
@@ -110,7 +118,7 @@ export default function AdminUsersPage() {
 
       {/* Results count */}
       <p className="text-sm text-[var(--text-muted)]">
-        {total} user{total !== 1 ? "s" : ""} found
+        {t("usersFound", { count: total })}
       </p>
 
       {/* Error state */}
@@ -122,7 +130,7 @@ export default function AdminUsersPage() {
             onClick={loadUsers}
             className="mt-3 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
-            Retry
+            {t("retry")}
           </button>
         </div>
       )}
@@ -141,19 +149,19 @@ export default function AdminUsersPage() {
             <thead>
               <tr className="border-b border-[var(--card-border)]">
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                  User
+                  {t("userTableUser")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                  Status
+                  {t("userTableStatus")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
-                  Created
+                  {t("userTableCreated")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
-                  Last Sync
+                  {t("userTableLastSync")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden lg:table-cell">
-                  Songs
+                  {t("userTableSongs")}
                 </th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
@@ -167,7 +175,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3">
                     <div>
                       <p className="text-[var(--text)] font-medium truncate max-w-[200px]">
-                        {user.display_name || user.email || "No name"}
+                        {user.display_name || user.email || t("noName")}
                       </p>
                       <p className="text-sm text-[var(--text-subtle)] truncate max-w-[200px]">
                         {user.email || user.id.slice(0, 8)}
@@ -179,24 +187,24 @@ export default function AdminUsersPage() {
                       {user.is_admin && (
                         <Badge variant="primary" className="flex items-center gap-1">
                           <ShieldIcon className="w-3 h-3" />
-                          Admin
+                          {t("admin")}
                         </Badge>
                       )}
                       {user.is_guest ? (
-                        <Badge variant="warning">Guest</Badge>
+                        <Badge variant="warning">{t("guest")}</Badge>
                       ) : (
-                        <Badge variant="success">Verified</Badge>
+                        <Badge variant="success">{t("verified")}</Badge>
                       )}
                       {user.quiz_completed_at && (
-                        <Badge variant="secondary">Quiz</Badge>
+                        <Badge variant="secondary">{t("quiz")}</Badge>
                       )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
-                    {formatDate(user.created_at)}
+                    {formatDate(user.created_at, t)}
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
-                    {user.last_sync_at ? formatDate(user.last_sync_at) : "Never"}
+                    {user.last_sync_at ? formatDate(user.last_sync_at, t) : t("never")}
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden lg:table-cell">
                     {user.total_songs_known}
@@ -216,7 +224,7 @@ export default function AdminUsersPage() {
 
           {users.length === 0 && (
             <div className="p-8 text-center text-[var(--text-subtle)]">
-              No users found matching your criteria.
+              {t("noUsersFound")}
             </div>
           )}
         </div>
@@ -226,7 +234,7 @@ export default function AdminUsersPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-[var(--text-muted)]">
-            Page {page + 1} of {totalPages}
+            {t("page", { current: page + 1, total: totalPages })}
           </p>
           <div className="flex gap-2">
             <button
@@ -234,14 +242,14 @@ export default function AdminUsersPage() {
               disabled={page === 0}
               className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
-              Previous
+              {t("previous")}
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
-              Next
+              {t("next")}
             </button>
           </div>
         </div>
@@ -250,18 +258,18 @@ export default function AdminUsersPage() {
   );
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string, t: (key: string, values?: Record<string, string | number | Date>) => string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) {
-    return "Today";
+    return t("today");
   } else if (diffDays === 1) {
-    return "Yesterday";
+    return t("yesterday");
   } else if (diffDays < 7) {
-    return `${diffDays}d ago`;
+    return t("daysAgo", { count: diffDays });
   } else {
     return date.toLocaleDateString("en-US", {
       month: "short",

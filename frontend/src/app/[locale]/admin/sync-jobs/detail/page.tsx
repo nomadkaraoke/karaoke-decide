@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { LoadingSpinner, Badge } from "@/components/ui";
 import {
@@ -42,6 +43,7 @@ interface SyncJobDetail {
 
 export default function SyncJobDetailPage() {
   const searchParams = useSearchParams();
+  const t = useTranslations("admin");
   const jobId = searchParams.get("id");
 
   const [job, setJob] = useState<SyncJobDetail | null>(null);
@@ -50,7 +52,7 @@ export default function SyncJobDetailPage() {
 
   const loadJob = useCallback(async () => {
     if (!jobId) {
-      setError("No job ID provided");
+      setError(t("noJobIdProvided"));
       setIsLoading(false);
       return;
     }
@@ -61,7 +63,7 @@ export default function SyncJobDetailPage() {
       const data = await api.admin.getSyncJob(jobId);
       setJob(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load job");
+      setError(err instanceof Error ? err.message : t("failedToLoadJob"));
     } finally {
       setIsLoading(false);
     }
@@ -95,11 +97,11 @@ export default function SyncJobDetailPage() {
           className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronLeftIcon className="w-4 h-4" />
-          Back to Sync Jobs
+          {t("backToSyncJobs")}
         </Link>
         <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-6 text-center">
           <AlertCircleIcon className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <p className="text-red-400">{error || "Job not found"}</p>
+          <p className="text-red-400">{error || t("jobNotFound")}</p>
         </div>
       </div>
     );
@@ -115,15 +117,15 @@ export default function SyncJobDetailPage() {
         className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <ChevronLeftIcon className="w-4 h-4" />
-        Back to Sync Jobs
+        {t("backToSyncJobs")}
       </Link>
 
       {/* Job header */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
-            Sync Job
-            <StatusBadge status={job.status} />
+            {t("syncJobTitle")}
+            <StatusBadge status={job.status} t={t} />
           </h2>
           <p className="text-[var(--text-muted)] mt-1 font-mono text-sm">{job.id}</p>
         </div>
@@ -133,7 +135,7 @@ export default function SyncJobDetailPage() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
             <RefreshIcon className="w-4 h-4" />
-            <span className="text-sm">Refresh</span>
+            <span className="text-sm">{t("refresh")}</span>
           </button>
         )}
       </div>
@@ -142,10 +144,10 @@ export default function SyncJobDetailPage() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Basic Info */}
         <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
-          <h3 className="font-semibold text-[var(--text)]">Job Info</h3>
+          <h3 className="font-semibold text-[var(--text)]">{t("jobInfo")}</h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">User</span>
+              <span className="text-[var(--text-muted)]">{t("user")}</span>
               <Link
                 href={`/admin/users/detail?id=${job.user_id}`}
                 className="text-cyan-400 hover:underline"
@@ -154,18 +156,18 @@ export default function SyncJobDetailPage() {
               </Link>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">Created</span>
+              <span className="text-[var(--text-muted)]">{t("created")}</span>
               <span className="text-[var(--text)]">{formatDateTime(job.created_at)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[var(--text-muted)]">Completed</span>
+              <span className="text-[var(--text-muted)]">{t("completed")}</span>
               <span className="text-[var(--text)]">
                 {job.completed_at ? formatDateTime(job.completed_at) : "-"}
               </span>
             </div>
             {job.completed_at && job.created_at && (
               <div className="flex justify-between">
-                <span className="text-[var(--text-muted)]">Duration</span>
+                <span className="text-[var(--text-muted)]">{t("duration")}</span>
                 <span className="text-[var(--text)]">
                   {formatDuration(job.created_at, job.completed_at)}
                 </span>
@@ -177,7 +179,7 @@ export default function SyncJobDetailPage() {
         {/* Progress */}
         {job.progress && (
           <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
-            <h3 className="font-semibold text-[var(--text)]">Progress</h3>
+            <h3 className="font-semibold text-[var(--text)]">{t("progress")}</h3>
             <div className="space-y-3">
               {/* Progress bar */}
               <div>
@@ -185,7 +187,7 @@ export default function SyncJobDetailPage() {
                   <span className="text-[var(--text-muted)]">
                     {job.progress.current_service
                       ? `${job.progress.current_service} - ${job.progress.current_phase}`
-                      : "Processing..."}
+                      : t("processing")}
                   </span>
                   <span className="text-[var(--text)]">{job.progress.percentage}%</span>
                 </div>
@@ -203,19 +205,19 @@ export default function SyncJobDetailPage() {
                   <p className="text-xl font-bold text-[var(--text)]">
                     {job.progress.total_tracks}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">Total</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t("total")}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xl font-bold text-[var(--text)]">
                     {job.progress.processed_tracks}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">Processed</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t("processed")}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xl font-bold text-green-400">
                     {job.progress.matched_tracks}
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">Matched</p>
+                  <p className="text-xs text-[var(--text-muted)]">{t("matched")}</p>
                 </div>
               </div>
             </div>
@@ -226,7 +228,7 @@ export default function SyncJobDetailPage() {
       {/* Error */}
       {job.error && (
         <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-4">
-          <h3 className="font-semibold text-red-400 mb-2">Error</h3>
+          <h3 className="font-semibold text-red-400 mb-2">{t("error")}</h3>
           <pre className="text-sm text-red-300 whitespace-pre-wrap font-mono">
             {job.error}
           </pre>
@@ -237,7 +239,7 @@ export default function SyncJobDetailPage() {
       {job.results.length > 0 && (
         <section>
           <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
-            Service Results
+            {t("serviceResults")}
           </h3>
           <div className="grid md:grid-cols-2 gap-4">
             {job.results.map((result) => (
@@ -252,49 +254,49 @@ export default function SyncJobDetailPage() {
                   {result.error ? (
                     <Badge variant="danger" className="flex items-center gap-1">
                       <XIcon className="w-3 h-3" />
-                      Error
+                      {t("error")}
                     </Badge>
                   ) : (
                     <Badge variant="success" className="flex items-center gap-1">
                       <CheckIcon className="w-3 h-3" />
-                      Success
+                      {t("success")}
                     </Badge>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-[var(--text-muted)]">Tracks Fetched</p>
+                    <p className="text-[var(--text-muted)]">{t("tracksFetched")}</p>
                     <p className="text-xl font-bold text-[var(--text)]">
                       {result.tracks_fetched}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[var(--text-muted)]">Tracks Matched</p>
+                    <p className="text-[var(--text-muted)]">{t("tracksMatched")}</p>
                     <p className="text-xl font-bold text-green-400">
                       {result.tracks_matched}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[var(--text-muted)]">Songs Created</p>
+                    <p className="text-[var(--text-muted)]">{t("songsCreated")}</p>
                     <p className="text-lg font-semibold text-[var(--text)]">
                       {result.user_songs_created}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[var(--text-muted)]">Songs Updated</p>
+                    <p className="text-[var(--text-muted)]">{t("songsUpdated")}</p>
                     <p className="text-lg font-semibold text-[var(--text)]">
                       {result.user_songs_updated}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[var(--text-muted)]">Artists Stored</p>
+                    <p className="text-[var(--text-muted)]">{t("artistsStored")}</p>
                     <p className="text-lg font-semibold text-[var(--text)]">
                       {result.artists_stored}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[var(--text-muted)]">Match Rate</p>
+                    <p className="text-[var(--text-muted)]">{t("matchRate")}</p>
                     <p className="text-lg font-semibold text-[var(--text)]">
                       {result.tracks_fetched > 0
                         ? Math.round(
@@ -320,14 +322,14 @@ export default function SyncJobDetailPage() {
       {/* Auto-refresh indicator */}
       {isActive && (
         <p className="text-sm text-cyan-400 text-center">
-          Auto-refreshing every 3 seconds...
+          {t("autoRefreshing", { seconds: 3 })}
         </p>
       )}
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: string) => string }) {
   const variants: Record<string, "success" | "warning" | "danger" | "secondary"> = {
     completed: "success",
     pending: "warning",
@@ -340,15 +342,20 @@ function StatusBadge({ status }: { status: string }) {
     failed: <XIcon className="w-3 h-3" />,
   };
 
+  const statusLabels: Record<string, string> = {
+    completed: t("completed"),
+    pending: t("pending"),
+    in_progress: t("inProgress"),
+    failed: t("failed"),
+  };
+
   return (
     <Badge
       variant={variants[status] || "secondary"}
       className="flex items-center gap-1"
     >
       {icons[status]}
-      {status === "in_progress"
-        ? "In Progress"
-        : status.charAt(0).toUpperCase() + status.slice(1)}
+      {statusLabels[status] || status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { LoadingSpinner, Badge } from "@/components/ui";
 import {
@@ -25,6 +26,7 @@ interface SyncJob {
 type StatusFilter = "all" | "pending" | "in_progress" | "completed" | "failed";
 
 export default function AdminSyncJobsPage() {
+  const t = useTranslations("admin");
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,6 +34,14 @@ export default function AdminSyncJobsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [page, setPage] = useState(0);
   const limit = 20;
+
+  const statusLabels: Record<StatusFilter, string> = {
+    all: t("all"),
+    pending: t("pending"),
+    in_progress: t("inProgress"),
+    completed: t("completed"),
+    failed: t("failed"),
+  };
 
   const loadJobs = useCallback(async () => {
     try {
@@ -45,7 +55,7 @@ export default function AdminSyncJobsPage() {
       setJobs(data.jobs);
       setTotal(data.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load sync jobs");
+      setError(err instanceof Error ? err.message : t("failedToLoadSyncJobs"));
     } finally {
       setIsLoading(false);
     }
@@ -68,13 +78,13 @@ export default function AdminSyncJobsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-[var(--text)]">Sync Jobs</h2>
+        <h2 className="text-2xl font-bold text-[var(--text)]">{t("syncJobs")}</h2>
         <button
           onClick={loadJobs}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
           <RefreshIcon className="w-4 h-4" />
-          <span className="text-sm">Refresh</span>
+          <span className="text-sm">{t("refresh")}</span>
         </button>
       </div>
 
@@ -95,18 +105,16 @@ export default function AdminSyncJobsPage() {
                 : "bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)]"
             }`}
           >
-            {status === "in_progress"
-              ? "In Progress"
-              : status.charAt(0).toUpperCase() + status.slice(1)}
+            {statusLabels[status]}
           </button>
         ))}
       </div>
 
       {/* Results count */}
       <p className="text-sm text-[var(--text-muted)]">
-        {total} job{total !== 1 ? "s" : ""} found
+        {t("jobsFound", { count: total })}
         {(statusFilter === "in_progress" || statusFilter === "pending") && (
-          <span className="ml-2 text-cyan-400">(auto-refreshing)</span>
+          <span className="ml-2 text-cyan-400">{t("autoRefreshingLabel")}</span>
         )}
       </p>
 
@@ -119,7 +127,7 @@ export default function AdminSyncJobsPage() {
             onClick={loadJobs}
             className="mt-3 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
           >
-            Retry
+            {t("retry")}
           </button>
         </div>
       )}
@@ -138,19 +146,19 @@ export default function AdminSyncJobsPage() {
             <thead>
               <tr className="border-b border-[var(--card-border)]">
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                  Job ID
+                  {t("jobId")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                  User
+                  {t("user")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                  Status
+                  {t("status")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
-                  Created
+                  {t("created")}
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)] hidden md:table-cell">
-                  Completed
+                  {t("completed")}
                 </th>
                 <th className="px-4 py-3 w-10"></th>
               </tr>
@@ -175,7 +183,7 @@ export default function AdminSyncJobsPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={job.status} />
+                    <StatusBadge status={job.status} t={t} />
                   </td>
                   <td className="px-4 py-3 text-sm text-[var(--text-muted)] hidden md:table-cell">
                     {formatDateTime(job.created_at)}
@@ -198,7 +206,7 @@ export default function AdminSyncJobsPage() {
 
           {jobs.length === 0 && (
             <div className="p-8 text-center text-[var(--text-subtle)]">
-              No sync jobs found matching your criteria.
+              {t("noSyncJobsMatchCriteria")}
             </div>
           )}
         </div>
@@ -208,7 +216,7 @@ export default function AdminSyncJobsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-[var(--text-muted)]">
-            Page {page + 1} of {totalPages}
+            {t("page", { current: page + 1, total: totalPages })}
           </p>
           <div className="flex gap-2">
             <button
@@ -216,14 +224,14 @@ export default function AdminSyncJobsPage() {
               disabled={page === 0}
               className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
-              Previous
+              {t("previous")}
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
               className="px-4 py-2 rounded-lg bg-[var(--card)] text-[var(--text)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--secondary)] transition-colors"
             >
-              Next
+              {t("next")}
             </button>
           </div>
         </div>
@@ -232,7 +240,7 @@ export default function AdminSyncJobsPage() {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: string) => string }) {
   const variants: Record<string, "success" | "warning" | "danger" | "secondary"> = {
     completed: "success",
     pending: "warning",
@@ -245,13 +253,20 @@ function StatusBadge({ status }: { status: string }) {
     failed: <XIcon className="w-3 h-3" />,
   };
 
+  const statusLabels: Record<string, string> = {
+    completed: t("completed"),
+    pending: t("pending"),
+    in_progress: t("inProgress"),
+    failed: t("failed"),
+  };
+
   return (
     <Badge
       variant={variants[status] || "secondary"}
       className="flex items-center gap-1"
     >
       {icons[status]}
-      {status === "in_progress" ? "In Progress" : status.charAt(0).toUpperCase() + status.slice(1)}
+      {statusLabels[status] || status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
 }

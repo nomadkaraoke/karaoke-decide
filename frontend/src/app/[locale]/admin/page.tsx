@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui";
 import {
@@ -35,6 +36,7 @@ interface Stats {
 }
 
 export default function AdminDashboard() {
+  const t = useTranslations("admin");
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ export default function AdminDashboard() {
       const data = await api.admin.getStats();
       setStats(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load stats");
+      setError(err instanceof Error ? err.message : t("failedToLoadStats"));
     } finally {
       setIsLoading(false);
     }
@@ -73,7 +75,7 @@ export default function AdminDashboard() {
           onClick={loadStats}
           className="mt-4 px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
-          Retry
+          {t("retry")}
         </button>
       </div>
     );
@@ -84,13 +86,13 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-[var(--text)]">Dashboard</h2>
+        <h2 className="text-2xl font-bold text-[var(--text)]">{t("dashboard")}</h2>
         <button
           onClick={loadStats}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
         >
           <RefreshIcon className="w-4 h-4" />
-          <span className="text-sm">Refresh</span>
+          <span className="text-sm">{t("refresh")}</span>
         </button>
       </div>
 
@@ -98,18 +100,18 @@ export default function AdminDashboard() {
       <section>
         <h3 className="text-lg font-semibold text-[var(--text)] mb-3 flex items-center gap-2">
           <UsersIcon className="w-5 h-5 text-cyan-400" />
-          Users
+          {t("usersSection")}
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Total Users" value={stats.users.total} />
+          <StatCard label={t("totalUsers")} value={stats.users.total} />
           <StatCard
-            label="Verified"
+            label={t("verified")}
             value={stats.users.verified}
             color="green"
           />
-          <StatCard label="Guests" value={stats.users.guests} color="amber" />
+          <StatCard label={t("guests")} value={stats.users.guests} color="amber" />
           <StatCard
-            label="Active (7d)"
+            label={t("active7d")}
             value={stats.users.active_7d}
             color="cyan"
           />
@@ -118,7 +120,7 @@ export default function AdminDashboard() {
           href="/admin/users"
           className="inline-block mt-3 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
-          View all users &rarr;
+          {t("viewAllUsers")}
         </Link>
       </section>
 
@@ -126,28 +128,28 @@ export default function AdminDashboard() {
       <section>
         <h3 className="text-lg font-semibold text-[var(--text)] mb-3 flex items-center gap-2">
           <ActivityIcon className="w-5 h-5 text-purple-400" />
-          Sync Jobs (24h)
+          {t("syncJobsSection")}
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard label="Total" value={stats.sync_jobs.total} />
+          <StatCard label={t("total")} value={stats.sync_jobs.total} />
           <StatCard
-            label="Pending"
+            label={t("pending")}
             value={stats.sync_jobs.pending}
             color="amber"
           />
           <StatCard
-            label="In Progress"
+            label={t("inProgress")}
             value={stats.sync_jobs.in_progress}
             color="cyan"
           />
           <StatCard
-            label="Completed"
+            label={t("completed")}
             value={stats.sync_jobs.completed}
             color="green"
             icon={<CheckIcon className="w-4 h-4" />}
           />
           <StatCard
-            label="Failed"
+            label={t("failed")}
             value={stats.sync_jobs.failed}
             color="red"
             icon={<AlertCircleIcon className="w-4 h-4" />}
@@ -157,14 +159,14 @@ export default function AdminDashboard() {
           href="/admin/sync-jobs"
           className="inline-block mt-3 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
-          View all sync jobs &rarr;
+          {t("viewAllSyncJobs")}
         </Link>
       </section>
 
       {/* Service Connections */}
       <section>
         <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
-          Service Connections
+          {t("serviceConnections")}
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4">
@@ -176,7 +178,7 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-bold text-[var(--text)]">
                   {stats.services.spotify_connected}
                 </p>
-                <p className="text-sm text-[var(--text-muted)]">Spotify Connected</p>
+                <p className="text-sm text-[var(--text-muted)]">{t("spotifyConnected")}</p>
               </div>
             </div>
           </div>
@@ -189,7 +191,7 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-bold text-[var(--text)]">
                   {stats.services.lastfm_connected}
                 </p>
-                <p className="text-sm text-[var(--text-muted)]">Last.fm Connected</p>
+                <p className="text-sm text-[var(--text-muted)]">{t("lastfmConnected")}</p>
               </div>
             </div>
           </div>

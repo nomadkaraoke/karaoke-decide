@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { LoadingSpinner, Badge } from "@/components/ui";
 import {
@@ -51,6 +52,8 @@ interface UserDetail {
 export default function UserDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const t = useTranslations("admin");
+  const tCommon = useTranslations("common");
   const userId = searchParams.get("id");
 
   const [user, setUser] = useState<UserDetail | null>(null);
@@ -70,7 +73,7 @@ export default function UserDetailPage() {
       await api.admin.deleteUser(userId);
       router.push("/admin/users");
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete user");
+      setDeleteError(err instanceof Error ? err.message : t("failedToDeleteUser"));
       setIsDeleting(false);
     }
   };
@@ -89,7 +92,7 @@ export default function UserDetailPage() {
         const data = await api.admin.getUser(userId);
         setUser(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load user");
+        setError(err instanceof Error ? err.message : t("failedToLoadUser"));
       } finally {
         setIsLoading(false);
       }
@@ -114,11 +117,11 @@ export default function UserDetailPage() {
           className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronLeftIcon className="w-4 h-4" />
-          Back to Users
+          {t("backToUsers")}
         </Link>
         <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-6 text-center">
           <AlertCircleIcon className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <p className="text-red-400">{error || "User not found"}</p>
+          <p className="text-red-400">{error || t("userNotFound")}</p>
         </div>
       </div>
     );
@@ -132,18 +135,18 @@ export default function UserDetailPage() {
         className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
       >
         <ChevronLeftIcon className="w-4 h-4" />
-        Back to Users
+        {t("backToUsers")}
       </Link>
 
       {/* User header */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
-            {user.display_name || user.email || "Unknown User"}
+            {user.display_name || user.email || t("unknownUser")}
             {user.is_admin && (
               <Badge variant="primary" className="flex items-center gap-1">
                 <ShieldIcon className="w-3 h-3" />
-                Admin
+                {t("admin")}
               </Badge>
             )}
           </h2>
@@ -151,9 +154,9 @@ export default function UserDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           {user.is_guest ? (
-            <Badge variant="warning">Guest</Badge>
+            <Badge variant="warning">{t("guest")}</Badge>
           ) : (
-            <Badge variant="success">Verified</Badge>
+            <Badge variant="success">{t("verified")}</Badge>
           )}
           {!user.is_admin && (
             <button
@@ -161,7 +164,7 @@ export default function UserDetailPage() {
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
             >
               <TrashIcon className="w-4 h-4" />
-              Delete
+              {t("delete")}
             </button>
           )}
         </div>
@@ -172,19 +175,19 @@ export default function UserDetailPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[var(--card)] border border-[var(--card-border)] rounded-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
-              Delete User?
+              {t("deleteUserConfirm")}
             </h3>
             <p className="text-[var(--text-muted)] mb-4">
-              This will permanently delete <strong>{user.email || user.id}</strong> and all their data including:
+              {t("deleteUserWillRemove", { identifier: user.email || user.id })}
             </p>
             <ul className="text-sm text-[var(--text-muted)] mb-4 list-disc list-inside space-y-1">
-              <li>{user.data_summary.songs_count} songs</li>
-              <li>{user.data_summary.artists_count} artists</li>
-              <li>{user.data_summary.playlists_count} playlists</li>
-              <li>All connected services and sync jobs</li>
+              <li>{t("songs", { count: user.data_summary.songs_count })}</li>
+              <li>{t("artists", { count: user.data_summary.artists_count })}</li>
+              <li>{t("playlistsData", { count: user.data_summary.playlists_count })}</li>
+              <li>{t("allServicesAndSyncJobs")}</li>
             </ul>
             <p className="text-red-400 text-sm mb-4">
-              This action cannot be undone.
+              {t("cannotBeUndone")}
             </p>
             {deleteError && (
               <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -197,7 +200,7 @@ export default function UserDetailPage() {
                 disabled={isDeleting}
                 className="px-4 py-2 rounded-lg bg-[var(--secondary)] text-[var(--text)] hover:bg-[var(--card-border)] transition-colors disabled:opacity-50"
               >
-                Cancel
+                {tCommon("cancel")}
               </button>
               <button
                 onClick={handleDelete}
@@ -207,12 +210,12 @@ export default function UserDetailPage() {
                 {isDeleting ? (
                   <>
                     <LoadingSpinner size="sm" />
-                    Deleting...
+                    {t("deleting")}
                   </>
                 ) : (
                   <>
                     <TrashIcon className="w-4 h-4" />
-                    Delete User
+                    {t("deleteUser")}
                   </>
                 )}
               </button>
@@ -225,23 +228,23 @@ export default function UserDetailPage() {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Basic Info */}
         <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
-          <h3 className="font-semibold text-[var(--text)]">Account Info</h3>
+          <h3 className="font-semibold text-[var(--text)]">{t("accountInfo")}</h3>
           <div className="space-y-3 text-sm">
-            <InfoRow label="User ID" value={user.id} mono />
+            <InfoRow label={t("userId")} value={user.id} mono />
             <InfoRow
-              label="Created"
+              label={t("created")}
               value={formatDateTime(user.created_at)}
             />
             <InfoRow
-              label="Last Sync"
-              value={user.last_sync_at ? formatDateTime(user.last_sync_at) : "Never"}
+              label={t("lastSync")}
+              value={user.last_sync_at ? formatDateTime(user.last_sync_at) : t("never")}
             />
             <InfoRow
-              label="Quiz Completed"
+              label={t("quizCompleted")}
               value={
                 user.quiz_completed_at
                   ? formatDateTime(user.quiz_completed_at)
-                  : "No"
+                  : t("no")
               }
             />
           </div>
@@ -249,25 +252,25 @@ export default function UserDetailPage() {
 
         {/* Data Summary */}
         <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-4 space-y-4">
-          <h3 className="font-semibold text-[var(--text)]">Data Summary</h3>
+          <h3 className="font-semibold text-[var(--text)]">{t("dataSummary")}</h3>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.artists_count}
               </p>
-              <p className="text-sm text-[var(--text-muted)]">Artists</p>
+              <p className="text-sm text-[var(--text-muted)]">{t("artists", { count: user.data_summary.artists_count })}</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.songs_count}
               </p>
-              <p className="text-sm text-[var(--text-muted)]">Songs</p>
+              <p className="text-sm text-[var(--text-muted)]">{t("songs", { count: user.data_summary.songs_count })}</p>
             </div>
             <div className="text-center">
               <p className="text-2xl font-bold text-[var(--text)]">
                 {user.data_summary.playlists_count}
               </p>
-              <p className="text-sm text-[var(--text-muted)]">Playlists</p>
+              <p className="text-sm text-[var(--text-muted)]">{t("playlistsData", { count: user.data_summary.playlists_count })}</p>
             </div>
           </div>
         </div>
@@ -276,11 +279,11 @@ export default function UserDetailPage() {
       {/* Connected Services */}
       <section>
         <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
-          Connected Services
+          {t("connectedServicesSection")}
         </h3>
         {user.services.length === 0 ? (
           <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-6 text-center text-[var(--text-subtle)]">
-            No services connected
+            {t("noServicesConnected")}
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
@@ -306,7 +309,7 @@ export default function UserDetailPage() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-muted)]">Status</span>
+                    <span className="text-[var(--text-muted)]">{t("status")}</span>
                     <Badge
                       variant={
                         service.sync_status === "error"
@@ -320,15 +323,15 @@ export default function UserDetailPage() {
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-muted)]">Tracks Synced</span>
+                    <span className="text-[var(--text-muted)]">{t("tracksSynced")}</span>
                     <span className="text-[var(--text)]">{service.tracks_synced}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[var(--text-muted)]">Last Sync</span>
+                    <span className="text-[var(--text-muted)]">{t("lastSync")}</span>
                     <span className="text-[var(--text)]">
                       {service.last_sync_at
                         ? formatDateTime(service.last_sync_at)
-                        : "Never"}
+                        : t("never")}
                     </span>
                   </div>
                   {service.sync_error && (
@@ -346,11 +349,11 @@ export default function UserDetailPage() {
       {/* Recent Sync Jobs */}
       <section>
         <h3 className="text-lg font-semibold text-[var(--text)] mb-3">
-          Recent Sync Jobs
+          {t("recentSyncJobs")}
         </h3>
         {user.sync_jobs.length === 0 ? (
           <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] p-6 text-center text-[var(--text-subtle)]">
-            No sync jobs found
+            {t("noSyncJobsFound")}
           </div>
         ) : (
           <div className="rounded-xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
@@ -358,16 +361,16 @@ export default function UserDetailPage() {
               <thead>
                 <tr className="border-b border-[var(--card-border)]">
                   <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                    Job ID
+                    {t("jobId")}
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                    Status
+                    {t("status")}
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                    Created
+                    {t("created")}
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-medium text-[var(--text-muted)]">
-                    Completed
+                    {t("completed")}
                   </th>
                 </tr>
               </thead>
@@ -383,7 +386,7 @@ export default function UserDetailPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={job.status} />
+                      <StatusBadge status={job.status} t={t} />
                     </td>
                     <td className="px-4 py-3 text-sm text-[var(--text-muted)]">
                       {formatDateTime(job.created_at)}
@@ -423,7 +426,7 @@ function InfoRow({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, t }: { status: string; t: (key: string) => string }) {
   const variants: Record<string, "success" | "warning" | "danger" | "secondary"> = {
     completed: "success",
     pending: "warning",
@@ -436,13 +439,20 @@ function StatusBadge({ status }: { status: string }) {
     failed: <XIcon className="w-3 h-3" />,
   };
 
+  const statusLabels: Record<string, string> = {
+    completed: t("completed"),
+    pending: t("pending"),
+    in_progress: t("inProgress"),
+    failed: t("failed"),
+  };
+
   return (
     <Badge
       variant={variants[status] || "secondary"}
       className="flex items-center gap-1"
     >
       {icons[status]}
-      {status.replace("_", " ")}
+      {statusLabels[status] || status.replace("_", " ")}
     </Badge>
   );
 }

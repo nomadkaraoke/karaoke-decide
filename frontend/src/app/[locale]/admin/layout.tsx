@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { AdminPage } from "@/components/AdminPage";
 import {
   BarChartIcon,
@@ -10,18 +11,19 @@ import {
   ChevronLeftIcon,
 } from "@/components/icons";
 
-const adminNavLinks = [
-  { href: "/admin", label: "Dashboard", icon: BarChartIcon },
-  { href: "/admin/users", label: "Users", icon: UsersIcon },
-  { href: "/admin/sync-jobs", label: "Sync Jobs", icon: ActivityIcon },
-];
-
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const t = useTranslations("admin");
+
+  const adminNavLinks = [
+    { href: "/admin", label: t("dashboard"), icon: BarChartIcon },
+    { href: "/admin/users", label: t("users"), icon: UsersIcon },
+    { href: "/admin/sync-jobs", label: t("syncJobs"), icon: ActivityIcon },
+  ];
 
   return (
     <AdminPage>
@@ -36,10 +38,10 @@ export default function AdminLayout({
                   className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
                 >
                   <ChevronLeftIcon className="w-4 h-4" />
-                  <span className="text-sm">Back to App</span>
+                  <span className="text-sm">{t("backToApp")}</span>
                 </Link>
                 <div className="h-6 w-px bg-[var(--secondary)]" />
-                <h1 className="text-lg font-semibold text-[var(--text)]">Admin</h1>
+                <h1 className="text-lg font-semibold text-[var(--text)]">{t("admin")}</h1>
               </div>
             </div>
           </div>
