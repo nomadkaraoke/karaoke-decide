@@ -1,37 +1,5 @@
-import type { Metadata, Viewport } from "next";
-import "./globals.css";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { Navigation } from "@/components/Navigation";
-import { ThemeProvider } from "@/components/theme-provider";
-import { GoogleAnalytics } from "@/components/GoogleAnalytics";
-
-export const metadata: Metadata = {
-  title: "Nomad Karaoke Decide - Find Your Next Karaoke Song",
-  description: "Search 275,000+ karaoke songs. Discover popular tracks, find songs by artist, and decide what to sing next.",
-  keywords: ["karaoke", "songs", "music", "singing", "karaoke songs", "song search"],
-  authors: [{ name: "Nomad Karaoke" }],
-  openGraph: {
-    title: "Nomad Karaoke Decide",
-    description: "Find your next karaoke song from 275,000+ tracks",
-    url: "https://decide.nomadkaraoke.com",
-    siteName: "Nomad Karaoke Decide",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Nomad Karaoke Decide",
-    description: "Find your next karaoke song from 275,000+ tracks",
-  },
-  manifest: "/manifest.json",
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-    ],
-    apple: "/apple-touch-icon.png",
-  },
-};
+import type { Viewport } from "next";
+import './globals.css';
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -43,26 +11,19 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon-16x16.png" sizes="16x16" type="image/png" />
+        <link rel="icon" href="/favicon-32x32.png" sizes="32x32" type="image/png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+      </head>
       <body className="font-sans antialiased" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-        <GoogleAnalytics />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <Navigation />
-            {/* Spacer for fixed navigation - nav is ~72px (py-4 + content) */}
-            <div className="h-[72px]" />
-            {children}
-          </AuthProvider>
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   );
