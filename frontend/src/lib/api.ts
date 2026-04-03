@@ -4,6 +4,12 @@
 
 import { API_BASE_URL, AUTH_TOKEN_KEY } from "./constants";
 
+function getCurrentLocale(): string {
+  if (typeof window === 'undefined') return 'en';
+  const match = window.location.pathname.match(/^\/(en|es|de)\//);
+  return match ? match[1] : 'en';
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -85,6 +91,7 @@ async function apiRequest<T>(
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Accept-Language": getCurrentLocale(),
     ...(options.headers as Record<string, string>),
   };
 

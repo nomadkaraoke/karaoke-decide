@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, Suspense, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { Link, useRouter } from "@/i18n/routing";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { api, setAuthToken, NetworkError, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";

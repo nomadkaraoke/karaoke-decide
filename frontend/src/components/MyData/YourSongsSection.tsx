@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import {
   MusicIcon,
@@ -48,6 +49,8 @@ export function YourSongsSection({
   onToggle,
   refreshTrigger,
 }: Props) {
+  const t = useTranslations('components.myDataSongs');
+  const tCommon = useTranslations('common');
   const [songs, setSongs] = useState<UserSong[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -96,7 +99,7 @@ export function YourSongsSection({
         setPage(pageNum);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to load your songs"
+          err instanceof Error ? err.message : t('failedToLoadSongs')
         );
       } finally {
         setIsLoading(false);
@@ -219,7 +222,7 @@ export function YourSongsSection({
       setSuggestions([]);
       await loadSongs(1);
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : "Failed to add song");
+      setAddError(err instanceof Error ? err.message : t('failedToAddSong'));
     } finally {
       setIsAdding(false);
     }
@@ -243,7 +246,7 @@ export function YourSongsSection({
       }
       await loadSongs(1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove song");
+      setError(err instanceof Error ? err.message : t('failedToRemoveSong'));
     } finally {
       setRemovingSong(null);
     }
@@ -274,11 +277,11 @@ export function YourSongsSection({
             <MusicIcon className="w-5 h-5 text-[var(--brand-purple)]" />
           </div>
           <div>
-            <h2 className="font-semibold text-[var(--text)]">Songs You Know</h2>
+            <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
               {total === 0
-                ? "No songs yet"
-                : `${total} song${total !== 1 ? "s" : ""} in your library`}
+                ? t('noSongsYet')
+                : t('songCount', { count: total })}
             </p>
           </div>
         </div>
@@ -298,7 +301,7 @@ export function YourSongsSection({
                 onClick={() => setError(null)}
                 className="ml-2 underline hover:no-underline"
               >
-                Dismiss
+                {t('dismiss')}
               </button>
             </div>
           )}
@@ -312,7 +315,7 @@ export function YourSongsSection({
                 <div className="flex-1 relative">
                   <Input
                     ref={inputRef}
-                    placeholder="Search for a song..."
+                    placeholder={t('searchPlaceholder')}
                     value={searchQuery}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
@@ -378,17 +381,16 @@ export function YourSongsSection({
                   disabled={!selectedSuggestion}
                   leftIcon={<PlusIcon className="w-4 h-4" />}
                 >
-                  Add
+                  {t('add')}
                 </Button>
               </form>
 
               {/* Song list */}
               {total === 0 ? (
                 <div className="text-center py-8 text-[var(--text-subtle)] text-sm">
-                  <p>No songs in your library yet.</p>
+                  <p>{t('noSongsMessage')}</p>
                   <p className="mt-1">
-                    Search for songs above, connect your music services, or take
-                    the quiz.
+                    {t('addSongsHint')}
                   </p>
                 </div>
               ) : (
@@ -409,7 +411,7 @@ export function YourSongsSection({
                             </p>
                             {song.has_karaoke_version === false && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-[#1DB954]/20 text-[#1DB954]/80 whitespace-nowrap">
-                                Make Karaoke
+                                {t('makeKaraoke')}
                               </span>
                             )}
                           </div>
@@ -420,7 +422,7 @@ export function YourSongsSection({
                         <div className="flex items-center gap-2">
                           {song.playcount && song.playcount > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--text-subtle)]">
-                              {song.playcount.toLocaleString()} plays
+                              {t('plays', { count: song.playcount.toLocaleString() })}
                             </span>
                           )}
                           {song.rank && song.rank <= 50 && (
@@ -436,7 +438,7 @@ export function YourSongsSection({
                               onClick={() => handleRemoveSong(song)}
                               disabled={removingSong === song.id}
                               className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-subtle)] hover:text-[var(--error)] transition-all"
-                              title="Remove song"
+                              title={t('removeSong')}
                             >
                               {removingSong === song.id ? (
                                 <span className="animate-pulse">...</span>
@@ -459,14 +461,14 @@ export function YourSongsSection({
                         onClick={handleLoadMore}
                         isLoading={isLoadingMore}
                       >
-                        Load More
+                        {tCommon('loadMore')}
                       </Button>
                     </div>
                   )}
 
                   {/* Summary */}
                   <div className="text-center text-xs text-[var(--text-subtle)]">
-                    Showing {songs.length} of {total} songs
+                    {t('showingOfTotal', { current: songs.length, total })}
                   </div>
                 </>
               )}

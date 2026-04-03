@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { SearchIcon, PlusIcon, CheckIcon } from "@/components/icons";
 import { Input } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -31,9 +32,11 @@ interface SongSearchAutocompleteProps {
 export function SongSearchAutocomplete({
   onSelect,
   selectedSongIds = new Set(),
-  placeholder = "Search songs to add...",
+  placeholder,
   className = "",
 }: SongSearchAutocompleteProps) {
+  const t = useTranslations('components.songSearch');
+  const resolvedPlaceholder = placeholder || t('placeholder');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchableSong[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -111,7 +114,7 @@ export function SongSearchAutocomplete({
         </div>
         <Input
           type="text"
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           onFocus={() => {
@@ -127,8 +130,8 @@ export function SongSearchAutocomplete({
           {searchResults.length === 0 ? (
             <div className="p-4 text-center text-[var(--text-subtle)] text-sm">
               {isSearching
-                ? "Searching..."
-                : `No songs found for "${searchQuery}"`}
+                ? t('searching')
+                : t('noSongsFound', { query: searchQuery })}
             </div>
           ) : (
             <div className="py-2">
@@ -157,12 +160,12 @@ export function SongSearchAutocomplete({
                     {isSelected ? (
                       <span className="flex items-center gap-1 text-green-400 text-sm">
                         <CheckIcon className="w-4 h-4" />
-                        Added
+                        {t('added')}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-[var(--brand-pink)] text-sm">
                         <PlusIcon className="w-4 h-4" />
-                        Add
+                        {t('add')}
                       </span>
                     )}
                   </button>

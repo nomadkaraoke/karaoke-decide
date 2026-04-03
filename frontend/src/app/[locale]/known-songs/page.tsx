@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { api, ApiError } from "@/lib/api";
 import { ProtectedPage } from "@/components/ProtectedPage";

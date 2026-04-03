@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense } from "react";
+import { Link } from "@/i18n/routing";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { XIcon, SpotifyIcon } from "@/components/icons";
 import { Button } from "@/components/ui";

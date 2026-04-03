@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { Recommendation } from "@/types";
 import {
   ChevronDownIcon,
@@ -100,6 +101,7 @@ export function RecommendationCard({
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations('components.recommendationCard');
 
   const links = getKaraokeLinks(recommendation.artist, recommendation.title);
   const isGenerateOnly = !recommendation.has_karaoke_version;
@@ -163,12 +165,12 @@ export function RecommendationCard({
               {/* Badges next to title */}
               {recommendation.explicit && (
                 <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[var(--secondary)] text-[var(--text-muted)] rounded">
-                  E
+                  {t('explicit')}
                 </span>
               )}
               {recommendation.is_classic && (
                 <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold bg-[var(--brand-gold)]/20 text-[var(--brand-gold)] rounded">
-                  CLASSIC
+                  {t('classic')}
                 </span>
               )}
             </div>
@@ -187,7 +189,7 @@ export function RecommendationCard({
           </Badge>
           {isGenerateOnly && (
             <Badge variant="default">
-              Generate Only
+              {t('generateOnly')}
             </Badge>
           )}
         </div>
@@ -199,7 +201,7 @@ export function RecommendationCard({
             {recommendation.has_karaoke_version && recommendation.brand_count > 0 && (
               <div className="flex items-center gap-2">
                 <PopularityStars count={recommendation.brand_count} />
-                <span className="text-xs text-[var(--text-subtle)]">{recommendation.brand_count} brands</span>
+                <span className="text-xs text-[var(--text-subtle)]">{t('brands', { count: recommendation.brand_count })}</span>
               </div>
             )}
 
@@ -210,7 +212,7 @@ export function RecommendationCard({
 
             {/* Spotify popularity */}
             {recommendation.popularity > 0 && (
-              <span className="text-xs text-[var(--text-subtle)]">Pop: {recommendation.popularity}</span>
+              <span className="text-xs text-[var(--text-subtle)]">{t('pop', { value: recommendation.popularity })}</span>
             )}
           </div>
 
@@ -225,7 +227,7 @@ export function RecommendationCard({
                 className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--brand-blue)] text-[var(--text)] text-sm font-semibold transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] active:scale-95"
               >
                 <VideoIcon className="w-4 h-4" />
-                <span>Generate</span>
+                <span>{t('generate')}</span>
               </a>
             ) : (
               /* Dropdown for karaoke-ready songs */
@@ -235,7 +237,7 @@ export function RecommendationCard({
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
                   <MicrophoneIcon className="w-4 h-4" />
-                  <span>Sing it!</span>
+                  <span>{t('singIt')}</span>
                   <ChevronDownIcon
                     className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
                   />
@@ -254,9 +256,9 @@ export function RecommendationCard({
                       >
                         <YouTubeIcon className="w-5 h-5 text-red-500" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-[var(--text)]">Search YouTube</div>
+                          <div className="text-sm font-medium text-[var(--text)]">{t('searchYouTube')}</div>
                           <div className="text-xs text-[var(--text-subtle)] truncate">
-                            Find existing karaoke videos
+                            {t('findExistingVideos')}
                           </div>
                         </div>
                       </a>
@@ -270,9 +272,9 @@ export function RecommendationCard({
                       >
                         <VideoIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-[var(--text)]">Create with Generator</div>
+                          <div className="text-sm font-medium text-[var(--text)]">{t('createWithGenerator')}</div>
                           <div className="text-xs text-[var(--text-subtle)] truncate">
-                            Generate custom karaoke video
+                            {t('generateCustomVideo')}
                           </div>
                         </div>
                       </a>

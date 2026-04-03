@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { MicrophoneIcon, StarIcon } from "./icons";
 import { SourceBadge } from "./ui";
 
@@ -43,6 +44,7 @@ export function UserSongCard({
   showAnimation = true,
 }: UserSongCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const t = useTranslations('components.userSongCard');
 
   return (
     <div
@@ -77,14 +79,14 @@ export function UserSongCard({
             <div className="flex items-center gap-2">
               <PopularityStars count={song.play_count} />
               <span className="text-xs text-[var(--text-subtle)] font-mono">
-                {song.play_count} plays
+                {t('plays', { count: song.play_count })}
               </span>
             </div>
 
             {/* Times sung */}
             {song.times_sung > 0 && (
               <span className="text-xs text-[var(--brand-purple)]">
-                Sung {song.times_sung}x
+                {t('sungTimes', { count: song.times_sung })}
               </span>
             )}
           </div>
@@ -102,7 +104,7 @@ export function UserSongCard({
             }}
           >
             <MicrophoneIcon className="w-4 h-4" />
-            <span>Sing it!</span>
+            <span>{t('singIt')}</span>
           </button>
         </div>
       </div>
