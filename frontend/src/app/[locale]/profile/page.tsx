@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -9,6 +10,8 @@ import { Button, Input } from "@/components/ui";
 
 export default function ProfilePage() {
   const { user, checkAuth } = useAuth();
+  const t = useTranslations('profile');
+  const tc = useTranslations('common');
   const [displayName, setDisplayName] = useState(user?.display_name || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +35,9 @@ export default function ProfilePage() {
         display_name: displayName.trim() || null,
       });
       await checkAuth();
-      setSuccessMessage("Profile updated successfully!");
+      setSuccessMessage(t("profileUpdated"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+      setError(err instanceof Error ? err.message : t("failedToUpdateProfile"));
     } finally {
       setIsSubmitting(false);
     }
@@ -50,10 +53,10 @@ export default function ProfilePage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
               <UserIcon className="w-7 h-7 text-[var(--brand-pink)]" />
-              Profile Settings
+              {t("title")}
             </h1>
             <p className="text-[var(--text-muted)] text-sm mt-1">
-              Manage your account settings and display name
+              {t("subtitle")}
             </p>
           </div>
 
@@ -78,13 +81,13 @@ export default function ProfilePage() {
               {/* Account info (read-only) */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text)] mb-2">
-                  Email Address
+                  {t("emailLabel")}
                 </label>
                 <div className="px-4 py-3 rounded-xl bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)]">
                   {user?.email}
                 </div>
                 <p className="text-xs text-[var(--text-subtle)] mt-1">
-                  Email cannot be changed
+                  {t("emailCannotChange")}
                 </p>
               </div>
 
@@ -94,12 +97,12 @@ export default function ProfilePage() {
                   htmlFor="displayName"
                   className="block text-sm font-medium text-[var(--text)] mb-2"
                 >
-                  Display Name
+                  {t("displayNameLabel")}
                 </label>
                 <Input
                   id="displayName"
                   type="text"
-                  placeholder="Enter your display name"
+                  placeholder={t("displayNamePlaceholder")}
                   value={displayName}
                   onChange={(e) => {
                     setDisplayName(e.target.value);
@@ -108,7 +111,7 @@ export default function ProfilePage() {
                   maxLength={50}
                 />
                 <p className="text-xs text-[var(--text-subtle)] mt-1">
-                  This is how your name will appear in the app
+                  {t("displayNameHint")}
                 </p>
               </div>
 
@@ -121,7 +124,7 @@ export default function ProfilePage() {
                   disabled={!hasChanges}
                   className="w-full sm:w-auto"
                 >
-                  Save Changes
+                  {tc("saveChanges")}
                 </Button>
               </div>
             </form>
@@ -130,7 +133,7 @@ export default function ProfilePage() {
           {/* Account ID info */}
           <div className="mt-6 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
             <p className="text-xs text-[var(--text-subtle)]">
-              Account ID: <span className="font-mono">{user?.id}</span>
+              {t("accountId", { id: user?.id ?? "" })}
             </p>
           </div>
         </div>

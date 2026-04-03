@@ -284,7 +284,8 @@
     "crowdPleasersSubtitle": "Popular karaoke songs everyone knows",
     "crowdPleasersEmpty": "No crowd pleasers match the current filters",
     "viewMySongs": "View my songs",
-    "syncMoreMusic": "Sync more music"
+    "syncMoreMusic": "Sync more music",
+    "tryAgain": "Try again"
   },
   "myData": {
     "title": "My Data",
@@ -302,7 +303,10 @@
     "toSyncServices": "to sync your music services.",
     "moreDataBetterRecs": "More data = better recommendations.",
     "takeTheQuiz": "Take the quiz",
-    "orConnectMore": "or connect more services."
+    "orConnectMore": "or connect more services.",
+    "recommendations": "Recommendations",
+    "retry": "Retry",
+    "failedToLoadSummary": "Failed to load data summary"
   },
   "musicIKnow": {
     "title": "Music I Know",
@@ -338,7 +342,46 @@
     "enjoysSinging": "Enjoy singing",
     "addSong": "Add song",
     "markAsEnjoy": "I enjoy singing this",
-    "editSinging": "Edit singing details"
+    "editSinging": "Edit singing details",
+    "loveSinging": "Love singing",
+    "mySongs": "My Songs",
+    "takeQuiz": "Take Quiz",
+    "removeSong": "Remove song",
+    "searchSongsToAdd": "Search songs to add...",
+    "noSongsYet": "No songs yet",
+    "noSongsYetDesc": "Search above to add songs you know and love to sing!",
+    "connectYourServices": "Connect Your Music Services",
+    "connectServicesGuestDesc": "Create an account to connect Spotify and Last.fm for personalized recommendations based on your listening history.",
+    "createAccount": "Create Account",
+    "spotify": "Spotify",
+    "lastfm": "Last.fm",
+    "connected": "Connected",
+    "notConnected": "Not connected",
+    "tracks": "{count} tracks",
+    "lastSync": "Last sync: {date}",
+    "disconnect": "Disconnect",
+    "connectSpotify": "Connect Spotify",
+    "connectLastfm": "Connect Last.fm",
+    "lastfmPlaceholder": "Your Last.fm username",
+    "syncListeningHistory": "Sync listening history",
+    "syncingInBackground": "Syncing in background...",
+    "fetchLatest": "Fetch latest from services",
+    "syncNow": "Sync Now",
+    "syncing": "Syncing...",
+    "syncComplete": "Sync complete! Found {count} karaoke songs.",
+    "lastfmTip": "Connect Last.fm for better recommendations based on your full listening history.",
+    "tip": "Tip:",
+    "failedToConnectSpotify": "Failed to connect Spotify",
+    "failedToConnectLastfm": "Failed to connect Last.fm",
+    "failedToDisconnect": "Failed to disconnect {service}",
+    "failedToStartSync": "Failed to start sync",
+    "failedToLoadServices": "Failed to load services",
+    "failedToLoadArtists": "Failed to load artists",
+    "failedToAddArtist": "Failed to add artist",
+    "failedToRemoveArtist": "Failed to remove artist",
+    "failedToExcludeArtist": "Failed to exclude artist",
+    "failedToIncludeArtist": "Failed to include artist",
+    "failedToLoadSongs": "Failed to load songs"
   },
   "knownSongs": {
     "title": "Songs I Know",
@@ -353,7 +396,10 @@
     "noKnownSongsYet": "No known songs yet",
     "noKnownSongsDesc": "Search above to add songs you know and love to sing!",
     "removeFromKnown": "Remove from known songs",
-    "viewRecsBasedOnSongs": "View recommendations based on your songs"
+    "viewRecsBasedOnSongs": "View recommendations based on your songs",
+    "add": "Add",
+    "failedToLoadKnownSongs": "Failed to load known songs",
+    "viewRecommendations": "View Recommendations"
   },
   "mySongs": {
     "redirecting": "Redirecting..."
@@ -440,7 +486,10 @@
     "deleteAccount": "Delete Account",
     "deleteConfirmMessage": "Are you sure? This will permanently delete your account and all your data. This action cannot be undone.",
     "yesDeleteAccount": "Yes, Delete My Account",
-    "deleteNotAvailable": "Account deletion is not yet available. Please contact support if you need to delete your account."
+    "deleteNotAvailable": "Account deletion is not yet available. Please contact support if you need to delete your account.",
+    "clearSession": "Clear Session",
+    "logOut": "Log Out",
+    "accountId": "Account ID: {id}"
   },
   "services": {
     "redirecting": "Redirecting...",
@@ -565,7 +614,9 @@
     "degraded": "Degraded",
     "down": "Down",
     "services": "Services",
+    "refresh": "Refresh",
     "allServicesHealthy": "All services healthy",
+    "statusDetail": "Status: {status}",
     "monitoringNote": "Automated monitoring runs every 5 minutes via",
     "gitHubActions": "GitHub Actions",
     "realTimeChecksNote": "For real-time 1-minute checks, see",

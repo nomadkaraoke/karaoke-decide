@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { API_BASE_URL } from "@/lib/constants";
 
 interface EndpointStatus {
@@ -21,6 +22,8 @@ const ENDPOINTS = [
 ];
 
 export default function StatusPage() {
+  const t = useTranslations('status');
+
   const [endpoints, setEndpoints] = useState<EndpointStatus[]>(
     ENDPOINTS.map((e) => ({
       name: e.name,
@@ -55,7 +58,7 @@ export default function StatusPage() {
                 status: "up",
                 latency,
                 lastChecked: new Date(),
-                details: "All services healthy",
+                details: t("allServicesHealthy"),
               };
             } else {
               return {
@@ -64,7 +67,7 @@ export default function StatusPage() {
                 status: "degraded",
                 latency,
                 lastChecked: new Date(),
-                details: `Status: ${data.status}`,
+                details: t("statusDetail", { status: data.status }),
               };
             }
           } catch {
@@ -119,7 +122,8 @@ export default function StatusPage() {
     setEndpoints(results);
     setLastFullCheck(new Date());
     setIsChecking(false);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
 
   useEffect(() => {
     // Data fetching on mount is a valid use case for setState in useEffect
@@ -156,13 +160,13 @@ export default function StatusPage() {
   const getStatusText = (status: string) => {
     switch (status) {
       case "up":
-        return "Operational";
+        return t("operational");
       case "degraded":
-        return "Degraded";
+        return t("degraded");
       case "down":
-        return "Down";
+        return t("down");
       case "checking":
-        return "Checking...";
+        return t("checking");
       default:
         return status;
     }
@@ -174,11 +178,11 @@ export default function StatusPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="text-[var(--brand-pink)] hover:text-[var(--brand-pink)]/80 text-sm mb-4 inline-block">
-            &larr; Back to App
+            {t("backToApp")}
           </Link>
-          <h1 className="text-3xl font-bold text-[var(--text)] mb-2">System Status</h1>
+          <h1 className="text-3xl font-bold text-[var(--text)] mb-2">{t("title")}</h1>
           <p className="text-[var(--text-muted)]">
-            Real-time status of Nomad Karaoke Decide services
+            {t("subtitle")}
           </p>
         </div>
 
@@ -189,14 +193,14 @@ export default function StatusPage() {
               <div className={`w-4 h-4 rounded-full ${getStatusColor(overallStatus)}`} />
               <div>
                 <h2 className="text-xl font-semibold text-[var(--text)]">
-                  {overallStatus === "operational" && "All Systems Operational"}
-                  {overallStatus === "degraded" && "Partial System Outage"}
-                  {overallStatus === "outage" && "Major System Outage"}
-                  {overallStatus === "checking" && "Checking Systems..."}
+                  {overallStatus === "operational" && t("allOperational")}
+                  {overallStatus === "degraded" && t("partialOutage")}
+                  {overallStatus === "outage" && t("majorOutage")}
+                  {overallStatus === "checking" && t("checkingSystems")}
                 </h2>
                 {lastFullCheck && (
                   <p className="text-[var(--text-subtle)] text-sm">
-                    Last checked: {lastFullCheck.toLocaleTimeString()}
+                    {t("lastChecked", { time: lastFullCheck.toLocaleTimeString() })}
                   </p>
                 )}
               </div>
@@ -206,14 +210,14 @@ export default function StatusPage() {
               disabled={isChecking}
               className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--secondary)] rounded-lg text-[var(--text)] text-sm transition-colors disabled:opacity-50"
             >
-              {isChecking ? "Checking..." : "Refresh"}
+              {isChecking ? t("checking") : t("refresh")}
             </button>
           </div>
         </div>
 
         {/* Individual Endpoints */}
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-[var(--text)]">Services</h3>
+          <h3 className="text-lg font-medium text-[var(--text)]">{t("services")}</h3>
           {endpoints.map((endpoint) => (
             <div
               key={endpoint.name}
@@ -250,25 +254,25 @@ export default function StatusPage() {
         {/* Footer */}
         <div className="mt-12 text-center text-[var(--text-subtle)] text-sm">
           <p>
-            Automated monitoring runs every 5 minutes via{" "}
+            {t("monitoringNote")}{" "}
             <a
               href="https://github.com/nomadkaraoke/karaoke-decide/actions/workflows/uptime-monitor.yml"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[var(--brand-pink)] hover:underline"
             >
-              GitHub Actions
+              {t("gitHubActions")}
             </a>
           </p>
           <p className="mt-2">
-            For real-time 1-minute checks, see{" "}
+            {t("realTimeChecksNote")}{" "}
             <a
               href="https://stats.uptimerobot.com/your-status-page"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[var(--brand-pink)] hover:underline"
             >
-              UptimeRobot Status
+              {t("uptimeRobotStatus")}
             </a>
           </p>
         </div>

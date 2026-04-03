@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { XIcon, SpotifyIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 
@@ -16,6 +17,7 @@ function safeDecodeURIComponent(str: string): string {
 
 function ErrorContent() {
   const searchParams = useSearchParams();
+  const t = useTranslations('services');
   const message = searchParams.get("message") || "An unknown error occurred";
 
   return (
@@ -32,19 +34,19 @@ function ErrorContent() {
         </div>
 
         <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-          Connection Failed
+          {t("connectionFailed")}
         </h1>
         <p className="text-[var(--text-muted)] mb-6">{safeDecodeURIComponent(message)}</p>
 
         <div className="space-y-3">
           <Link href="/services">
             <Button variant="primary" className="w-full">
-              Try Again
+              {t("tryAgain")}
             </Button>
           </Link>
           <Link href="/">
             <Button variant="ghost" className="w-full">
-              Back to Home
+              {t("backToHome")}
             </Button>
           </Link>
         </div>

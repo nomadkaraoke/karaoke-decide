@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { CheckIcon, SpotifyIcon } from "@/components/icons";
 
 export default function SpotifySuccessPage() {
   const router = useRouter();
+  const t = useTranslations('services');
 
   useEffect(() => {
     // Redirect to services page after a brief delay
@@ -30,9 +32,9 @@ export default function SpotifySuccessPage() {
         </div>
 
         <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-          Spotify Connected!
+          {t("spotifyConnected")}
         </h1>
-        <p className="text-[var(--text-muted)]">Redirecting you back...</p>
+        <p className="text-[var(--text-muted)]">{t("redirectingBack")}</p>
       </div>
     </main>
   );

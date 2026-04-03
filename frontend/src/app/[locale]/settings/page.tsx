@@ -2,6 +2,7 @@
 
 import { useState, useEffect, FormEvent, useCallback } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
@@ -31,6 +32,8 @@ interface ServiceInfo {
 
 export default function SettingsPage() {
   const { user, isGuest, checkAuth, logout } = useAuth();
+  const t = useTranslations('settings');
+  const tc = useTranslations('common');
 
   // Profile state
   const [displayName, setDisplayName] = useState(user?.display_name || "");
@@ -95,9 +98,9 @@ export default function SettingsPage() {
         display_name: displayName.trim() || null,
       });
       await checkAuth();
-      setProfileSuccess("Profile updated!");
+      setProfileSuccess(t("profileUpdated"));
     } catch (err) {
-      setProfileError(err instanceof Error ? err.message : "Failed to update profile");
+      setProfileError(err instanceof Error ? err.message : t("failedToUpdateProfile"));
     } finally {
       setIsSubmitting(false);
     }
@@ -111,7 +114,7 @@ export default function SettingsPage() {
   // Delete account functionality - placeholder for future implementation
   const handleDeleteAccount = async () => {
     // API endpoint not implemented yet
-    setDeleteError("Account deletion is not yet available. Please contact support if you need to delete your account.");
+    setDeleteError(t("deleteNotAvailable"));
   };
 
   const hasProfileChanges = (displayName.trim() || null) !== (user?.display_name || null);
@@ -126,10 +129,10 @@ export default function SettingsPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[var(--text)] flex items-center gap-3">
               <SettingsIcon className="w-7 h-7 text-[var(--brand-blue)]" />
-              Settings
+              {t("title")}
             </h1>
             <p className="text-[var(--text-muted)] text-sm mt-1">
-              Manage your profile and preferences
+              {t("subtitle")}
             </p>
           </div>
 
@@ -141,8 +144,8 @@ export default function SettingsPage() {
                   <UserIcon className="w-5 h-5 text-[var(--brand-pink)]" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-[var(--text)]">Profile</h2>
-                  <p className="text-xs text-[var(--text-muted)]">Your account information</p>
+                  <h2 className="font-semibold text-[var(--text)]">{t("profileSection")}</h2>
+                  <p className="text-xs text-[var(--text-muted)]">{t("yourAccountInfo")}</p>
                 </div>
               </div>
 
@@ -163,22 +166,22 @@ export default function SettingsPage() {
                 {/* Email (read-only) */}
                 <div>
                   <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
-                    Email
+                    {t("emailLabel")}
                   </label>
                   <div className="px-3 py-2.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)] text-sm">
-                    {user?.email || "Guest session"}
+                    {user?.email || t("guestSession")}
                   </div>
                 </div>
 
                 {/* Display name */}
                 <div>
                   <label htmlFor="displayName" className="block text-xs font-medium text-[var(--text-muted)] mb-1.5">
-                    Display Name
+                    {t("displayNameLabel")}
                   </label>
                   <Input
                     id="displayName"
                     type="text"
-                    placeholder="How should we call you?"
+                    placeholder={t("displayNamePlaceholder")}
                     value={displayName}
                     onChange={(e) => {
                       setDisplayName(e.target.value);
@@ -196,7 +199,7 @@ export default function SettingsPage() {
                   isLoading={isSubmitting}
                   disabled={!hasProfileChanges}
                 >
-                  Save Changes
+                  {tc("saveChanges")}
                 </Button>
               </form>
             </section>
@@ -209,13 +212,13 @@ export default function SettingsPage() {
                     <MusicIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-[var(--text)]">Music Preferences</h2>
-                    <p className="text-xs text-[var(--text-muted)]">Your karaoke style</p>
+                    <h2 className="font-semibold text-[var(--text)]">{t("musicPreferences")}</h2>
+                    <p className="text-xs text-[var(--text-muted)]">{t("yourKaraokeStyle")}</p>
                   </div>
                 </div>
                 <Link href="/quiz">
                   <Button variant="secondary" size="sm">
-                    Update
+                    {t("update")}
                   </Button>
                 </Link>
               </div>
@@ -233,7 +236,7 @@ export default function SettingsPage() {
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-sm text-[var(--text-subtle)]">No genres selected</span>
+                      <span className="text-sm text-[var(--text-subtle)]">{t("noGenresSelected")}</span>
                     )}
                   </div>
 
@@ -246,19 +249,19 @@ export default function SettingsPage() {
                     ) : null}
                     {preferences.energy ? (
                       <span className="px-2.5 py-1 rounded-full bg-[var(--secondary)] text-[var(--text-muted)]">
-                        {preferences.energy} energy
+                        {t("energy", { level: preferences.energy })}
                       </span>
                     ) : null}
                     {!preferences.decade && !preferences.energy && preferences.genres.length === 0 && (
                       <span className="text-[var(--text-subtle)]">
-                        Take the quiz to set your preferences
+                        {t("takeQuizToSetPrefs")}
                       </span>
                     )}
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-[var(--text-subtle)]">
-                  Take the quiz to set your preferences
+                  {t("takeQuizToSetPrefs")}
                 </p>
               )}
             </section>
@@ -286,11 +289,11 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <div>
-                      <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+                      <h2 className="font-semibold text-[var(--text)]">{t("connectedServices")}</h2>
                       <p className="text-xs text-[var(--text-muted)]">
-                        {servicesLoading ? "Loading..." :
-                          connectedServicesCount === 0 ? "No services connected" :
-                          `${connectedServicesCount} service${connectedServicesCount !== 1 ? "s" : ""} connected`
+                        {servicesLoading ? tc("loading") :
+                          connectedServicesCount === 0 ? t("noServicesConnected") :
+                          t("servicesConnectedCount", { count: connectedServicesCount })
                         }
                       </p>
                     </div>
@@ -308,14 +311,14 @@ export default function SettingsPage() {
                     <LogOutIcon className="w-5 h-5 text-[var(--text-muted)]" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-[var(--text)]">Log Out</h2>
+                    <h2 className="font-semibold text-[var(--text)]">{t("logOutSection")}</h2>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {isGuest ? "Clear your guest session" : "Sign out of your account"}
+                      {isGuest ? t("clearGuestSession") : t("signOutOfAccount")}
                     </p>
                   </div>
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleLogout}>
-                  {isGuest ? "Clear Session" : "Log Out"}
+                  {isGuest ? t("clearSession") : t("logOut")}
                 </Button>
               </div>
             </section>
@@ -328,8 +331,8 @@ export default function SettingsPage() {
                     <TrashIcon className="w-5 h-5 text-red-400" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-red-400">Danger Zone</h2>
-                    <p className="text-xs text-[var(--text-muted)]">Irreversible actions</p>
+                    <h2 className="font-semibold text-red-400">{t("dangerZone")}</h2>
+                    <p className="text-xs text-[var(--text-muted)]">{t("irreversibleActions")}</p>
                   </div>
                 </div>
 
@@ -345,13 +348,12 @@ export default function SettingsPage() {
                     size="sm"
                     onClick={() => setShowDeleteConfirm(true)}
                   >
-                    Delete Account
+                    {t("deleteAccount")}
                   </Button>
                 ) : (
                   <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30">
                     <p className="text-sm text-[var(--text)] mb-4">
-                      Are you sure? This will permanently delete your account and all your data.
-                      This action cannot be undone.
+                      {t("deleteConfirmMessage")}
                     </p>
                     <div className="flex items-center gap-3">
                       <Button
@@ -359,14 +361,14 @@ export default function SettingsPage() {
                         size="sm"
                         onClick={handleDeleteAccount}
                       >
-                        Yes, Delete My Account
+                        {t("yesDeleteAccount")}
                       </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => setShowDeleteConfirm(false)}
                       >
-                        Cancel
+                        {tc("cancel")}
                       </Button>
                     </div>
                   </div>
@@ -376,7 +378,7 @@ export default function SettingsPage() {
 
             {/* Account ID */}
             <div className="text-center text-xs text-[var(--text-subtle)]">
-              Account ID: {user?.id}
+              {t("accountId", { id: user?.id ?? "" })}
             </div>
           </div>
         </div>
