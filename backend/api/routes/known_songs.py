@@ -6,8 +6,10 @@ to improve recommendation quality.
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from starlette.requests import Request
 
 from backend.api.deps import CurrentUser, KnownSongsServiceDep
+from backend.i18n import get_locale_from_request, t
 
 router = APIRouter()
 
@@ -189,9 +191,10 @@ async def list_known_songs(
 
 @router.post("", response_model=AddKnownSongResponse, status_code=status.HTTP_201_CREATED)
 async def add_known_song(
-    request: AddKnownSongRequest,
+    request_body: AddKnownSongRequest,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
 ) -> AddKnownSongResponse:
     """Add a song to user's known songs.
 
@@ -202,7 +205,7 @@ async def add_known_song(
     try:
         result = await known_songs_service.add_known_song(
             user_id=user.id,
-            song_id=request.song_id,
+            song_id=request_body.song_id,
         )
 
         return AddKnownSongResponse(
@@ -212,10 +215,11 @@ async def add_known_song(
             title=result.title,
             already_existed=result.already_existed,
         )
-    except ValueError as e:
+    except ValueError:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=t(locale, "catalog.songNotFound"),
         )
 
 
@@ -226,7 +230,7 @@ async def add_known_song(
 
 @router.post("/bulk", response_model=BulkAddKnownSongsResponse)
 async def bulk_add_known_songs(
-    request: BulkAddKnownSongsRequest,
+    request_body: BulkAddKnownSongsRequest,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
 ) -> BulkAddKnownSongsResponse:
@@ -237,7 +241,7 @@ async def bulk_add_known_songs(
     """
     result = await known_songs_service.bulk_add_known_songs(
         user_id=user.id,
-        song_ids=request.song_ids,
+        song_ids=request_body.song_ids,
     )
 
     return BulkAddKnownSongsResponse(
@@ -255,9 +259,10 @@ async def bulk_add_known_songs(
 
 @router.post("/spotify", response_model=AddSpotifyTrackResponse, status_code=status.HTTP_201_CREATED)
 async def add_spotify_track(
-    request: AddSpotifyTrackRequest,
+    request_body: AddSpotifyTrackRequest,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
 ) -> AddSpotifyTrackResponse:
     """Add a song to user's known songs via Spotify track ID.
 
@@ -270,7 +275,7 @@ async def add_spotify_track(
     try:
         result = await known_songs_service.add_spotify_track(
             user_id=user.id,
-            track_id=request.track_id,
+            track_id=request_body.track_id,
         )
 
         return AddSpotifyTrackResponse(
@@ -284,10 +289,11 @@ async def add_spotify_track(
             explicit=result.explicit,
             already_existed=result.already_existed,
         )
-    except ValueError as e:
+    except ValueError:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            detail=t(locale, "knownSongs.trackNotFound"),
         )
 
 
@@ -301,6 +307,7 @@ async def remove_spotify_track(
     track_id: str,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
 ) -> None:
     """Remove a Spotify track from user's known songs.
 
@@ -313,9 +320,10 @@ async def remove_spotify_track(
     )
 
     if not removed:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Track not found in known songs or cannot be removed",
+            detail=t(locale, "knownSongs.trackNotFound"),
         )
 
 
@@ -326,9 +334,10 @@ async def remove_spotify_track(
 
 @router.post("/enjoy-singing", response_model=SetEnjoySingingResponse, status_code=status.HTTP_201_CREATED)
 async def set_enjoy_singing_by_query(
-    request: SetEnjoySingingRequest,
+    request_body: SetEnjoySingingRequest,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
     song_id: str = Query(..., description="Song ID - karaoke catalog ID or 'spotify:{track_id}'"),
 ) -> SetEnjoySingingResponse:
     """Mark a song as one the user enjoys singing at karaoke.
@@ -347,10 +356,10 @@ async def set_enjoy_singing_by_query(
         result = await known_songs_service.set_enjoy_singing(
             user_id=user.id,
             song_id=song_id,
-            singing_tags=request.singing_tags,
-            singing_energy=request.singing_energy,
-            vocal_comfort=request.vocal_comfort,
-            notes=request.notes,
+            singing_tags=request_body.singing_tags,
+            singing_energy=request_body.singing_energy,
+            vocal_comfort=request_body.vocal_comfort,
+            notes=request_body.notes,
         )
 
         return SetEnjoySingingResponse(
@@ -376,6 +385,7 @@ async def set_enjoy_singing_by_query(
 async def remove_enjoy_singing(
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
     song_id: str = Query(..., description="Song ID - karaoke catalog ID or 'spotify:{track_id}'"),
 ) -> None:
     """Remove enjoy singing flag from a song.
@@ -390,9 +400,10 @@ async def remove_enjoy_singing(
     )
 
     if not removed:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Song not found in user's library",
+            detail=t(locale, "knownSongs.songNotFound"),
         )
 
 
@@ -406,6 +417,7 @@ async def remove_known_song(
     song_id: int,
     user: CurrentUser,
     known_songs_service: KnownSongsServiceDep,
+    request: Request,
 ) -> None:
     """Remove a song from user's known songs.
 
@@ -418,7 +430,8 @@ async def remove_known_song(
     )
 
     if not removed:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Song not found in known songs or cannot be removed",
+            detail=t(locale, "knownSongs.songCannotBeRemoved"),
         )

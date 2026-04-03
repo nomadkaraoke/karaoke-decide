@@ -10,8 +10,10 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from starlette.requests import Request
 
 from backend.api.deps import CurrentUser, UserDataServiceDep
+from backend.i18n import get_locale_from_request, t
 
 router = APIRouter()
 
@@ -229,7 +231,7 @@ async def get_all_artists(
 async def add_artist(
     user: CurrentUser,
     user_data_service: UserDataServiceDep,
-    request: AddArtistRequest,
+    request_body: AddArtistRequest,
 ) -> AddArtistResponse:
     """Add an artist manually to user's preferences.
 
@@ -243,9 +245,9 @@ async def add_artist(
     """
     result = await user_data_service.add_artist(
         user.id,
-        request.artist_name,
-        mbid=request.mbid,
-        spotify_artist_id=request.spotify_artist_id,
+        request_body.artist_name,
+        mbid=request_body.mbid,
+        spotify_artist_id=request_body.spotify_artist_id,
     )
     return AddArtistResponse(**result)
 
@@ -289,6 +291,7 @@ async def remove_artist(
     user: CurrentUser,
     user_data_service: UserDataServiceDep,
     artist_name: str,
+    request: Request,
 ) -> RemoveArtistResponse:
     """Remove an artist from user's preferences.
 
@@ -299,9 +302,10 @@ async def remove_artist(
     result = await user_data_service.remove_artist(user.id, artist_name)
 
     if not result["success"]:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Artist '{artist_name}' not found in user's data",
+            detail=t(locale, "myData.artistNotFound", artist_name=artist_name),
         )
 
     return RemoveArtistResponse(**result)
@@ -332,7 +336,7 @@ async def get_preferences(
 async def update_preferences(
     user: CurrentUser,
     user_data_service: UserDataServiceDep,
-    request: UpdatePreferencesRequest,
+    request_body: UpdatePreferencesRequest,
 ) -> PreferencesResponse:
     """Update user's quiz/preference settings.
 
@@ -341,8 +345,8 @@ async def update_preferences(
     """
     updated = await user_data_service.update_preferences(
         user_id=user.id,
-        decade_preference=request.decade_preference,
-        energy_preference=request.energy_preference,
-        genres=request.genres,
+        decade_preference=request_body.decade_preference,
+        energy_preference=request_body.energy_preference,
+        genres=request_body.genres,
     )
     return PreferencesResponse(**updated)

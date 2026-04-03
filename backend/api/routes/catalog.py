@@ -2,7 +2,9 @@
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, computed_field
+from starlette.requests import Request
 
+from backend.i18n import get_locale_from_request, t
 from backend.services.karaoke_link_service import (
     KaraokeLinkService,
     get_karaoke_link_service,
@@ -219,11 +221,12 @@ async def get_popular_songs(
 
 
 @router.get("/songs/{song_id}", response_model=SongResponse)
-async def get_song(song_id: int) -> SongResponse:
+async def get_song(song_id: int, request: Request) -> SongResponse:
     """Get details for a specific song."""
     result = get_catalog_service().get_song_by_id(song_id)
     if not result:
-        raise HTTPException(status_code=404, detail="Song not found")
+        locale = get_locale_from_request(request)
+        raise HTTPException(status_code=404, detail=t(locale, "catalog.songNotFound"))
 
     return SongResponse(
         id=result.id,
@@ -236,7 +239,7 @@ async def get_song(song_id: int) -> SongResponse:
 
 
 @router.get("/songs/{song_id}/links", response_model=SongLinksResponse)
-async def get_song_links(song_id: int) -> SongLinksResponse:
+async def get_song_links(song_id: int, request: Request) -> SongLinksResponse:
     """Get karaoke links for a specific song.
 
     Returns available links to watch or create karaoke videos:
@@ -246,7 +249,8 @@ async def get_song_links(song_id: int) -> SongLinksResponse:
     # First get the song to verify it exists and get artist/title
     song = get_catalog_service().get_song_by_id(song_id)
     if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
+        locale = get_locale_from_request(request)
+        raise HTTPException(status_code=404, detail=t(locale, "catalog.songNotFound"))
 
     # Get karaoke links
     link_service = _get_karaoke_link_service()

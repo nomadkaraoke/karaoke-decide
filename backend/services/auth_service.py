@@ -284,18 +284,19 @@ class AuthService:
         except JWTError as e:
             raise AuthenticationError(f"Invalid token: {e}")
 
-    async def send_magic_link(self, email: str) -> bool:
+    async def send_magic_link(self, email: str, locale: str = "en") -> bool:
         """Generate and send a magic link to the user's email.
 
         Args:
             email: User's email address
+            locale: Language code for the email template
 
         Returns:
             True if magic link was sent successfully
         """
         token = self.generate_magic_link_token()
         await self.store_magic_link(email, token)
-        return await self.email_service.send_magic_link(email, token)
+        return await self.email_service.send_magic_link(email, token, locale=locale)
 
     async def create_guest_user(self) -> User:
         """Create a new guest/anonymous user.
