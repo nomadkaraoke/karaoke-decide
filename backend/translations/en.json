@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Sign in to Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Sign in to your account",
+      "description": "Click the button below to sign in. This link will expire in 24 hours.",
+      "button": "Sign In",
+      "copyLink": "Or copy and paste this link into your browser:",
+      "footer": "If you didn't request this email, you can safely ignore it.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Your music sync is complete!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Your music sync is complete!",
+      "description": "We've finished syncing your listening history from {services}.",
+      "songsFound": "Karaoke Songs Found",
+      "artistsAnalyzed": "Artists Analyzed",
+      "cta": "Head over to the app to explore personalized karaoke recommendations based on your music taste!",
+      "button": "View My Songs",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Account is already verified",
+    "failedToSendVerification": "Failed to send verification email. Please try again later.",
+    "failedToSendMagicLink": "Failed to send magic link email. Please try again later.",
+    "verificationSent": "Verification email sent. Check your inbox to complete the upgrade.",
+    "magicLinkSent": "If an account exists for this email, you will receive a magic link shortly.",
+    "quizCompleted": "Quiz completed successfully",
+    "emailCollected": "Email collected",
+    "accountDeleted": "Account and all associated data deleted successfully",
+    "loggedOut": "Successfully logged out",
+    "userNotFound": "User not found",
+    "invalidOrExpiredToken": "Invalid or expired token",
+    "tokenAlreadyUsed": "Token has already been used",
+    "tokenExpired": "Token has expired"
+  },
+  "admin": {
+    "userNotFound": "User not found",
+    "syncJobNotFound": "Sync job not found",
+    "mustProvideUserIdOrEmail": "Must provide either user_id or email",
+    "failedToDeleteUser": "Failed to delete user",
+    "userDeleted": "User and all associated data deleted successfully"
+  },
+  "catalog": {
+    "songNotFound": "Song not found"
+  },
+  "playlists": {
+    "notFound": "Playlist not found",
+    "accessDenied": "Access denied to this playlist"
+  },
+  "knownSongs": {
+    "trackNotFound": "Track not found in known songs or cannot be removed",
+    "songNotFound": "Song not found in user's library",
+    "songCannotBeRemoved": "Song not found in known songs or cannot be removed"
+  },
+  "myData": {
+    "artistNotFound": "Artist '{artist_name}' not found in user's data"
+  },
+  "services": {
+    "invalidServiceType": "Invalid service type: {service_type}",
+    "serviceNotConnected": "Service {service_type} is not connected",
+    "failedToStartSync": "Failed to start sync: {error}",
+    "disconnected": "Successfully disconnected {service_type}",
+    "syncStarted": "Sync job started. Poll /sync/status for progress."
+  }
+}

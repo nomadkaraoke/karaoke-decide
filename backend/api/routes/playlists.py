@@ -6,8 +6,10 @@ within playlists.
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from starlette.requests import Request
 
 from backend.api.deps import CurrentUser, PlaylistServiceDep
+from backend.i18n import get_locale_from_request, t
 from backend.services.playlist_service import (
     PlaylistAccessDeniedError,
     PlaylistNotFoundError,
@@ -113,7 +115,7 @@ async def list_playlists(
 
 @router.post("", response_model=PlaylistResponse, status_code=status.HTTP_201_CREATED)
 async def create_playlist(
-    request: CreatePlaylistRequest,
+    request_body: CreatePlaylistRequest,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
 ) -> PlaylistResponse:
@@ -124,8 +126,8 @@ async def create_playlist(
     """
     playlist = await playlist_service.create_playlist(
         user_id=user.id,
-        name=request.name,
-        description=request.description,
+        name=request_body.name,
+        description=request_body.description,
     )
 
     return PlaylistResponse(
@@ -149,11 +151,13 @@ async def get_playlist(
     playlist_id: str,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
+    request: Request,
 ) -> PlaylistResponse:
     """Get a playlist by ID.
 
     Returns the playlist if the authenticated user owns it.
     """
+    locale = get_locale_from_request(request)
     try:
         playlist = await playlist_service.get_playlist(
             playlist_id=playlist_id,
@@ -162,12 +166,12 @@ async def get_playlist(
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Playlist not found",
+            detail=t(locale, "playlists.notFound"),
         )
     except PlaylistAccessDeniedError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this playlist",
+            detail=t(locale, "playlists.accessDenied"),
         )
 
     return PlaylistResponse(
@@ -189,31 +193,33 @@ async def get_playlist(
 @router.put("/{playlist_id}", response_model=PlaylistResponse)
 async def update_playlist(
     playlist_id: str,
-    request: UpdatePlaylistRequest,
+    request_body: UpdatePlaylistRequest,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
+    request: Request,
 ) -> PlaylistResponse:
     """Update a playlist's metadata.
 
     Updates the name and/or description of a playlist.
     Only the playlist owner can update it.
     """
+    locale = get_locale_from_request(request)
     try:
         playlist = await playlist_service.update_playlist(
             playlist_id=playlist_id,
             user_id=user.id,
-            name=request.name,
-            description=request.description,
+            name=request_body.name,
+            description=request_body.description,
         )
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Playlist not found",
+            detail=t(locale, "playlists.notFound"),
         )
     except PlaylistAccessDeniedError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this playlist",
+            detail=t(locale, "playlists.accessDenied"),
         )
 
     return PlaylistResponse(
@@ -237,11 +243,13 @@ async def delete_playlist(
     playlist_id: str,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
+    request: Request,
 ) -> None:
     """Delete a playlist.
 
     Permanently deletes a playlist. Only the playlist owner can delete it.
     """
+    locale = get_locale_from_request(request)
     try:
         await playlist_service.delete_playlist(
             playlist_id=playlist_id,
@@ -250,12 +258,12 @@ async def delete_playlist(
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Playlist not found",
+            detail=t(locale, "playlists.notFound"),
         )
     except PlaylistAccessDeniedError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this playlist",
+            detail=t(locale, "playlists.accessDenied"),
         )
 
 
@@ -267,30 +275,32 @@ async def delete_playlist(
 @router.post("/{playlist_id}/songs", response_model=PlaylistResponse)
 async def add_song_to_playlist(
     playlist_id: str,
-    request: AddSongRequest,
+    request_body: AddSongRequest,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
+    request: Request,
 ) -> PlaylistResponse:
     """Add a song to a playlist.
 
     Adds the specified song to the end of the playlist.
     Duplicate songs are ignored (no error, but not added again).
     """
+    locale = get_locale_from_request(request)
     try:
         playlist = await playlist_service.add_song_to_playlist(
             playlist_id=playlist_id,
             user_id=user.id,
-            song_id=request.song_id,
+            song_id=request_body.song_id,
         )
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Playlist not found",
+            detail=t(locale, "playlists.notFound"),
         )
     except PlaylistAccessDeniedError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this playlist",
+            detail=t(locale, "playlists.accessDenied"),
         )
 
     return PlaylistResponse(
@@ -315,12 +325,14 @@ async def remove_song_from_playlist(
     song_id: str,
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
+    request: Request,
 ) -> None:
     """Remove a song from a playlist.
 
     Removes the specified song from the playlist.
     If the song is not in the playlist, this is a no-op (no error).
     """
+    locale = get_locale_from_request(request)
     try:
         await playlist_service.remove_song_from_playlist(
             playlist_id=playlist_id,
@@ -330,10 +342,10 @@ async def remove_song_from_playlist(
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Playlist not found",
+            detail=t(locale, "playlists.notFound"),
         )
     except PlaylistAccessDeniedError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this playlist",
+            detail=t(locale, "playlists.accessDenied"),
         )

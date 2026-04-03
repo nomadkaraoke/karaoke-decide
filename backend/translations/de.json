@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Melde dich bei Nomad Karaoke Decide an",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Melde dich bei deinem Konto an",
+      "description": "Klicke auf den Button unten, um dich anzumelden. Dieser Link läuft in 24 Stunden ab.",
+      "button": "Anmelden",
+      "copyLink": "Oder kopiere diesen Link und füge ihn in deinen Browser ein:",
+      "footer": "Wenn du diese E-Mail nicht angefordert hast, kannst du sie einfach ignorieren.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Deine Musik-Synchronisation ist abgeschlossen!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Deine Musik-Synchronisation ist abgeschlossen!",
+      "description": "Wir haben die Synchronisation deines Hörverlaufs von {services} abgeschlossen.",
+      "songsFound": "Gefundene Karaoke-Songs",
+      "artistsAnalyzed": "Analysierte Künstler",
+      "cta": "Gehe zur App, um personalisierte Karaoke-Empfehlungen basierend auf deinem Musikgeschmack zu entdecken!",
+      "button": "Meine Songs ansehen",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Konto ist bereits verifiziert",
+    "failedToSendVerification": "Fehler beim Senden der Verifizierungs-E-Mail. Bitte versuche es später erneut.",
+    "failedToSendMagicLink": "Fehler beim Senden der Magic-Link-E-Mail. Bitte versuche es später erneut.",
+    "verificationSent": "Verifizierungs-E-Mail gesendet. Überprüfe deinen Posteingang, um das Upgrade abzuschließen.",
+    "magicLinkSent": "Wenn ein Konto für diese E-Mail existiert, erhältst du in Kürze einen Magic Link.",
+    "quizCompleted": "Quiz erfolgreich abgeschlossen",
+    "emailCollected": "E-Mail erfasst",
+    "accountDeleted": "Konto und alle zugehörigen Daten erfolgreich gelöscht",
+    "loggedOut": "Erfolgreich abgemeldet",
+    "userNotFound": "Benutzer nicht gefunden",
+    "invalidOrExpiredToken": "Ungültiger oder abgelaufener Token",
+    "tokenAlreadyUsed": "Token wurde bereits verwendet",
+    "tokenExpired": "Token ist abgelaufen"
+  },
+  "admin": {
+    "userNotFound": "Benutzer nicht gefunden",
+    "syncJobNotFound": "Synchronisations-Job nicht gefunden",
+    "mustProvideUserIdOrEmail": "Es muss entweder user_id oder email angegeben werden",
+    "failedToDeleteUser": "Fehler beim Löschen des Benutzers",
+    "userDeleted": "Benutzer und alle zugehörigen Daten erfolgreich gelöscht"
+  },
+  "catalog": {
+    "songNotFound": "Song nicht gefunden"
+  },
+  "playlists": {
+    "notFound": "Playlist nicht gefunden",
+    "accessDenied": "Zugriff auf diese Playlist verweigert"
+  },
+  "knownSongs": {
+    "trackNotFound": "Track nicht in den bekannten Songs gefunden oder kann nicht entfernt werden",
+    "songNotFound": "Song nicht in der Bibliothek des Benutzers gefunden",
+    "songCannotBeRemoved": "Song nicht in den bekannten Songs gefunden oder kann nicht entfernt werden"
+  },
+  "myData": {
+    "artistNotFound": "Künstler '{artist_name}' nicht in den Daten des Benutzers gefunden"
+  },
+  "services": {
+    "invalidServiceType": "Ungültiger Diensttyp: {service_type}",
+    "serviceNotConnected": "Dienst {service_type} ist nicht verbunden",
+    "failedToStartSync": "Fehler beim Starten der Synchronisation: {error}",
+    "disconnected": "{service_type} erfolgreich getrennt",
+    "syncStarted": "Synchronisations-Job gestartet. Rufe /sync/status für den Fortschritt ab."
+  }
+}

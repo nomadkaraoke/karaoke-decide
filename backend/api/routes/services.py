@@ -11,6 +11,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from backend.api.deps import (
     FirestoreServiceDep,
@@ -18,6 +19,7 @@ from backend.api.deps import (
     Settings,
     VerifiedUser,
 )
+from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
@@ -203,17 +205,20 @@ async def spotify_callback(
     is verified through the OAuth state parameter.
     """
     frontend_url = settings.frontend_url
+    # OAuth callbacks come from Spotify, not the user — no Accept-Language header.
+    # Use the default locale for redirect URLs.
+    locale_prefix = get_locale_prefix(DEFAULT_LOCALE)
 
     # Handle OAuth errors
     if error:
         return RedirectResponse(
-            url=f"{frontend_url}/en/services/spotify/error?message={quote(error, safe='')}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={quote(error, safe='')}",
             status_code=status.HTTP_302_FOUND,
         )
 
     if not code or not state:
         return RedirectResponse(
-            url=f"{frontend_url}/en/services/spotify/error?message=missing_params",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=missing_params",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -221,7 +226,7 @@ async def spotify_callback(
     state_data = await music_service.verify_oauth_state(state)
     if not state_data:
         return RedirectResponse(
-            url=f"{frontend_url}/en/services/spotify/error?message=invalid_state",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=invalid_state",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -239,14 +244,14 @@ async def spotify_callback(
         await music_service.create_or_update_spotify_service(user_id, tokens, profile)
 
         return RedirectResponse(
-            url=f"{frontend_url}/en/services/spotify/success",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/success",
             status_code=status.HTTP_302_FOUND,
         )
 
     except Exception as e:
         error_msg = quote(str(e)[:100], safe="")  # URL-encode for safety
         return RedirectResponse(
-            url=f"{frontend_url}/en/services/spotify/error?message={error_msg}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={error_msg}",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -258,7 +263,7 @@ async def spotify_callback(
 
 @router.post("/lastfm/connect", response_model=ConnectedServiceResponse)
 async def connect_lastfm(
-    request: LastFmConnectRequest,
+    request_body: LastFmConnectRequest,
     user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> ConnectedServiceResponse:
@@ -269,7 +274,7 @@ async def connect_lastfm(
     by fetching the user's profile from Last.fm.
     """
     try:
-        service = await music_service.create_lastfm_service(user.id, request.username)
+        service = await music_service.create_lastfm_service(user.id, request_body.username)
 
         return ConnectedServiceResponse(
             service_type=service.service_type,
@@ -295,7 +300,7 @@ async def connect_lastfm(
 
 @router.post("/listenbrainz/connect", response_model=ConnectedServiceResponse)
 async def connect_listenbrainz(
-    request: ListenBrainzConnectRequest,
+    request_body: ListenBrainzConnectRequest,
     user: VerifiedUser,
     music_service: MusicServiceServiceDep,
 ) -> ConnectedServiceResponse:
@@ -306,7 +311,7 @@ async def connect_listenbrainz(
     username. We validate the username by fetching the user's listen count.
     """
     try:
-        service = await music_service.create_listenbrainz_service(user.id, request.username)
+        service = await music_service.create_listenbrainz_service(user.id, request_body.username)
 
         return ConnectedServiceResponse(
             service_type=service.service_type,
@@ -335,26 +340,29 @@ async def disconnect_service(
     service_type: str,
     user: VerifiedUser,
     music_service: MusicServiceServiceDep,
+    request: Request,
 ) -> DisconnectResponse:
     """Disconnect a music service.
 
     Removes the service connection and any stored tokens.
     Does not delete synced UserSong records.
     """
+    locale = get_locale_from_request(request)
+
     if service_type not in ("spotify", "lastfm", "listenbrainz"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid service type: {service_type}",
+            detail=t(locale, "services.invalidServiceType", service_type=service_type),
         )
 
     try:
         await music_service.delete_service(user.id, service_type)
-        return DisconnectResponse(message=f"Successfully disconnected {service_type}")
+        return DisconnectResponse(message=t(locale, "services.disconnected", service_type=service_type))
 
     except NotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Service {service_type} is not connected",
+            detail=t(locale, "services.serviceNotConnected", service_type=service_type),
         )
 
 
@@ -368,6 +376,7 @@ async def trigger_sync(
     user: VerifiedUser,
     settings: Settings,
     firestore: FirestoreServiceDep,
+    request: Request,
 ) -> SyncJobStartResponse:
     """Trigger async sync for all connected services.
 
@@ -400,15 +409,17 @@ async def trigger_sync(
         job.status = SyncJobStatus.FAILED
         job.error = f"Failed to enqueue task: {e}"
         await firestore.set_document("sync_jobs", job_id, job.to_dict())
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start sync: {e}",
+            detail=t(locale, "services.failedToStartSync", error=str(e)),
         )
 
+    locale = get_locale_from_request(request)
     return SyncJobStartResponse(
         job_id=job_id,
         status="pending",
-        message="Sync job started. Poll /sync/status for progress.",
+        message=t(locale, "services.syncStarted"),
     )
 
 

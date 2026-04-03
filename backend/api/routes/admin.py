@@ -13,8 +13,10 @@ from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
+from starlette.requests import Request
 
 from backend.api.deps import AdminUser, AuthServiceDep, FirestoreServiceDep
+from backend.i18n import get_locale_from_request, t
 from backend.models.admin import (
     AdminStats,
     DataSummary,
@@ -213,6 +215,7 @@ async def get_user_detail(
     user_id: str,
     user: AdminUser,
     firestore: FirestoreServiceDep,
+    request: Request,
 ) -> UserDetail:
     """Get detailed information about a specific user."""
     # Get user document - guest users use user_id as doc ID, regular users need query
@@ -228,9 +231,10 @@ async def get_user_detail(
         user_doc = user_docs[0] if user_docs else None
 
     if not user_doc:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=t(locale, "admin.userNotFound"),
         )
 
     # Get connected services
@@ -308,6 +312,7 @@ async def admin_delete_user(
     admin: AdminUser,
     auth_service: AuthServiceDep,
     firestore: FirestoreServiceDep,
+    request: Request,
 ) -> AdminDeleteUserResponse:
     """Delete a user and all their associated data (admin only).
 
@@ -337,10 +342,12 @@ async def admin_delete_user(
         )
         user_doc = user_docs[0] if user_docs else None
 
+    locale = get_locale_from_request(request)
+
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=t(locale, "admin.userNotFound"),
         )
 
     user_email = user_doc.get("email")
@@ -351,13 +358,13 @@ async def admin_delete_user(
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete user",
+            detail=t(locale, "admin.failedToDeleteUser"),
         )
 
     logger.info(f"Admin {admin.email} deleted user {user_id} ({user_email})")
 
     return AdminDeleteUserResponse(
-        message="User and all associated data deleted successfully",
+        message=t(locale, "admin.userDeleted"),
         deleted_user_id=user_id,
         deleted_user_email=user_email,
     )
@@ -435,14 +442,16 @@ async def get_sync_job_detail(
     job_id: str,
     user: AdminUser,
     firestore: FirestoreServiceDep,
+    request: Request,
 ) -> SyncJobDetail:
     """Get detailed information about a specific sync job."""
     # Get job document
     job_doc = await firestore.get_document("sync_jobs", job_id)
     if not job_doc:
+        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sync job not found",
+            detail=t(locale, "admin.syncJobNotFound"),
         )
 
     # Get user email
@@ -518,10 +527,11 @@ def _parse_datetime(value: str | datetime | None) -> datetime | None:
 
 @router.post("/impersonate", response_model=ImpersonateResponse)
 async def impersonate_user(
-    request: ImpersonateRequest,
+    request_body: ImpersonateRequest,
     admin: AdminUser,
     auth_service: AuthServiceDep,
     firestore: FirestoreServiceDep,
+    request: Request,
 ) -> ImpersonateResponse:
     """Generate a JWT token to impersonate a specific user.
 
@@ -534,22 +544,24 @@ async def impersonate_user(
     Returns:
         JWT token that can be used to authenticate as the target user
     """
-    if not request.user_id and not request.email:
+    locale = get_locale_from_request(request)
+
+    if not request_body.user_id and not request_body.email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Must provide either user_id or email",
+            detail=t(locale, "admin.mustProvideUserIdOrEmail"),
         )
 
     target_user = None
 
     # Look up user by ID
-    if request.user_id:
-        target_user = await auth_service.get_user_by_id(request.user_id)
+    if request_body.user_id:
+        target_user = await auth_service.get_user_by_id(request_body.user_id)
 
     # Look up user by email
-    elif request.email:
+    elif request_body.email:
         # Use auth service to get or find user by email
-        email_lower = request.email.lower()
+        email_lower = request_body.email.lower()
         # Query by email field
         user_docs = await firestore.query_documents(
             "decide_users",
@@ -563,7 +575,7 @@ async def impersonate_user(
     if target_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=t(locale, "admin.userNotFound"),
         )
 
     # Generate JWT for the target user

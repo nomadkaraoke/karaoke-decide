@@ -2,8 +2,10 @@
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
+from starlette.requests import Request
 
 from backend.api.deps import AuthServiceDep, CurrentUser
+from backend.i18n import get_locale_from_request, t
 from backend.services.auth_service import AuthenticationError
 
 router = APIRouter()
@@ -98,9 +100,10 @@ async def create_guest_session(
 
 @router.post("/upgrade", response_model=UpgradeGuestResponse)
 async def request_guest_upgrade(
-    request: UpgradeGuestRequest,
+    request_body: UpgradeGuestRequest,
     user: CurrentUser,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> UpgradeGuestResponse:
     """Request to upgrade a guest account to a verified account.
 
@@ -109,16 +112,18 @@ async def request_guest_upgrade(
 
     If the email already has an account, the guest data will be merged.
     """
+    locale = get_locale_from_request(request)
+
     if not user.is_guest:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Account is already verified",
+            detail=t(locale, "auth.accountAlreadyVerified"),
         )
 
     try:
         # Store the guest user ID in the magic link so we can upgrade on verify
         token = auth_service.generate_magic_link_token()
-        await auth_service.store_magic_link(request.email, token)
+        await auth_service.store_magic_link(request_body.email, token)
 
         # Store the guest_user_id association with this magic link
         await auth_service.firestore.update_document(
@@ -127,15 +132,15 @@ async def request_guest_upgrade(
             {"guest_user_id": user.id},
         )
 
-        success = await auth_service.email_service.send_magic_link(request.email, token)
+        success = await auth_service.email_service.send_magic_link(request_body.email, token, locale=locale)
 
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send verification email. Please try again later.",
+                detail=t(locale, "auth.failedToSendVerification"),
             )
 
-        return UpgradeGuestResponse(message="Verification email sent. Check your inbox to complete the upgrade.")
+        return UpgradeGuestResponse(message=t(locale, "auth.verificationSent"))
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -145,8 +150,9 @@ async def request_guest_upgrade(
 
 @router.post("/magic-link", response_model=MagicLinkResponse)
 async def request_magic_link(
-    request: MagicLinkRequest,
+    request_body: MagicLinkRequest,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> MagicLinkResponse:
     """Request a magic link to be sent to the user's email.
 
@@ -156,16 +162,18 @@ async def request_magic_link(
     In development mode (when SendGrid is not configured), the magic link
     is logged to the console instead of being sent via email.
     """
+    locale = get_locale_from_request(request)
+
     try:
-        success = await auth_service.send_magic_link(request.email)
+        success = await auth_service.send_magic_link(request_body.email, locale=locale)
 
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send magic link email. Please try again later.",
+                detail=t(locale, "auth.failedToSendMagicLink"),
             )
 
-        return MagicLinkResponse(message="If an account exists for this email, you will receive a magic link shortly.")
+        return MagicLinkResponse(message=t(locale, "auth.magicLinkSent"))
     except RuntimeError as e:
         # Email service configuration error (e.g., SendGrid not configured in production)
         raise HTTPException(
@@ -176,8 +184,9 @@ async def request_magic_link(
 
 @router.post("/verify", response_model=AuthResponse)
 async def verify_magic_link(
-    request: VerifyTokenRequest,
+    request_body: VerifyTokenRequest,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> AuthResponse:
     """Verify a magic link token and return an access token.
 
@@ -189,11 +198,13 @@ async def verify_magic_link(
     """
     try:
         # Get the magic link document before verification (to check for guest upgrade)
-        magic_link_doc = await auth_service.firestore.get_document(auth_service.MAGIC_LINKS_COLLECTION, request.token)
+        magic_link_doc = await auth_service.firestore.get_document(
+            auth_service.MAGIC_LINKS_COLLECTION, request_body.token
+        )
         guest_user_id = magic_link_doc.get("guest_user_id") if magic_link_doc else None
 
         # Verify the magic link token
-        email = await auth_service.verify_magic_link(request.token)
+        email = await auth_service.verify_magic_link(request_body.token)
 
         # Handle guest upgrade if applicable
         if guest_user_id:
@@ -244,24 +255,27 @@ async def get_current_user_endpoint(user: CurrentUser) -> UserResponse:
 
 @router.put("/profile", response_model=UserResponse)
 async def update_profile(
-    request: UpdateProfileRequest,
+    request_body: UpdateProfileRequest,
     user: CurrentUser,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> UserResponse:
     """Update the current user's profile.
 
     Allows updating display name and other profile settings.
     Requires a valid Bearer token in the Authorization header.
     """
+    locale = get_locale_from_request(request)
+
     updated_user = await auth_service.update_user_profile(
         user_id=user.id,
-        display_name=request.display_name,
+        display_name=request_body.display_name,
     )
 
     if updated_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=t(locale, "auth.userNotFound"),
         )
 
     return UserResponse(
@@ -274,15 +288,16 @@ async def update_profile(
 
 
 @router.post("/logout")
-async def logout(user: CurrentUser) -> dict[str, str]:
+async def logout(user: CurrentUser, request: Request) -> dict[str, str]:
     """Log out the current user.
 
     This is a stateless logout - the client should discard their token.
     The server does not maintain a token blacklist.
     """
+    locale = get_locale_from_request(request)
     # Stateless logout - just acknowledge the request
     # The client is responsible for discarding the token
-    return {"message": "Successfully logged out"}
+    return {"message": t(locale, "auth.loggedOut")}
 
 
 class CollectEmailRequest(BaseModel):
@@ -300,9 +315,10 @@ class CollectEmailResponse(BaseModel):
 
 @router.post("/collect-email", response_model=CollectEmailResponse)
 async def collect_email(
-    request: CollectEmailRequest,
+    request_body: CollectEmailRequest,
     user: CurrentUser,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> CollectEmailResponse:
     """Collect email for a guest user.
 
@@ -313,9 +329,10 @@ async def collect_email(
     This is typically called after quiz submission to capture the
     user's email before showing recommendations.
     """
-    await auth_service.collect_email(user.id, request.email)
+    locale = get_locale_from_request(request)
+    await auth_service.collect_email(user.id, request_body.email)
     return CollectEmailResponse(
-        message="Email collected",
+        message=t(locale, "auth.emailCollected"),
         user_id=user.id,
     )
 
@@ -331,6 +348,7 @@ class DeleteAccountResponse(BaseModel):
 async def delete_account(
     user: CurrentUser,
     auth_service: AuthServiceDep,
+    request: Request,
 ) -> DeleteAccountResponse:
     """Delete the current user's account and all associated data.
 
@@ -346,15 +364,16 @@ async def delete_account(
     - GDPR data deletion requests
     - Test cleanup (E2E tests create guest accounts that should be cleaned up)
     """
+    locale = get_locale_from_request(request)
     deleted = await auth_service.delete_user(user.id)
 
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=t(locale, "auth.userNotFound"),
         )
 
     return DeleteAccountResponse(
-        message="Account and all associated data deleted successfully",
+        message=t(locale, "auth.accountDeleted"),
         deleted_user_id=user.id,
     )
