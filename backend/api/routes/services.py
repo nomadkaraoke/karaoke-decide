@@ -207,13 +207,13 @@ async def spotify_callback(
     # Handle OAuth errors
     if error:
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/error?message={quote(error, safe='')}",
+            url=f"{frontend_url}/en/services/spotify/error?message={quote(error, safe='')}",
             status_code=status.HTTP_302_FOUND,
         )
 
     if not code or not state:
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/error?message=missing_params",
+            url=f"{frontend_url}/en/services/spotify/error?message=missing_params",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -221,7 +221,7 @@ async def spotify_callback(
     state_data = await music_service.verify_oauth_state(state)
     if not state_data:
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/error?message=invalid_state",
+            url=f"{frontend_url}/en/services/spotify/error?message=invalid_state",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -239,14 +239,14 @@ async def spotify_callback(
         await music_service.create_or_update_spotify_service(user_id, tokens, profile)
 
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/success",
+            url=f"{frontend_url}/en/services/spotify/success",
             status_code=status.HTTP_302_FOUND,
         )
 
     except Exception as e:
         error_msg = quote(str(e)[:100], safe="")  # URL-encode for safety
         return RedirectResponse(
-            url=f"{frontend_url}/services/spotify/error?message={error_msg}",
+            url=f"{frontend_url}/en/services/spotify/error?message={error_msg}",
             status_code=status.HTTP_302_FOUND,
         )
 
