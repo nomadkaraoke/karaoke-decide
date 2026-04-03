@@ -3,6 +3,7 @@
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input } from "@/components/ui";
@@ -10,6 +11,7 @@ import { MailIcon, CheckIcon, MicrophoneIcon } from "@/components/icons";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("auth");
   const { isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,7 +37,7 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to send magic link. Please try again."
+          : t("failedToSendMagicLink")
       );
     } finally {
       setIsSubmitting(false);
@@ -66,15 +68,14 @@ export default function LoginPage() {
             </div>
 
             <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-              Check your email!
+              {t("checkYourEmail")}
             </h1>
             <p className="text-[var(--text)]/60 mb-6">
-              We sent a magic link to{" "}
+              {t("magicLinkSentTo")}{" "}
               <span className="text-[var(--text)] font-medium">{email}</span>
             </p>
             <p className="text-[var(--text)]/40 text-sm mb-8">
-              Click the link in your email to sign in. The link expires in 15
-              minutes.
+              {t("linkExpiresIn15")}
             </p>
 
             <div className="space-y-3">
@@ -86,11 +87,11 @@ export default function LoginPage() {
                   setEmail("");
                 }}
               >
-                Use a different email
+                {t("useDifferentEmail")}
               </Button>
               <Link href="/">
                 <Button variant="ghost" className="w-full">
-                  Back to home
+                  {t("backToHome")}
                 </Button>
               </Link>
             </div>
@@ -109,9 +110,9 @@ export default function LoginPage() {
             <MicrophoneIcon className="w-full h-full text-[var(--brand-pink)]" />
             <div className="absolute inset-0 blur-xl bg-[var(--brand-pink)]/30" />
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Welcome back</h1>
+          <h1 className="text-2xl font-bold text-[var(--text)] mb-2">{t("welcomeBack")}</h1>
           <p className="text-[var(--text)]/60">
-            Sign in to access your songs and recommendations
+            {t("signInSubtitle")}
           </p>
         </div>
 
@@ -119,8 +120,8 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="email"
-            label="Email address"
-            placeholder="you@example.com"
+            label={t("emailLabel")}
+            placeholder={t("emailPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             error={error || undefined}
@@ -137,31 +138,31 @@ export default function LoginPage() {
             isLoading={isSubmitting}
             leftIcon={<MailIcon className="w-5 h-5" />}
           >
-            Send Magic Link
+            {t("sendMagicLink")}
           </Button>
         </form>
 
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-[var(--text)]/40 text-sm">
-            No password needed. We&apos;ll send you a secure link to sign in.
+            {t("noPasswordNeeded")}
           </p>
         </div>
 
         {/* Divider */}
         <div className="my-8 flex items-center gap-4">
           <div className="flex-1 h-px bg-[var(--card-border)]" />
-          <span className="text-[var(--text)]/30 text-xs uppercase">or</span>
+          <span className="text-[var(--text)]/30 text-xs uppercase">{t("or")}</span>
           <div className="flex-1 h-px bg-[var(--card-border)]" />
         </div>
 
         {/* Alternative action */}
         <div className="text-center">
           <p className="text-[var(--text)]/60 text-sm mb-3">
-            Just want to browse? No account needed.
+            {t("justWantToBrowse")}
           </p>
           <Link href="/">
-            <Button variant="ghost">Browse Songs</Button>
+            <Button variant="ghost">{t("browseSongs")}</Button>
           </Link>
         </div>
       </div>

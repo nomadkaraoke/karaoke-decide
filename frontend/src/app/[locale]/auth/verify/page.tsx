@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { api, setAuthToken, NetworkError, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui";
@@ -13,6 +14,8 @@ type ErrorType = "network" | "expired" | "invalid" | "unknown";
 function VerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const { checkAuth } = useAuth();
   const [status, setStatus] = useState<"verifying" | "success" | "error">(
     "verifying"
@@ -27,7 +30,7 @@ function VerifyContent() {
     if (!token) {
       setStatus("error");
       setErrorType("invalid");
-      setError("No verification token found. Please request a new magic link.");
+      setError(t("noTokenFound"));
       return;
     }
 
@@ -55,10 +58,10 @@ function VerifyContent() {
       } else if (err instanceof ApiError) {
         if (err.message.includes("expired")) {
           setErrorType("expired");
-          setError("This magic link has expired. Please request a new one.");
+          setError(t("linkExpired"));
         } else if (err.message.includes("already been used")) {
           setErrorType("invalid");
-          setError("This magic link has already been used. Please request a new one.");
+          setError(t("linkAlreadyUsed"));
         } else {
           setErrorType("invalid");
           setError(err.message);
@@ -68,7 +71,7 @@ function VerifyContent() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to verify token. It may have expired or already been used."
+            : t("failedToVerify")
         );
       }
     }
@@ -96,9 +99,9 @@ function VerifyContent() {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-            Verifying your link...
+            {t("verifyingLink")}
           </h1>
-          <p className="text-[var(--text-muted)]">Please wait a moment</p>
+          <p className="text-[var(--text-muted)]">{t("pleaseWait")}</p>
         </div>
       </main>
     );
@@ -115,9 +118,9 @@ function VerifyContent() {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-            You&apos;re signed in!
+            {t("youreSignedIn")}
           </h1>
-          <p className="text-[var(--text-muted)]">Redirecting you to your songs...</p>
+          <p className="text-[var(--text-muted)]">{t("redirectingToSongs")}</p>
         </div>
       </main>
     );
@@ -135,19 +138,19 @@ function VerifyContent() {
         </div>
 
         <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
-          {errorType === "network" ? "Connection Error" : "Verification Failed"}
+          {errorType === "network" ? t("connectionError") : t("verificationFailed")}
         </h1>
         <p className="text-[var(--text-muted)] mb-6">{error}</p>
 
         {/* Network error troubleshooting tips */}
         {errorType === "network" && (
           <div className="bg-[var(--card)] rounded-lg p-4 mb-6 text-left">
-            <p className="text-[var(--text)] text-sm font-medium mb-2">Troubleshooting tips:</p>
+            <p className="text-[var(--text)] text-sm font-medium mb-2">{t("troubleshootingTips")}</p>
             <ul className="text-[var(--text-muted)] text-sm space-y-1 list-disc list-inside">
-              <li>Try using mobile data instead of WiFi</li>
-              <li>Disable VPN or ad-blocker extensions</li>
-              <li>Try opening in incognito/private mode</li>
-              <li>Check if you&apos;re on a corporate or school network</li>
+              <li>{t("tipMobileData")}</li>
+              <li>{t("tipDisableVpn")}</li>
+              <li>{t("tipIncognito")}</li>
+              <li>{t("tipCorporateNetwork")}</li>
             </ul>
           </div>
         )}
@@ -160,7 +163,7 @@ function VerifyContent() {
               className="w-full"
               onClick={handleRetry}
             >
-              {retryCount > 0 ? `Retry Again (${retryCount})` : "Try Again"}
+              {retryCount > 0 ? t("retryAgainCount", { count: retryCount }) : tCommon("tryAgain")}
             </Button>
           )}
 
@@ -169,12 +172,12 @@ function VerifyContent() {
               variant={errorType === "network" ? "ghost" : "primary"}
               className="w-full"
             >
-              Request New Link
+              {t("requestNewLink")}
             </Button>
           </Link>
           <Link href="/">
             <Button variant="ghost" className="w-full">
-              Back to Home
+              {t("backToHomeCaps")}
             </Button>
           </Link>
         </div>
@@ -184,6 +187,7 @@ function VerifyContent() {
 }
 
 export default function VerifyPage() {
+  const tCommon = useTranslations("common");
   return (
     <Suspense
       fallback={
@@ -195,7 +199,7 @@ export default function VerifyPage() {
                 <LoaderIcon className="w-10 h-10 text-[var(--brand-pink)] animate-spin" />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-[var(--text)] mb-2">Loading...</h1>
+            <h1 className="text-2xl font-bold text-[var(--text)] mb-2">{tCommon("loading")}</h1>
           </div>
         </main>
       }

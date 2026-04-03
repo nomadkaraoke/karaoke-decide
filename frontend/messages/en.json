@@ -201,6 +201,10 @@
     "skipForNow": "Skip for now",
     "emailSavedSuccess": "Email saved!",
     "viewRecommendations": "View My Recommendations",
+    "emailUpdatesHint": "We'll send you updates about your recommendations. No spam, ever.",
+    "generatingRecommendationsButton": "Generating recommendations...",
+    "enterEmailToContinue": "Enter your email to continue",
+    "pleaseEnterEmailAbove": "Please enter your email above to see your recommendations",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",

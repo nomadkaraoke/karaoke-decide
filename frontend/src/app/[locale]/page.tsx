@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   SparklesIcon,
@@ -18,6 +19,8 @@ import { LoadingOverlay, Button } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
+  const t = useTranslations("home");
+  const tCommon = useTranslations("common");
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -52,7 +55,7 @@ export default function Home() {
       router.push("/quiz");
     } catch (err) {
       console.error("Failed to start session:", err);
-      setError("Failed to start. Please try again.");
+      setError(t("failedToStart"));
     } finally {
       setIsStartingSession(false);
     }
@@ -60,7 +63,7 @@ export default function Home() {
 
   // Show loading while checking auth/quiz status or redirecting
   if (authLoading || quizStatusLoading || isAuthenticated) {
-    return <LoadingOverlay message="Loading..." />;
+    return <LoadingOverlay message={tCommon("loading")} />;
   }
 
   return (
@@ -70,14 +73,14 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           {/* Large headline matching Generator style */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-[var(--text)] mb-6 leading-tight">
-            Easily Choose{" "}
-            <span className="gradient-text">Karaoke Songs</span>
-            {" "}to Sing
+            {t("heroTitle")}{" "}
+            <span className="gradient-text">{t("heroTitleHighlight")}</span>
+            {" "}{t("heroTitleEnd")}
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl max-w-2xl mx-auto mb-10">
-            Find songs you know, can actually sing, and that the crowd will love. Personalized recommendations in 30 seconds.
+            {t("heroSubtitle")}
           </p>
 
           {/* Primary CTA */}
@@ -89,13 +92,13 @@ export default function Home() {
             disabled={isStartingSession}
             className="px-8 py-4 text-lg btn-glow"
           >
-            Find Your Song
+            {t("findYourSong")}
             <SparklesIcon className="w-5 h-5 ml-2" />
           </Button>
 
           {/* Trust signal */}
           <p className="text-[var(--text-subtle)] text-sm mt-4">
-            Free • No sign-up required • Takes 30 seconds
+            {t("trustSignal")}
           </p>
 
           {/* Error message */}
@@ -111,32 +114,32 @@ export default function Home() {
       <section className="py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-            Sound familiar?
+            {t("soundFamiliar")}
           </h2>
           <p className="text-[var(--text-muted)] text-center max-w-2xl mx-auto mb-12">
-            You&apos;re at karaoke, flipping through the songbook, and...
+            {t("soundFamiliarSubtitle")}
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
             <ProblemCard
               emoji="🤷"
-              title="Nothing jumps out"
-              description="The book has thousands of songs but you're drawing a blank on what to pick"
+              title={t("problemNothingTitle")}
+              description={t("problemNothingDesc")}
             />
             <ProblemCard
               emoji="😬"
-              title="Can I even sing this?"
-              description="You love the song but have no idea if it's in your vocal range"
+              title={t("problemSingTitle")}
+              description={t("problemSingDesc")}
             />
             <ProblemCard
               emoji="😶"
-              title="Will anyone care?"
-              description="You want something that gets the room going, not awkward silence"
+              title={t("problemCareTitle")}
+              description={t("problemCareDesc")}
             />
             <ProblemCard
               emoji="❓"
-              title="I don't know these songs"
-              description="Half the catalog is stuff you've never heard of"
+              title={t("problemKnowTitle")}
+              description={t("problemKnowDesc")}
             />
           </div>
         </div>
@@ -146,10 +149,10 @@ export default function Home() {
       <section className="py-16 px-4 bg-[var(--card)]/50">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-            Two ways to get started
+            {t("twoWaysTitle")}
           </h2>
           <p className="text-[var(--text-muted)] text-center max-w-2xl mx-auto mb-12">
-            Whether you have streaming data or not, we&apos;ve got you covered
+            {t("twoWaysSubtitle")}
           </p>
 
           <div className="grid md:grid-cols-2 gap-8">
@@ -158,17 +161,17 @@ export default function Home() {
               <div className="w-14 h-14 bg-[var(--brand-purple)]/20 rounded-xl flex items-center justify-center mb-6">
                 <SparklesIcon className="w-7 h-7 text-[var(--brand-purple)]" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Quick Quiz</h3>
+              <h3 className="text-xl font-bold mb-2">{t("quickQuizTitle")}</h3>
               <p className="text-[var(--text-muted)] mb-6">
-                Perfect if you just want quick recommendations. Answer 3 questions about your music taste and go.
+                {t("quickQuizDesc")}
               </p>
               <div className="space-y-3 text-sm">
-                <PathStep number={1} text="Pick your favorite genres" />
-                <PathStep number={2} text="Choose your decades" />
-                <PathStep number={3} text="Select artists you like" />
+                <PathStep number={1} text={t("quickQuizStep1")} />
+                <PathStep number={2} text={t("quickQuizStep2")} />
+                <PathStep number={3} text={t("quickQuizStep3")} />
               </div>
               <div className="mt-6 pt-6 border-t border-[var(--card-border)]">
-                <p className="text-xs text-[var(--text-subtle)]">Takes about 30 seconds</p>
+                <p className="text-xs text-[var(--text-subtle)]">{t("quickQuizTime")}</p>
               </div>
             </div>
 
@@ -177,9 +180,9 @@ export default function Home() {
               <div className="w-14 h-14 bg-[var(--brand-pink)]/20 rounded-xl flex items-center justify-center mb-6">
                 <MusicIcon className="w-7 h-7 text-[var(--brand-pink)]" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Connect Your Music</h3>
+              <h3 className="text-xl font-bold mb-2">{t("connectMusicTitle")}</h3>
               <p className="text-[var(--text-muted)] mb-6">
-                Already use Spotify or Last.fm? Connect them for personalized recommendations based on what you actually listen to.
+                {t("connectMusicDesc")}
               </p>
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--secondary)]">
@@ -192,7 +195,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="mt-6 pt-6 border-t border-[var(--card-border)]">
-                <p className="text-xs text-[var(--text-subtle)]">Best recommendations for power users</p>
+                <p className="text-xs text-[var(--text-subtle)]">{t("connectMusicPowerUsers")}</p>
               </div>
             </div>
           </div>
@@ -207,13 +210,13 @@ export default function Home() {
               <div className="flex-1">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--brand-purple)]/20 text-[var(--brand-purple)] text-sm font-medium mb-4">
                   <SparklesIcon className="w-4 h-4" />
-                  Powered by Nomad Karaoke
+                  {t("poweredByNomad")}
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-                  Any song can be karaoke
+                  {t("anySongCanBeKaraoke")}
                 </h2>
                 <p className="text-[var(--text-muted)] mb-6">
-                  Found the perfect song but no karaoke version exists? No problem. Our Generator can create a karaoke track for almost any song in under 30 minutes - so you can sing it the same night.
+                  {t("anySongDesc")}
                 </p>
                 <a
                   href="https://gen.nomadkaraoke.com"
@@ -221,7 +224,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-[var(--brand-purple)] hover:text-[var(--brand-pink)] transition-colors font-medium"
                 >
-                  Try the Generator
+                  {t("tryTheGenerator")}
                   <ExternalLinkIcon className="w-4 h-4" />
                 </a>
               </div>
@@ -241,30 +244,30 @@ export default function Home() {
       <section className="py-16 px-4 bg-[var(--card)]/50">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">
-            See it in action
+            {t("seeItInAction")}
           </h2>
           <p className="text-[var(--text-muted)] text-center max-w-2xl mx-auto mb-12">
-            From quick quiz to personalized recommendations in seconds
+            {t("seeItInActionSubtitle")}
           </p>
 
           <div className="grid md:grid-cols-3 gap-8">
             <ScreenshotCard
               src="/screenshots/quiz.avif"
-              alt="Quiz - Select your favorite genres"
-              title="1. Quick Quiz"
-              description="Tell us what genres and decades you love"
+              alt={t("screenshotQuizAlt")}
+              title={t("screenshotQuizTitle")}
+              description={t("screenshotQuizDesc")}
             />
             <ScreenshotCard
               src="/screenshots/recommendations.avif"
-              alt="Personalized song recommendations"
-              title="2. Get Matches"
-              description="See songs matched to your taste"
+              alt={t("screenshotRecsAlt")}
+              title={t("screenshotRecsTitle")}
+              description={t("screenshotRecsDesc")}
             />
             <ScreenshotCard
               src="/screenshots/my-data.avif"
-              alt="Your music data overview"
-              title="3. Your Data"
-              description="Full transparency on what we know about you"
+              alt={t("screenshotDataAlt")}
+              title={t("screenshotDataTitle")}
+              description={t("screenshotDataDesc")}
             />
           </div>
         </div>
@@ -274,23 +277,23 @@ export default function Home() {
       <section className="py-16 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
-            What makes it work
+            {t("whatMakesItWork")}
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
             <FeatureCard
               icon={<MusicIcon className="w-7 h-7 text-[var(--brand-pink)]" />}
-              title="275K+ Existing Tracks"
-              description="Database of all existing karaoke songs"
+              title={t("feature275kTitle")}
+              description={t("feature275kDesc")}
             />
             <FeatureCard
               icon={<SparklesIcon className="w-7 h-7 text-[var(--brand-purple)]" />}
-              title="Personalized"
-              description="Matches songs to your actual music taste"
+              title={t("featurePersonalizedTitle")}
+              description={t("featurePersonalizedDesc")}
             />
             <FeatureCard
               icon={<SearchIcon className="w-7 h-7 text-[var(--brand-blue)]" />}
-              title="Smart Filtering"
-              description="Filter by decade, genre, popularity & more"
+              title={t("featureFilteringTitle")}
+              description={t("featureFilteringDesc")}
             />
           </div>
         </div>
@@ -300,10 +303,10 @@ export default function Home() {
       <section className="py-20 px-4">
         <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-            Ready to find your next song?
+            {t("readyToFind")}
           </h2>
           <p className="text-[var(--text-muted)] mb-8">
-            Stop scrolling through endless song lists. Get personalized karaoke recommendations in under a minute.
+            {t("readyToFindSubtitle")}
           </p>
           <Button
             variant="primary"
@@ -313,7 +316,7 @@ export default function Home() {
             disabled={isStartingSession}
             className="px-8 py-4 text-lg btn-glow"
           >
-            Get Started Free
+            {t("getStartedFree")}
             <ChevronRightIcon className="w-5 h-5 ml-2" />
           </Button>
         </div>
@@ -327,13 +330,13 @@ export default function Home() {
           </div>
           <div className="flex gap-6 text-sm text-[var(--text-muted)]">
             <a href="https://karaokenerds.com" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">
-              KaraokeNerds
+              {t("footerKaraokeNerds")}
             </a>
             <a href="https://gen.nomadkaraoke.com" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">
-              Generator
+              {t("footerGenerator")}
             </a>
             <a href="https://nomadkaraoke.com" target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">
-              About
+              {t("footerAbout")}
             </a>
           </div>
         </div>

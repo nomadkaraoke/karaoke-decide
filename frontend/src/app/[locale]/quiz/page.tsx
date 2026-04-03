@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { QuizArtistCard, ArtistAffinity } from "@/components/QuizArtistCard";
@@ -59,55 +60,55 @@ type CrowdPleaserPref = "hits" | "deep_cuts" | "any" | null;
 // Expanded decades including 1950s and 1960s
 const DECADES = ["1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s"];
 
-const ENERGY_OPTIONS: { value: EnergyPreference; label: string; emoji: string }[] = [
-  { value: "chill", label: "Chill", emoji: "🎵" },
-  { value: "medium", label: "Medium", emoji: "🎶" },
-  { value: "high", label: "High Energy", emoji: "🔥" },
+const ENERGY_OPTIONS: { value: EnergyPreference; labelKey: string; emoji: string }[] = [
+  { value: "chill", labelKey: "energyChill", emoji: "🎵" },
+  { value: "medium", labelKey: "energyMedium", emoji: "🎶" },
+  { value: "high", labelKey: "energyHigh", emoji: "🔥" },
 ];
 
-const VOCAL_COMFORT_OPTIONS: { value: VocalComfortPref; label: string; description: string; emoji: string }[] = [
-  { value: "easy", label: "Easy Songs", description: "Comfortable vocal range", emoji: "😌" },
-  { value: "challenging", label: "Show Off", description: "Love vocal challenges", emoji: "💪" },
-  { value: "any", label: "Any", description: "No preference", emoji: "🎤" },
+const VOCAL_COMFORT_OPTIONS: { value: VocalComfortPref; labelKey: string; descKey: string; emoji: string }[] = [
+  { value: "easy", labelKey: "vocalEasy", descKey: "vocalEasyDesc", emoji: "😌" },
+  { value: "challenging", labelKey: "vocalShowOff", descKey: "vocalShowOffDesc", emoji: "💪" },
+  { value: "any", labelKey: "vocalAny", descKey: "vocalAnyDesc", emoji: "🎤" },
 ];
 
-const CROWD_PLEASER_OPTIONS: { value: CrowdPleaserPref; label: string; description: string; emoji: string }[] = [
-  { value: "hits", label: "Popular Hits", description: "Songs everyone knows", emoji: "🌟" },
-  { value: "deep_cuts", label: "Deep Cuts", description: "Hidden gems & B-sides", emoji: "💎" },
-  { value: "any", label: "Mix", description: "Give me both", emoji: "🎲" },
+const CROWD_PLEASER_OPTIONS: { value: CrowdPleaserPref; labelKey: string; descKey: string; emoji: string }[] = [
+  { value: "hits", labelKey: "crowdHits", descKey: "crowdHitsDesc", emoji: "🌟" },
+  { value: "deep_cuts", labelKey: "crowdDeepCuts", descKey: "crowdDeepCutsDesc", emoji: "💎" },
+  { value: "any", labelKey: "crowdMix", descKey: "crowdMixDesc", emoji: "🎲" },
 ];
 
 interface Genre {
   id: string;
-  label: string;
+  labelKey: string;
   exampleArtists: string[];
   emoji: string;
 }
 
 // Expanded genres with punk, emo, grunge, folk, blues, ska, and "other"
 const GENRES: Genre[] = [
-  { id: "pop", label: "Pop", exampleArtists: ["Taylor Swift", "Ed Sheeran", "Dua Lipa"], emoji: "🎤" },
-  { id: "rock", label: "Rock", exampleArtists: ["Queen", "Bon Jovi", "Foo Fighters"], emoji: "🎸" },
-  { id: "hiphop", label: "Hip-Hop / Rap", exampleArtists: ["Drake", "Eminem", "Kendrick Lamar"], emoji: "🎧" },
-  { id: "rnb", label: "R&B / Soul", exampleArtists: ["Beyoncé", "Usher", "Alicia Keys"], emoji: "🎹" },
-  { id: "country", label: "Country", exampleArtists: ["Luke Combs", "Carrie Underwood", "Dolly Parton"], emoji: "🤠" },
-  { id: "electronic", label: "Electronic / Dance", exampleArtists: ["Daft Punk", "Calvin Harris", "The Chainsmokers"], emoji: "🎛️" },
-  { id: "metal", label: "Metal / Hard Rock", exampleArtists: ["Metallica", "AC/DC", "Iron Maiden"], emoji: "🤘" },
-  { id: "punk", label: "Punk", exampleArtists: ["Green Day", "Blink-182", "The Offspring"], emoji: "⚡" },
-  { id: "emo", label: "Emo / Goth", exampleArtists: ["My Chemical Romance", "Fall Out Boy", "Paramore"], emoji: "🖤" },
-  { id: "grunge", label: "Grunge", exampleArtists: ["Nirvana", "Pearl Jam", "Soundgarden"], emoji: "🔊" },
-  { id: "jazz", label: "Jazz / Standards", exampleArtists: ["Frank Sinatra", "Ella Fitzgerald", "Michael Bublé"], emoji: "🎺" },
-  { id: "latin", label: "Latin", exampleArtists: ["Bad Bunny", "Shakira", "J Balvin"], emoji: "💃" },
-  { id: "indie", label: "Indie / Alternative", exampleArtists: ["Arctic Monkeys", "The 1975", "Tame Impala"], emoji: "🌙" },
-  { id: "kpop", label: "K-Pop", exampleArtists: ["BTS", "BLACKPINK", "Stray Kids"], emoji: "🇰🇷" },
-  { id: "disco", label: "Disco / Funk", exampleArtists: ["ABBA", "Earth, Wind & Fire", "Bee Gees"], emoji: "🕺" },
-  { id: "classic-rock", label: "Classic Rock", exampleArtists: ["Journey", "Eagles", "Fleetwood Mac"], emoji: "🎷" },
-  { id: "folk", label: "Folk / Acoustic", exampleArtists: ["Mumford & Sons", "The Lumineers", "Hozier"], emoji: "🪕" },
-  { id: "blues", label: "Blues", exampleArtists: ["B.B. King", "Eric Clapton", "John Mayer"], emoji: "🎸" },
-  { id: "ska", label: "Ska", exampleArtists: ["No Doubt", "Sublime", "Reel Big Fish"], emoji: "🎺" },
-  { id: "musical", label: "Broadway / Musical", exampleArtists: ["Wicked", "Les Misérables", "Hamilton"], emoji: "🎭" },
-  { id: "reggae", label: "Reggae", exampleArtists: ["Bob Marley", "UB40", "Sean Paul"], emoji: "🇯🇲" },
-  { id: "other", label: "Other / Not Sure", exampleArtists: ["I'll browse recommendations"], emoji: "❓" },
+  { id: "pop", labelKey: "pop", exampleArtists: ["Taylor Swift", "Ed Sheeran", "Dua Lipa"], emoji: "🎤" },
+  { id: "rock", labelKey: "rock", exampleArtists: ["Queen", "Bon Jovi", "Foo Fighters"], emoji: "🎸" },
+  { id: "hiphop", labelKey: "hiphop", exampleArtists: ["Drake", "Eminem", "Kendrick Lamar"], emoji: "🎧" },
+  { id: "rnb", labelKey: "rnb", exampleArtists: ["Beyoncé", "Usher", "Alicia Keys"], emoji: "🎹" },
+  { id: "country", labelKey: "country", exampleArtists: ["Luke Combs", "Carrie Underwood", "Dolly Parton"], emoji: "🤠" },
+  { id: "electronic", labelKey: "electronic", exampleArtists: ["Daft Punk", "Calvin Harris", "The Chainsmokers"], emoji: "🎛️" },
+  { id: "metal", labelKey: "metal", exampleArtists: ["Metallica", "AC/DC", "Iron Maiden"], emoji: "🤘" },
+  { id: "punk", labelKey: "punk", exampleArtists: ["Green Day", "Blink-182", "The Offspring"], emoji: "⚡" },
+  { id: "emo", labelKey: "emo", exampleArtists: ["My Chemical Romance", "Fall Out Boy", "Paramore"], emoji: "🖤" },
+  { id: "grunge", labelKey: "grunge", exampleArtists: ["Nirvana", "Pearl Jam", "Soundgarden"], emoji: "🔊" },
+  { id: "jazz", labelKey: "jazz", exampleArtists: ["Frank Sinatra", "Ella Fitzgerald", "Michael Bublé"], emoji: "🎺" },
+  { id: "latin", labelKey: "latin", exampleArtists: ["Bad Bunny", "Shakira", "J Balvin"], emoji: "💃" },
+  { id: "indie", labelKey: "indie", exampleArtists: ["Arctic Monkeys", "The 1975", "Tame Impala"], emoji: "🌙" },
+  { id: "kpop", labelKey: "kpop", exampleArtists: ["BTS", "BLACKPINK", "Stray Kids"], emoji: "🇰🇷" },
+  { id: "disco", labelKey: "disco", exampleArtists: ["ABBA", "Earth, Wind & Fire", "Bee Gees"], emoji: "🕺" },
+  { id: "classic-rock", labelKey: "classicRock", exampleArtists: ["Journey", "Eagles", "Fleetwood Mac"], emoji: "🎷" },
+  { id: "folk", labelKey: "folk", exampleArtists: ["Mumford & Sons", "The Lumineers", "Hozier"], emoji: "🪕" },
+  { id: "blues", labelKey: "blues", exampleArtists: ["B.B. King", "Eric Clapton", "John Mayer"], emoji: "🎸" },
+  { id: "ska", labelKey: "ska", exampleArtists: ["No Doubt", "Sublime", "Reel Big Fish"], emoji: "🎺" },
+  { id: "musical", labelKey: "musical", exampleArtists: ["Wicked", "Les Misérables", "Hamilton"], emoji: "🎭" },
+  { id: "reggae", labelKey: "reggae", exampleArtists: ["Bob Marley", "UB40", "Sean Paul"], emoji: "🇯🇲" },
+  { id: "other", labelKey: "other", exampleArtists: ["I'll browse recommendations"], emoji: "❓" },
 ];
 
 // 6-step quiz (redesigned flow):
@@ -129,6 +130,8 @@ interface EnjoySongSelection extends SelectedSong {
 
 export default function QuizPage() {
   const router = useRouter();
+  const t = useTranslations("quiz");
+  const tCommon = useTranslations("common");
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -320,7 +323,7 @@ export default function QuizPage() {
           await startGuestSession();
         } catch (err) {
           console.error("Failed to create guest session:", err);
-          setError("Failed to start quiz. Please try again.");
+          setError(t("failedToStartQuiz"));
         }
       }
     };
@@ -527,11 +530,11 @@ export default function QuizPage() {
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email.trim()) {
-      setEmailError("Please enter your email");
+      setEmailError(t("pleaseEnterEmail"));
       return;
     }
     if (!emailRegex.test(email.trim())) {
-      setEmailError("Please enter a valid email");
+      setEmailError(t("pleaseEnterValidEmail"));
       return;
     }
 
@@ -544,7 +547,7 @@ export default function QuizPage() {
       setIsEmailSubmitting(false);
     } catch (err) {
       setIsEmailSubmitting(false);
-      setEmailError(err instanceof Error ? err.message : "Failed to save email");
+      setEmailError(err instanceof Error ? err.message : t("failedToSaveEmail"));
     }
   };
 
@@ -611,7 +614,7 @@ export default function QuizPage() {
   // Show loading while auth is being checked or redirecting
   // But not if we're on step 6 (email collection + generating)
   if (authLoading || quizStatusLoading || !isAuthenticated || (hasCompletedQuiz && step !== 6)) {
-    return <LoadingOverlay message="Starting quiz..." />;
+    return <LoadingOverlay message={t("startingQuiz")} />;
   }
 
   return (
@@ -640,10 +643,10 @@ export default function QuizPage() {
             <div className="text-center mb-8">
               <div className="text-5xl mb-4">🎤</div>
               <h1 data-testid="quiz-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Let&apos;s find your perfect karaoke songs
+                {t("letsFind")}
               </h1>
               <p className="text-[var(--text)]/60">
-                Answer a few quick questions so we can personalize your recommendations.
+                {t("answerQuickQuestions")}
               </p>
             </div>
 
@@ -652,9 +655,9 @@ export default function QuizPage() {
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
                 <span className="text-2xl flex-shrink-0">✨</span>
                 <div>
-                  <h3 className="font-semibold text-[var(--text)] mb-1">Tell us about your music taste</h3>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">{t("tellUsAboutTaste")}</h3>
                   <p className="text-sm text-[var(--text)]/60">
-                    We&apos;ll ask about genres, decades, and artists you like.
+                    {t("tellUsAboutTasteDesc")}
                   </p>
                 </div>
               </div>
@@ -662,9 +665,9 @@ export default function QuizPage() {
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
                 <span className="text-2xl flex-shrink-0">📊</span>
                 <div>
-                  <h3 className="font-semibold text-[var(--text)] mb-1">More info = better recommendations</h3>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">{t("moreInfoBetter")}</h3>
                   <p className="text-sm text-[var(--text)]/60">
-                    The more you share, the better we can personalize your song suggestions.
+                    {t("moreInfoBetterDesc")}
                   </p>
                 </div>
               </div>
@@ -672,9 +675,9 @@ export default function QuizPage() {
               <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
                 <span className="text-2xl flex-shrink-0">⏭️</span>
                 <div>
-                  <h3 className="font-semibold text-[var(--text)] mb-1">Skip if you&apos;re in a hurry</h3>
+                  <h3 className="font-semibold text-[var(--text)] mb-1">{t("skipIfHurry")}</h3>
                   <p className="text-sm text-[var(--text)]/60">
-                    All questions after genres are optional - skip ahead anytime.
+                    {t("skipIfHurryDesc")}
                   </p>
                 </div>
               </div>
@@ -689,7 +692,7 @@ export default function QuizPage() {
                 onClick={() => setStep(2)}
                 rightIcon={<ChevronRightIcon className="w-5 h-5" />}
               >
-                Get Started
+                {t("getStarted")}
               </Button>
             </div>
           </>
@@ -700,10 +703,10 @@ export default function QuizPage() {
           <>
             <div className="text-center mb-8">
               <h1 data-testid="music-taste-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                What kind of music do you listen to?
+                {t("whatKindOfMusic")}
               </h1>
               <p className="text-[var(--text)]/60">
-                Select your favorite decades and genres to get started.
+                {t("selectDecadesAndGenres")}
               </p>
             </div>
 
@@ -723,7 +726,7 @@ export default function QuizPage() {
                     }
                   `}
                 >
-                  <span className="text-sm font-medium text-[var(--text)]">{d}</span>
+                  <span className="text-sm font-medium text-[var(--text)]">{t(`decades.${d}`)}</span>
                   {selectedDecades.has(d) && (
                     <CheckIcon className="w-3 h-3 text-[var(--brand-pink)] mx-auto mt-1" />
                   )}
@@ -751,7 +754,7 @@ export default function QuizPage() {
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{genre.emoji}</span>
                       <div>
-                        <h3 className="font-semibold text-[var(--text)]">{genre.label}</h3>
+                        <h3 className="font-semibold text-[var(--text)]">{t(`genres.${genre.labelKey}`)}</h3>
                         <p className="text-xs text-[var(--text)]/50 mt-0.5">
                           {genre.exampleArtists.join(", ")}
                         </p>
@@ -771,8 +774,8 @@ export default function QuizPage() {
             <div className="text-center mb-6">
               <span data-testid="genre-selection-count" className="text-[var(--text)]/40 text-sm">
                 {selectedGenres.size === 0
-                  ? "Select at least one genre"
-                  : `${selectedGenres.size} genre${selectedGenres.size > 1 ? "s" : ""} selected`}
+                  ? t("selectAtLeastOneGenre")
+                  : t("genresSelected", { count: selectedGenres.size })}
               </span>
             </div>
 
@@ -784,7 +787,7 @@ export default function QuizPage() {
                 className="flex-1"
                 onClick={() => setStep(1)}
               >
-                Back
+                {tCommon("back")}
               </Button>
               <Button
                 variant="primary"
@@ -794,7 +797,7 @@ export default function QuizPage() {
                 disabled={selectedGenres.size === 0}
                 rightIcon={<ChevronRightIcon className="w-5 h-5" />}
               >
-                Continue
+                {tCommon("continue")}
               </Button>
             </div>
 
@@ -806,7 +809,7 @@ export default function QuizPage() {
                   disabled={isSubmitting}
                   className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
                 >
-                  {isSubmitting ? "Loading..." : "Skip to recommendations →"}
+                  {isSubmitting ? tCommon("loading") : t("skipToRecommendations")}
                 </button>
               </div>
             )}
@@ -818,10 +821,10 @@ export default function QuizPage() {
           <>
             <div className="text-center mb-8">
               <h1 data-testid="artists-you-know-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Artists You Know
+                {t("artistsYouKnow")}
               </h1>
               <p className="text-[var(--text)]/60">
-                The more artists you add, the better your recommendations.
+                {t("moreArtistsBetterRecs")}
               </p>
             </div>
 
@@ -830,7 +833,7 @@ export default function QuizPage() {
               <ArtistSearchAutocomplete
                 onSelect={handleAddManualArtist}
                 selectedArtistIds={new Set(manualArtists.map((a) => getArtistUniqueId(a)))}
-                placeholder="Search for artists you know..."
+                placeholder={t("searchForArtists")}
                 className="mb-3"
               />
               {manualArtists.length > 0 && (
@@ -860,7 +863,7 @@ export default function QuizPage() {
             {manualArtists.length > 0 && (
               <div className="text-center mb-6">
                 <span className="text-[var(--text)]/40 text-sm">
-                  {manualArtists.length} artist{manualArtists.length > 1 ? "s" : ""} added
+                  {t("artistsAdded", { count: manualArtists.length })}
                 </span>
               </div>
             )}
@@ -871,23 +874,23 @@ export default function QuizPage() {
                 <span className="text-2xl flex-shrink-0">📥</span>
                 <div>
                   <h2 className="font-semibold text-[var(--text)] mb-1">
-                    Have listening history in Last.fm or Spotify?
+                    {t("haveListeningHistory")}
                   </h2>
                   <p className="text-[var(--text)]/60 text-sm mb-3">
-                    Import it for even better recommendations!
+                    {t("importForBetterRecs")}
                   </p>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-[var(--text)]/50">
                       <LastfmIcon className="w-4 h-4 text-[#d51007] flex-shrink-0" />
-                      <span><span className="text-[var(--text)]/70">Last.fm</span> — direct import</span>
+                      <span><span className="text-[var(--text)]/70">{t("lastfmDirectImport")}</span> — {t("lastfmDirectImportDesc")}</span>
                     </div>
                     <div className="flex items-center gap-2 text-[var(--text)]/50">
                       <SpotifyIcon className="w-4 h-4 text-[#1DB954] flex-shrink-0" />
-                      <span><span className="text-[var(--text)]/70">ListenBrainz</span> — imports from Spotify</span>
+                      <span><span className="text-[var(--text)]/70">{t("listenBrainzImport")}</span> — {t("listenBrainzImportDesc")}</span>
                     </div>
                   </div>
                   <p className="text-[var(--text)]/40 text-xs mt-3">
-                    After the quiz, go to Settings → Connected Services to sync.
+                    {t("afterQuizSyncHint")}
                   </p>
                 </div>
               </div>
@@ -897,9 +900,9 @@ export default function QuizPage() {
             {manualArtists.length === 0 && (
               <div className="text-center py-4 mb-6">
                 <p className="text-[var(--text)]/40 text-sm">
-                  Adding artists helps us find songs you&apos;ll love to sing.
+                  {t("addingArtistsHelps")}
                   <br />
-                  You can skip this step if you prefer.
+                  {t("canSkipStep")}
                 </p>
               </div>
             )}
@@ -912,7 +915,7 @@ export default function QuizPage() {
                 className="flex-1"
                 onClick={() => setStep(2)}
               >
-                Back
+                {tCommon("back")}
               </Button>
               <Button
                 variant="primary"
@@ -921,7 +924,7 @@ export default function QuizPage() {
                 onClick={handleContinueFromStep3}
                 rightIcon={<ChevronRightIcon className="w-5 h-5" />}
               >
-                Continue
+                {tCommon("continue")}
               </Button>
             </div>
 
@@ -932,7 +935,7 @@ export default function QuizPage() {
                 disabled={isSubmitting}
                 className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
               >
-                {isSubmitting ? "Loading..." : "Skip to recommendations →"}
+                {isSubmitting ? tCommon("loading") : t("skipToRecommendations")}
               </button>
             </div>
           </>
@@ -943,25 +946,25 @@ export default function QuizPage() {
           <>
             <div className="text-center mb-8">
               <h1 data-testid="preferences-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Karaoke Preferences
+                {t("karaokePreferences")}
               </h1>
               <p className="text-[var(--text)]/60">
-                Help us understand your karaoke style.
+                {t("understandKaraokeStyle")}
               </p>
             </div>
 
             {/* Songs I Enjoy Singing */}
             <div className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
-                Songs You Love to Sing
+                {t("songsYouLoveToSing")}
               </h2>
               <p className="text-[var(--text)]/50 text-sm mb-3">
-                Add songs you&apos;ve sung before and enjoyed and tell us why!
+                {t("addSongsYouveEnjoyedDesc")}
               </p>
               <SongSearchAutocomplete
                 onSelect={handleAddEnjoySong}
                 selectedSongIds={new Set(enjoySongs.map((s) => s.song_id))}
-                placeholder="Search for songs you love singing..."
+                placeholder={t("searchForSongsYouLove")}
               />
             </div>
 
@@ -970,13 +973,13 @@ export default function QuizPage() {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-[var(--text)]/70">
-                    Songs Added ({enjoySongs.length})
+                    {t("songsAddedCount", { count: enjoySongs.length })}
                   </h3>
                   <button
                     onClick={() => setEnjoySongs([])}
                     className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
                   >
-                    Clear all
+                    {t("clearAll")}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -1004,12 +1007,12 @@ export default function QuizPage() {
                           }
                         `}
                       >
-                        {song.singing_tags && song.singing_tags.length > 0 ? "Edit" : "Why?"}
+                        {song.singing_tags && song.singing_tags.length > 0 ? t("editSong") : t("whySong")}
                       </button>
                       <button
                         onClick={() => handleRemoveEnjoySong(song.song_id)}
                         className="p-2 rounded-full text-[var(--text-subtle)] hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                        title="Remove song"
+                        title={tCommon("remove")}
                       >
                         <XIcon className="w-4 h-4" />
                       </button>
@@ -1022,7 +1025,7 @@ export default function QuizPage() {
             {/* Energy preference */}
             <div data-testid="energy-section" className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Energy Level
+                {t("energyLevel")}
               </h2>
               <div className="grid grid-cols-3 gap-3">
                 {ENERGY_OPTIONS.map((option) => (
@@ -1044,7 +1047,7 @@ export default function QuizPage() {
                     `}
                   >
                     <span className="text-2xl block mb-1">{option.emoji}</span>
-                    <span className="text-sm font-medium text-[var(--text)]">{option.label}</span>
+                    <span className="text-sm font-medium text-[var(--text)]">{t(option.labelKey)}</span>
                   </button>
                 ))}
               </div>
@@ -1053,7 +1056,7 @@ export default function QuizPage() {
             {/* Vocal Comfort preference */}
             <div data-testid="vocal-comfort-section" className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Vocal Comfort
+                {t("vocalComfort")}
               </h2>
               <div className="grid grid-cols-3 gap-3">
                 {VOCAL_COMFORT_OPTIONS.map((option) => (
@@ -1075,8 +1078,8 @@ export default function QuizPage() {
                     `}
                   >
                     <span className="text-2xl block mb-1">{option.emoji}</span>
-                    <span className="text-sm font-medium text-[var(--text)]">{option.label}</span>
-                    <span className="text-xs text-[var(--text)]/50 block mt-0.5">{option.description}</span>
+                    <span className="text-sm font-medium text-[var(--text)]">{t(option.labelKey)}</span>
+                    <span className="text-xs text-[var(--text)]/50 block mt-0.5">{t(option.descKey)}</span>
                   </button>
                 ))}
               </div>
@@ -1085,7 +1088,7 @@ export default function QuizPage() {
             {/* Crowd Pleaser preference */}
             <div data-testid="crowd-pleaser-section" className="mb-6">
               <h2 className="text-sm font-medium text-[var(--text)]/70 mb-3 uppercase tracking-wide">
-                Song Discovery
+                {t("songDiscovery")}
               </h2>
               <div className="grid grid-cols-3 gap-3">
                 {CROWD_PLEASER_OPTIONS.map((option) => (
@@ -1107,8 +1110,8 @@ export default function QuizPage() {
                     `}
                   >
                     <span className="text-2xl block mb-1">{option.emoji}</span>
-                    <span className="text-sm font-medium text-[var(--text)]">{option.label}</span>
-                    <span className="text-xs text-[var(--text)]/50 block mt-0.5">{option.description}</span>
+                    <span className="text-sm font-medium text-[var(--text)]">{t(option.labelKey)}</span>
+                    <span className="text-xs text-[var(--text)]/50 block mt-0.5">{t(option.descKey)}</span>
                   </button>
                 ))}
               </div>
@@ -1122,7 +1125,7 @@ export default function QuizPage() {
                 className="flex-1"
                 onClick={() => setStep(3)}
               >
-                Back
+                {tCommon("back")}
               </Button>
               <Button
                 variant="primary"
@@ -1131,7 +1134,7 @@ export default function QuizPage() {
                 onClick={() => setStep(5)}
                 rightIcon={<ChevronRightIcon className="w-5 h-5" />}
               >
-                Continue
+                {tCommon("continue")}
               </Button>
             </div>
 
@@ -1142,7 +1145,7 @@ export default function QuizPage() {
                 disabled={isSubmitting}
                 className="text-sm text-[var(--text)]/40 hover:text-[var(--text)]/60 transition-colors"
               >
-                {isSubmitting ? "Loading..." : "Skip to recommendations →"}
+                {isSubmitting ? tCommon("loading") : t("skipToRecommendations")}
               </button>
             </div>
 
@@ -1175,10 +1178,10 @@ export default function QuizPage() {
           <>
             <div className="text-center mb-8">
               <h1 data-testid="smart-artists-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Know Any of These Artists?
+                {t("knowAnyOfThese")}
               </h1>
               <p className="text-[var(--text)]/60">
-                Based on your preferences, you might know these artists.
+                {t("basedOnPreferences")}
               </p>
             </div>
 
@@ -1188,7 +1191,7 @@ export default function QuizPage() {
               <div className="text-center py-8">
                 <p className="text-[var(--text)]/60 mb-4">{error}</p>
                 <Button onClick={() => loadSmartArtists()} variant="secondary">
-                  Try again
+                  {tCommon("tryAgain")}
                 </Button>
               </div>
             ) : (
@@ -1196,14 +1199,14 @@ export default function QuizPage() {
                 {/* Selection count and clear button */}
                 <div className="flex items-center justify-between mb-4">
                   <span data-testid="artist-selection-count" className="text-[var(--text)]/60 text-sm">
-                    {artistAffinity.size} selected
+                    {t("selected", { count: artistAffinity.size })}
                   </span>
                   {artistAffinity.size > 0 && (
                     <button
                       onClick={() => setArtistAffinity(new Map())}
                       className="text-sm text-[var(--text)]/40 hover:text-[var(--text)] transition-colors"
                     >
-                      Clear all
+                      {t("clearAll")}
                     </button>
                   )}
                 </div>
@@ -1232,12 +1235,12 @@ export default function QuizPage() {
                     {isLoadingMore && (
                       <div className="flex items-center gap-2 text-[var(--text-muted)]">
                         <LoaderIcon className="w-4 h-4 animate-spin" />
-                        <span className="text-sm">Finding more artists you may know...</span>
+                        <span className="text-sm">{t("findingMoreArtists")}</span>
                       </div>
                     )}
                     {!hasMoreArtists && quizArtists.length > 0 && (
                       <p className="text-sm text-[var(--text-muted)]">
-                        No more artists to show
+                        {t("noMoreArtists")}
                       </p>
                     )}
                   </div>
@@ -1261,10 +1264,10 @@ export default function QuizPage() {
           <>
             <div className="text-center mb-8">
               <h1 data-testid="email-step-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                Almost There!
+                {t("almostThere")}
               </h1>
               <p className="text-[var(--text)]/60">
-                Enter your email to save your recommendations.
+                {t("enterEmailToSave")}
               </p>
             </div>
 
@@ -1275,8 +1278,8 @@ export default function QuizPage() {
                   <>
                     <LoaderIcon className="w-8 h-8 animate-spin text-[var(--brand-pink)] flex-shrink-0" />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">Generating your recommendations...</h3>
-                      <p className="text-sm text-[var(--text-muted)]">Analyzing your music taste</p>
+                      <h3 className="font-semibold text-[var(--text)]">{t("generatingRecs")}</h3>
+                      <p className="text-sm text-[var(--text-muted)]">{t("analyzingTaste")}</p>
                       {/* Progress bar */}
                       <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
                         <div className="h-full bg-[var(--brand-pink)] rounded-full animate-pulse" style={{ width: "60%" }} />
@@ -1289,8 +1292,8 @@ export default function QuizPage() {
                       <CheckIcon className="w-5 h-5 text-green-500" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">Recommendations ready!</h3>
-                      <p className="text-sm text-[var(--text-muted)]">Your personalized song list is waiting</p>
+                      <h3 className="font-semibold text-[var(--text)]">{t("recsReady")}</h3>
+                      <p className="text-sm text-[var(--text-muted)]">{t("personalizedListWaiting")}</p>
                       {/* Completed progress bar */}
                       <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
                         <div className="h-full bg-green-500 rounded-full" style={{ width: "100%" }} />
@@ -1303,8 +1306,8 @@ export default function QuizPage() {
                       <span className="text-[var(--text-muted)]">⏳</span>
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">Waiting to generate...</h3>
-                      <p className="text-sm text-[var(--text-muted)]">This will start shortly</p>
+                      <h3 className="font-semibold text-[var(--text)]">{t("waitingToGenerate")}</h3>
+                      <p className="text-sm text-[var(--text-muted)]">{t("startShortly")}</p>
                     </div>
                   </>
                 )}
@@ -1314,13 +1317,13 @@ export default function QuizPage() {
             {/* Email Input */}
             <div className="mb-8">
               <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
-                Your Email
+                {t("yourEmail")}
               </label>
               {emailSubmitted ? (
                 <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
                   <CheckIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
                   <div>
-                    <p className="text-[var(--text)] font-medium">Email saved!</p>
+                    <p className="text-[var(--text)] font-medium">{t("emailSavedSuccess")}</p>
                     <p className="text-sm text-[var(--text-muted)]">{email}</p>
                   </div>
                 </div>
@@ -1336,7 +1339,7 @@ export default function QuizPage() {
                         setEmail(e.target.value);
                         setEmailError(null);
                       }}
-                      placeholder="you@example.com"
+                      placeholder={t("emailPlaceholder")}
                       className={`
                         flex-1 px-4 py-3 rounded-xl bg-[var(--card)] border text-[var(--text)]
                         placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-pink)]
@@ -1350,14 +1353,14 @@ export default function QuizPage() {
                       onClick={handleEmailSubmit}
                       disabled={isEmailSubmitting || !email.trim()}
                     >
-                      {isEmailSubmitting ? "Saving..." : "Save"}
+                      {isEmailSubmitting ? tCommon("loading") : t("saveEmail")}
                     </Button>
                   </div>
                   {emailError && (
                     <p className="mt-2 text-sm text-red-500">{emailError}</p>
                   )}
                   <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    We&apos;ll send you updates about your recommendations. No spam, ever.
+                    {t("emailUpdatesHint")}
                   </p>
                 </>
               )}
@@ -1374,15 +1377,15 @@ export default function QuizPage() {
               rightIcon={<ChevronRightIcon className="w-5 h-5" />}
             >
               {!recommendationsReady
-                ? "Generating recommendations..."
+                ? t("generatingRecommendationsButton")
                 : !emailSubmitted
-                  ? "Enter your email to continue"
-                  : "View My Recommendations"}
+                  ? t("enterEmailToContinue")
+                  : t("viewRecommendations")}
             </Button>
 
             {!emailSubmitted && recommendationsReady && (
               <p className="text-center mt-3 text-sm text-[var(--text-muted)]">
-                Please enter your email above to see your recommendations
+                {t("pleaseEnterEmailAbove")}
               </p>
             )}
           </>
