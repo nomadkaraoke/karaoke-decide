@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "description": "Translation glossary for Nomad Karaoke. Terms listed here should be translated consistently across all projects.",
+    "usage": "Terms with null values should NOT be translated (keep original). Terms with string values should use the specified translation."
+  },
+  "terms": {
+    "Nomad Karaoke": { "es": null, "de": null },
+    "Decide": { "es": null, "de": null },
+    "Generator": { "es": null, "de": null },
+    "KaraokeNerds": { "es": null, "de": null },
+    "Fiverr": { "es": null, "de": null },
+    "CashApp": { "es": null, "de": null },
+    "Venmo": { "es": null, "de": null },
+    "PayPal": { "es": null, "de": null },
+    "Zelle": { "es": null, "de": null },
+    "Spotify": { "es": null, "de": null },
+    "Last.fm": { "es": null, "de": null },
+    "YouTube": { "es": null, "de": null },
+    "Discord": { "es": null, "de": null },
+    "CDG": { "es": null, "de": null },
+    "stem separation": { "es": "separación de pistas", "de": "Stem-Trennung" },
+    "vocal separation": { "es": "separación vocal", "de": "Gesangstrennung" },
+    "backing vocals": { "es": "coros", "de": "Hintergrundgesang" },
+    "karaoke video": { "es": "video de karaoke", "de": "Karaoke-Video" },
+    "white-label": { "es": "marca blanca", "de": "White-Label" }
+  }
+}

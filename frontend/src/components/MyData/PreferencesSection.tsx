@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { ChevronDownIcon, CheckIcon, SparklesIcon } from "@/components/icons";
 import { Button, LoadingPulse } from "@/components/ui";
@@ -20,33 +21,35 @@ interface Props {
 const DECADES = ["1970s", "1980s", "1990s", "2000s", "2010s", "2020s"];
 const ENERGY_OPTIONS: {
   value: "chill" | "medium" | "high";
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
 }[] = [
-  { value: "chill", label: "Chill", description: "Slow ballads, easy listening" },
-  { value: "medium", label: "Medium", description: "Classic sing-alongs" },
-  { value: "high", label: "High Energy", description: "Dance hits, rock anthems" },
+  { value: "chill", labelKey: "chill", descKey: "chillDesc" },
+  { value: "medium", labelKey: "medium", descKey: "mediumDesc" },
+  { value: "high", labelKey: "highEnergy", descKey: "highEnergyDesc" },
 ];
 
 const GENRES = [
-  { id: "pop", label: "Pop" },
-  { id: "rock", label: "Rock" },
-  { id: "hiphop", label: "Hip-Hop" },
-  { id: "rnb", label: "R&B" },
-  { id: "country", label: "Country" },
-  { id: "electronic", label: "Electronic" },
-  { id: "metal", label: "Metal" },
-  { id: "jazz", label: "Jazz" },
-  { id: "latin", label: "Latin" },
-  { id: "indie", label: "Indie" },
-  { id: "kpop", label: "K-Pop" },
-  { id: "disco", label: "Disco" },
-  { id: "classic-rock", label: "Classic Rock" },
-  { id: "musical", label: "Broadway" },
-  { id: "reggae", label: "Reggae" },
+  { id: "pop", key: "pop" },
+  { id: "rock", key: "rock" },
+  { id: "hiphop", key: "hiphop" },
+  { id: "rnb", key: "rnb" },
+  { id: "country", key: "country" },
+  { id: "electronic", key: "electronic" },
+  { id: "metal", key: "metal" },
+  { id: "jazz", key: "jazz" },
+  { id: "latin", key: "latin" },
+  { id: "indie", key: "indie" },
+  { id: "kpop", key: "kpop" },
+  { id: "disco", key: "disco" },
+  { id: "classic-rock", key: "classicRock" },
+  { id: "musical", key: "musical" },
+  { id: "reggae", key: "reggae" },
 ];
 
 export function PreferencesSection({ isExpanded, onToggle }: Props) {
+  const t = useTranslations('components.myDataPreferences');
+  const tCommon = useTranslations('common');
   const [preferences, setPreferences] = useState<UserPreferences>({
     decade_preference: null,
     energy_preference: null,
@@ -70,7 +73,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
       setEditedPreferences(null);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load preferences"
+        err instanceof Error ? err.message : t('failedToLoadPreferences')
       );
     } finally {
       setIsLoading(false);
@@ -129,9 +132,9 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
 
       // Refetch to ensure we have server state
       await loadPreferences();
-      setSuccessMessage("Preferences saved! Changes will apply to your next recommendations.");
+      setSuccessMessage(t('preferencesSaved'));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save preferences");
+      setError(err instanceof Error ? err.message : t('failedToSavePreferences'));
     } finally {
       setIsSaving(false);
     }
@@ -166,9 +169,9 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
             <SparklesIcon className="w-5 h-5 text-[var(--brand-blue)]" />
           </div>
           <div>
-            <h2 className="font-semibold text-[var(--text)]">Preferences</h2>
+            <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
-              {hasPreferences ? "Customized" : "Not set"}
+              {hasPreferences ? t('customized') : t('notSet')}
             </p>
           </div>
         </div>
@@ -201,7 +204,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
               {/* Decade preference */}
               <div>
                 <h3 className="text-sm font-medium text-[var(--text)] mb-3">
-                  Favorite decade
+                  {t('favoriteDecade')}
                 </h3>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {DECADES.map((decade) => (
@@ -230,7 +233,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
               {/* Energy preference */}
               <div>
                 <h3 className="text-sm font-medium text-[var(--text)] mb-3">
-                  Energy level
+                  {t('energyLevel')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {ENERGY_OPTIONS.map((option) => (
@@ -254,14 +257,14 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-medium text-[var(--text)]">
-                          {option.label}
+                          {t(option.labelKey)}
                         </span>
                         {currentPrefs.energy_preference === option.value && (
                           <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
                         )}
                       </div>
                       <p className="text-xs text-[var(--text-subtle)] mt-1">
-                        {option.description}
+                        {t(option.descKey)}
                       </p>
                     </button>
                   ))}
@@ -271,7 +274,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
               {/* Genre preferences */}
               <div>
                 <h3 className="text-sm font-medium text-[var(--text)] mb-3">
-                  Favorite genres
+                  {t('favoriteGenres')}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {GENRES.map((genre) => (
@@ -287,7 +290,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                         }
                       `}
                     >
-                      {genre.label}
+                      {t(`genreLabels.${genre.key}`)}
                       {currentPrefs.genres.includes(genre.id) && (
                         <CheckIcon className="w-3 h-3 ml-1 inline" />
                       )}
@@ -305,7 +308,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                     onClick={handleCancel}
                     disabled={isSaving}
                   >
-                    Cancel
+                    {tCommon('cancel')}
                   </Button>
                   <Button
                     variant="primary"
@@ -313,7 +316,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                     onClick={handleSave}
                     isLoading={isSaving}
                   >
-                    Save Changes
+                    {tCommon('saveChanges')}
                   </Button>
                 </div>
               )}
@@ -325,7 +328,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                   className="text-sm text-[var(--brand-blue)] hover:underline flex items-center gap-2"
                 >
                   <SparklesIcon className="w-4 h-4" />
-                  Retake the quiz to update your preferences
+                  {t('retakeQuiz')}
                 </Link>
               </div>
             </>

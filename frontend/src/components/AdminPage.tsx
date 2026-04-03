@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingOverlay } from "@/components/ui";
 
@@ -12,6 +13,7 @@ interface AdminPageProps {
 export function AdminPage({ children }: AdminPageProps) {
   const router = useRouter();
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
+  const t = useTranslations('components.adminPage');
 
   useEffect(() => {
     if (!isLoading) {
@@ -24,7 +26,7 @@ export function AdminPage({ children }: AdminPageProps) {
   }, [isAuthenticated, isAdmin, isLoading, router]);
 
   if (isLoading) {
-    return <LoadingOverlay message="Checking permissions..." />;
+    return <LoadingOverlay message={t('checkingPermissions')} />;
   }
 
   if (!isAuthenticated || !isAdmin) {

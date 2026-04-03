@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { MailIcon } from "@/components/icons";
 
 interface PostQuizEmailModalProps {
@@ -20,6 +21,7 @@ export function PostQuizEmailModal({
 }: PostQuizEmailModalProps) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const t = useTranslations('components.postQuizEmail');
 
   if (!isOpen) return null;
 
@@ -30,14 +32,14 @@ export function PostQuizEmailModal({
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address");
+      setError(t('invalidEmail'));
       return;
     }
 
     try {
       await onEmailSubmit(email);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save email");
+      setError(err instanceof Error ? err.message : t('failedToSaveEmail'));
     }
   };
 
@@ -54,10 +56,10 @@ export function PostQuizEmailModal({
             <MailIcon className="w-6 h-6 text-[var(--brand-pink)]" />
           </div>
           <h2 className="text-xl font-bold text-[var(--text)] text-center">
-            Almost there!
+            {t('almostThere')}
           </h2>
           <p className="text-[var(--text-muted)] text-center mt-2">
-            Enter your email to see your personalized recommendations
+            {t('enterEmailToSeeRecs')}
           </p>
         </div>
 
@@ -66,12 +68,12 @@ export function PostQuizEmailModal({
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="sr-only">
-                Email address
+                {t('emailLabel')}
               </label>
               <input
                 id="email"
                 type="email"
-                placeholder="your@email.com"
+                placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
@@ -109,18 +111,18 @@ export function PostQuizEmailModal({
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Saving...
+                  {t('saving')}
                 </span>
               ) : (
-                "Continue"
+                t('continue')
               )}
             </button>
           </div>
 
           <p className="mt-4 text-xs text-[var(--text-subtle)] text-center">
-            We&apos;ll send you updates about your recommendations.
+            {t('updateNote')}
             <br />
-            No spam, we promise.
+            {t('noSpam')}
           </p>
         </form>
       </div>

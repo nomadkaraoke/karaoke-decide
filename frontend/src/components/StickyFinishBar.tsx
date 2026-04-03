@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ArrowRightIcon, ChevronRightIcon } from "@/components/icons";
 
 interface StickyFinishBarProps {
@@ -21,6 +22,7 @@ export function StickyFinishBar({
   onBack,
   isSubmitting,
 }: StickyFinishBarProps) {
+  const t = useTranslations('components.stickyFinish');
   const hasSelections = selectedCount > 0;
 
   return (
@@ -41,11 +43,11 @@ export function StickyFinishBar({
               <button
                 data-testid="sticky-back-button"
                 onClick={onBack}
-                aria-label="Back"
+                aria-label={t('back')}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors text-sm"
               >
                 <ChevronRightIcon className="w-4 h-4 transform rotate-180" aria-hidden="true" />
-                <span className="hidden sm:inline">Back</span>
+                <span className="hidden sm:inline">{t('back')}</span>
               </button>
             )}
 
@@ -57,12 +59,12 @@ export function StickyFinishBar({
                     {selectedCount}
                   </span>
                   <span className="text-[var(--text)] text-sm sm:text-base hidden sm:inline">
-                    {selectedCount === 1 ? "artist" : "artists"} selected
+                    {t('artistSelected', { count: selectedCount })}
                   </span>
                 </>
               ) : (
                 <span className="text-[var(--text-muted)] text-sm sm:text-base hidden sm:inline">
-                  Select artists you know
+                  {t('selectArtists')}
                 </span>
               )}
             </div>
@@ -76,7 +78,7 @@ export function StickyFinishBar({
               disabled={isSubmitting}
               className="text-[var(--text-muted)] hover:text-[var(--text)] text-sm transition-colors disabled:opacity-50"
             >
-              Skip
+              {t('skip')}
             </button>
 
             {/* Finish button */}
@@ -97,11 +99,11 @@ export function StickyFinishBar({
               {isSubmitting ? (
                 <>
                   <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                  Saving...
+                  {t('saving')}
                 </>
               ) : (
                 <>
-                  Finish Quiz
+                  {t('finishQuiz')}
                   <ArrowRightIcon className="w-4 h-4" />
                 </>
               )}

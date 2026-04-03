@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { MicrophoneIcon } from "@/components/icons";
 
 interface SuggestionReason {
@@ -95,13 +96,13 @@ function ReasonBadge({ reason }: { reason: SuggestionReason }) {
 
 const AFFINITY_OPTIONS: Array<{
   value: ArtistAffinity;
-  label: string;
+  labelKey: string;
   emoji: string;
-  description: string;
+  descKey: string;
 }> = [
-  { value: "occasionally", label: "Occasionally", emoji: "🎵", description: "Listen sometimes" },
-  { value: "like", label: "Like", emoji: "❤️", description: "Generally enjoy" },
-  { value: "love", label: "LOVE", emoji: "🔥", description: "Absolutely love" },
+  { value: "occasionally", labelKey: "occasionally", emoji: "🎵", descKey: "occasionallyDesc" },
+  { value: "like", labelKey: "like", emoji: "❤️", descKey: "likeDesc" },
+  { value: "love", labelKey: "love", emoji: "🔥", descKey: "loveDesc" },
 ];
 
 export function QuizArtistCard({
@@ -110,6 +111,7 @@ export function QuizArtistCard({
   onAffinityChange,
   index,
 }: QuizArtistCardProps) {
+  const t = useTranslations('components.quizArtistCard');
   const displayGenres = artist.genres?.slice(0, 3) || [];
   const hasAffinity = affinity !== null;
 
@@ -157,7 +159,7 @@ export function QuizArtistCard({
           </h3>
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-[var(--text-muted)] text-sm">
-              {artist.song_count} karaoke songs
+              {t('karaokeSongs', { count: artist.song_count })}
             </p>
             {/* Suggestion reason badge */}
             {artist.suggestion_reason && (
@@ -182,7 +184,7 @@ export function QuizArtistCard({
           {/* Top songs preview */}
           {artist.top_songs.length > 0 && (
             <div className="mt-2">
-              <p className="text-[var(--text-subtle)] text-xs mb-1">Popular songs:</p>
+              <p className="text-[var(--text-subtle)] text-xs mb-1">{t('popularSongs')}</p>
               <div className="flex flex-wrap gap-1">
                 {artist.top_songs.slice(0, 3).map((song, i) => (
                   <span
@@ -204,7 +206,7 @@ export function QuizArtistCard({
                 <button
                   key={option.value}
                   onClick={() => handleAffinityClick(option.value)}
-                  title={option.description}
+                  title={t(option.descKey)}
                   className={`
                     flex-1 py-2 px-2 rounded-lg text-center transition-all duration-200
                     ${
@@ -215,7 +217,7 @@ export function QuizArtistCard({
                   `}
                 >
                   <span className="text-base block">{option.emoji}</span>
-                  <span className="text-xs font-medium block mt-0.5">{option.label}</span>
+                  <span className="text-xs font-medium block mt-0.5">{t(option.labelKey)}</span>
                 </button>
               );
             })}

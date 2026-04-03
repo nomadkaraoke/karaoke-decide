@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   ChevronDownIcon,
   MicrophoneIcon,
@@ -57,6 +58,7 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
   const [isHovered, setIsHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations('components.songCard');
 
   const links = getKaraokeLinks(song.artist, song.title);
 
@@ -111,7 +113,7 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <MicrophoneIcon className="w-4 h-4" />
-              <span>Sing it!</span>
+              <span>{t('singIt')}</span>
               <ChevronDownIcon
                 className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`}
               />
@@ -130,9 +132,9 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
                   >
                     <YouTubeIcon className="w-5 h-5 text-red-500" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[var(--text)]">Search YouTube</div>
+                      <div className="text-sm font-medium text-[var(--text)]">{t('searchYouTube')}</div>
                       <div className="text-xs text-[var(--text-subtle)] truncate">
-                        Find existing karaoke videos
+                        {t('findExistingVideos')}
                       </div>
                     </div>
                   </a>
@@ -146,9 +148,9 @@ export function SongCard({ song, index = 0, showAnimation = true }: SongCardProp
                   >
                     <VideoIcon className="w-5 h-5 text-[var(--brand-blue)]" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-[var(--text)]">Create with Generator</div>
+                      <div className="text-sm font-medium text-[var(--text)]">{t('createWithGenerator')}</div>
                       <div className="text-xs text-[var(--text-subtle)] truncate">
-                        Generate custom karaoke video
+                        {t('generateCustomVideo')}
                       </div>
                     </div>
                   </a>

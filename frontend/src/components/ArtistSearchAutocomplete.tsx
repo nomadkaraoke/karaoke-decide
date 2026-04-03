@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { SearchIcon, PlusIcon, CheckIcon } from "@/components/icons";
 import { Input } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -50,9 +51,11 @@ interface ArtistSearchAutocompleteProps {
 export function ArtistSearchAutocomplete({
   onSelect,
   selectedArtistIds = new Set(),
-  placeholder = "Search artists to add...",
+  placeholder,
   className = "",
 }: ArtistSearchAutocompleteProps) {
+  const t = useTranslations('components.artistSearch');
+  const resolvedPlaceholder = placeholder || t('placeholder');
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchableArtist[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -214,7 +217,7 @@ export function ArtistSearchAutocomplete({
         </div>
         <Input
           type="text"
-          placeholder={indexLoading ? "Loading artists..." : placeholder}
+          placeholder={indexLoading ? t('loadingArtists') : resolvedPlaceholder}
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           onFocus={() => {
@@ -230,14 +233,14 @@ export function ArtistSearchAutocomplete({
           {searchResults.length === 0 && !isSearching && !isApiSearching ? (
             <div className="p-4">
               <p className="text-center text-[var(--text-subtle)] text-sm mb-3">
-                No artists found for &quot;{searchQuery}&quot;
+                {t('noArtistsFound', { query: searchQuery })}
               </p>
               {indexReady && (
                 <button
                   onClick={() => handleApiSearch(searchQuery)}
                   className="w-full py-2 px-4 text-sm text-[var(--brand-pink)] hover:bg-[var(--secondary)] rounded-lg transition-colors"
                 >
-                  Search full database...
+                  {t('searchFullDatabase')}
                 </button>
               )}
             </div>
@@ -272,12 +275,12 @@ export function ArtistSearchAutocomplete({
                     {isSelected ? (
                       <span className="flex items-center gap-1 text-green-400 text-sm">
                         <CheckIcon className="w-4 h-4" />
-                        Added
+                        {t('added')}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-[var(--brand-pink)] text-sm">
                         <PlusIcon className="w-4 h-4" />
-                        Add
+                        {t('add')}
                       </span>
                     )}
                   </button>
@@ -294,12 +297,12 @@ export function ArtistSearchAutocomplete({
                   {isApiSearching ? (
                     <>
                       <div className="w-3 h-3 border-2 border-[var(--brand-pink)] border-t-transparent rounded-full animate-spin" />
-                      Searching...
+                      {t('searching')}
                     </>
                   ) : (
                     <>
                       <SearchIcon className="w-3 h-3" />
-                      Search for more artists...
+                      {t('searchForMore')}
                     </>
                   )}
                 </button>

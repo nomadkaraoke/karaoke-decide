@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input } from "@/components/ui";
 import { CheckIcon, SparklesIcon } from "@/components/icons";
@@ -12,10 +13,13 @@ interface UpgradePromptProps {
 }
 
 export function UpgradePrompt({
-  title = "Create Your Account",
-  description = "Verify your email to unlock this feature and save your progress.",
+  title,
+  description,
   featureName,
 }: UpgradePromptProps) {
+  const t = useTranslations('components.upgrade');
+  const resolvedTitle = title || t('defaultTitle');
+  const resolvedDescription = description || t('defaultDescription');
   const { requestUpgrade } = useAuth();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +38,7 @@ export function UpgradePrompt({
       setSuccess(true);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to send verification email"
+        err instanceof Error ? err.message : t('failedToSend')
       );
     } finally {
       setIsSubmitting(false);
@@ -48,13 +52,12 @@ export function UpgradePrompt({
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
             <CheckIcon className="w-8 h-8 text-green-400" />
           </div>
-          <h2 className="text-xl font-bold text-[var(--text)] mb-2">Check Your Email</h2>
+          <h2 className="text-xl font-bold text-[var(--text)] mb-2">{t('checkYourEmail')}</h2>
           <p className="text-[var(--text-muted)]">
-            We&apos;ve sent a verification link to <span className="text-[var(--text)] font-medium">{email}</span>.
-            Click the link to verify your account and unlock all features.
+            {t('verificationSentTo', { email })}
           </p>
           <p className="text-[var(--text-subtle)] text-sm mt-4">
-            Your quiz results and progress will be saved when you verify.
+            {t('progressSavedOnVerify')}
           </p>
         </div>
       </div>
@@ -67,11 +70,11 @@ export function UpgradePrompt({
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[var(--brand-pink)] to-[var(--brand-purple)] flex items-center justify-center">
           <SparklesIcon className="w-8 h-8 text-[var(--text)]" />
         </div>
-        <h2 className="text-xl font-bold text-[var(--text)] mb-2">{title}</h2>
-        <p className="text-[var(--text-muted)]">{description}</p>
+        <h2 className="text-xl font-bold text-[var(--text)] mb-2">{resolvedTitle}</h2>
+        <p className="text-[var(--text-muted)]">{resolvedDescription}</p>
         {featureName && (
           <p className="text-[var(--text-subtle)] text-sm mt-2">
-            <strong className="text-[var(--brand-pink)]">{featureName}</strong> requires a verified account.
+            {t('requiresVerified', { feature: featureName })}
           </p>
         )}
       </div>
@@ -79,7 +82,7 @@ export function UpgradePrompt({
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           type="email"
-          placeholder="Enter your email"
+          placeholder={t('emailPlaceholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={error || undefined}
@@ -92,28 +95,28 @@ export function UpgradePrompt({
           isLoading={isSubmitting}
           disabled={!email.trim()}
         >
-          Send Verification Link
+          {t('sendVerificationLink')}
         </Button>
       </form>
 
       <div className="mt-6 pt-6 border-t border-[var(--card-border)]">
-        <h3 className="text-sm font-medium text-[var(--text-muted)] mb-3">With an account you can:</h3>
+        <h3 className="text-sm font-medium text-[var(--text-muted)] mb-3">{t('withAccountYouCan')}</h3>
         <ul className="space-y-2 text-sm text-[var(--text-muted)]">
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
-            Connect Spotify and Last.fm
+            {t('connectSpotifyLastfm')}
           </li>
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
-            Sync your listening history
+            {t('syncListeningHistory')}
           </li>
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
-            Save your progress across devices
+            {t('saveProgressAcrossDevices')}
           </li>
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
-            Create and manage playlists
+            {t('createAndManagePlaylists')}
           </li>
         </ul>
       </div>

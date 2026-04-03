@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import {
   SpotifyIcon,
@@ -55,6 +56,7 @@ export function YourArtistsSection({
   onToggle,
   refreshTrigger,
 }: Props) {
+  const t = useTranslations('components.myDataArtists');
   const [artists, setArtists] = useState<UserArtist[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export function YourArtistsSection({
       const response = await api.my.getDataArtists();
       setArtists(response.artists);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load artists");
+      setError(err instanceof Error ? err.message : t('failedToLoadArtists'));
     } finally {
       setIsLoading(false);
     }
@@ -207,7 +209,7 @@ export function YourArtistsSection({
       setSuggestions([]);
       await loadArtists();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : "Failed to add artist");
+      setAddError(err instanceof Error ? err.message : t('failedToAddArtist'));
     } finally {
       setIsAdding(false);
     }
@@ -220,7 +222,7 @@ export function YourArtistsSection({
       await loadArtists();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to remove artist"
+        err instanceof Error ? err.message : t('failedToRemoveArtist')
       );
     } finally {
       setRemovingArtist(null);
@@ -266,11 +268,11 @@ export function YourArtistsSection({
             <span className="text-lg text-[var(--brand-pink)]">★</span>
           </div>
           <div>
-            <h2 className="font-semibold text-[var(--text)]">Artists You Know</h2>
+            <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
               {artists.length === 0
-                ? "No artists yet"
-                : `${artists.length} artist${artists.length !== 1 ? "s" : ""}`}
+                ? t('noArtistsYet')
+                : t('artistCount', { count: artists.length })}
             </p>
           </div>
         </div>
@@ -290,7 +292,7 @@ export function YourArtistsSection({
                 onClick={() => setError(null)}
                 className="ml-2 underline hover:no-underline"
               >
-                Dismiss
+                {t('dismiss')}
               </button>
             </div>
           )}
@@ -304,7 +306,7 @@ export function YourArtistsSection({
                 <div className="flex-1 relative">
                   <Input
                     ref={inputRef}
-                    placeholder="Search for an artist..."
+                    placeholder={t('searchPlaceholder')}
                     value={newArtist}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
@@ -365,17 +367,16 @@ export function YourArtistsSection({
                   disabled={!newArtist.trim()}
                   leftIcon={<PlusIcon className="w-4 h-4" />}
                 >
-                  Add
+                  {t('add')}
                 </Button>
               </form>
 
               {/* Artist list */}
               {artists.length === 0 ? (
                 <div className="text-center py-8 text-[var(--text-subtle)] text-sm">
-                  <p>No artists yet.</p>
+                  <p>{t('noArtistsMessage')}</p>
                   <p className="mt-1">
-                    Add artists manually, take the quiz, or sync your music
-                    services.
+                    {t('addArtistsHint')}
                   </p>
                 </div>
               ) : (
@@ -413,7 +414,7 @@ export function YourArtistsSection({
                           })}
                           {artist.is_excluded && (
                             <span className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 px-1.5 py-0.5 rounded">
-                              Hidden
+                              {t('hidden')}
                             </span>
                           )}
                         </div>
@@ -434,7 +435,7 @@ export function YourArtistsSection({
                         onClick={() => handleRemoveArtist(artist.artist_name)}
                         disabled={removingArtist === artist.artist_name}
                         className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-subtle)] hover:text-[var(--error)] transition-all"
-                        title="Remove artist"
+                        title={t('removeArtist')}
                       >
                         {removingArtist === artist.artist_name ? (
                           <span className="animate-pulse">...</span>
@@ -446,7 +447,7 @@ export function YourArtistsSection({
                   ))}
                   {artists.length > 30 && (
                     <div className="text-center py-2 text-sm text-[var(--text-subtle)]">
-                      +{artists.length - 30} more artists
+                      {t('moreArtists', { count: artists.length - 30 })}
                     </div>
                   )}
                 </div>

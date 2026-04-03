@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { Button, Input } from "@/components/ui";
 import { XIcon, CheckIcon } from "@/components/icons";
 import { api } from "@/lib/api";
@@ -13,25 +14,25 @@ import type {
   VOCAL_COMFORT_LABELS,
 } from "@/types";
 
-// Re-define the labels here to avoid import issues with objects
-const TAG_LABELS: Record<SingingTag, string> = {
-  easy_to_sing: "Easy to sing",
-  crowd_pleaser: "Crowd pleaser",
-  shows_range: "Shows off my range",
-  fun_lyrics: "Fun lyrics",
-  nostalgic: "Nostalgic",
+// Tag/energy/comfort keys for looking up translations
+const TAG_KEYS: Record<SingingTag, string> = {
+  easy_to_sing: "tagEasyToSing",
+  crowd_pleaser: "tagCrowdPleaser",
+  shows_range: "tagShowsRange",
+  fun_lyrics: "tagFunLyrics",
+  nostalgic: "tagNostalgic",
 };
 
-const ENERGY_LABELS: Record<SingingEnergy, { label: string; emoji: string }> = {
-  upbeat_party: { label: "Upbeat Party", emoji: "🎉" },
-  chill_ballad: { label: "Chill Ballad", emoji: "🌙" },
-  emotional_powerhouse: { label: "Emotional Powerhouse", emoji: "💪" },
+const ENERGY_KEYS: Record<SingingEnergy, { key: string; emoji: string }> = {
+  upbeat_party: { key: "energyUpbeatParty", emoji: "🎉" },
+  chill_ballad: { key: "energyChillBallad", emoji: "🌙" },
+  emotional_powerhouse: { key: "energyEmotionalPowerhouse", emoji: "💪" },
 };
 
-const COMFORT_LABELS: Record<VocalComfort, { label: string; emoji: string }> = {
-  easy: { label: "Easy", emoji: "😌" },
-  comfortable: { label: "Comfortable", emoji: "👍" },
-  challenging: { label: "Challenging", emoji: "💪" },
+const COMFORT_KEYS: Record<VocalComfort, { key: string; emoji: string }> = {
+  easy: { key: "comfortEasy", emoji: "😌" },
+  comfortable: { key: "comfortComfortable", emoji: "👍" },
+  challenging: { key: "comfortChallenging", emoji: "💪" },
 };
 
 export interface EnjoySingingMetadataResult {
@@ -67,6 +68,8 @@ export function EnjoySingingModal({
   onLocalSave,
   song,
 }: EnjoySingingModalProps) {
+  const t = useTranslations('components.enjoySinging');
+  const tCommon = useTranslations('common');
   const [selectedTags, setSelectedTags] = useState<SingingTag[]>(
     song.singing_tags || []
   );
@@ -112,7 +115,7 @@ export function EnjoySingingModal({
       onSuccess?.();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(err instanceof Error ? err.message : t('failedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -127,7 +130,7 @@ export function EnjoySingingModal({
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-[var(--text)]">
-              I Enjoy Singing This
+              {t('title')}
             </h2>
             <p className="text-sm text-[var(--text-muted)] mt-1">
               {song.artist} - {song.title}
@@ -151,10 +154,10 @@ export function EnjoySingingModal({
         {/* Tags Section */}
         <div className="mb-5">
           <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-            Why do you enjoy singing this? (optional)
+            {t('whyEnjoyLabel')}
           </label>
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(TAG_LABELS) as SingingTag[]).map((tag) => (
+            {(Object.keys(TAG_KEYS) as SingingTag[]).map((tag) => (
               <button
                 key={tag}
                 onClick={() => toggleTag(tag)}
@@ -167,7 +170,7 @@ export function EnjoySingingModal({
                 {selectedTags.includes(tag) && (
                   <CheckIcon className="w-3 h-3 inline mr-1" />
                 )}
-                {TAG_LABELS[tag]}
+                {t(TAG_KEYS[tag])}
               </button>
             ))}
           </div>
@@ -176,10 +179,10 @@ export function EnjoySingingModal({
         {/* Energy Section */}
         <div className="mb-5">
           <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-            What kind of song is this for you? (optional)
+            {t('whatKindLabel')}
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(ENERGY_LABELS) as SingingEnergy[]).map((energy) => (
+            {(Object.keys(ENERGY_KEYS) as SingingEnergy[]).map((energy) => (
               <button
                 key={energy}
                 onClick={() =>
@@ -192,10 +195,10 @@ export function EnjoySingingModal({
                 }`}
               >
                 <span className="text-xl block mb-1">
-                  {ENERGY_LABELS[energy].emoji}
+                  {ENERGY_KEYS[energy].emoji}
                 </span>
                 <span className="text-xs font-medium text-[var(--text)]">
-                  {ENERGY_LABELS[energy].label}
+                  {t(ENERGY_KEYS[energy].key)}
                 </span>
               </button>
             ))}
@@ -205,10 +208,10 @@ export function EnjoySingingModal({
         {/* Vocal Comfort Section */}
         <div className="mb-5">
           <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-            How comfortable is this in your vocal range? (optional)
+            {t('vocalComfortLabel')}
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(COMFORT_LABELS) as VocalComfort[]).map((comfort) => (
+            {(Object.keys(COMFORT_KEYS) as VocalComfort[]).map((comfort) => (
               <button
                 key={comfort}
                 onClick={() =>
@@ -223,10 +226,10 @@ export function EnjoySingingModal({
                 }`}
               >
                 <span className="text-xl block mb-1">
-                  {COMFORT_LABELS[comfort].emoji}
+                  {COMFORT_KEYS[comfort].emoji}
                 </span>
                 <span className="text-xs font-medium text-[var(--text)]">
-                  {COMFORT_LABELS[comfort].label}
+                  {t(COMFORT_KEYS[comfort].key)}
                 </span>
               </button>
             ))}
@@ -236,25 +239,25 @@ export function EnjoySingingModal({
         {/* Notes Section */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-            Personal notes (optional)
+            {t('notesLabel')}
           </label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Any notes about why you love singing this song..."
+            placeholder={t('notesPlaceholder')}
             maxLength={500}
             rows={3}
             className="w-full px-4 py-3 bg-[var(--secondary)] border border-[var(--card-border)] rounded-xl text-[var(--text)] placeholder:text-[var(--text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-pink)] focus:border-transparent resize-none"
           />
           <p className="text-xs text-[var(--text-subtle)] mt-1 text-right">
-            {notes.length}/500
+            {t('charCount', { current: notes.length })}
           </p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onClose}>
-            Cancel
+            {tCommon('cancel')}
           </Button>
           <Button
             variant="primary"
@@ -262,7 +265,7 @@ export function EnjoySingingModal({
             onClick={handleSave}
             isLoading={isSaving}
           >
-            Save
+            {tCommon('save')}
           </Button>
         </div>
       </div>

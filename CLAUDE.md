@@ -22,7 +22,7 @@
 
 - **Live:** https://decide.nomadkaraoke.com
 - **API:** https://karaoke-decide-718638054799.us-central1.run.app
-- **Tech Stack:** Python 3.12, FastAPI, BigQuery, Cloud Run, Next.js
+- **Tech Stack:** Python 3.12, FastAPI, BigQuery, Cloud Run, Next.js, next-intl (i18n)
 - **Sister Project:** [karaoke-gen](https://github.com/nomadkaraoke/karaoke-gen) - shares patterns
 
 ## Essential Rules
@@ -37,6 +37,18 @@ All code must follow SOLID principles:
 - **Dependency Inversion** - Depend on abstractions, not concretions
 
 See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
+
+### Internationalization (i18n)
+
+- All user-facing strings live in `frontend/messages/{locale}.json` (en, es, de), NOT in components
+- Components use `useTranslations('namespace')` from next-intl
+- Pages are under `frontend/src/app/[locale]/` — static export generates `/en/`, `/es/`, `/de/`
+- Internal links use `Link` from `@/i18n/routing` (locale-aware)
+- Root `/` detects browser language and redirects; preference saved in localStorage
+- API client sends `Accept-Language` header with every request
+- To add a new language: `python scripts/translate.py --messages-dir ./frontend/messages --target <code>`
+- Translation pipeline uses Gemini 3.1 Pro via Vertex AI (nomadkaraoke GCP project)
+- Don't hardcode user-facing strings — add to `messages/en.json` and use `t('key')`
 
 ### Git Workflow
 

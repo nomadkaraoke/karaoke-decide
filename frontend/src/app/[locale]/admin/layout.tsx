@@ -1,0 +1,87 @@
+"use client";
+
+import { Link, usePathname } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
+import { AdminPage } from "@/components/AdminPage";
+import {
+  BarChartIcon,
+  UsersIcon,
+  ActivityIcon,
+  ChevronLeftIcon,
+} from "@/components/icons";
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const t = useTranslations("admin");
+
+  const adminNavLinks = [
+    { href: "/admin", label: t("dashboard"), icon: BarChartIcon },
+    { href: "/admin/users", label: t("users"), icon: UsersIcon },
+    { href: "/admin/sync-jobs", label: t("syncJobs"), icon: ActivityIcon },
+  ];
+
+  return (
+    <AdminPage>
+      <div className="min-h-screen bg-[#0a0a0f]">
+        {/* Admin Header */}
+        <div className="border-b border-[var(--card-border)] bg-[#0a0a0f]/80 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/"
+                  className="flex items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                >
+                  <ChevronLeftIcon className="w-4 h-4" />
+                  <span className="text-sm">{t("backToApp")}</span>
+                </Link>
+                <div className="h-6 w-px bg-[var(--secondary)]" />
+                <h1 className="text-lg font-semibold text-[var(--text)]">{t("admin")}</h1>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex gap-6">
+            {/* Sidebar */}
+            <nav className="w-48 shrink-0">
+              <div className="sticky top-24 space-y-1">
+                {adminNavLinks.map((link) => {
+                  const isActive =
+                    pathname === link.href ||
+                    (link.href !== "/admin" && pathname.startsWith(link.href));
+                  const Icon = link.icon;
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`
+                        flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                        ${
+                          isActive
+                            ? "bg-[var(--secondary)] text-[var(--text)]"
+                            : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--card)]"
+                        }
+                      `}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+
+            {/* Main Content */}
+            <main className="flex-1 min-w-0">{children}</main>
+          </div>
+        </div>
+      </div>
+    </AdminPage>
+  );
+}

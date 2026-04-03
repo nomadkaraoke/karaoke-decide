@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -62,6 +63,7 @@ export function ConnectedServicesSection({
   onSyncComplete,
 }: Props) {
   const { isGuest } = useAuth();
+  const t = useTranslations('components.myDataServices');
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export function ConnectedServicesSection({
               0
             ) || 0;
           setSyncMessage(
-            `Sync complete! Found ${totalMatched} karaoke songs, added ${totalCreated} new songs.${totalArtists > 0 ? ` Synced ${totalArtists} artists.` : ""}`
+            t('syncComplete', { matched: totalMatched, created: totalCreated, artists: totalArtists })
           );
 
           onSyncComplete?.();
@@ -121,7 +123,7 @@ export function ConnectedServicesSection({
             clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
           }
-          setError(response.active_job.error || "Sync failed");
+          setError(response.active_job.error || t('syncFailed'));
         }
       }
     } catch (err) {
@@ -150,7 +152,7 @@ export function ConnectedServicesSection({
         setIsSyncing(false);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load services");
+      setError(err instanceof Error ? err.message : t('failedToLoadServices'));
     } finally {
       setIsLoading(false);
     }
@@ -182,7 +184,7 @@ export function ConnectedServicesSection({
       window.location.href = response.auth_url;
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to connect Spotify"
+        err instanceof Error ? err.message : t('failedToConnectSpotify')
       );
     }
   };
@@ -199,7 +201,7 @@ export function ConnectedServicesSection({
       await loadServices();
     } catch (err) {
       setLastfmError(
-        err instanceof Error ? err.message : "Failed to connect Last.fm"
+        err instanceof Error ? err.message : t('failedToConnectLastfm')
       );
     } finally {
       setIsConnectingLastfm(false);
@@ -215,7 +217,7 @@ export function ConnectedServicesSection({
       setError(
         err instanceof Error
           ? err.message
-          : `Failed to disconnect ${serviceType}`
+          : t('failedToDisconnect', { service: serviceType })
       );
     } finally {
       setDisconnecting(null);
@@ -237,7 +239,7 @@ export function ConnectedServicesSection({
 
       await pollSyncStatus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start sync");
+      setError(err instanceof Error ? err.message : t('failedToStartSync'));
       setIsSyncing(false);
     }
   };
@@ -268,9 +270,9 @@ export function ConnectedServicesSection({
               <SpotifyIcon className="w-5 h-5 text-[var(--brand-blue)]" />
             </div>
             <div>
-              <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+              <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
               <p className="text-sm text-[var(--text-muted)]">
-                Create an account to connect
+                {t('createAccountToConnect')}
               </p>
             </div>
           </div>
@@ -282,9 +284,9 @@ export function ConnectedServicesSection({
         {isExpanded && (
           <div className="px-5 pb-5">
             <UpgradePrompt
-              title="Connect Your Music Services"
-              description="Create an account to connect Spotify and Last.fm for personalized recommendations."
-              featureName="Music Services"
+              title={t('connectMusicServicesTitle')}
+              description={t('connectMusicServicesDesc')}
+              featureName={t('musicServicesFeature')}
             />
           </div>
         )}
@@ -324,13 +326,13 @@ export function ConnectedServicesSection({
             </div>
           )}
           <div>
-            <h2 className="font-semibold text-[var(--text)]">Connected Services</h2>
+            <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
             <p className="text-sm text-[var(--text-muted)]">
               {connectedCount === 0
-                ? "No services connected"
+                ? t('noServicesConnected')
                 : [
-                    spotifyConnected && "Spotify",
-                    lastfmConnected && "Last.fm",
+                    spotifyConnected && t('spotify'),
+                    lastfmConnected && t('lastfm'),
                   ]
                     .filter(Boolean)
                     .join(", ")}
@@ -370,7 +372,7 @@ export function ConnectedServicesSection({
                     <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium text-[var(--text)]">Spotify</h3>
+                    <h3 className="font-medium text-[var(--text)]">{t('spotify')}</h3>
                     {isConnected("spotify") ? (
                       <p className="text-xs text-[var(--text-muted)]">
                         {getService("spotify")?.service_username}
@@ -378,9 +380,9 @@ export function ConnectedServicesSection({
                     ) : null}
                   </div>
                   {isConnected("spotify") ? (
-                    <Badge variant="success">Connected</Badge>
+                    <Badge variant="success">{t('connected')}</Badge>
                   ) : (
-                    <Badge variant="default">Not connected</Badge>
+                    <Badge variant="default">{t('notConnected')}</Badge>
                   )}
                 </div>
 
@@ -388,15 +390,14 @@ export function ConnectedServicesSection({
                   <div className="space-y-2">
                     <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
                       <span>
-                        {getService("spotify")?.songs_synced || getService("spotify")?.tracks_synced || 0} songs
+                        {t('songsLabel', { count: getService("spotify")?.songs_synced || getService("spotify")?.tracks_synced || 0 })}
                       </span>
                       <span>
-                        {getService("spotify")?.artists_synced || 0} artists
+                        {t('artistsLabel', { count: getService("spotify")?.artists_synced || 0 })}
                       </span>
                       {getService("spotify")?.last_sync_at && (
                         <span>
-                          Last sync:{" "}
-                          {formatDate(getService("spotify")!.last_sync_at!)}
+                          {t('lastSyncLabel', { date: formatDate(getService("spotify")!.last_sync_at!) })}
                         </span>
                       )}
                     </div>
@@ -406,7 +407,7 @@ export function ConnectedServicesSection({
                       onClick={() => handleDisconnect("spotify")}
                       isLoading={disconnecting === "spotify"}
                     >
-                      Disconnect
+                      {t('disconnect')}
                     </Button>
                   </div>
                 ) : (
@@ -416,7 +417,7 @@ export function ConnectedServicesSection({
                     onClick={handleConnectSpotify}
                     leftIcon={<SpotifyIcon className="w-4 h-4" />}
                   >
-                    Connect Spotify
+                    {t('connectSpotify')}
                   </Button>
                 )}
               </div>
@@ -428,7 +429,7 @@ export function ConnectedServicesSection({
                     <LastfmIcon className="w-4 h-4 text-[#ff4444]" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-medium text-[var(--text)]">Last.fm</h3>
+                    <h3 className="font-medium text-[var(--text)]">{t('lastfm')}</h3>
                     {isConnected("lastfm") ? (
                       <p className="text-xs text-[var(--text-muted)]">
                         {getService("lastfm")?.service_username}
@@ -436,9 +437,9 @@ export function ConnectedServicesSection({
                     ) : null}
                   </div>
                   {isConnected("lastfm") ? (
-                    <Badge variant="success">Connected</Badge>
+                    <Badge variant="success">{t('connected')}</Badge>
                   ) : (
-                    <Badge variant="default">Not connected</Badge>
+                    <Badge variant="default">{t('notConnected')}</Badge>
                   )}
                 </div>
 
@@ -446,15 +447,14 @@ export function ConnectedServicesSection({
                   <div className="space-y-2">
                     <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
                       <span>
-                        {getService("lastfm")?.songs_synced || getService("lastfm")?.tracks_synced || 0} songs
+                        {t('songsLabel', { count: getService("lastfm")?.songs_synced || getService("lastfm")?.tracks_synced || 0 })}
                       </span>
                       <span>
-                        {getService("lastfm")?.artists_synced || 0} artists
+                        {t('artistsLabel', { count: getService("lastfm")?.artists_synced || 0 })}
                       </span>
                       {getService("lastfm")?.last_sync_at && (
                         <span>
-                          Last sync:{" "}
-                          {formatDate(getService("lastfm")!.last_sync_at!)}
+                          {t('lastSyncLabel', { date: formatDate(getService("lastfm")!.last_sync_at!) })}
                         </span>
                       )}
                     </div>
@@ -464,13 +464,13 @@ export function ConnectedServicesSection({
                       onClick={() => handleDisconnect("lastfm")}
                       isLoading={disconnecting === "lastfm"}
                     >
-                      Disconnect
+                      {t('disconnect')}
                     </Button>
                   </div>
                 ) : (
                   <form onSubmit={handleConnectLastfm} className="space-y-2">
                     <Input
-                      placeholder="Your Last.fm username"
+                      placeholder={t('lastfmUsernamePlaceholder')}
                       value={lastfmUsername}
                       onChange={(e) => setLastfmUsername(e.target.value)}
                       error={lastfmError || undefined}
@@ -483,7 +483,7 @@ export function ConnectedServicesSection({
                       disabled={!lastfmUsername.trim()}
                       leftIcon={<LastfmIcon className="w-4 h-4" />}
                     >
-                      Connect Last.fm
+                      {t('connectLastfm')}
                     </Button>
                   </form>
                 )}
@@ -495,12 +495,12 @@ export function ConnectedServicesSection({
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium text-[var(--text)] text-sm">
-                        Sync listening history
+                        {t('syncListeningHistory')}
                       </h3>
                       <p className="text-xs text-[var(--text-subtle)]">
                         {isSyncing
-                          ? "Syncing in background..."
-                          : "Fetch latest from services"}
+                          ? t('syncingInBackground')
+                          : t('fetchLatestFromServices')}
                       </p>
                     </div>
                     <Button
@@ -511,7 +511,7 @@ export function ConnectedServicesSection({
                       disabled={isSyncing}
                       leftIcon={<RefreshIcon className="w-4 h-4" />}
                     >
-                      {isSyncing ? "Syncing..." : "Sync Now"}
+                      {isSyncing ? t('syncing') : t('syncNow')}
                     </Button>
                   </div>
 
@@ -553,9 +553,8 @@ export function ConnectedServicesSection({
               {isConnected("spotify") && !isConnected("lastfm") && (
                 <div className="p-3 rounded-xl bg-[#ff4444]/10 border border-[#ff4444]/20">
                   <p className="text-xs text-[var(--text-muted)]">
-                    <strong className="text-[#ff4444]">Tip:</strong> Connect
-                    Last.fm for more accurate recommendations based on your full
-                    listening history.
+                    <strong className="text-[#ff4444]">{t('lastfmTip')}</strong>{' '}
+                    {t('lastfmTipDesc')}
                   </p>
                 </div>
               )}
