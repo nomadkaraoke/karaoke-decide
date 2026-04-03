@@ -31,7 +31,8 @@ def _load_translations(locale: str) -> dict[str, Any]:
             return _load_translations(DEFAULT_LOCALE)
         return {}
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        result: dict[str, Any] = json.load(f)
+        return result
 
 
 def t(locale: str, key: str, **kwargs: Any) -> str:
@@ -64,14 +65,15 @@ def t(locale: str, key: str, **kwargs: Any) -> str:
     if not isinstance(value, str):
         return key
 
+    result: str = value
     # Interpolate variables
     if kwargs:
         try:
-            value = value.format(**kwargs)
+            result = result.format(**kwargs)
         except KeyError:
             pass  # Missing variable — return template as-is
 
-    return value
+    return result
 
 
 def get_locale_from_request(request: Request) -> str:
