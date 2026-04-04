@@ -56,13 +56,16 @@ export default async function LocaleLayout({
 
   setRequestLocale(locale);
 
+  const rtlLocales = ['ar', 'he'];
+  const dir = rtlLocales.includes(locale) ? 'rtl' : 'ltr';
+
   const messages = await getMessages();
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
       <script
         dangerouslySetInnerHTML={{
-          __html: `document.documentElement.lang="${locale}";`,
+          __html: `document.documentElement.lang="${locale}";document.documentElement.dir="${dir}";`,
         }}
       />
       <GoogleAnalytics />

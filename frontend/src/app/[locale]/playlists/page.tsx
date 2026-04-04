@@ -506,7 +506,7 @@ function PlaylistsContent() {
                         handleDeletePlaylist(playlist.id);
                       }
                     }}
-                    className="ml-2 p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
+                    className="ms-2 p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
                     disabled={deletingId === playlist.id}
                   >
                     {deletingId === playlist.id ? (

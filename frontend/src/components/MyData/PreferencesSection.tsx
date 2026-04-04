@@ -292,7 +292,7 @@ export function PreferencesSection({ isExpanded, onToggle }: Props) {
                     >
                       {t(`genreLabels.${genre.key}`)}
                       {currentPrefs.genres.includes(genre.id) && (
-                        <CheckIcon className="w-3 h-3 ml-1 inline" />
+                        <CheckIcon className="w-3 h-3 ms-1 inline" />
                       )}
                     </button>
                   ))}

@@ -93,7 +93,7 @@ export default function Home() {
             className="px-8 py-4 text-lg btn-glow"
           >
             {t("findYourSong")}
-            <SparklesIcon className="w-5 h-5 ml-2" />
+            <SparklesIcon className="w-5 h-5 ms-2" />
           </Button>
 
           {/* Trust signal */}
@@ -317,7 +317,7 @@ export default function Home() {
             className="px-8 py-4 text-lg btn-glow"
           >
             {t("getStartedFree")}
-            <ChevronRightIcon className="w-5 h-5 ml-2" />
+            <ChevronRightIcon className="w-5 h-5 ms-2 rtl:rotate-180" />
           </Button>
         </div>
       </section>

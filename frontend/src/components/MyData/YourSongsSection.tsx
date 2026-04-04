@@ -299,7 +299,7 @@ export function YourSongsSection({
               {error}
               <button
                 onClick={() => setError(null)}
-                className="ml-2 underline hover:no-underline"
+                className="ms-2 underline hover:no-underline"
               >
                 {t('dismiss')}
               </button>
@@ -351,7 +351,7 @@ export function YourSongsSection({
                                 {suggestion.artist_name}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 ml-2">
+                            <div className="flex items-center gap-2 ms-2">
                               <span className="text-xs text-[var(--text-subtle)]">
                                 {formatDuration(suggestion.duration_ms)}
                               </span>

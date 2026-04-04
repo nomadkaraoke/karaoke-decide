@@ -46,7 +46,7 @@ export function StickyFinishBar({
                 aria-label={t('back')}
                 className="flex items-center gap-1 px-3 py-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors text-sm"
               >
-                <ChevronRightIcon className="w-4 h-4 transform rotate-180" aria-hidden="true" />
+                <ChevronRightIcon className="w-4 h-4 transform rotate-180 rtl:rotate-0" aria-hidden="true" />
                 <span className="hidden sm:inline">{t('back')}</span>
               </button>
             )}
@@ -104,7 +104,7 @@ export function StickyFinishBar({
               ) : (
                 <>
                   {t('finishQuiz')}
-                  <ArrowRightIcon className="w-4 h-4" />
+                  <ArrowRightIcon className="w-4 h-4 rtl:rotate-180" />
                 </>
               )}
             </button>

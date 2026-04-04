@@ -290,7 +290,7 @@ export function YourArtistsSection({
               {error}
               <button
                 onClick={() => setError(null)}
-                className="ml-2 underline hover:no-underline"
+                className="ms-2 underline hover:no-underline"
               >
                 {t('dismiss')}
               </button>
