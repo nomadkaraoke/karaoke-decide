@@ -35,7 +35,7 @@ export function PopularityStars({ count }: { count: number }) {
           className={`w-3.5 h-3.5 ${i < stars ? "text-[var(--brand-gold)]" : "text-[var(--text-subtle)]"}`}
         />
       ))}
-      <span className="ml-1.5 text-xs text-[var(--text-subtle)] font-mono">{count}</span>
+      <span className="ms-1.5 text-xs text-[var(--text-subtle)] font-mono">{count}</span>
     </div>
   );
 }

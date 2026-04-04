@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Inicia sessió a Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Inicia sessió al teu compte",
+      "description": "Fes clic al botó de sota per iniciar sessió. Aquest enllaç caducarà en 24 hores.",
+      "button": "Inicia sessió",
+      "copyLink": "O copia i enganxa aquest enllaç al teu navegador:",
+      "footer": "Si no has sol·licitat aquest correu, pots ignorar-lo amb seguretat.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "La teva sincronització de música s'ha completat!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "La teva sincronització de música s'ha completat!",
+      "description": "Hem acabat de sincronitzar el teu historial de reproducció de {services}.",
+      "songsFound": "Cançons de karaoke trobades",
+      "artistsAnalyzed": "Artistes analitzats",
+      "cta": "Vés a l'aplicació per explorar recomanacions de karaoke personalitzades basades en els teus gustos musicals!",
+      "button": "Veure les meves cançons",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "El compte ja està verificat",
+    "failedToSendVerification": "No s'ha pogut enviar el correu de verificació. Si us plau, torna-ho a provar més tard.",
+    "failedToSendMagicLink": "No s'ha pogut enviar el correu amb l'enllaç màgic. Si us plau, torna-ho a provar més tard.",
+    "verificationSent": "Correu de verificació enviat. Revisa la teva safata d'entrada per completar l'actualització.",
+    "magicLinkSent": "Si existeix un compte per a aquest correu, rebràs un enllaç màgic en breu.",
+    "quizCompleted": "Qüestionari completat amb èxit",
+    "emailCollected": "Correu electrònic registrat",
+    "accountDeleted": "El compte i totes les dades associades s'han eliminat amb èxit",
+    "loggedOut": "Sessió tancada amb èxit",
+    "userNotFound": "Usuari no trobat",
+    "invalidOrExpiredToken": "Token no vàlid o caducat",
+    "tokenAlreadyUsed": "El token ja s'ha utilitzat",
+    "tokenExpired": "El token ha caducat"
+  },
+  "admin": {
+    "userNotFound": "Usuari no trobat",
+    "syncJobNotFound": "Tasca de sincronització no trobada",
+    "mustProvideUserIdOrEmail": "S'ha de proporcionar el user_id o el correu electrònic",
+    "failedToDeleteUser": "No s'ha pogut eliminar l'usuari",
+    "userDeleted": "L'usuari i totes les dades associades s'han eliminat amb èxit"
+  },
+  "catalog": {
+    "songNotFound": "Cançó no trobada"
+  },
+  "playlists": {
+    "notFound": "Llista de reproducció no trobada",
+    "accessDenied": "Accés denegat a aquesta llista de reproducció"
+  },
+  "knownSongs": {
+    "trackNotFound": "Pista no trobada a les cançons conegudes o no es pot eliminar",
+    "songNotFound": "Cançó no trobada a la biblioteca de l'usuari",
+    "songCannotBeRemoved": "Cançó no trobada a les cançons conegudes o no es pot eliminar"
+  },
+  "myData": {
+    "artistNotFound": "Artista '{artist_name}' no trobat a les dades de l'usuari"
+  },
+  "services": {
+    "invalidServiceType": "Tipus de servei no vàlid: {service_type}",
+    "serviceNotConnected": "El servei {service_type} no està connectat",
+    "failedToStartSync": "No s'ha pogut iniciar la sincronització: {error}",
+    "disconnected": "S'ha desconnectat {service_type} amb èxit",
+    "syncStarted": "Tasca de sincronització iniciada. Consulta /sync/status per veure'n el progrés."
+  }
+}

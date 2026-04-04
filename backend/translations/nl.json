@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Log in bij Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Log in op je account",
+      "description": "Klik op de onderstaande knop om in te loggen. Deze link verloopt over 24 uur.",
+      "button": "Inloggen",
+      "copyLink": "Of kopieer en plak deze link in je browser:",
+      "footer": "Als je deze e-mail niet hebt aangevraagd, kun je deze veilig negeren.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Je muzieksynchronisatie is voltooid!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Je muzieksynchronisatie is voltooid!",
+      "description": "We zijn klaar met het synchroniseren van je luistergeschiedenis van {services}.",
+      "songsFound": "Gevonden karaokenummers",
+      "artistsAnalyzed": "Geanalyseerde artiesten",
+      "cta": "Ga naar de app om gepersonaliseerde karaoke-aanbevelingen te ontdekken op basis van jouw muzieksmaak!",
+      "button": "Bekijk mijn nummers",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Account is al geverifieerd",
+    "failedToSendVerification": "Kan verificatie-e-mail niet verzenden. Probeer het later opnieuw.",
+    "failedToSendMagicLink": "Kan e-mail met magic link niet verzenden. Probeer het later opnieuw.",
+    "verificationSent": "Verificatie-e-mail verzonden. Controleer je inbox om de upgrade te voltooien.",
+    "magicLinkSent": "Als er een account bestaat voor dit e-mailadres, ontvang je binnenkort een magic link.",
+    "quizCompleted": "Quiz succesvol afgerond",
+    "emailCollected": "E-mailadres verzameld",
+    "accountDeleted": "Account en alle bijbehorende gegevens succesvol verwijderd",
+    "loggedOut": "Succesvol uitgelogd",
+    "userNotFound": "Gebruiker niet gevonden",
+    "invalidOrExpiredToken": "Ongeldig of verlopen token",
+    "tokenAlreadyUsed": "Token is al gebruikt",
+    "tokenExpired": "Token is verlopen"
+  },
+  "admin": {
+    "userNotFound": "Gebruiker niet gevonden",
+    "syncJobNotFound": "Synchronisatietaak niet gevonden",
+    "mustProvideUserIdOrEmail": "Je moet een user_id of e-mailadres opgeven",
+    "failedToDeleteUser": "Kan gebruiker niet verwijderen",
+    "userDeleted": "Gebruiker en alle bijbehorende gegevens succesvol verwijderd"
+  },
+  "catalog": {
+    "songNotFound": "Nummer niet gevonden"
+  },
+  "playlists": {
+    "notFound": "Afspeellijst niet gevonden",
+    "accessDenied": "Toegang tot deze afspeellijst geweigerd"
+  },
+  "knownSongs": {
+    "trackNotFound": "Track niet gevonden in bekende nummers of kan niet worden verwijderd",
+    "songNotFound": "Nummer niet gevonden in de bibliotheek van de gebruiker",
+    "songCannotBeRemoved": "Nummer niet gevonden in bekende nummers of kan niet worden verwijderd"
+  },
+  "myData": {
+    "artistNotFound": "Artiest '{artist_name}' niet gevonden in de gegevens van de gebruiker"
+  },
+  "services": {
+    "invalidServiceType": "Ongeldig servicetype: {service_type}",
+    "serviceNotConnected": "Service {service_type} is niet verbonden",
+    "failedToStartSync": "Kan synchronisatie niet starten: {error}",
+    "disconnected": "Verbinding met {service_type} succesvol verbroken",
+    "syncStarted": "Synchronisatietaak gestart. Poll /sync/status voor de voortgang."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Prijavi se u Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Prijavi se na svoj račun",
+      "description": "Klikni na gumb ispod za prijavu. Ova poveznica istječe za 24 sata.",
+      "button": "Prijavi se",
+      "copyLink": "Ili kopiraj i zalijepi ovu poveznicu u svoj preglednik:",
+      "footer": "Ako nisi zatražio/la ovaj e-mail, možeš ga sigurno zanemariti.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Tvoja sinkronizacija glazbe je završena!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Tvoja sinkronizacija glazbe je završena!",
+      "description": "Završili smo sa sinkronizacijom tvoje povijesti slušanja s {services}.",
+      "songsFound": "Pronađene karaoke pjesme",
+      "artistsAnalyzed": "Analizirani izvođači",
+      "cta": "Otvori aplikaciju i istraži personalizirane karaoke preporuke na temelju tvog glazbenog ukusa!",
+      "button": "Pogledaj moje pjesme",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Račun je već potvrđen",
+    "failedToSendVerification": "Slanje e-maila za potvrdu nije uspjelo. Pokušaj ponovno kasnije.",
+    "failedToSendMagicLink": "Slanje e-maila s magičnom poveznicom nije uspjelo. Pokušaj ponovno kasnije.",
+    "verificationSent": "E-mail za potvrdu je poslan. Provjeri svoj sandučić kako bi dovršio/la nadogradnju.",
+    "magicLinkSent": "Ako postoji račun za ovaj e-mail, uskoro ćeš dobiti magičnu poveznicu.",
+    "quizCompleted": "Kviz je uspješno završen",
+    "emailCollected": "E-mail adresa je zabilježena",
+    "accountDeleted": "Račun i svi povezani podaci su uspješno izbrisani",
+    "loggedOut": "Uspješno si odjavljen/a",
+    "userNotFound": "Korisnik nije pronađen",
+    "invalidOrExpiredToken": "Nevažeći ili istekli token",
+    "tokenAlreadyUsed": "Token je već iskorišten",
+    "tokenExpired": "Token je istekao"
+  },
+  "admin": {
+    "userNotFound": "Korisnik nije pronađen",
+    "syncJobNotFound": "Zadatak sinkronizacije nije pronađen",
+    "mustProvideUserIdOrEmail": "Moraš unijeti user_id ili e-mail",
+    "failedToDeleteUser": "Brisanje korisnika nije uspjelo",
+    "userDeleted": "Korisnik i svi povezani podaci su uspješno izbrisani"
+  },
+  "catalog": {
+    "songNotFound": "Pjesma nije pronađena"
+  },
+  "playlists": {
+    "notFound": "Playlista nije pronađena",
+    "accessDenied": "Pristup ovoj playlisti je odbijen"
+  },
+  "knownSongs": {
+    "trackNotFound": "Zapis nije pronađen u poznatim pjesmama ili se ne može ukloniti",
+    "songNotFound": "Pjesma nije pronađena u korisnikovoj biblioteci",
+    "songCannotBeRemoved": "Pjesma nije pronađena u poznatim pjesmama ili se ne može ukloniti"
+  },
+  "myData": {
+    "artistNotFound": "Izvođač '{artist_name}' nije pronađen u podacima korisnika"
+  },
+  "services": {
+    "invalidServiceType": "Nevažeća vrsta usluge: {service_type}",
+    "serviceNotConnected": "Usluga {service_type} nije povezana",
+    "failedToStartSync": "Pokretanje sinkronizacije nije uspjelo: {error}",
+    "disconnected": "Uspješno prekinuta veza s uslugom {service_type}",
+    "syncStarted": "Zadatak sinkronizacije je pokrenut. Provjeri /sync/status za napredak."
+  }
+}

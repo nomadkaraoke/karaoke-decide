@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Logg inn på Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Logg inn på kontoen din",
+      "description": "Klikk på knappen nedenfor for å logge inn. Denne lenken utløper om 24 timer.",
+      "button": "Logg inn",
+      "copyLink": "Eller kopier og lim inn denne lenken i nettleseren din:",
+      "footer": "Hvis du ikke ba om denne e-posten, kan du trygt ignorere den.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Musikksynkroniseringen din er fullført!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Musikksynkroniseringen din er fullført!",
+      "description": "Vi er ferdige med å synkronisere lyttehistorikken din fra {services}.",
+      "songsFound": "Karaokesanger funnet",
+      "artistsAnalyzed": "Artister analysert",
+      "cta": "Gå til appen for å utforske personlige karaokeanbefalinger basert på musikksmaken din!",
+      "button": "Se sangene mine",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Kontoen er allerede bekreftet",
+    "failedToSendVerification": "Kunne ikke sende bekreftelses-e-post. Prøv igjen senere.",
+    "failedToSendMagicLink": "Kunne ikke sende e-post med magisk lenke. Prøv igjen senere.",
+    "verificationSent": "Bekreftelses-e-post sendt. Sjekk innboksen din for å fullføre oppgraderingen.",
+    "magicLinkSent": "Hvis det finnes en konto for denne e-postadressen, vil du motta en magisk lenke om kort tid.",
+    "quizCompleted": "Quizen ble fullført",
+    "emailCollected": "E-postadresse registrert",
+    "accountDeleted": "Kontoen og alle tilknyttede data er slettet",
+    "loggedOut": "Du er nå logget ut",
+    "userNotFound": "Fant ikke brukeren",
+    "invalidOrExpiredToken": "Ugyldig eller utløpt token",
+    "tokenAlreadyUsed": "Tokenet er allerede brukt",
+    "tokenExpired": "Tokenet har utløpt"
+  },
+  "admin": {
+    "userNotFound": "Fant ikke brukeren",
+    "syncJobNotFound": "Fant ikke synkroniseringsjobben",
+    "mustProvideUserIdOrEmail": "Du må oppgi enten user_id eller e-postadresse",
+    "failedToDeleteUser": "Kunne ikke slette brukeren",
+    "userDeleted": "Brukeren og alle tilknyttede data er slettet"
+  },
+  "catalog": {
+    "songNotFound": "Fant ikke sangen"
+  },
+  "playlists": {
+    "notFound": "Fant ikke spillelisten",
+    "accessDenied": "Ingen tilgang til denne spillelisten"
+  },
+  "knownSongs": {
+    "trackNotFound": "Fant ikke sporet blant kjente sanger, eller det kan ikke fjernes",
+    "songNotFound": "Fant ikke sangen i brukerens bibliotek",
+    "songCannotBeRemoved": "Fant ikke sangen blant kjente sanger, eller den kan ikke fjernes"
+  },
+  "myData": {
+    "artistNotFound": "Artisten '{artist_name}' ble ikke funnet i brukerens data"
+  },
+  "services": {
+    "invalidServiceType": "Ugyldig tjenestetype: {service_type}",
+    "serviceNotConnected": "Tjenesten {service_type} er ikke koblet til",
+    "failedToStartSync": "Kunne ikke starte synkronisering: {error}",
+    "disconnected": "{service_type} er koblet fra",
+    "syncStarted": "Synkroniseringsjobb startet. Sjekk /sync/status for fremdrift."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "เข้าสู่ระบบ Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "เข้าสู่ระบบบัญชีของคุณ",
+      "description": "คลิกปุ่มด้านล่างเพื่อเข้าสู่ระบบ ลิงก์นี้จะหมดอายุภายใน 24 ชั่วโมง",
+      "button": "เข้าสู่ระบบ",
+      "copyLink": "หรือคัดลอกและวางลิงก์นี้ในเบราว์เซอร์ของคุณ:",
+      "footer": "หากคุณไม่ได้ขอรับอีเมลนี้ คุณสามารถข้ามอีเมลนี้ได้เลย",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "การซิงค์เพลงของคุณเสร็จสมบูรณ์แล้ว!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "การซิงค์เพลงของคุณเสร็จสมบูรณ์แล้ว!",
+      "description": "เราได้ซิงค์ประวัติการฟังของคุณจาก {services} เสร็จเรียบร้อยแล้ว",
+      "songsFound": "เพลงคาราโอเกะที่พบ",
+      "artistsAnalyzed": "ศิลปินที่วิเคราะห์แล้ว",
+      "cta": "เข้าไปที่แอปเพื่อสำรวจเพลงคาราโอเกะที่แนะนำตามสไตล์การฟังเพลงของคุณได้เลย!",
+      "button": "ดูเพลงของฉัน",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "บัญชีได้รับการยืนยันแล้ว",
+    "failedToSendVerification": "ไม่สามารถส่งอีเมลยืนยันได้ โปรดลองอีกครั้งในภายหลัง",
+    "failedToSendMagicLink": "ไม่สามารถส่งอีเมล Magic Link ได้ โปรดลองอีกครั้งในภายหลัง",
+    "verificationSent": "ส่งอีเมลยืนยันแล้ว โปรดตรวจสอบกล่องจดหมายของคุณเพื่อดำเนินการอัปเกรดให้เสร็จสิ้น",
+    "magicLinkSent": "หากมีบัญชีที่ใช้อีเมลนี้ คุณจะได้รับ Magic Link ในไม่ช้า",
+    "quizCompleted": "ทำแบบทดสอบเสร็จสมบูรณ์",
+    "emailCollected": "บันทึกอีเมลแล้ว",
+    "accountDeleted": "ลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดเรียบร้อยแล้ว",
+    "loggedOut": "ออกจากระบบสำเร็จ",
+    "userNotFound": "ไม่พบผู้ใช้",
+    "invalidOrExpiredToken": "โทเค็นไม่ถูกต้องหรือหมดอายุ",
+    "tokenAlreadyUsed": "โทเค็นนี้ถูกใช้งานไปแล้ว",
+    "tokenExpired": "โทเค็นหมดอายุแล้ว"
+  },
+  "admin": {
+    "userNotFound": "ไม่พบผู้ใช้",
+    "syncJobNotFound": "ไม่พบงานซิงค์",
+    "mustProvideUserIdOrEmail": "ต้องระบุ user_id หรืออีเมลอย่างใดอย่างหนึ่ง",
+    "failedToDeleteUser": "ไม่สามารถลบผู้ใช้ได้",
+    "userDeleted": "ลบผู้ใช้และข้อมูลที่เกี่ยวข้องทั้งหมดเรียบร้อยแล้ว"
+  },
+  "catalog": {
+    "songNotFound": "ไม่พบเพลง"
+  },
+  "playlists": {
+    "notFound": "ไม่พบเพลย์ลิสต์",
+    "accessDenied": "ไม่มีสิทธิ์เข้าถึงเพลย์ลิสต์นี้"
+  },
+  "knownSongs": {
+    "trackNotFound": "ไม่พบแทร็กในเพลงที่รู้จักหรือไม่สามารถลบได้",
+    "songNotFound": "ไม่พบเพลงในคลังของผู้ใช้",
+    "songCannotBeRemoved": "ไม่พบเพลงในเพลงที่รู้จักหรือไม่สามารถลบได้"
+  },
+  "myData": {
+    "artistNotFound": "ไม่พบศิลปิน '{artist_name}' ในข้อมูลของผู้ใช้"
+  },
+  "services": {
+    "invalidServiceType": "ประเภทบริการไม่ถูกต้อง: {service_type}",
+    "serviceNotConnected": "บริการ {service_type} ยังไม่ได้เชื่อมต่อ",
+    "failedToStartSync": "ไม่สามารถเริ่มการซิงค์ได้: {error}",
+    "disconnected": "ยกเลิกการเชื่อมต่อ {service_type} สำเร็จ",
+    "syncStarted": "เริ่มงานซิงค์แล้ว ตรวจสอบความคืบหน้าได้ที่ /sync/status"
+  }
+}

@@ -376,7 +376,7 @@ function ArtistsTab({ onCountChange }: { onCountChange: (count: number) => void 
       {error && (
         <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 underline">{tCommon("dismiss")}</button>
+          <button onClick={() => setError(null)} className="ms-2 underline">{tCommon("dismiss")}</button>
         </div>
       )}
 

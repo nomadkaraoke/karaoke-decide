@@ -127,7 +127,7 @@ export default function MyDataPage() {
               {error}
               <button
                 onClick={loadSummary}
-                className="ml-2 underline hover:no-underline"
+                className="ms-2 underline hover:no-underline"
               >
                 {t("retry")}
               </button>

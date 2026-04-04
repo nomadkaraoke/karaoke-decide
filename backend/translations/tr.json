@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Nomad Karaoke Decide'a giriş yap",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Hesabına giriş yap",
+      "description": "Giriş yapmak için aşağıdaki butona tıkla. Bu bağlantının süresi 24 saat içinde dolacak.",
+      "button": "Giriş Yap",
+      "copyLink": "Veya bu bağlantıyı kopyalayıp tarayıcına yapıştır:",
+      "footer": "Bu e-postayı sen talep etmediysen, güvenle görmezden gelebilirsin.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Müzik senkronizasyonun tamamlandı!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Müzik senkronizasyonun tamamlandı!",
+      "description": "{services} üzerinden dinleme geçmişini senkronize etmeyi bitirdik.",
+      "songsFound": "Bulunan Karaoke Şarkıları",
+      "artistsAnalyzed": "İncelenen Sanatçılar",
+      "cta": "Müzik zevkine göre kişiselleştirilmiş karaoke önerilerini keşfetmek için uygulamaya git!",
+      "button": "Şarkılarımı Görüntüle",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Hesap zaten doğrulandı",
+    "failedToSendVerification": "Doğrulama e-postası gönderilemedi. Lütfen daha sonra tekrar dene.",
+    "failedToSendMagicLink": "Sihirli bağlantı e-postası gönderilemedi. Lütfen daha sonra tekrar dene.",
+    "verificationSent": "Doğrulama e-postası gönderildi. Yükseltmeyi tamamlamak için gelen kutunu kontrol et.",
+    "magicLinkSent": "Bu e-posta için bir hesap varsa, kısa süre içinde bir sihirli bağlantı alacaksın.",
+    "quizCompleted": "Test başarıyla tamamlandı",
+    "emailCollected": "E-posta alındı",
+    "accountDeleted": "Hesap ve ilişkili tüm veriler başarıyla silindi",
+    "loggedOut": "Başarıyla çıkış yapıldı",
+    "userNotFound": "Kullanıcı bulunamadı",
+    "invalidOrExpiredToken": "Geçersiz veya süresi dolmuş token",
+    "tokenAlreadyUsed": "Token zaten kullanılmış",
+    "tokenExpired": "Token'ın süresi dolmuş"
+  },
+  "admin": {
+    "userNotFound": "Kullanıcı bulunamadı",
+    "syncJobNotFound": "Senkronizasyon görevi bulunamadı",
+    "mustProvideUserIdOrEmail": "user_id veya e-posta sağlanmalıdır",
+    "failedToDeleteUser": "Kullanıcı silinemedi",
+    "userDeleted": "Kullanıcı ve ilişkili tüm veriler başarıyla silindi"
+  },
+  "catalog": {
+    "songNotFound": "Şarkı bulunamadı"
+  },
+  "playlists": {
+    "notFound": "Çalma listesi bulunamadı",
+    "accessDenied": "Bu çalma listesine erişim reddedildi"
+  },
+  "knownSongs": {
+    "trackNotFound": "Parça bilinen şarkılarda bulunamadı veya kaldırılamıyor",
+    "songNotFound": "Şarkı kullanıcının kitaplığında bulunamadı",
+    "songCannotBeRemoved": "Şarkı bilinen şarkılarda bulunamadı veya kaldırılamıyor"
+  },
+  "myData": {
+    "artistNotFound": "Sanatçı '{artist_name}' kullanıcının verilerinde bulunamadı"
+  },
+  "services": {
+    "invalidServiceType": "Geçersiz hizmet türü: {service_type}",
+    "serviceNotConnected": "{service_type} hizmeti bağlı değil",
+    "failedToStartSync": "Senkronizasyon başlatılamadı: {error}",
+    "disconnected": "{service_type} bağlantısı başarıyla kesildi",
+    "syncStarted": "Senkronizasyon görevi başlatıldı. İlerleme durumu için /sync/status adresini kontrol et."
+  }
+}

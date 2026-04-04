@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Войди в Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Войди в свой аккаунт",
+      "description": "Нажми на кнопку ниже, чтобы войти. Срок действия этой ссылки истечет через 24 часа.",
+      "button": "Войти",
+      "copyLink": "Или скопируй и вставь эту ссылку в браузер:",
+      "footer": "Если ты не запрашивал это письмо, можешь смело его проигнорировать.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Синхронизация твоей музыки завершена!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Синхронизация твоей музыки завершена!",
+      "description": "Мы закончили синхронизацию твоей истории прослушиваний из {services}.",
+      "songsFound": "Найдено караоке-песен",
+      "artistsAnalyzed": "Проанализировано исполнителей",
+      "cta": "Переходи в приложение, чтобы посмотреть персональные караоке-рекомендации на основе твоих музыкальных вкусов!",
+      "button": "Посмотреть мои песни",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Аккаунт уже подтвержден",
+    "failedToSendVerification": "Не удалось отправить письмо для подтверждения. Пожалуйста, попробуй позже.",
+    "failedToSendMagicLink": "Не удалось отправить письмо со ссылкой для входа. Пожалуйста, попробуй позже.",
+    "verificationSent": "Письмо для подтверждения отправлено. Проверь почту, чтобы завершить обновление.",
+    "magicLinkSent": "Если аккаунт с этим адресом существует, ты скоро получишь ссылку для входа.",
+    "quizCompleted": "Квиз успешно пройден",
+    "emailCollected": "Email получен",
+    "accountDeleted": "Аккаунт и все связанные данные успешно удалены",
+    "loggedOut": "Успешный выход из системы",
+    "userNotFound": "Пользователь не найден",
+    "invalidOrExpiredToken": "Недействительный или просроченный токен",
+    "tokenAlreadyUsed": "Токен уже использован",
+    "tokenExpired": "Срок действия токена истек"
+  },
+  "admin": {
+    "userNotFound": "Пользователь не найден",
+    "syncJobNotFound": "Задача синхронизации не найдена",
+    "mustProvideUserIdOrEmail": "Необходимо указать user_id или email",
+    "failedToDeleteUser": "Не удалось удалить пользователя",
+    "userDeleted": "Пользователь и все связанные данные успешно удалены"
+  },
+  "catalog": {
+    "songNotFound": "Песня не найдена"
+  },
+  "playlists": {
+    "notFound": "Плейлист не найден",
+    "accessDenied": "Доступ к этому плейлисту запрещен"
+  },
+  "knownSongs": {
+    "trackNotFound": "Трек не найден в списке известных песен или не может быть удален",
+    "songNotFound": "Песня не найдена в библиотеке пользователя",
+    "songCannotBeRemoved": "Песня не найдена в списке известных песен или не может быть удалена"
+  },
+  "myData": {
+    "artistNotFound": "Исполнитель '{artist_name}' не найден в данных пользователя"
+  },
+  "services": {
+    "invalidServiceType": "Неверный тип сервиса: {service_type}",
+    "serviceNotConnected": "Сервис {service_type} не подключен",
+    "failedToStartSync": "Не удалось запустить синхронизацию: {error}",
+    "disconnected": "Сервис {service_type} успешно отключен",
+    "syncStarted": "Задача синхронизации запущена. Проверяй статус через /sync/status."
+  }
+}

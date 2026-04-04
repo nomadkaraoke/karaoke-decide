@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Conectează-te la Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Conectează-te la contul tău",
+      "description": "Apasă pe butonul de mai jos pentru a te conecta. Acest link va expira în 24 de ore.",
+      "button": "Conectează-te",
+      "copyLink": "Sau copiază și lipește acest link în browserul tău:",
+      "footer": "Dacă nu ai solicitat acest e-mail, îl poți ignora în siguranță.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Sincronizarea muzicii tale s-a finalizat!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Sincronizarea muzicii tale s-a finalizat!",
+      "description": "Am terminat de sincronizat istoricul tău de ascultare din {services}.",
+      "songsFound": "Melodii karaoke găsite",
+      "artistsAnalyzed": "Artiști analizați",
+      "cta": "Intră în aplicație pentru a explora recomandări personalizate de karaoke bazate pe gusturile tale muzicale!",
+      "button": "Vezi melodiile mele",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Contul este deja verificat",
+    "failedToSendVerification": "Nu s-a putut trimite e-mailul de verificare. Te rugăm să încerci din nou mai târziu.",
+    "failedToSendMagicLink": "Nu s-a putut trimite e-mailul cu linkul magic. Te rugăm să încerci din nou mai târziu.",
+    "verificationSent": "E-mailul de verificare a fost trimis. Verifică-ți căsuța de e-mail pentru a finaliza actualizarea.",
+    "magicLinkSent": "Dacă există un cont pentru acest e-mail, vei primi un link magic în scurt timp.",
+    "quizCompleted": "Chestionar finalizat cu succes",
+    "emailCollected": "E-mail colectat",
+    "accountDeleted": "Contul și toate datele asociate au fost șterse cu succes",
+    "loggedOut": "Te-ai deconectat cu succes",
+    "userNotFound": "Utilizatorul nu a fost găsit",
+    "invalidOrExpiredToken": "Token invalid sau expirat",
+    "tokenAlreadyUsed": "Tokenul a fost deja folosit",
+    "tokenExpired": "Tokenul a expirat"
+  },
+  "admin": {
+    "userNotFound": "Utilizatorul nu a fost găsit",
+    "syncJobNotFound": "Sarcina de sincronizare nu a fost găsită",
+    "mustProvideUserIdOrEmail": "Trebuie să furnizezi fie user_id, fie adresa de e-mail",
+    "failedToDeleteUser": "Nu s-a putut șterge utilizatorul",
+    "userDeleted": "Utilizatorul și toate datele asociate au fost șterse cu succes"
+  },
+  "catalog": {
+    "songNotFound": "Melodia nu a fost găsită"
+  },
+  "playlists": {
+    "notFound": "Playlistul nu a fost găsit",
+    "accessDenied": "Acces interzis la acest playlist"
+  },
+  "knownSongs": {
+    "trackNotFound": "Piesa nu a fost găsită în melodiile cunoscute sau nu poate fi eliminată",
+    "songNotFound": "Melodia nu a fost găsită în biblioteca utilizatorului",
+    "songCannotBeRemoved": "Melodia nu a fost găsită în melodiile cunoscute sau nu poate fi eliminată"
+  },
+  "myData": {
+    "artistNotFound": "Artistul '{artist_name}' nu a fost găsit în datele utilizatorului"
+  },
+  "services": {
+    "invalidServiceType": "Tip de serviciu invalid: {service_type}",
+    "serviceNotConnected": "Serviciul {service_type} nu este conectat",
+    "failedToStartSync": "Nu s-a putut începe sincronizarea: {error}",
+    "disconnected": "Ai deconectat cu succes {service_type}",
+    "syncStarted": "Sarcina de sincronizare a început. Verifică /sync/status pentru progres."
+  }
+}

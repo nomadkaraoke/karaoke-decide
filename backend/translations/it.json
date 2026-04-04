@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Accedi a Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Accedi al tuo account",
+      "description": "Clicca sul pulsante qui sotto per accedere. Questo link scadrà in 24 ore.",
+      "button": "Accedi",
+      "copyLink": "Oppure copia e incolla questo link nel tuo browser:",
+      "footer": "Se non hai richiesto questa email, puoi ignorarla tranquillamente.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "La sincronizzazione della tua musica è completata!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "La sincronizzazione della tua musica è completata!",
+      "description": "Abbiamo finito di sincronizzare la tua cronologia di ascolto da {services}.",
+      "songsFound": "Canzoni karaoke trovate",
+      "artistsAnalyzed": "Artisti analizzati",
+      "cta": "Vai all'app per esplorare i consigli karaoke personalizzati in base ai tuoi gusti musicali!",
+      "button": "Vedi le mie canzoni",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "L'account è già verificato",
+    "failedToSendVerification": "Impossibile inviare l'email di verifica. Riprova più tardi.",
+    "failedToSendMagicLink": "Impossibile inviare l'email con il magic link. Riprova più tardi.",
+    "verificationSent": "Email di verifica inviata. Controlla la tua casella di posta per completare l'aggiornamento.",
+    "magicLinkSent": "Se esiste un account per questa email, riceverai a breve un magic link.",
+    "quizCompleted": "Quiz completato con successo",
+    "emailCollected": "Email salvata",
+    "accountDeleted": "Account e tutti i dati associati eliminati con successo",
+    "loggedOut": "Disconnessione effettuata con successo",
+    "userNotFound": "Utente non trovato",
+    "invalidOrExpiredToken": "Token non valido o scaduto",
+    "tokenAlreadyUsed": "Il token è già stato utilizzato",
+    "tokenExpired": "Il token è scaduto"
+  },
+  "admin": {
+    "userNotFound": "Utente non trovato",
+    "syncJobNotFound": "Processo di sincronizzazione non trovato",
+    "mustProvideUserIdOrEmail": "Devi fornire user_id o email",
+    "failedToDeleteUser": "Impossibile eliminare l'utente",
+    "userDeleted": "Utente e tutti i dati associati eliminati con successo"
+  },
+  "catalog": {
+    "songNotFound": "Canzone non trovata"
+  },
+  "playlists": {
+    "notFound": "Playlist non trovata",
+    "accessDenied": "Accesso negato a questa playlist"
+  },
+  "knownSongs": {
+    "trackNotFound": "Traccia non trovata nelle canzoni conosciute o impossibile da rimuovere",
+    "songNotFound": "Canzone non trovata nella libreria dell'utente",
+    "songCannotBeRemoved": "Canzone non trovata nelle canzoni conosciute o impossibile da rimuovere"
+  },
+  "myData": {
+    "artistNotFound": "Artista '{artist_name}' non trovato nei dati dell'utente"
+  },
+  "services": {
+    "invalidServiceType": "Tipo di servizio non valido: {service_type}",
+    "serviceNotConnected": "Il servizio {service_type} non è connesso",
+    "failedToStartSync": "Impossibile avviare la sincronizzazione: {error}",
+    "disconnected": "{service_type} disconnesso con successo",
+    "syncStarted": "Processo di sincronizzazione avviato. Controlla /sync/status per l'avanzamento."
+  }
+}

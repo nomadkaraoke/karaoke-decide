@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Masuk ke Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Masuk ke akun Anda",
+      "description": "Klik tombol di bawah untuk masuk. Tautan ini akan kedaluwarsa dalam 24 jam.",
+      "button": "Masuk",
+      "copyLink": "Atau salin dan tempel tautan ini ke browser Anda:",
+      "footer": "Jika Anda tidak meminta email ini, Anda dapat mengabaikannya.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Sinkronisasi musik Anda telah selesai!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Sinkronisasi musik Anda telah selesai!",
+      "description": "Kami telah selesai menyinkronkan riwayat mendengarkan Anda dari {services}.",
+      "songsFound": "Lagu Karaoke Ditemukan",
+      "artistsAnalyzed": "Artis yang Dianalisis",
+      "cta": "Buka aplikasi untuk menjelajahi rekomendasi karaoke yang dipersonalisasi berdasarkan selera musik Anda!",
+      "button": "Lihat Lagu Saya",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Akun sudah diverifikasi",
+    "failedToSendVerification": "Gagal mengirim email verifikasi. Silakan coba lagi nanti.",
+    "failedToSendMagicLink": "Gagal mengirim email magic link. Silakan coba lagi nanti.",
+    "verificationSent": "Email verifikasi terkirim. Periksa kotak masuk Anda untuk menyelesaikan peningkatan.",
+    "magicLinkSent": "Jika ada akun untuk email ini, Anda akan segera menerima magic link.",
+    "quizCompleted": "Kuis berhasil diselesaikan",
+    "emailCollected": "Email berhasil disimpan",
+    "accountDeleted": "Akun dan semua data terkait berhasil dihapus",
+    "loggedOut": "Berhasil keluar",
+    "userNotFound": "Pengguna tidak ditemukan",
+    "invalidOrExpiredToken": "Token tidak valid atau kedaluwarsa",
+    "tokenAlreadyUsed": "Token sudah digunakan",
+    "tokenExpired": "Token telah kedaluwarsa"
+  },
+  "admin": {
+    "userNotFound": "Pengguna tidak ditemukan",
+    "syncJobNotFound": "Tugas sinkronisasi tidak ditemukan",
+    "mustProvideUserIdOrEmail": "Harus menyertakan user_id atau email",
+    "failedToDeleteUser": "Gagal menghapus pengguna",
+    "userDeleted": "Pengguna dan semua data terkait berhasil dihapus"
+  },
+  "catalog": {
+    "songNotFound": "Lagu tidak ditemukan"
+  },
+  "playlists": {
+    "notFound": "Playlist tidak ditemukan",
+    "accessDenied": "Akses ditolak untuk playlist ini"
+  },
+  "knownSongs": {
+    "trackNotFound": "Trek tidak ditemukan dalam daftar lagu yang dikenal atau tidak dapat dihapus",
+    "songNotFound": "Lagu tidak ditemukan di koleksi pengguna",
+    "songCannotBeRemoved": "Lagu tidak ditemukan dalam daftar lagu yang dikenal atau tidak dapat dihapus"
+  },
+  "myData": {
+    "artistNotFound": "Artis '{artist_name}' tidak ditemukan dalam data pengguna"
+  },
+  "services": {
+    "invalidServiceType": "Jenis layanan tidak valid: {service_type}",
+    "serviceNotConnected": "Layanan {service_type} tidak terhubung",
+    "failedToStartSync": "Gagal memulai sinkronisasi: {error}",
+    "disconnected": "Berhasil memutuskan sambungan {service_type}",
+    "syncStarted": "Tugas sinkronisasi dimulai. Periksa /sync/status untuk melihat progres."
+  }
+}

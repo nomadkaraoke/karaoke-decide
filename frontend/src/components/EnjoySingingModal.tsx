@@ -168,7 +168,7 @@ export function EnjoySingingModal({
                 }`}
               >
                 {selectedTags.includes(tag) && (
-                  <CheckIcon className="w-3 h-3 inline mr-1" />
+                  <CheckIcon className="w-3 h-3 inline me-1" />
                 )}
                 {t(TAG_KEYS[tag])}
               </button>
