@@ -24,24 +24,24 @@
   },
   "auth": {
     "accountAlreadyVerified": "Konto ist bereits verifiziert",
-    "failedToSendVerification": "Fehler beim Senden der Verifizierungs-E-Mail. Bitte versuche es später erneut.",
-    "failedToSendMagicLink": "Fehler beim Senden der Magic-Link-E-Mail. Bitte versuche es später erneut.",
+    "failedToSendVerification": "Senden der Verifizierungs-E-Mail fehlgeschlagen. Bitte versuche es später noch einmal.",
+    "failedToSendMagicLink": "Senden der E-Mail mit dem magischen Link fehlgeschlagen. Bitte versuche es später noch einmal.",
     "verificationSent": "Verifizierungs-E-Mail gesendet. Überprüfe deinen Posteingang, um das Upgrade abzuschließen.",
-    "magicLinkSent": "Wenn ein Konto für diese E-Mail existiert, erhältst du in Kürze einen Magic Link.",
+    "magicLinkSent": "Wenn ein Konto für diese E-Mail existiert, erhältst du in Kürze einen magischen Link.",
     "quizCompleted": "Quiz erfolgreich abgeschlossen",
     "emailCollected": "E-Mail erfasst",
     "accountDeleted": "Konto und alle zugehörigen Daten erfolgreich gelöscht",
     "loggedOut": "Erfolgreich abgemeldet",
     "userNotFound": "Benutzer nicht gefunden",
-    "invalidOrExpiredToken": "Ungültiger oder abgelaufener Token",
+    "invalidOrExpiredToken": "Ungültiges oder abgelaufenes Token",
     "tokenAlreadyUsed": "Token wurde bereits verwendet",
     "tokenExpired": "Token ist abgelaufen"
   },
   "admin": {
     "userNotFound": "Benutzer nicht gefunden",
-    "syncJobNotFound": "Synchronisations-Job nicht gefunden",
+    "syncJobNotFound": "Synchronisations-Auftrag nicht gefunden",
     "mustProvideUserIdOrEmail": "Es muss entweder user_id oder email angegeben werden",
-    "failedToDeleteUser": "Fehler beim Löschen des Benutzers",
+    "failedToDeleteUser": "Löschen des Benutzers fehlgeschlagen",
     "userDeleted": "Benutzer und alle zugehörigen Daten erfolgreich gelöscht"
   },
   "catalog": {
@@ -52,9 +52,9 @@
     "accessDenied": "Zugriff auf diese Playlist verweigert"
   },
   "knownSongs": {
-    "trackNotFound": "Track nicht in den bekannten Songs gefunden oder kann nicht entfernt werden",
+    "trackNotFound": "Track wurde nicht in den bekannten Songs gefunden oder kann nicht entfernt werden",
     "songNotFound": "Song nicht in der Bibliothek des Benutzers gefunden",
-    "songCannotBeRemoved": "Song nicht in den bekannten Songs gefunden oder kann nicht entfernt werden"
+    "songCannotBeRemoved": "Song wurde nicht in den bekannten Songs gefunden oder kann nicht entfernt werden"
   },
   "myData": {
     "artistNotFound": "Künstler '{artist_name}' nicht in den Daten des Benutzers gefunden"
@@ -62,8 +62,8 @@
   "services": {
     "invalidServiceType": "Ungültiger Diensttyp: {service_type}",
     "serviceNotConnected": "Dienst {service_type} ist nicht verbunden",
-    "failedToStartSync": "Fehler beim Starten der Synchronisation: {error}",
+    "failedToStartSync": "Starten der Synchronisation fehlgeschlagen: {error}",
     "disconnected": "{service_type} erfolgreich getrennt",
-    "syncStarted": "Synchronisations-Job gestartet. Rufe /sync/status für den Fortschritt ab."
+    "syncStarted": "Synchronisations-Auftrag gestartet. Frage /sync/status für den Fortschritt ab."
   }
 }

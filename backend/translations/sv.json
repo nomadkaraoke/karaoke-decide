@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Logga in på Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Logga in på ditt konto",
+      "description": "Klicka på knappen nedan för att logga in. Denna länk löper ut om 24 timmar.",
+      "button": "Logga in",
+      "copyLink": "Eller kopiera och klistra in denna länk i din webbläsare:",
+      "footer": "Om du inte har begärt det här mejlet kan du bara ignorera det.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Din musiksynkronisering är klar!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Din musiksynkronisering är klar!",
+      "description": "Vi har nu synkroniserat din lyssningshistorik från {services}.",
+      "songsFound": "Hittade karaokelåtar",
+      "artistsAnalyzed": "Analyserade artister",
+      "cta": "Gå till appen för att utforska personliga karaokerekommendationer baserade på din musiksmak!",
+      "button": "Visa mina låtar",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Kontot är redan verifierat",
+    "failedToSendVerification": "Det gick inte att skicka verifieringsmejlet. Försök igen senare.",
+    "failedToSendMagicLink": "Det gick inte att skicka mejlet med den magiska länken. Försök igen senare.",
+    "verificationSent": "Verifieringsmejl skickat. Kolla din inkorg för att slutföra uppgraderingen.",
+    "magicLinkSent": "Om det finns ett konto för den här e-postadressen kommer du snart att få en magisk länk.",
+    "quizCompleted": "Quizet har slutförts",
+    "emailCollected": "E-postadress registrerad",
+    "accountDeleted": "Kontot och all tillhörande data har raderats",
+    "loggedOut": "Du har loggats ut",
+    "userNotFound": "Användaren hittades inte",
+    "invalidOrExpiredToken": "Ogiltig eller utgången token",
+    "tokenAlreadyUsed": "Token har redan använts",
+    "tokenExpired": "Token har gått ut"
+  },
+  "admin": {
+    "userNotFound": "Användaren hittades inte",
+    "syncJobNotFound": "Synkroniseringsjobbet hittades inte",
+    "mustProvideUserIdOrEmail": "Du måste ange antingen user_id eller e-post",
+    "failedToDeleteUser": "Det gick inte att radera användaren",
+    "userDeleted": "Användaren och all tillhörande data har raderats"
+  },
+  "catalog": {
+    "songNotFound": "Låten hittades inte"
+  },
+  "playlists": {
+    "notFound": "Spellistan hittades inte",
+    "accessDenied": "Åtkomst nekad till denna spellista"
+  },
+  "knownSongs": {
+    "trackNotFound": "Spåret hittades inte i kända låtar eller kan inte tas bort",
+    "songNotFound": "Låten hittades inte i användarens bibliotek",
+    "songCannotBeRemoved": "Låten hittades inte i kända låtar eller kan inte tas bort"
+  },
+  "myData": {
+    "artistNotFound": "Artisten '{artist_name}' hittades inte i användarens data"
+  },
+  "services": {
+    "invalidServiceType": "Ogiltig tjänstetyp: {service_type}",
+    "serviceNotConnected": "Tjänsten {service_type} är inte ansluten",
+    "failedToStartSync": "Det gick inte att starta synkroniseringen: {error}",
+    "disconnected": "{service_type} har kopplats bort",
+    "syncStarted": "Synkroniseringsjobb startat. Anropa /sync/status för att se förloppet."
+  }
+}

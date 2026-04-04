@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Log ind på Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Log ind på din konto",
+      "description": "Klik på knappen nedenfor for at logge ind. Dette link udløber om 24 timer.",
+      "button": "Log ind",
+      "copyLink": "Eller kopiér og indsæt dette link i din browser:",
+      "footer": "Hvis du ikke har anmodet om denne e-mail, kan du roligt ignorere den.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Din musiksynkronisering er fuldført!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Din musiksynkronisering er fuldført!",
+      "description": "Vi er færdige med at synkronisere din lyttehistorik fra {services}.",
+      "songsFound": "Fundne karaokesange",
+      "artistsAnalyzed": "Analyserede kunstnere",
+      "cta": "Gå til appen for at udforske personlige karaoke-anbefalinger baseret på din musiksmag!",
+      "button": "Se mine sange",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Kontoen er allerede bekræftet",
+    "failedToSendVerification": "Kunne ikke sende bekræftelses-e-mail. Prøv igen senere.",
+    "failedToSendMagicLink": "Kunne ikke sende e-mail med magisk link. Prøv igen senere.",
+    "verificationSent": "Bekræftelses-e-mail sendt. Tjek din indbakke for at fuldføre opgraderingen.",
+    "magicLinkSent": "Hvis der findes en konto til denne e-mail, vil du modtage et magisk link inden længe.",
+    "quizCompleted": "Quizzen er fuldført",
+    "emailCollected": "E-mail registreret",
+    "accountDeleted": "Konto og alle tilknyttede data er slettet",
+    "loggedOut": "Logget ud",
+    "userNotFound": "Bruger ikke fundet",
+    "invalidOrExpiredToken": "Ugyldigt eller udløbet token",
+    "tokenAlreadyUsed": "Token er allerede blevet brugt",
+    "tokenExpired": "Token er udløbet"
+  },
+  "admin": {
+    "userNotFound": "Bruger ikke fundet",
+    "syncJobNotFound": "Synkroniseringsjob ikke fundet",
+    "mustProvideUserIdOrEmail": "Du skal angive enten user_id eller e-mail",
+    "failedToDeleteUser": "Kunne ikke slette bruger",
+    "userDeleted": "Bruger og alle tilknyttede data er slettet"
+  },
+  "catalog": {
+    "songNotFound": "Sang ikke fundet"
+  },
+  "playlists": {
+    "notFound": "Playliste ikke fundet",
+    "accessDenied": "Adgang nægtet til denne playliste"
+  },
+  "knownSongs": {
+    "trackNotFound": "Nummer ikke fundet i kendte sange eller kan ikke fjernes",
+    "songNotFound": "Sang ikke fundet i brugerens bibliotek",
+    "songCannotBeRemoved": "Sang ikke fundet i kendte sange eller kan ikke fjernes"
+  },
+  "myData": {
+    "artistNotFound": "Kunstneren '{artist_name}' blev ikke fundet i brugerens data"
+  },
+  "services": {
+    "invalidServiceType": "Ugyldig tjenestetype: {service_type}",
+    "serviceNotConnected": "Tjenesten {service_type} er ikke forbundet",
+    "failedToStartSync": "Kunne ikke starte synkronisering: {error}",
+    "disconnected": "Frakoblede {service_type} med succes",
+    "syncStarted": "Synkroniseringsjob startet. Tjek /sync/status for fremskridt."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Đăng nhập vào Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Đăng nhập vào tài khoản của bạn",
+      "description": "Nhấp vào nút bên dưới để đăng nhập. Liên kết này sẽ hết hạn sau 24 giờ.",
+      "button": "Đăng nhập",
+      "copyLink": "Hoặc sao chép và dán liên kết này vào trình duyệt của bạn:",
+      "footer": "Nếu bạn không yêu cầu email này, bạn có thể an tâm bỏ qua.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Quá trình đồng bộ nhạc của bạn đã hoàn tất!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Quá trình đồng bộ nhạc của bạn đã hoàn tất!",
+      "description": "Chúng tôi đã hoàn tất việc đồng bộ lịch sử nghe nhạc của bạn từ {services}.",
+      "songsFound": "Bài hát Karaoke tìm thấy",
+      "artistsAnalyzed": "Nghệ sĩ đã phân tích",
+      "cta": "Hãy truy cập ứng dụng để khám phá các đề xuất karaoke được cá nhân hóa dựa trên sở thích âm nhạc của bạn!",
+      "button": "Xem bài hát của tôi",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Tài khoản đã được xác minh",
+    "failedToSendVerification": "Không thể gửi email xác minh. Vui lòng thử lại sau.",
+    "failedToSendMagicLink": "Không thể gửi email chứa liên kết đăng nhập. Vui lòng thử lại sau.",
+    "verificationSent": "Đã gửi email xác minh. Hãy kiểm tra hộp thư đến của bạn để hoàn tất việc nâng cấp.",
+    "magicLinkSent": "Nếu email này đã được đăng ký, bạn sẽ sớm nhận được liên kết đăng nhập.",
+    "quizCompleted": "Hoàn thành bài trắc nghiệm thành công",
+    "emailCollected": "Đã thu thập email",
+    "accountDeleted": "Tài khoản và tất cả dữ liệu liên quan đã được xóa thành công",
+    "loggedOut": "Đăng xuất thành công",
+    "userNotFound": "Không tìm thấy người dùng",
+    "invalidOrExpiredToken": "Mã xác thực không hợp lệ hoặc đã hết hạn",
+    "tokenAlreadyUsed": "Mã xác thực đã được sử dụng",
+    "tokenExpired": "Mã xác thực đã hết hạn"
+  },
+  "admin": {
+    "userNotFound": "Không tìm thấy người dùng",
+    "syncJobNotFound": "Không tìm thấy tác vụ đồng bộ",
+    "mustProvideUserIdOrEmail": "Phải cung cấp user_id hoặc email",
+    "failedToDeleteUser": "Không thể xóa người dùng",
+    "userDeleted": "Người dùng và tất cả dữ liệu liên quan đã được xóa thành công"
+  },
+  "catalog": {
+    "songNotFound": "Không tìm thấy bài hát"
+  },
+  "playlists": {
+    "notFound": "Không tìm thấy danh sách phát",
+    "accessDenied": "Không có quyền truy cập vào danh sách phát này"
+  },
+  "knownSongs": {
+    "trackNotFound": "Không tìm thấy bản nhạc trong các bài hát đã biết hoặc không thể xóa",
+    "songNotFound": "Không tìm thấy bài hát trong thư viện của người dùng",
+    "songCannotBeRemoved": "Không tìm thấy bài hát trong các bài hát đã biết hoặc không thể xóa"
+  },
+  "myData": {
+    "artistNotFound": "Không tìm thấy nghệ sĩ '{artist_name}' trong dữ liệu của người dùng"
+  },
+  "services": {
+    "invalidServiceType": "Loại dịch vụ không hợp lệ: {service_type}",
+    "serviceNotConnected": "Dịch vụ {service_type} chưa được kết nối",
+    "failedToStartSync": "Không thể bắt đầu đồng bộ: {error}",
+    "disconnected": "Đã ngắt kết nối thành công {service_type}",
+    "syncStarted": "Tác vụ đồng bộ đã bắt đầu. Hãy kiểm tra /sync/status để xem tiến độ."
+  }
+}

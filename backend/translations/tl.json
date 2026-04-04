@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Mag-sign in sa Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Mag-sign in sa iyong account",
+      "description": "I-click ang button sa ibaba para mag-sign in. Mag-e-expire ang link na ito sa loob ng 24 na oras.",
+      "button": "Mag-sign In",
+      "copyLink": "O kopyahin at i-paste ang link na ito sa iyong browser:",
+      "footer": "Kung hindi mo ni-request ang email na ito, maaari mo itong balewalain.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Tapos na ang iyong music sync!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Tapos na ang iyong music sync!",
+      "description": "Tapos na naming i-sync ang iyong listening history mula sa {services}.",
+      "songsFound": "Mga Nahanap na Karaoke Song",
+      "artistsAnalyzed": "Mga Nasuring Artist",
+      "cta": "Pumunta sa app para tuklasin ang mga personalized na karaoke recommendation base sa iyong panlasa sa musika!",
+      "button": "Tingnan ang Aking Mga Kanta",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Verified na ang account",
+    "failedToSendVerification": "Hindi maipadala ang verification email. Pakisubukan muli mamaya.",
+    "failedToSendMagicLink": "Hindi maipadala ang magic link email. Pakisubukan muli mamaya.",
+    "verificationSent": "Naipadala na ang verification email. I-check ang iyong inbox para makumpleto ang upgrade.",
+    "magicLinkSent": "Kung may account na nakarehistro sa email na ito, makakatanggap ka ng magic link sa lalong madaling panahon.",
+    "quizCompleted": "Matagumpay na nakumpleto ang quiz",
+    "emailCollected": "Nakuha na ang email",
+    "accountDeleted": "Matagumpay na nabura ang account at lahat ng nauugnay na data",
+    "loggedOut": "Matagumpay na nag-log out",
+    "userNotFound": "Hindi nahanap ang user",
+    "invalidOrExpiredToken": "Invalid o expired na ang token",
+    "tokenAlreadyUsed": "Nagamit na ang token",
+    "tokenExpired": "Expired na ang token"
+  },
+  "admin": {
+    "userNotFound": "Hindi nahanap ang user",
+    "syncJobNotFound": "Hindi nahanap ang sync job",
+    "mustProvideUserIdOrEmail": "Kailangang magbigay ng user_id o email",
+    "failedToDeleteUser": "Hindi mabura ang user",
+    "userDeleted": "Matagumpay na nabura ang user at lahat ng nauugnay na data"
+  },
+  "catalog": {
+    "songNotFound": "Hindi nahanap ang kanta"
+  },
+  "playlists": {
+    "notFound": "Hindi nahanap ang playlist",
+    "accessDenied": "Tinanggihan ang access sa playlist na ito"
+  },
+  "knownSongs": {
+    "trackNotFound": "Hindi nahanap ang track sa mga alam na kanta o hindi ito maaaring alisin",
+    "songNotFound": "Hindi nahanap ang kanta sa library ng user",
+    "songCannotBeRemoved": "Hindi nahanap ang kanta sa mga alam na kanta o hindi ito maaaring alisin"
+  },
+  "myData": {
+    "artistNotFound": "Hindi nahanap ang artist na '{artist_name}' sa data ng user"
+  },
+  "services": {
+    "invalidServiceType": "Invalid na uri ng serbisyo: {service_type}",
+    "serviceNotConnected": "Hindi konektado ang serbisyong {service_type}",
+    "failedToStartSync": "Hindi masimulan ang pag-sync: {error}",
+    "disconnected": "Matagumpay na nadiskonekta ang {service_type}",
+    "syncStarted": "Nagsimula na ang sync job. I-poll ang /sync/status para sa progress."
+  }
+}

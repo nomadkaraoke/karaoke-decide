@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "تسجيل الدخول إلى Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "تسجيل الدخول إلى حسابك",
+      "description": "انقر على الزر أدناه لتسجيل الدخول. ستنتهي صلاحية هذا الرابط خلال 24 ساعة.",
+      "button": "تسجيل الدخول",
+      "copyLink": "أو انسخ هذا الرابط والصقه في متصفحك:",
+      "footer": "إذا لم تطلب هذا البريد الإلكتروني، يمكنك تجاهله بأمان.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "اكتملت مزامنة موسيقاك!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "اكتملت مزامنة موسيقاك!",
+      "description": "لقد انتهينا من مزامنة سجل استماعك من {services}.",
+      "songsFound": "أغاني الكاريوكي التي تم العثور عليها",
+      "artistsAnalyzed": "الفنانون الذين تم تحليلهم",
+      "cta": "توجه إلى التطبيق لاستكشاف توصيات كاريوكي مخصصة بناءً على ذوقك الموسيقي!",
+      "button": "عرض الأغاني الخاصة بي",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "تم التحقق من الحساب بالفعل",
+    "failedToSendVerification": "فشل إرسال بريد التحقق. يرجى المحاولة مرة أخرى لاحقاً.",
+    "failedToSendMagicLink": "فشل إرسال بريد الرابط السحري. يرجى المحاولة مرة أخرى لاحقاً.",
+    "verificationSent": "تم إرسال بريد التحقق. تحقق من صندوق الوارد الخاص بك لإكمال الترقية.",
+    "magicLinkSent": "إذا كان هناك حساب مسجل بهذا البريد الإلكتروني، فستتلقى رابطاً سحرياً قريباً.",
+    "quizCompleted": "اكتمل الاختبار بنجاح",
+    "emailCollected": "تم تسجيل البريد الإلكتروني",
+    "accountDeleted": "تم حذف الحساب وجميع البيانات المرتبطة به بنجاح",
+    "loggedOut": "تم تسجيل الخروج بنجاح",
+    "userNotFound": "المستخدم غير موجود",
+    "invalidOrExpiredToken": "الرمز غير صالح أو منتهي الصلاحية",
+    "tokenAlreadyUsed": "تم استخدام الرمز بالفعل",
+    "tokenExpired": "انتهت صلاحية الرمز"
+  },
+  "admin": {
+    "userNotFound": "المستخدم غير موجود",
+    "syncJobNotFound": "مهمة المزامنة غير موجودة",
+    "mustProvideUserIdOrEmail": "يجب توفير إما user_id أو البريد الإلكتروني",
+    "failedToDeleteUser": "فشل حذف المستخدم",
+    "userDeleted": "تم حذف المستخدم وجميع البيانات المرتبطة به بنجاح"
+  },
+  "catalog": {
+    "songNotFound": "الأغنية غير موجودة"
+  },
+  "playlists": {
+    "notFound": "قائمة التشغيل غير موجودة",
+    "accessDenied": "تم رفض الوصول إلى قائمة التشغيل هذه"
+  },
+  "knownSongs": {
+    "trackNotFound": "المقطع غير موجود في الأغاني المعروفة أو لا يمكن إزالته",
+    "songNotFound": "الأغنية غير موجودة في مكتبة المستخدم",
+    "songCannotBeRemoved": "الأغنية غير موجودة في الأغاني المعروفة أو لا يمكن إزالتها"
+  },
+  "myData": {
+    "artistNotFound": "الفنان '{artist_name}' غير موجود في بيانات المستخدم"
+  },
+  "services": {
+    "invalidServiceType": "نوع الخدمة غير صالح: {service_type}",
+    "serviceNotConnected": "الخدمة {service_type} غير متصلة",
+    "failedToStartSync": "فشل بدء المزامنة: {error}",
+    "disconnected": "تم قطع الاتصال بنجاح بـ {service_type}",
+    "syncStarted": "بدأت مهمة المزامنة. يرجى التحقق من /sync/status لمعرفة التقدم."
+  }
+}

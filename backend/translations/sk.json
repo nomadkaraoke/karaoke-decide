@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Prihlás sa do Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Prihlás sa do svojho účtu",
+      "description": "Klikni na tlačidlo nižšie a prihlás sa. Platnosť tohto odkazu vyprší o 24 hodín.",
+      "button": "Prihlásiť sa",
+      "copyLink": "Alebo skopíruj a vlož tento odkaz do svojho prehliadača:",
+      "footer": "Ak si o tento e-mail nepožiadal, môžeš ho bezpečne ignorovať.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Synchronizácia tvojej hudby je dokončená!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Synchronizácia tvojej hudby je dokončená!",
+      "description": "Dokončili sme synchronizáciu tvojej histórie počúvania z {services}.",
+      "songsFound": "Nájdené karaoke piesne",
+      "artistsAnalyzed": "Analyzovaní interpreti",
+      "cta": "Prejdi do aplikácie a preskúmaj personalizované karaoke odporúčania na základe tvojho hudobného vkusu!",
+      "button": "Zobraziť moje piesne",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Účet je už overený",
+    "failedToSendVerification": "Nepodarilo sa odoslať overovací e-mail. Skús to prosím neskôr.",
+    "failedToSendMagicLink": "Nepodarilo sa odoslať e-mail s magickým odkazom. Skús to prosím neskôr.",
+    "verificationSent": "Overovací e-mail bol odoslaný. Skontroluj si doručenú poštu a dokonči aktualizáciu.",
+    "magicLinkSent": "Ak pre tento e-mail existuje účet, čoskoro dostaneš magický odkaz.",
+    "quizCompleted": "Kvíz bol úspešne dokončený",
+    "emailCollected": "E-mail bol uložený",
+    "accountDeleted": "Účet a všetky pridružené dáta boli úspešne vymazané",
+    "loggedOut": "Úspešne odhlásený",
+    "userNotFound": "Používateľ nebol nájdený",
+    "invalidOrExpiredToken": "Neplatný alebo expirovaný token",
+    "tokenAlreadyUsed": "Token už bol použitý",
+    "tokenExpired": "Platnosť tokenu vypršala"
+  },
+  "admin": {
+    "userNotFound": "Používateľ nebol nájdený",
+    "syncJobNotFound": "Úloha synchronizácie nebola nájdená",
+    "mustProvideUserIdOrEmail": "Musíš zadať buď user_id alebo e-mail",
+    "failedToDeleteUser": "Nepodarilo sa vymazať používateľa",
+    "userDeleted": "Používateľ a všetky pridružené dáta boli úspešne vymazané"
+  },
+  "catalog": {
+    "songNotFound": "Pieseň nebola nájdená"
+  },
+  "playlists": {
+    "notFound": "Playlist nebol nájdený",
+    "accessDenied": "Prístup k tomuto playlistu bol odmietnutý"
+  },
+  "knownSongs": {
+    "trackNotFound": "Skladba nebola nájdená v známych piesňach alebo ju nie je možné odstrániť",
+    "songNotFound": "Pieseň nebola nájdená v knižnici používateľa",
+    "songCannotBeRemoved": "Pieseň nebola nájdená v známych piesňach alebo ju nie je možné odstrániť"
+  },
+  "myData": {
+    "artistNotFound": "Interpret '{artist_name}' nebol nájdený v dátach používateľa"
+  },
+  "services": {
+    "invalidServiceType": "Neplatný typ služby: {service_type}",
+    "serviceNotConnected": "Služba {service_type} nie je pripojená",
+    "failedToStartSync": "Nepodarilo sa spustiť synchronizáciu: {error}",
+    "disconnected": "Služba {service_type} bola úspešne odpojená",
+    "syncStarted": "Úloha synchronizácie bola spustená. Priebeh môžeš sledovať na /sync/status."
+  }
+}

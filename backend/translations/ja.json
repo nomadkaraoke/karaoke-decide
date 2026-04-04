@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Nomad Karaoke Decide にサインイン",
+      "heading": "Nomad Karaoke Decide",
+      "title": "アカウントにサインイン",
+      "description": "下のボタンをクリックしてサインインしてください。このリンクの有効期限は24時間です。",
+      "button": "サインイン",
+      "copyLink": "または、以下のリンクをコピーしてブラウザに貼り付けてください：",
+      "footer": "このメールに心当たりがない場合は、そのまま破棄してください。",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "音楽の同期が完了しました！",
+      "heading": "Nomad Karaoke Decide",
+      "title": "音楽の同期が完了しました！",
+      "description": "{services} からの再生履歴の同期が完了しました。",
+      "songsFound": "見つかったカラオケ曲",
+      "artistsAnalyzed": "分析されたアーティスト",
+      "cta": "アプリにアクセスして、あなたの音楽の好みに合わせたおすすめのカラオケ曲をチェックしましょう！",
+      "button": "マイソングを見る",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "アカウントはすでに認証されています",
+    "failedToSendVerification": "認証メールの送信に失敗しました。後でもう一度お試しください。",
+    "failedToSendMagicLink": "マジックリンクメールの送信に失敗しました。後でもう一度お試しください。",
+    "verificationSent": "認証メールを送信しました。受信トレイを確認してアップグレードを完了してください。",
+    "magicLinkSent": "このメールアドレスのアカウントが存在する場合、まもなくマジックリンクが届きます。",
+    "quizCompleted": "クイズが完了しました",
+    "emailCollected": "メールアドレスを受け付けました",
+    "accountDeleted": "アカウントと関連するすべてのデータを削除しました",
+    "loggedOut": "ログアウトしました",
+    "userNotFound": "ユーザーが見つかりません",
+    "invalidOrExpiredToken": "トークンが無効または期限切れです",
+    "tokenAlreadyUsed": "トークンはすでに使用されています",
+    "tokenExpired": "トークンの有効期限が切れています"
+  },
+  "admin": {
+    "userNotFound": "ユーザーが見つかりません",
+    "syncJobNotFound": "同期ジョブが見つかりません",
+    "mustProvideUserIdOrEmail": "user_id または email のいずれかを指定してください",
+    "failedToDeleteUser": "ユーザーの削除に失敗しました",
+    "userDeleted": "ユーザーと関連するすべてのデータを削除しました"
+  },
+  "catalog": {
+    "songNotFound": "曲が見つかりません"
+  },
+  "playlists": {
+    "notFound": "プレイリストが見つかりません",
+    "accessDenied": "このプレイリストへのアクセス権限がありません"
+  },
+  "knownSongs": {
+    "trackNotFound": "トラックが既知の曲に見つからないか、削除できません",
+    "songNotFound": "ユーザーのライブラリに曲が見つかりません",
+    "songCannotBeRemoved": "曲が既知の曲に見つからないか、削除できません"
+  },
+  "myData": {
+    "artistNotFound": "ユーザーのデータにアーティスト '{artist_name}' が見つかりません"
+  },
+  "services": {
+    "invalidServiceType": "無効なサービスタイプです: {service_type}",
+    "serviceNotConnected": "サービス {service_type} は接続されていません",
+    "failedToStartSync": "同期の開始に失敗しました: {error}",
+    "disconnected": "{service_type} の接続を解除しました",
+    "syncStarted": "同期ジョブを開始しました。進捗状況は /sync/status をポーリングして確認してください。"
+  }
+}

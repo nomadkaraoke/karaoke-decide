@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Jelentkezz be a Nomad Karaoke Decide-ba",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Jelentkezz be a fiókodba",
+      "description": "Kattints az alábbi gombra a bejelentkezéshez. Ez a link 24 óra múlva lejár.",
+      "button": "Bejelentkezés",
+      "copyLink": "Vagy másold be ezt a linket a böngésződbe:",
+      "footer": "Ha nem te kérted ezt az e-mailt, nyugodtan figyelmen kívül hagyhatod.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "A zenei szinkronizálásod befejeződött!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "A zenei szinkronizálásod befejeződött!",
+      "description": "Befejeztük a hallgatási előzményeid szinkronizálását innen: {services}.",
+      "songsFound": "Talált karaoke dalok",
+      "artistsAnalyzed": "Elemzett előadók",
+      "cta": "Irány az alkalmazás, és fedezd fel a zenei ízlésed alapján személyre szabott karaoke ajánlásokat!",
+      "button": "Dalaim megtekintése",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "A fiók már hitelesítve van",
+    "failedToSendVerification": "Nem sikerült elküldeni a hitelesítő e-mailt. Kérlek, próbáld újra később.",
+    "failedToSendMagicLink": "Nem sikerült elküldeni a varázslinket tartalmazó e-mailt. Kérlek, próbáld újra később.",
+    "verificationSent": "Hitelesítő e-mail elküldve. Ellenőrizd a bejövő üzeneteidet a frissítés befejezéséhez.",
+    "magicLinkSent": "Ha létezik fiók ehhez az e-mail címhez, hamarosan kapsz egy varázslinket.",
+    "quizCompleted": "Kvíz sikeresen befejezve",
+    "emailCollected": "E-mail cím rögzítve",
+    "accountDeleted": "A fiók és minden kapcsolódó adat sikeresen törölve",
+    "loggedOut": "Sikeresen kijelentkeztél",
+    "userNotFound": "Felhasználó nem található",
+    "invalidOrExpiredToken": "Érvénytelen vagy lejárt token",
+    "tokenAlreadyUsed": "A tokent már felhasználták",
+    "tokenExpired": "A token lejárt"
+  },
+  "admin": {
+    "userNotFound": "Felhasználó nem található",
+    "syncJobNotFound": "Szinkronizálási feladat nem található",
+    "mustProvideUserIdOrEmail": "Meg kell adni a user_id-t vagy az e-mail címet",
+    "failedToDeleteUser": "Nem sikerült törölni a felhasználót",
+    "userDeleted": "A felhasználó és minden kapcsolódó adat sikeresen törölve"
+  },
+  "catalog": {
+    "songNotFound": "Dal nem található"
+  },
+  "playlists": {
+    "notFound": "Lejátszási lista nem található",
+    "accessDenied": "Hozzáférés megtagadva ehhez a lejátszási listához"
+  },
+  "knownSongs": {
+    "trackNotFound": "A szám nem található az ismert dalok között, vagy nem távolítható el",
+    "songNotFound": "A dal nem található a felhasználó könyvtárában",
+    "songCannotBeRemoved": "A dal nem található az ismert dalok között, vagy nem távolítható el"
+  },
+  "myData": {
+    "artistNotFound": "A(z) '{artist_name}' előadó nem található a felhasználó adataiban"
+  },
+  "services": {
+    "invalidServiceType": "Érvénytelen szolgáltatástípus: {service_type}",
+    "serviceNotConnected": "A(z) {service_type} szolgáltatás nincs csatlakoztatva",
+    "failedToStartSync": "Nem sikerült elindítani a szinkronizálást: {error}",
+    "disconnected": "Sikeresen leválasztva: {service_type}",
+    "syncStarted": "Szinkronizálási feladat elindítva. A folyamat állapotáért kérdezd le a /sync/status végpontot."
+  }
+}

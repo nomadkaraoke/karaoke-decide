@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Nomad Karaoke Decide में साइन इन करो",
+      "heading": "Nomad Karaoke Decide",
+      "title": "अपने अकाउंट में साइन इन करो",
+      "description": "साइन इन करने के लिए नीचे दिए गए बटन पर क्लिक करो। यह लिंक 24 घंटे में एक्सपायर हो जाएगा।",
+      "button": "साइन इन करो",
+      "copyLink": "या इस लिंक को कॉपी करके अपने ब्राउज़र में पेस्ट करो:",
+      "footer": "अगर तुमने इस ईमेल की रिक्वेस्ट नहीं की थी, तो तुम इसे सुरक्षित रूप से इग्नोर कर सकते हो।",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "तुम्हारा म्यूज़िक सिंक पूरा हो गया है!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "तुम्हारा म्यूज़िक सिंक पूरा हो गया है!",
+      "description": "हमने {services} से तुम्हारी लिसनिंग हिस्ट्री को सिंक करना पूरा कर लिया है।",
+      "songsFound": "कराओके गाने मिले",
+      "artistsAnalyzed": "आर्टिस्ट्स एनालाइज़ किए गए",
+      "cta": "तुम्हारे म्यूज़िक टेस्ट के आधार पर पर्सनलाइज़्ड कराओके रिकमेंडेशन्स एक्सप्लोर करने के लिए ऐप पर जाओ!",
+      "button": "मेरे गाने देखो",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "अकाउंट पहले से ही वेरिफाइड है",
+    "failedToSendVerification": "वेरिफिकेशन ईमेल नहीं भेजा जा सका। कृपया बाद में फिर से कोशिश करो।",
+    "failedToSendMagicLink": "मैजिक लिंक ईमेल नहीं भेजा जा सका। कृपया बाद में फिर से कोशिश करो।",
+    "verificationSent": "वेरिफिकेशन ईमेल भेज दिया गया है। अपग्रेड पूरा करने के लिए अपना इनबॉक्स चेक करो।",
+    "magicLinkSent": "अगर इस ईमेल के लिए कोई अकाउंट मौजूद है, तो तुम्हें जल्द ही एक मैजिक लिंक मिल जाएगा।",
+    "quizCompleted": "क्विज़ सफलतापूर्वक पूरा हुआ",
+    "emailCollected": "ईमेल कलेक्ट कर लिया गया",
+    "accountDeleted": "अकाउंट और उससे जुड़ा सारा डेटा सफलतापूर्वक डिलीट कर दिया गया",
+    "loggedOut": "सफलतापूर्वक लॉग आउट हो गए",
+    "userNotFound": "यूज़र नहीं मिला",
+    "invalidOrExpiredToken": "अमान्य या एक्सपायर हो चुका टोकन",
+    "tokenAlreadyUsed": "टोकन पहले ही इस्तेमाल किया जा चुका है",
+    "tokenExpired": "टोकन एक्सपायर हो गया है"
+  },
+  "admin": {
+    "userNotFound": "यूज़र नहीं मिला",
+    "syncJobNotFound": "सिंक जॉब नहीं मिली",
+    "mustProvideUserIdOrEmail": "user_id या ईमेल में से कोई एक देना ज़रूरी है",
+    "failedToDeleteUser": "यूज़र को डिलीट नहीं किया जा सका",
+    "userDeleted": "यूज़र और उससे जुड़ा सारा डेटा सफलतापूर्वक डिलीट कर दिया गया"
+  },
+  "catalog": {
+    "songNotFound": "गाना नहीं मिला"
+  },
+  "playlists": {
+    "notFound": "प्लेलिस्ट नहीं मिली",
+    "accessDenied": "इस प्लेलिस्ट का एक्सेस नहीं है"
+  },
+  "knownSongs": {
+    "trackNotFound": "ट्रैक ज्ञात गानों में नहीं मिला या हटाया नहीं जा सकता",
+    "songNotFound": "गाना यूज़र की लाइब्रेरी में नहीं मिला",
+    "songCannotBeRemoved": "गाना ज्ञात गानों में नहीं मिला या हटाया नहीं जा सकता"
+  },
+  "myData": {
+    "artistNotFound": "आर्टिस्ट '{artist_name}' यूज़र के डेटा में नहीं मिला"
+  },
+  "services": {
+    "invalidServiceType": "अमान्य सर्विस टाइप: {service_type}",
+    "serviceNotConnected": "सर्विस {service_type} कनेक्टेड नहीं है",
+    "failedToStartSync": "सिंक शुरू नहीं किया जा सका: {error}",
+    "disconnected": "{service_type} सफलतापूर्वक डिस्कनेक्ट हो गया",
+    "syncStarted": "सिंक जॉब शुरू हो गई है। प्रोग्रेस के लिए /sync/status को पोल करो।"
+  }
+}

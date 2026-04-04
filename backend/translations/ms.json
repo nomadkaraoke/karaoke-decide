@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Log masuk ke Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Log masuk ke akaun anda",
+      "description": "Klik butang di bawah untuk log masuk. Pautan ini akan tamat tempoh dalam masa 24 jam.",
+      "button": "Log Masuk",
+      "copyLink": "Atau salin dan tampal pautan ini ke dalam pelayar anda:",
+      "footer": "Jika anda tidak meminta e-mel ini, anda boleh mengabaikannya.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Penyegerakan muzik anda telah selesai!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Penyegerakan muzik anda telah selesai!",
+      "description": "Kami telah selesai menyegerakkan sejarah pendengaran anda daripada {services}.",
+      "songsFound": "Lagu Karaoke Ditemui",
+      "artistsAnalyzed": "Artis Dianalisis",
+      "cta": "Buka aplikasi untuk meneroka cadangan karaoke peribadi berdasarkan cita rasa muzik anda!",
+      "button": "Lihat Lagu Saya",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Akaun telah pun disahkan",
+    "failedToSendVerification": "Gagal menghantar e-mel pengesahan. Sila cuba lagi nanti.",
+    "failedToSendMagicLink": "Gagal menghantar e-mel pautan ajaib. Sila cuba lagi nanti.",
+    "verificationSent": "E-mel pengesahan telah dihantar. Semak peti masuk anda untuk melengkapkan naik taraf.",
+    "magicLinkSent": "Jika akaun wujud untuk e-mel ini, anda akan menerima pautan ajaib sebentar lagi.",
+    "quizCompleted": "Kuiz berjaya diselesaikan",
+    "emailCollected": "E-mel telah dikumpul",
+    "accountDeleted": "Akaun dan semua data yang berkaitan berjaya dipadamkan",
+    "loggedOut": "Berjaya log keluar",
+    "userNotFound": "Pengguna tidak ditemui",
+    "invalidOrExpiredToken": "Token tidak sah atau telah tamat tempoh",
+    "tokenAlreadyUsed": "Token telah pun digunakan",
+    "tokenExpired": "Token telah tamat tempoh"
+  },
+  "admin": {
+    "userNotFound": "Pengguna tidak ditemui",
+    "syncJobNotFound": "Tugas penyegerakan tidak ditemui",
+    "mustProvideUserIdOrEmail": "Mesti berikan sama ada user_id atau e-mel",
+    "failedToDeleteUser": "Gagal memadamkan pengguna",
+    "userDeleted": "Pengguna dan semua data yang berkaitan berjaya dipadamkan"
+  },
+  "catalog": {
+    "songNotFound": "Lagu tidak ditemui"
+  },
+  "playlists": {
+    "notFound": "Senarai main tidak ditemui",
+    "accessDenied": "Akses ditolak untuk senarai main ini"
+  },
+  "knownSongs": {
+    "trackNotFound": "Trek tidak ditemui dalam lagu yang diketahui atau tidak boleh dialih keluar",
+    "songNotFound": "Lagu tidak ditemui dalam pustaka pengguna",
+    "songCannotBeRemoved": "Lagu tidak ditemui dalam lagu yang diketahui atau tidak boleh dialih keluar"
+  },
+  "myData": {
+    "artistNotFound": "Artis '{artist_name}' tidak ditemui dalam data pengguna"
+  },
+  "services": {
+    "invalidServiceType": "Jenis perkhidmatan tidak sah: {service_type}",
+    "serviceNotConnected": "Perkhidmatan {service_type} tidak disambungkan",
+    "failedToStartSync": "Gagal memulakan penyegerakan: {error}",
+    "disconnected": "Berjaya memutuskan sambungan {service_type}",
+    "syncStarted": "Tugas penyegerakan bermula. Semak /sync/status untuk kemajuan."
+  }
+}

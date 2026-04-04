@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Kirjaudu sisään Nomad Karaoke Decide -palveluun",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Kirjaudu tilillesi",
+      "description": "Kirjaudu sisään klikkaamalla alla olevaa painiketta. Tämä linkki vanhenee 24 tunnin kuluttua.",
+      "button": "Kirjaudu sisään",
+      "copyLink": "Tai kopioi ja liitä tämä linkki selaimeesi:",
+      "footer": "Jos et pyytänyt tätä sähköpostia, voit jättää sen huomiotta.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "Musiikin synkronointi on valmis!",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Musiikin synkronointi on valmis!",
+      "description": "Kuunteluhistoriasi synkronointi palveluista {services} on nyt valmis.",
+      "songsFound": "Löydetyt karaokekappaleet",
+      "artistsAnalyzed": "Analysoidut artistit",
+      "cta": "Siirry sovellukseen ja tutustu juuri sinun musiikkimakuusi sopiviin karaokesuosituksiin!",
+      "button": "Näytä omat kappaleeni",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Tili on jo vahvistettu",
+    "failedToSendVerification": "Vahvistussähköpostin lähetys epäonnistui. Yritä myöhemmin uudelleen.",
+    "failedToSendMagicLink": "Kirjautumislinkin lähetys epäonnistui. Yritä myöhemmin uudelleen.",
+    "verificationSent": "Vahvistusviesti on lähetetty. Tarkista sähköpostisi ja vie päivitys loppuun.",
+    "magicLinkSent": "Jos tällä sähköpostiosoitteella löytyy tili, saat kirjautumislinkin hetken kuluttua.",
+    "quizCompleted": "Kysely suoritettu onnistuneesti",
+    "emailCollected": "Sähköpostiosoite tallennettu",
+    "accountDeleted": "Tili ja kaikki siihen liittyvät tiedot poistettu onnistuneesti",
+    "loggedOut": "Olet kirjautunut ulos",
+    "userNotFound": "Käyttäjää ei löytynyt",
+    "invalidOrExpiredToken": "Virheellinen tai vanhentunut tunniste",
+    "tokenAlreadyUsed": "Tunniste on jo käytetty",
+    "tokenExpired": "Tunniste on vanhentunut"
+  },
+  "admin": {
+    "userNotFound": "Käyttäjää ei löytynyt",
+    "syncJobNotFound": "Synkronointityötä ei löytynyt",
+    "mustProvideUserIdOrEmail": "On annettava joko user_id tai sähköpostiosoite",
+    "failedToDeleteUser": "Käyttäjän poistaminen epäonnistui",
+    "userDeleted": "Käyttäjä ja kaikki siihen liittyvät tiedot poistettu onnistuneesti"
+  },
+  "catalog": {
+    "songNotFound": "Kappaletta ei löytynyt"
+  },
+  "playlists": {
+    "notFound": "Soittolistaa ei löytynyt",
+    "accessDenied": "Ei pääsyä tälle soittolistalle"
+  },
+  "knownSongs": {
+    "trackNotFound": "Kappaletta ei löytynyt tunnetuista kappaleista tai sitä ei voida poistaa",
+    "songNotFound": "Kappaletta ei löytynyt käyttäjän kirjastosta",
+    "songCannotBeRemoved": "Kappaletta ei löytynyt tunnetuista kappaleista tai sitä ei voida poistaa"
+  },
+  "myData": {
+    "artistNotFound": "Artistia '{artist_name}' ei löytynyt käyttäjän tiedoista"
+  },
+  "services": {
+    "invalidServiceType": "Virheellinen palvelutyyppi: {service_type}",
+    "serviceNotConnected": "Palvelua {service_type} ei ole yhdistetty",
+    "failedToStartSync": "Synkronoinnin aloittaminen epäonnistui: {error}",
+    "disconnected": "Palvelun {service_type} yhteys katkaistu onnistuneesti",
+    "syncStarted": "Synkronointityö aloitettu. Seuraa edistymistä osoitteesta /sync/status."
+  }
+}

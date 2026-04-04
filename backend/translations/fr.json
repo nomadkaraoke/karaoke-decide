@@ -1,0 +1,69 @@
+{
+  "emails": {
+    "magicLink": {
+      "subject": "Connecte-toi à Nomad Karaoke Decide",
+      "heading": "Nomad Karaoke Decide",
+      "title": "Connecte-toi à ton compte",
+      "description": "Clique sur le bouton ci-dessous pour te connecter. Ce lien expirera dans 24 heures.",
+      "button": "Se connecter",
+      "copyLink": "Ou copie et colle ce lien dans ton navigateur :",
+      "footer": "Si tu n'as pas demandé cet e-mail, tu peux l'ignorer en toute sécurité.",
+      "copyright": "Nomad Karaoke"
+    },
+    "syncComplete": {
+      "subject": "La synchronisation de ta musique est terminée !",
+      "heading": "Nomad Karaoke Decide",
+      "title": "La synchronisation de ta musique est terminée !",
+      "description": "Nous avons terminé la synchronisation de ton historique d'écoute depuis {services}.",
+      "songsFound": "Chansons de karaoké trouvées",
+      "artistsAnalyzed": "Artistes analysés",
+      "cta": "Rends-toi sur l'application pour explorer des recommandations de karaoké personnalisées basées sur tes goûts musicaux !",
+      "button": "Voir mes chansons",
+      "copyright": "Nomad Karaoke"
+    }
+  },
+  "auth": {
+    "accountAlreadyVerified": "Le compte est déjà vérifié",
+    "failedToSendVerification": "Impossible d'envoyer l'e-mail de vérification. Réessaie plus tard.",
+    "failedToSendMagicLink": "Impossible d'envoyer le lien magique par e-mail. Réessaie plus tard.",
+    "verificationSent": "E-mail de vérification envoyé. Vérifie ta boîte de réception pour terminer la mise à niveau.",
+    "magicLinkSent": "Si un compte existe pour cet e-mail, tu recevras un lien magique sous peu.",
+    "quizCompleted": "Quiz terminé avec succès",
+    "emailCollected": "Adresse e-mail enregistrée",
+    "accountDeleted": "Compte et toutes les données associées supprimés avec succès",
+    "loggedOut": "Déconnecté avec succès",
+    "userNotFound": "Utilisateur introuvable",
+    "invalidOrExpiredToken": "Jeton invalide ou expiré",
+    "tokenAlreadyUsed": "Le jeton a déjà été utilisé",
+    "tokenExpired": "Le jeton a expiré"
+  },
+  "admin": {
+    "userNotFound": "Utilisateur introuvable",
+    "syncJobNotFound": "Tâche de synchronisation introuvable",
+    "mustProvideUserIdOrEmail": "Tu dois fournir soit user_id, soit un e-mail",
+    "failedToDeleteUser": "Impossible de supprimer l'utilisateur",
+    "userDeleted": "Utilisateur et toutes les données associées supprimés avec succès"
+  },
+  "catalog": {
+    "songNotFound": "Chanson introuvable"
+  },
+  "playlists": {
+    "notFound": "Playlist introuvable",
+    "accessDenied": "Accès refusé à cette playlist"
+  },
+  "knownSongs": {
+    "trackNotFound": "Piste introuvable dans les chansons connues ou impossible à supprimer",
+    "songNotFound": "Chanson introuvable dans la bibliothèque de l'utilisateur",
+    "songCannotBeRemoved": "Chanson introuvable dans les chansons connues ou impossible à supprimer"
+  },
+  "myData": {
+    "artistNotFound": "Artiste '{artist_name}' introuvable dans les données de l'utilisateur"
+  },
+  "services": {
+    "invalidServiceType": "Type de service invalide : {service_type}",
+    "serviceNotConnected": "Le service {service_type} n'est pas connecté",
+    "failedToStartSync": "Impossible de démarrer la synchronisation : {error}",
+    "disconnected": "{service_type} déconnecté avec succès",
+    "syncStarted": "Tâche de synchronisation démarrée. Consulte /sync/status pour suivre la progression."
+  }
+}
