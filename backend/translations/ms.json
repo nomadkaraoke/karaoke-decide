@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Gagal memadam pengguna",
+    "mustProvideUserIdOrEmail": "Mesti memberikan sama ada user_id atau e-mel",
+    "syncJobNotFound": "Tugas penyegerakan tidak dijumpai",
+    "userDeleted": "Pengguna dan semua data yang berkaitan berjaya dipadamkan",
+    "userNotFound": "Pengguna tidak dijumpai"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Akaun telah disahkan",
+    "accountDeleted": "Akaun dan semua data yang berkaitan berjaya dipadamkan",
+    "emailCollected": "E-mel telah dikumpulkan",
+    "failedToSendMagicLink": "Gagal menghantar e-mel pautan ajaib. Sila cuba lagi nanti.",
+    "failedToSendVerification": "Gagal menghantar e-mel pengesahan. Sila cuba lagi nanti.",
+    "invalidOrExpiredToken": "Token tidak sah atau telah tamat tempoh",
+    "loggedOut": "Berjaya log keluar",
+    "magicLinkSent": "Jika akaun wujud untuk e-mel ini, anda akan menerima pautan ajaib sebentar lagi.",
+    "quizCompleted": "Kuiz berjaya diselesaikan",
+    "tokenAlreadyUsed": "Token telah pun digunakan",
+    "tokenExpired": "Token telah tamat tempoh",
+    "userNotFound": "Pengguna tidak dijumpai",
+    "verificationSent": "E-mel pengesahan telah dihantar. Semak peti masuk anda untuk melengkapkan naik taraf."
+  },
+  "catalog": {
+    "songNotFound": "Lagu tidak dijumpai"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Log Masuk",
+      "copyLink": "Atau salin dan tampal pautan ini ke dalam pelayar anda:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klik butang di bawah untuk log masuk. Pautan ini akan tamat tempoh dalam masa 24 jam.",
+      "footer": "Jika anda tidak meminta e-mel ini, anda boleh mengabaikannya dengan selamat.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Log masuk ke Nomad Karaoke Decide",
+      "title": "Log masuk ke akaun anda"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artis Dianalisis",
+      "button": "Lihat Lagu Saya",
+      "copyright": "Nomad Karaoke",
+      "cta": "Pergi ke aplikasi untuk meneroka cadangan karaoke yang diperibadikan berdasarkan cita rasa muzik anda!",
+      "description": "Kami telah selesai menyegerakkan sejarah pendengaran anda dari {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Lagu Karaoke Dijumpai",
+      "subject": "Penyegerakan muzik anda telah selesai!",
+      "title": "Penyegerakan muzik anda telah selesai!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Lagu tidak dijumpai dalam lagu yang diketahui atau tidak boleh dialih keluar",
+    "songNotFound": "Lagu tidak dijumpai dalam pustaka pengguna",
+    "trackNotFound": "Trek tidak dijumpai dalam lagu yang diketahui atau tidak boleh dialih keluar"
+  },
+  "myData": {
+    "artistNotFound": "Artis '{artist_name}' tidak dijumpai dalam data pengguna"
+  },
+  "playlists": {
+    "accessDenied": "Akses ditolak untuk senarai main ini",
+    "notFound": "Senarai main tidak dijumpai"
+  },
+  "services": {
+    "disconnected": "Berjaya memutuskan sambungan {service_type}",
+    "failedToStartSync": "Gagal memulakan penyegerakan: {error}",
+    "invalidServiceType": "Jenis perkhidmatan tidak sah: {service_type}",
+    "serviceNotConnected": "Perkhidmatan {service_type} tidak disambungkan",
+    "syncStarted": "Tugas penyegerakan bermula. Semak /sync/status untuk melihat kemajuan."
+  }
+}

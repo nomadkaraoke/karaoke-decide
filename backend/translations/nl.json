@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Kan gebruiker niet verwijderen",
+    "mustProvideUserIdOrEmail": "Je moet een user_id of e-mailadres opgeven",
+    "syncJobNotFound": "Synchronisatietaak niet gevonden",
+    "userDeleted": "Gebruiker en alle bijbehorende gegevens succesvol verwijderd",
+    "userNotFound": "Gebruiker niet gevonden"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Account is al geverifieerd",
+    "accountDeleted": "Account en alle bijbehorende gegevens succesvol verwijderd",
+    "emailCollected": "E-mailadres verzameld",
+    "failedToSendMagicLink": "Kan magic link e-mail niet verzenden. Probeer het later opnieuw.",
+    "failedToSendVerification": "Kan verificatie-e-mail niet verzenden. Probeer het later opnieuw.",
+    "invalidOrExpiredToken": "Ongeldige of verlopen token",
+    "loggedOut": "Succesvol uitgelogd",
+    "magicLinkSent": "Als er een account bestaat voor dit e-mailadres, ontvang je binnenkort een magic link.",
+    "quizCompleted": "Quiz succesvol afgerond",
+    "tokenAlreadyUsed": "Token is al gebruikt",
+    "tokenExpired": "Token is verlopen",
+    "userNotFound": "Gebruiker niet gevonden",
+    "verificationSent": "Verificatie-e-mail verzonden. Controleer je inbox om de upgrade te voltooien."
+  },
+  "catalog": {
+    "songNotFound": "Nummer niet gevonden"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Inloggen",
+      "copyLink": "Of kopieer en plak deze link in je browser:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klik op de onderstaande knop om in te loggen. Deze link verloopt over 24 uur.",
+      "footer": "Als je deze e-mail niet hebt aangevraagd, kun je deze veilig negeren.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Inloggen bij Nomad Karaoke Decide",
+      "title": "Inloggen op je account"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Geanalyseerde artiesten",
+      "button": "Mijn nummers bekijken",
+      "copyright": "Nomad Karaoke",
+      "cta": "Ga naar de app om gepersonaliseerde karaoke-aanbevelingen te ontdekken op basis van jouw muzieksmaak!",
+      "description": "We zijn klaar met het synchroniseren van je luistergeschiedenis van {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Gevonden karaokenummers",
+      "subject": "Je muzieksynchronisatie is voltooid!",
+      "title": "Je muzieksynchronisatie is voltooid!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Nummer niet gevonden in bekende nummers of kan niet worden verwijderd",
+    "songNotFound": "Nummer niet gevonden in de bibliotheek van de gebruiker",
+    "trackNotFound": "Track niet gevonden in bekende nummers of kan niet worden verwijderd"
+  },
+  "myData": {
+    "artistNotFound": "Artiest '{artist_name}' niet gevonden in de gegevens van de gebruiker"
+  },
+  "playlists": {
+    "accessDenied": "Toegang geweigerd tot deze afspeellijst",
+    "notFound": "Afspeellijst niet gevonden"
+  },
+  "services": {
+    "disconnected": "{service_type} succesvol losgekoppeld",
+    "failedToStartSync": "Kan synchronisatie niet starten: {error}",
+    "invalidServiceType": "Ongeldig servicetype: {service_type}",
+    "serviceNotConnected": "Service {service_type} is niet verbonden",
+    "syncStarted": "Synchronisatietaak gestart. Poll /sync/status voor de voortgang."
+  }
+}

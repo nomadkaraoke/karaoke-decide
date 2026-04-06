@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Kullanıcı silinemedi",
+    "mustProvideUserIdOrEmail": "user_id veya email sağlanmalıdır",
+    "syncJobNotFound": "Senkronizasyon görevi bulunamadı",
+    "userDeleted": "Kullanıcı ve ilişkili tüm veriler başarıyla silindi",
+    "userNotFound": "Kullanıcı bulunamadı"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Hesap zaten doğrulandı",
+    "accountDeleted": "Hesap ve ilişkili tüm veriler başarıyla silindi",
+    "emailCollected": "E-posta alındı",
+    "failedToSendMagicLink": "Sihirli bağlantı e-postası gönderilemedi. Lütfen daha sonra tekrar dene.",
+    "failedToSendVerification": "Doğrulama e-postası gönderilemedi. Lütfen daha sonra tekrar dene.",
+    "invalidOrExpiredToken": "Geçersiz veya süresi dolmuş token",
+    "loggedOut": "Başarıyla çıkış yapıldı",
+    "magicLinkSent": "Eğer bu e-posta için bir hesap varsa, kısa süre içinde bir sihirli bağlantı alacaksın.",
+    "quizCompleted": "Test başarıyla tamamlandı",
+    "tokenAlreadyUsed": "Token zaten kullanılmış",
+    "tokenExpired": "Token'ın süresi dolmuş",
+    "userNotFound": "Kullanıcı bulunamadı",
+    "verificationSent": "Doğrulama e-postası gönderildi. Yükseltmeyi tamamlamak için gelen kutunu kontrol et."
+  },
+  "catalog": {
+    "songNotFound": "Şarkı bulunamadı"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Giriş Yap",
+      "copyLink": "Veya bu bağlantıyı kopyalayıp tarayıcına yapıştır:",
+      "copyright": "Nomad Karaoke",
+      "description": "Giriş yapmak için aşağıdaki butona tıkla. Bu bağlantının süresi 24 saat içinde dolacak.",
+      "footer": "Bu e-postayı sen talep etmediysen, güvenle görmezden gelebilirsin.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Nomad Karaoke Decide'a giriş yap",
+      "title": "Hesabına giriş yap"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "İncelenen Sanatçılar",
+      "button": "Şarkılarımı Görüntüle",
+      "copyright": "Nomad Karaoke",
+      "cta": "Müzik zevkine göre kişiselleştirilmiş karaoke önerilerini keşfetmek için uygulamaya git!",
+      "description": "{services} üzerinden dinleme geçmişini senkronize etmeyi tamamladık.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Bulunan Karaoke Şarkıları",
+      "subject": "Müzik senkronizasyonun tamamlandı!",
+      "title": "Müzik senkronizasyonun tamamlandı!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Şarkı bilinen şarkılarda bulunamadı veya kaldırılamıyor",
+    "songNotFound": "Şarkı kullanıcının kütüphanesinde bulunamadı",
+    "trackNotFound": "Parça bilinen şarkılarda bulunamadı veya kaldırılamıyor"
+  },
+  "myData": {
+    "artistNotFound": "'{artist_name}' adlı sanatçı kullanıcının verilerinde bulunamadı"
+  },
+  "playlists": {
+    "accessDenied": "Bu çalma listesine erişim reddedildi",
+    "notFound": "Çalma listesi bulunamadı"
+  },
+  "services": {
+    "disconnected": "{service_type} bağlantısı başarıyla kesildi",
+    "failedToStartSync": "Senkronizasyon başlatılamadı: {error}",
+    "invalidServiceType": "Geçersiz hizmet türü: {service_type}",
+    "serviceNotConnected": "{service_type} hizmeti bağlı değil",
+    "syncStarted": "Senkronizasyon görevi başlatıldı. İlerleme durumu için /sync/status'u kontrol et."
+  }
+}

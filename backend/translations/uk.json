@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Не вдалося видалити користувача",
+    "mustProvideUserIdOrEmail": "Необхідно вказати user_id або email",
+    "syncJobNotFound": "Завдання синхронізації не знайдено",
+    "userDeleted": "Користувача та всі пов'язані дані успішно видалено",
+    "userNotFound": "Користувача не знайдено"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Акаунт вже верифіковано",
+    "accountDeleted": "Акаунт та всі пов'язані дані успішно видалено",
+    "emailCollected": "Email отримано",
+    "failedToSendMagicLink": "Не вдалося надіслати email з магічним посиланням. Будь ласка, спробуй пізніше.",
+    "failedToSendVerification": "Не вдалося надіслати email для верифікації. Будь ласка, спробуй пізніше.",
+    "invalidOrExpiredToken": "Недійсний або прострочений токен",
+    "loggedOut": "Успішний вихід із системи",
+    "magicLinkSent": "Якщо акаунт з цим email існує, ти незабаром отримаєш магічне посилання.",
+    "quizCompleted": "Квіз успішно пройдено",
+    "tokenAlreadyUsed": "Токен вже використано",
+    "tokenExpired": "Термін дії токена закінчився",
+    "userNotFound": "Користувача не знайдено",
+    "verificationSent": "Email для верифікації надіслано. Перевір свою поштову скриньку, щоб завершити оновлення."
+  },
+  "catalog": {
+    "songNotFound": "Пісню не знайдено"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Увійти",
+      "copyLink": "Або скопіюй та встав це посилання у свій браузер:",
+      "copyright": "Nomad Karaoke",
+      "description": "Натисни кнопку нижче, щоб увійти. Це посилання діятиме 24 години.",
+      "footer": "Якщо ти не запитував цей email, можеш сміливо його проігнорувати.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Вхід до Nomad Karaoke Decide",
+      "title": "Увійди до свого акаунта"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Проаналізовано виконавців",
+      "button": "Переглянути мої пісні",
+      "copyright": "Nomad Karaoke",
+      "cta": "Переходь у додаток, щоб переглянути персоналізовані караоке-рекомендації на основі твоїх музичних смаків!",
+      "description": "Ми завершили синхронізацію твоєї історії прослуховувань з {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Знайдено караоке-пісень",
+      "subject": "Синхронізацію музики завершено!",
+      "title": "Синхронізацію музики завершено!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Пісню не знайдено у відомих піснях або її неможливо видалити",
+    "songNotFound": "Пісню не знайдено в бібліотеці користувача",
+    "trackNotFound": "Трек не знайдено у відомих піснях або його неможливо видалити"
+  },
+  "myData": {
+    "artistNotFound": "Виконавця '{artist_name}' не знайдено в даних користувача"
+  },
+  "playlists": {
+    "accessDenied": "Доступ до цього плейлиста заборонено",
+    "notFound": "Плейлист не знайдено"
+  },
+  "services": {
+    "disconnected": "Успішно відключено {service_type}",
+    "failedToStartSync": "Не вдалося розпочати синхронізацію: {error}",
+    "invalidServiceType": "Недійсний тип сервісу: {service_type}",
+    "serviceNotConnected": "Сервіс {service_type} не підключено",
+    "syncStarted": "Завдання синхронізації розпочато. Опитуй /sync/status для перевірки прогресу."
+  }
+}

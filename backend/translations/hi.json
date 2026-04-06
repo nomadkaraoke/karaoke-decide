@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "यूज़र को डिलीट करने में विफल",
+    "mustProvideUserIdOrEmail": "user_id या ईमेल में से कोई एक देना ज़रूरी है",
+    "syncJobNotFound": "सिंक जॉब नहीं मिली",
+    "userDeleted": "यूज़र और उससे जुड़ा सारा डेटा सफलतापूर्वक डिलीट कर दिया गया है",
+    "userNotFound": "यूज़र नहीं मिला"
+  },
+  "auth": {
+    "accountAlreadyVerified": "अकाउंट पहले से ही वेरिफाइड है",
+    "accountDeleted": "अकाउंट और उससे जुड़ा सारा डेटा सफलतापूर्वक डिलीट कर दिया गया है",
+    "emailCollected": "ईमेल कलेक्ट कर लिया गया है",
+    "failedToSendMagicLink": "मैजिक लिंक ईमेल भेजने में विफल। कृपया बाद में फिर से कोशिश करो।",
+    "failedToSendVerification": "वेरिफिकेशन ईमेल भेजने में विफल। कृपया बाद में फिर से कोशिश करो।",
+    "invalidOrExpiredToken": "अमान्य या एक्सपायर हो चुका टोकन",
+    "loggedOut": "सफलतापूर्वक लॉग आउट हो गए",
+    "magicLinkSent": "अगर इस ईमेल के लिए कोई अकाउंट मौजूद है, तो तुम्हें जल्द ही एक मैजिक लिंक मिल जाएगा।",
+    "quizCompleted": "क्विज़ सफलतापूर्वक पूरा हो गया",
+    "tokenAlreadyUsed": "टोकन का इस्तेमाल पहले ही किया जा चुका है",
+    "tokenExpired": "टोकन एक्सपायर हो गया है",
+    "userNotFound": "यूज़र नहीं मिला",
+    "verificationSent": "वेरिफिकेशन ईमेल भेज दिया गया है। अपग्रेड पूरा करने के लिए अपना इनबॉक्स चेक करो।"
+  },
+  "catalog": {
+    "songNotFound": "गाना नहीं मिला"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "साइन इन करो",
+      "copyLink": "या इस लिंक को कॉपी करके अपने ब्राउज़र में पेस्ट करो:",
+      "copyright": "Nomad Karaoke",
+      "description": "साइन इन करने के लिए नीचे दिए गए बटन पर क्लिक करो। यह लिंक 24 घंटे में एक्सपायर हो जाएगा।",
+      "footer": "अगर तुमने इस ईमेल की रिक्वेस्ट नहीं की थी, तो तुम इसे सुरक्षित रूप से इग्नोर कर सकते हो।",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Nomad Karaoke Decide में साइन इन करो",
+      "title": "अपने अकाउंट में साइन इन करो"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "एनालाइज़ किए गए आर्टिस्ट",
+      "button": "मेरे गाने देखो",
+      "copyright": "Nomad Karaoke",
+      "cta": "तुम्हारे म्यूज़िक टेस्ट के आधार पर पर्सनलाइज़्ड कराओके रिकमेंडेशन एक्सप्लोर करने के लिए ऐप पर जाओ!",
+      "description": "हमने {services} से तुम्हारी लिसनिंग हिस्ट्री को सिंक करना पूरा कर लिया है।",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "मिले हुए कराओके गाने",
+      "subject": "तुम्हारा म्यूज़िक सिंक पूरा हो गया है!",
+      "title": "तुम्हारा म्यूज़िक सिंक पूरा हो गया है!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "गाना ज्ञात गानों में नहीं मिला या हटाया नहीं जा सकता",
+    "songNotFound": "गाना यूज़र की लाइब्रेरी में नहीं मिला",
+    "trackNotFound": "ट्रैक ज्ञात गानों में नहीं मिला या हटाया नहीं जा सकता"
+  },
+  "myData": {
+    "artistNotFound": "आर्टिस्ट '{artist_name}' यूज़र के डेटा में नहीं मिला"
+  },
+  "playlists": {
+    "accessDenied": "इस प्लेलिस्ट का एक्सेस नहीं दिया गया",
+    "notFound": "प्लेलिस्ट नहीं मिली"
+  },
+  "services": {
+    "disconnected": "{service_type} को सफलतापूर्वक डिस्कनेक्ट कर दिया गया",
+    "failedToStartSync": "सिंक शुरू करने में विफल: {error}",
+    "invalidServiceType": "अमान्य सर्विस टाइप: {service_type}",
+    "serviceNotConnected": "सर्विस {service_type} कनेक्टेड नहीं है",
+    "syncStarted": "सिंक जॉब शुरू हो गई है। प्रोग्रेस के लिए /sync/status को पोल करो।"
+  }
+}

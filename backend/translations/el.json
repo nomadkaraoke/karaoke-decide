@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Αποτυχία διαγραφής χρήστη",
+    "mustProvideUserIdOrEmail": "Πρέπει να δώσεις είτε user_id είτε email",
+    "syncJobNotFound": "Η εργασία συγχρονισμού δεν βρέθηκε",
+    "userDeleted": "Ο χρήστης και όλα τα σχετικά δεδομένα διαγράφηκαν με επιτυχία",
+    "userNotFound": "Ο χρήστης δεν βρέθηκε"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Ο λογαριασμός είναι ήδη επαληθευμένος",
+    "accountDeleted": "Ο λογαριασμός και όλα τα σχετικά δεδομένα διαγράφηκαν με επιτυχία",
+    "emailCollected": "Το email συλλέχθηκε",
+    "failedToSendMagicLink": "Αποτυχία αποστολής email με magic link. Παρακαλώ δοκίμασε ξανά αργότερα.",
+    "failedToSendVerification": "Αποτυχία αποστολής email επαλήθευσης. Παρακαλώ δοκίμασε ξανά αργότερα.",
+    "invalidOrExpiredToken": "Μη έγκυρο ή ληγμένο token",
+    "loggedOut": "Αποσυνδέθηκες με επιτυχία",
+    "magicLinkSent": "Αν υπάρχει λογαριασμός για αυτό το email, θα λάβεις ένα magic link σύντομα.",
+    "quizCompleted": "Το κουίζ ολοκληρώθηκε με επιτυχία",
+    "tokenAlreadyUsed": "Το token έχει ήδη χρησιμοποιηθεί",
+    "tokenExpired": "Το token έχει λήξει",
+    "userNotFound": "Ο χρήστης δεν βρέθηκε",
+    "verificationSent": "Το email επαλήθευσης στάλθηκε. Έλεγξε τα εισερχόμενά σου για να ολοκληρώσεις την αναβάθμιση."
+  },
+  "catalog": {
+    "songNotFound": "Το τραγούδι δεν βρέθηκε"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Σύνδεση",
+      "copyLink": "Ή αντέγραψε και επικόλλησε αυτόν τον σύνδεσμο στον περιηγητή σου:",
+      "copyright": "Nomad Karaoke",
+      "description": "Κάνε κλικ στο παρακάτω κουμπί για να συνδεθείς. Αυτός ο σύνδεσμος θα λήξει σε 24 ώρες.",
+      "footer": "Αν δεν ζήτησες αυτό το email, μπορείς να το αγνοήσεις με ασφάλεια.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Συνδέσου στο Nomad Karaoke Decide",
+      "title": "Συνδέσου στον λογαριασμό σου"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Καλλιτέχνες που αναλύθηκαν",
+      "button": "Προβολή των τραγουδιών μου",
+      "copyright": "Nomad Karaoke",
+      "cta": "Πήγαινε στην εφαρμογή για να εξερευνήσεις εξατομικευμένες προτάσεις καραόκε με βάση τα μουσικά σου γούστα!",
+      "description": "Ολοκληρώσαμε τον συγχρονισμό του ιστορικού ακρόασής σου από {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Τραγούδια καραόκε που βρέθηκαν",
+      "subject": "Ο συγχρονισμός της μουσικής σου ολοκληρώθηκε!",
+      "title": "Ο συγχρονισμός της μουσικής σου ολοκληρώθηκε!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Το τραγούδι δεν βρέθηκε στα γνωστά τραγούδια ή δεν μπορεί να αφαιρεθεί",
+    "songNotFound": "Το τραγούδι δεν βρέθηκε στη βιβλιοθήκη του χρήστη",
+    "trackNotFound": "Το κομμάτι δεν βρέθηκε στα γνωστά τραγούδια ή δεν μπορεί να αφαιρεθεί"
+  },
+  "myData": {
+    "artistNotFound": "Ο καλλιτέχνης '{artist_name}' δεν βρέθηκε στα δεδομένα του χρήστη"
+  },
+  "playlists": {
+    "accessDenied": "Δεν επιτρέπεται η πρόσβαση σε αυτήν τη λίστα αναπαραγωγής",
+    "notFound": "Η λίστα αναπαραγωγής δεν βρέθηκε"
+  },
+  "services": {
+    "disconnected": "Αποσυνδέθηκε με επιτυχία το {service_type}",
+    "failedToStartSync": "Αποτυχία έναρξης συγχρονισμού: {error}",
+    "invalidServiceType": "Μη έγκυρος τύπος υπηρεσίας: {service_type}",
+    "serviceNotConnected": "Η υπηρεσία {service_type} δεν είναι συνδεδεμένη",
+    "syncStarted": "Η εργασία συγχρονισμού ξεκίνησε. Έλεγξε το /sync/status για την πρόοδο."
+  }
+}

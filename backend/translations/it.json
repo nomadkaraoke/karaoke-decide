@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Impossibile eliminare l'utente",
+    "mustProvideUserIdOrEmail": "Devi fornire user_id o email",
+    "syncJobNotFound": "Processo di sincronizzazione non trovato",
+    "userDeleted": "Utente e tutti i dati associati eliminati con successo",
+    "userNotFound": "Utente non trovato"
+  },
+  "auth": {
+    "accountAlreadyVerified": "L'account è già verificato",
+    "accountDeleted": "Account e tutti i dati associati eliminati con successo",
+    "emailCollected": "Email raccolta",
+    "failedToSendMagicLink": "Impossibile inviare l'email con il magic link. Riprova più tardi.",
+    "failedToSendVerification": "Impossibile inviare l'email di verifica. Riprova più tardi.",
+    "invalidOrExpiredToken": "Token non valido o scaduto",
+    "loggedOut": "Disconnessione effettuata con successo",
+    "magicLinkSent": "Se esiste un account per questa email, riceverai a breve un magic link.",
+    "quizCompleted": "Quiz completato con successo",
+    "tokenAlreadyUsed": "Il token è già stato utilizzato",
+    "tokenExpired": "Il token è scaduto",
+    "userNotFound": "Utente non trovato",
+    "verificationSent": "Email di verifica inviata. Controlla la tua casella di posta per completare l'aggiornamento."
+  },
+  "catalog": {
+    "songNotFound": "Canzone non trovata"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Accedi",
+      "copyLink": "Oppure copia e incolla questo link nel tuo browser:",
+      "copyright": "Nomad Karaoke",
+      "description": "Clicca sul pulsante qui sotto per accedere. Questo link scadrà in 24 ore.",
+      "footer": "Se non hai richiesto questa email, puoi tranquillamente ignorarla.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Accedi a Nomad Karaoke Decide",
+      "title": "Accedi al tuo account"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artisti analizzati",
+      "button": "Vedi le mie canzoni",
+      "copyright": "Nomad Karaoke",
+      "cta": "Vai all'app per esplorare i consigli karaoke personalizzati in base ai tuoi gusti musicali!",
+      "description": "Abbiamo terminato la sincronizzazione della tua cronologia di ascolto da {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Canzoni karaoke trovate",
+      "subject": "La tua sincronizzazione musicale è completa!",
+      "title": "La tua sincronizzazione musicale è completa!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Canzone non trovata nelle canzoni conosciute o impossibile da rimuovere",
+    "songNotFound": "Canzone non trovata nella libreria dell'utente",
+    "trackNotFound": "Traccia non trovata nelle canzoni conosciute o impossibile da rimuovere"
+  },
+  "myData": {
+    "artistNotFound": "Artista '{artist_name}' non trovato nei dati dell'utente"
+  },
+  "playlists": {
+    "accessDenied": "Accesso negato a questa playlist",
+    "notFound": "Playlist non trovata"
+  },
+  "services": {
+    "disconnected": "{service_type} disconnesso con successo",
+    "failedToStartSync": "Impossibile avviare la sincronizzazione: {error}",
+    "invalidServiceType": "Tipo di servizio non valido: {service_type}",
+    "serviceNotConnected": "Il servizio {service_type} non è connesso",
+    "syncStarted": "Processo di sincronizzazione avviato. Interroga /sync/status per il progresso."
+  }
+}

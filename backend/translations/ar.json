@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "فشل في حذف المستخدم",
+    "mustProvideUserIdOrEmail": "يجب توفير إما user_id أو البريد الإلكتروني",
+    "syncJobNotFound": "لم يتم العثور على مهمة المزامنة",
+    "userDeleted": "تم حذف المستخدم وجميع البيانات المرتبطة به بنجاح",
+    "userNotFound": "لم يتم العثور على المستخدم"
+  },
+  "auth": {
+    "accountAlreadyVerified": "تم التحقق من الحساب بالفعل",
+    "accountDeleted": "تم حذف الحساب وجميع البيانات المرتبطة به بنجاح",
+    "emailCollected": "تم جمع البريد الإلكتروني",
+    "failedToSendMagicLink": "فشل في إرسال بريد الرابط السحري. يرجى المحاولة مرة أخرى لاحقاً.",
+    "failedToSendVerification": "فشل في إرسال بريد التحقق. يرجى المحاولة مرة أخرى لاحقاً.",
+    "invalidOrExpiredToken": "رمز غير صالح أو منتهي الصلاحية",
+    "loggedOut": "تم تسجيل الخروج بنجاح",
+    "magicLinkSent": "إذا كان هناك حساب مرتبط بهذا البريد الإلكتروني، فستتلقى رابطاً سحرياً قريباً.",
+    "quizCompleted": "تم إكمال الاختبار بنجاح",
+    "tokenAlreadyUsed": "تم استخدام الرمز بالفعل",
+    "tokenExpired": "انتهت صلاحية الرمز",
+    "userNotFound": "لم يتم العثور على المستخدم",
+    "verificationSent": "تم إرسال بريد التحقق. تحقق من صندوق الوارد الخاص بك لإكمال الترقية."
+  },
+  "catalog": {
+    "songNotFound": "لم يتم العثور على الأغنية"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "تسجيل الدخول",
+      "copyLink": "أو انسخ هذا الرابط والصقه في متصفحك:",
+      "copyright": "Nomad Karaoke",
+      "description": "انقر على الزر أدناه لتسجيل الدخول. ستنتهي صلاحية هذا الرابط خلال 24 ساعة.",
+      "footer": "إذا لم تطلب هذا البريد الإلكتروني، يمكنك تجاهله بأمان.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "تسجيل الدخول إلى Nomad Karaoke Decide",
+      "title": "تسجيل الدخول إلى حسابك"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "الفنانون الذين تم تحليلهم",
+      "button": "عرض أغانيّ",
+      "copyright": "Nomad Karaoke",
+      "cta": "توجه إلى التطبيق لاستكشاف توصيات كاريوكي مخصصة بناءً على ذوقك الموسيقي!",
+      "description": "لقد انتهينا من مزامنة سجل استماعك من {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "أغاني الكاريوكي التي تم العثور عليها",
+      "subject": "اكتملت مزامنة موسيقاك!",
+      "title": "اكتملت مزامنة موسيقاك!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "لم يتم العثور على الأغنية في الأغاني المعروفة أو لا يمكن إزالتها",
+    "songNotFound": "لم يتم العثور على الأغنية في مكتبة المستخدم",
+    "trackNotFound": "لم يتم العثور على المقطع في الأغاني المعروفة أو لا يمكن إزالته"
+  },
+  "myData": {
+    "artistNotFound": "لم يتم العثور على الفنان '{artist_name}' في بيانات المستخدم"
+  },
+  "playlists": {
+    "accessDenied": "تم رفض الوصول إلى قائمة التشغيل هذه",
+    "notFound": "لم يتم العثور على قائمة التشغيل"
+  },
+  "services": {
+    "disconnected": "تم قطع اتصال {service_type} بنجاح",
+    "failedToStartSync": "فشل في بدء المزامنة: {error}",
+    "invalidServiceType": "نوع الخدمة غير صالح: {service_type}",
+    "serviceNotConnected": "الخدمة {service_type} غير متصلة",
+    "syncStarted": "بدأت مهمة المزامنة. استعلم عن /sync/status لمعرفة التقدم."
+  }
+}

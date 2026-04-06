@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Misslyckades med att ta bort användare",
+    "mustProvideUserIdOrEmail": "Måste ange antingen user_id eller e-post",
+    "syncJobNotFound": "Synkroniseringsjobbet hittades inte",
+    "userDeleted": "Användaren och all tillhörande data har tagits bort",
+    "userNotFound": "Användaren hittades inte"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Kontot är redan verifierat",
+    "accountDeleted": "Kontot och all tillhörande data har tagits bort",
+    "emailCollected": "E-post insamlad",
+    "failedToSendMagicLink": "Misslyckades med att skicka e-post med magisk länk. Försök igen senare.",
+    "failedToSendVerification": "Misslyckades med att skicka verifierings-e-post. Försök igen senare.",
+    "invalidOrExpiredToken": "Ogiltig eller utgången token",
+    "loggedOut": "Utloggad",
+    "magicLinkSent": "Om ett konto finns för denna e-postadress kommer du snart att få en magisk länk.",
+    "quizCompleted": "Quizet slutfördes framgångsrikt",
+    "tokenAlreadyUsed": "Token har redan använts",
+    "tokenExpired": "Token har gått ut",
+    "userNotFound": "Användaren hittades inte",
+    "verificationSent": "Verifierings-e-post skickad. Kolla din inkorg för att slutföra uppgraderingen."
+  },
+  "catalog": {
+    "songNotFound": "Låten hittades inte"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Logga in",
+      "copyLink": "Eller kopiera och klistra in denna länk i din webbläsare:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klicka på knappen nedan för att logga in. Denna länk går ut om 24 timmar.",
+      "footer": "Om du inte begärde detta e-postmeddelande kan du säkert ignorera det.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Logga in på Nomad Karaoke Decide",
+      "title": "Logga in på ditt konto"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Analyserade artister",
+      "button": "Visa mina låtar",
+      "copyright": "Nomad Karaoke",
+      "cta": "Gå till appen för att utforska personliga karaokerekommendationer baserade på din musiksmak!",
+      "description": "Vi är klara med att synkronisera din lyssningshistorik från {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Hittade karaokelåtar",
+      "subject": "Din musiksynkronisering är klar!",
+      "title": "Din musiksynkronisering är klar!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Låten hittades inte i kända låtar eller kan inte tas bort",
+    "songNotFound": "Låten hittades inte i användarens bibliotek",
+    "trackNotFound": "Spåret hittades inte i kända låtar eller kan inte tas bort"
+  },
+  "myData": {
+    "artistNotFound": "Artisten '{artist_name}' hittades inte i användarens data"
+  },
+  "playlists": {
+    "accessDenied": "Åtkomst nekad till denna spellista",
+    "notFound": "Spellistan hittades inte"
+  },
+  "services": {
+    "disconnected": "Kopplade från {service_type}",
+    "failedToStartSync": "Misslyckades med att starta synkronisering: {error}",
+    "invalidServiceType": "Ogiltig tjänstetyp: {service_type}",
+    "serviceNotConnected": "Tjänsten {service_type} är inte ansluten",
+    "syncStarted": "Synkroniseringsjobb startat. Polla /sync/status för förlopp."
+  }
+}

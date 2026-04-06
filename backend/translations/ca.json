@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Error en eliminar l'usuari",
+    "mustProvideUserIdOrEmail": "Has de proporcionar el user_id o el correu electrònic",
+    "syncJobNotFound": "No s'ha trobat la tasca de sincronització",
+    "userDeleted": "L'usuari i totes les dades associades s'han suprimit correctament",
+    "userNotFound": "No s'ha trobat l'usuari"
+  },
+  "auth": {
+    "accountAlreadyVerified": "El compte ja està verificat",
+    "accountDeleted": "El compte i totes les dades associades s'han suprimit correctament",
+    "emailCollected": "Correu electrònic recollit",
+    "failedToSendMagicLink": "No s'ha pogut enviar el correu amb l'enllaç màgic. Si us plau, torna-ho a provar més tard.",
+    "failedToSendVerification": "No s'ha pogut enviar el correu de verificació. Si us plau, torna-ho a provar més tard.",
+    "invalidOrExpiredToken": "Token no vàlid o caducat",
+    "loggedOut": "S'ha tancat la sessió correctament",
+    "magicLinkSent": "Si hi ha un compte per a aquest correu electrònic, rebràs un enllaç màgic aviat.",
+    "quizCompleted": "Qüestionari completat correctament",
+    "tokenAlreadyUsed": "El token ja s'ha utilitzat",
+    "tokenExpired": "El token ha caducat",
+    "userNotFound": "No s'ha trobat l'usuari",
+    "verificationSent": "S'ha enviat el correu de verificació. Revisa la teva safata d'entrada per completar l'actualització."
+  },
+  "catalog": {
+    "songNotFound": "No s'ha trobat la cançó"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Inicia sessió",
+      "copyLink": "O copia i enganxa aquest enllaç al teu navegador:",
+      "copyright": "Nomad Karaoke",
+      "description": "Fes clic al botó de sota per iniciar sessió. Aquest enllaç caducarà en 24 hores.",
+      "footer": "Si no has sol·licitat aquest correu, pots ignorar-lo amb seguretat.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Inicia sessió a Nomad Karaoke Decide",
+      "title": "Inicia sessió al teu compte"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artistes analitzats",
+      "button": "Veure les meves cançons",
+      "copyright": "Nomad Karaoke",
+      "cta": "Dirigeix-te a l'aplicació per explorar recomanacions de karaoke personalitzades basades en els teus gustos musicals!",
+      "description": "Hem acabat de sincronitzar el teu historial d'escolta de {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Cançons de karaoke trobades",
+      "subject": "La teva sincronització de música s'ha completat!",
+      "title": "La teva sincronització de música s'ha completat!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "No s'ha trobat la cançó a les cançons conegudes o no es pot eliminar",
+    "songNotFound": "No s'ha trobat la cançó a la biblioteca de l'usuari",
+    "trackNotFound": "No s'ha trobat la pista a les cançons conegudes o no es pot eliminar"
+  },
+  "myData": {
+    "artistNotFound": "No s'ha trobat l'artista '{artist_name}' a les dades de l'usuari"
+  },
+  "playlists": {
+    "accessDenied": "Accés denegat a aquesta llista de reproducció",
+    "notFound": "No s'ha trobat la llista de reproducció"
+  },
+  "services": {
+    "disconnected": "S'ha desconnectat correctament {service_type}",
+    "failedToStartSync": "No s'ha pogut iniciar la sincronització: {error}",
+    "invalidServiceType": "Tipus de servei no vàlid: {service_type}",
+    "serviceNotConnected": "El servei {service_type} no està connectat",
+    "syncStarted": "S'ha iniciat la tasca de sincronització. Consulta /sync/status per veure'n el progrés."
+  }
+}

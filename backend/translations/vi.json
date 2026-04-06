@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Không thể xóa người dùng",
+    "mustProvideUserIdOrEmail": "Phải cung cấp user_id hoặc email",
+    "syncJobNotFound": "Không tìm thấy tiến trình đồng bộ",
+    "userDeleted": "Đã xóa thành công người dùng và tất cả dữ liệu liên quan",
+    "userNotFound": "Không tìm thấy người dùng"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Tài khoản đã được xác minh",
+    "accountDeleted": "Đã xóa thành công tài khoản và tất cả dữ liệu liên quan",
+    "emailCollected": "Đã thu thập email",
+    "failedToSendMagicLink": "Không thể gửi email chứa magic link. Vui lòng thử lại sau.",
+    "failedToSendVerification": "Không thể gửi email xác minh. Vui lòng thử lại sau.",
+    "invalidOrExpiredToken": "Token không hợp lệ hoặc đã hết hạn",
+    "loggedOut": "Đăng xuất thành công",
+    "magicLinkSent": "Nếu có tài khoản tồn tại cho email này, bạn sẽ sớm nhận được một magic link.",
+    "quizCompleted": "Hoàn thành bài trắc nghiệm thành công",
+    "tokenAlreadyUsed": "Token đã được sử dụng",
+    "tokenExpired": "Token đã hết hạn",
+    "userNotFound": "Không tìm thấy người dùng",
+    "verificationSent": "Đã gửi email xác minh. Hãy kiểm tra hộp thư đến của bạn để hoàn tất việc nâng cấp."
+  },
+  "catalog": {
+    "songNotFound": "Không tìm thấy bài hát"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Đăng nhập",
+      "copyLink": "Hoặc sao chép và dán liên kết này vào trình duyệt của bạn:",
+      "copyright": "Nomad Karaoke",
+      "description": "Nhấp vào nút bên dưới để đăng nhập. Liên kết này sẽ hết hạn trong 24 giờ.",
+      "footer": "Nếu bạn không yêu cầu email này, bạn có thể bỏ qua nó một cách an toàn.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Đăng nhập vào Nomad Karaoke Decide",
+      "title": "Đăng nhập vào tài khoản của bạn"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Nghệ sĩ đã phân tích",
+      "button": "Xem bài hát của tôi",
+      "copyright": "Nomad Karaoke",
+      "cta": "Hãy truy cập ứng dụng để khám phá các đề xuất karaoke được cá nhân hóa dựa trên gu âm nhạc của bạn!",
+      "description": "Chúng tôi đã hoàn tất việc đồng bộ lịch sử nghe nhạc của bạn từ {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Bài hát Karaoke tìm thấy",
+      "subject": "Quá trình đồng bộ nhạc của bạn đã hoàn tất!",
+      "title": "Quá trình đồng bộ nhạc của bạn đã hoàn tất!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Không tìm thấy bài hát trong danh sách bài hát đã biết hoặc không thể xóa",
+    "songNotFound": "Không tìm thấy bài hát trong thư viện của người dùng",
+    "trackNotFound": "Không tìm thấy bản nhạc trong danh sách bài hát đã biết hoặc không thể xóa"
+  },
+  "myData": {
+    "artistNotFound": "Không tìm thấy nghệ sĩ '{artist_name}' trong dữ liệu của người dùng"
+  },
+  "playlists": {
+    "accessDenied": "Từ chối quyền truy cập vào danh sách phát này",
+    "notFound": "Không tìm thấy danh sách phát"
+  },
+  "services": {
+    "disconnected": "Ngắt kết nối {service_type} thành công",
+    "failedToStartSync": "Không thể bắt đầu đồng bộ: {error}",
+    "invalidServiceType": "Loại dịch vụ không hợp lệ: {service_type}",
+    "serviceNotConnected": "Dịch vụ {service_type} chưa được kết nối",
+    "syncStarted": "Tiến trình đồng bộ đã bắt đầu. Thăm dò /sync/status để biết tiến độ."
+  }
+}

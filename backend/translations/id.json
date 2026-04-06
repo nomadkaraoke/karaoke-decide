@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Gagal menghapus pengguna",
+    "mustProvideUserIdOrEmail": "Harus memberikan user_id atau email",
+    "syncJobNotFound": "Tugas sinkronisasi tidak ditemukan",
+    "userDeleted": "Pengguna dan semua data terkait berhasil dihapus",
+    "userNotFound": "Pengguna tidak ditemukan"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Akun sudah diverifikasi",
+    "accountDeleted": "Akun dan semua data terkait berhasil dihapus",
+    "emailCollected": "Email telah dikumpulkan",
+    "failedToSendMagicLink": "Gagal mengirim email magic link. Silakan coba lagi nanti.",
+    "failedToSendVerification": "Gagal mengirim email verifikasi. Silakan coba lagi nanti.",
+    "invalidOrExpiredToken": "Token tidak valid atau sudah kedaluwarsa",
+    "loggedOut": "Berhasil keluar",
+    "magicLinkSent": "Jika ada akun yang terdaftar dengan email ini, Anda akan segera menerima magic link.",
+    "quizCompleted": "Kuis berhasil diselesaikan",
+    "tokenAlreadyUsed": "Token sudah digunakan",
+    "tokenExpired": "Token telah kedaluwarsa",
+    "userNotFound": "Pengguna tidak ditemukan",
+    "verificationSent": "Email verifikasi telah dikirim. Periksa kotak masuk Anda untuk menyelesaikan peningkatan akun."
+  },
+  "catalog": {
+    "songNotFound": "Lagu tidak ditemukan"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Masuk",
+      "copyLink": "Atau salin dan tempel tautan ini ke peramban Anda:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klik tombol di bawah untuk masuk. Tautan ini akan kedaluwarsa dalam 24 jam.",
+      "footer": "Jika Anda tidak meminta email ini, Anda dapat mengabaikannya.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Masuk ke Nomad Karaoke Decide",
+      "title": "Masuk ke akun Anda"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artis yang Dianalisis",
+      "button": "Lihat Lagu Saya",
+      "copyright": "Nomad Karaoke",
+      "cta": "Buka aplikasi untuk menjelajahi rekomendasi karaoke yang dipersonalisasi berdasarkan selera musik Anda!",
+      "description": "Kami telah selesai menyinkronkan riwayat mendengarkan Anda dari {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Lagu Karaoke Ditemukan",
+      "subject": "Sinkronisasi musik Anda telah selesai!",
+      "title": "Sinkronisasi musik Anda telah selesai!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Lagu tidak ditemukan dalam lagu yang dikenal atau tidak dapat dihapus",
+    "songNotFound": "Lagu tidak ditemukan di perpustakaan pengguna",
+    "trackNotFound": "Trek tidak ditemukan dalam lagu yang dikenal atau tidak dapat dihapus"
+  },
+  "myData": {
+    "artistNotFound": "Artis '{artist_name}' tidak ditemukan dalam data pengguna"
+  },
+  "playlists": {
+    "accessDenied": "Akses ditolak ke daftar putar ini",
+    "notFound": "Daftar putar tidak ditemukan"
+  },
+  "services": {
+    "disconnected": "Berhasil memutuskan sambungan {service_type}",
+    "failedToStartSync": "Gagal memulai sinkronisasi: {error}",
+    "invalidServiceType": "Jenis layanan tidak valid: {service_type}",
+    "serviceNotConnected": "Layanan {service_type} tidak terhubung",
+    "syncStarted": "Tugas sinkronisasi dimulai. Pantau /sync/status untuk melihat perkembangannya."
+  }
+}

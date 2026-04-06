@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "ユーザーの削除に失敗しました",
+    "mustProvideUserIdOrEmail": "user_idまたはemailのいずれかを提供する必要があります",
+    "syncJobNotFound": "同期ジョブが見つかりません",
+    "userDeleted": "ユーザーと関連するすべてのデータが正常に削除されました",
+    "userNotFound": "ユーザーが見つかりません"
+  },
+  "auth": {
+    "accountAlreadyVerified": "アカウントはすでに確認済みです",
+    "accountDeleted": "アカウントと関連するすべてのデータが正常に削除されました",
+    "emailCollected": "メールアドレスを取得しました",
+    "failedToSendMagicLink": "マジックリンクメールの送信に失敗しました。後でもう一度お試しください。",
+    "failedToSendVerification": "確認メールの送信に失敗しました。後でもう一度お試しください。",
+    "invalidOrExpiredToken": "トークンが無効または期限切れです",
+    "loggedOut": "正常にログアウトしました",
+    "magicLinkSent": "このメールアドレスのアカウントが存在する場合、まもなくマジックリンクが届きます。",
+    "quizCompleted": "クイズが正常に完了しました",
+    "tokenAlreadyUsed": "トークンはすでに使用されています",
+    "tokenExpired": "トークンの有効期限が切れています",
+    "userNotFound": "ユーザーが見つかりません",
+    "verificationSent": "確認メールを送信しました。受信トレイを確認してアップグレードを完了してください。"
+  },
+  "catalog": {
+    "songNotFound": "曲が見つかりません"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "サインイン",
+      "copyLink": "または、以下のリンクをブラウザにコピーして貼り付けてください：",
+      "copyright": "Nomad Karaoke",
+      "description": "下のボタンをクリックしてサインインしてください。このリンクは24時間で有効期限が切れます。",
+      "footer": "このメールに心当たりがない場合は、そのまま無視していただいて構いません。",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Nomad Karaoke Decideにサインイン",
+      "title": "アカウントにサインイン"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "分析されたアーティスト",
+      "button": "マイソングを見る",
+      "copyright": "Nomad Karaoke",
+      "cta": "アプリにアクセスして、あなたの音楽の好みに合わせたカラオケのおすすめを見つけましょう！",
+      "description": "{services}からの再生履歴の同期が完了しました。",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "見つかったカラオケ曲",
+      "subject": "音楽の同期が完了しました！",
+      "title": "音楽の同期が完了しました！"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "曲が既知の曲に見つからないか、削除できません",
+    "songNotFound": "ユーザーのライブラリに曲が見つかりません",
+    "trackNotFound": "トラックが既知の曲に見つからないか、削除できません"
+  },
+  "myData": {
+    "artistNotFound": "ユーザーのデータにアーティスト「{artist_name}」が見つかりません"
+  },
+  "playlists": {
+    "accessDenied": "このプレイリストへのアクセスが拒否されました",
+    "notFound": "プレイリストが見つかりません"
+  },
+  "services": {
+    "disconnected": "{service_type}の接続を正常に解除しました",
+    "failedToStartSync": "同期の開始に失敗しました: {error}",
+    "invalidServiceType": "無効なサービスタイプです: {service_type}",
+    "serviceNotConnected": "サービス {service_type} は接続されていません",
+    "syncStarted": "同期ジョブが開始されました。進捗状況は /sync/status をポーリングして確認してください。"
+  }
+}

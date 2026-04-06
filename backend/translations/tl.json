@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Nabigong burahin ang user",
+    "mustProvideUserIdOrEmail": "Kailangang magbigay ng user_id o email",
+    "syncJobNotFound": "Hindi nahanap ang sync job",
+    "userDeleted": "Matagumpay na nabura ang user at lahat ng nauugnay na data",
+    "userNotFound": "Hindi nahanap ang user"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Na-verify na ang account",
+    "accountDeleted": "Matagumpay na nabura ang account at lahat ng nauugnay na data",
+    "emailCollected": "Nakolekta ang email",
+    "failedToSendMagicLink": "Nabigong ipadala ang magic link email. Mangyaring subukan muli mamaya.",
+    "failedToSendVerification": "Nabigong ipadala ang verification email. Mangyaring subukan muli mamaya.",
+    "invalidOrExpiredToken": "Imbalido o paso na ang token",
+    "loggedOut": "Matagumpay na nag-log out",
+    "magicLinkSent": "Kung may account na umiiral para sa email na ito, makakatanggap ka ng magic link sa lalong madaling panahon.",
+    "quizCompleted": "Matagumpay na nakumpleto ang quiz",
+    "tokenAlreadyUsed": "Nagamit na ang token",
+    "tokenExpired": "Paso na ang token",
+    "userNotFound": "Hindi nahanap ang user",
+    "verificationSent": "Naipadala na ang verification email. Suriin ang iyong inbox para makumpleto ang pag-upgrade."
+  },
+  "catalog": {
+    "songNotFound": "Hindi nahanap ang kanta"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Mag-sign In",
+      "copyLink": "O i-copy at i-paste ang link na ito sa iyong browser:",
+      "copyright": "Nomad Karaoke",
+      "description": "I-click ang button sa ibaba para mag-sign in. Mapapaso ang link na ito sa loob ng 24 oras.",
+      "footer": "Kung hindi mo ni-request ang email na ito, maaari mo itong balewalain.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Mag-sign in sa Nomad Karaoke Decide",
+      "title": "Mag-sign in sa iyong account"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Mga Artist na Na-analyze",
+      "button": "Tingnan ang Aking Mga Kanta",
+      "copyright": "Nomad Karaoke",
+      "cta": "Pumunta sa app para tuklasin ang mga personalized na rekomendasyon sa karaoke base sa iyong panlasa sa musika!",
+      "description": "Tapos na naming i-sync ang iyong listening history mula sa {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Mga Kantang Karaoke na Nahanap",
+      "subject": "Kumpleto na ang iyong music sync!",
+      "title": "Kumpleto na ang iyong music sync!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Hindi nahanap ang kanta sa known songs o hindi maaaring alisin",
+    "songNotFound": "Hindi nahanap ang kanta sa library ng user",
+    "trackNotFound": "Hindi nahanap ang track sa known songs o hindi maaaring alisin"
+  },
+  "myData": {
+    "artistNotFound": "Hindi nahanap ang artist na '{artist_name}' sa data ng user"
+  },
+  "playlists": {
+    "accessDenied": "Tinanggihan ang access sa playlist na ito",
+    "notFound": "Hindi nahanap ang playlist"
+  },
+  "services": {
+    "disconnected": "Matagumpay na na-disconnect ang {service_type}",
+    "failedToStartSync": "Nabigong simulan ang sync: {error}",
+    "invalidServiceType": "Imbalidong uri ng serbisyo: {service_type}",
+    "serviceNotConnected": "Hindi konektado ang serbisyong {service_type}",
+    "syncStarted": "Nagsimula na ang sync job. I-poll ang /sync/status para sa progreso."
+  }
+}

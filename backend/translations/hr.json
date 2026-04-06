@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Brisanje korisnika nije uspjelo",
+    "mustProvideUserIdOrEmail": "Moraš navesti user_id ili email",
+    "syncJobNotFound": "Zadatak sinkronizacije nije pronađen",
+    "userDeleted": "Korisnik i svi povezani podaci uspješno su izbrisani",
+    "userNotFound": "Korisnik nije pronađen"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Račun je već verificiran",
+    "accountDeleted": "Račun i svi povezani podaci uspješno su izbrisani",
+    "emailCollected": "Email je prikupljen",
+    "failedToSendMagicLink": "Slanje e-maila s magičnom poveznicom nije uspjelo. Molim te, pokušaj ponovno kasnije.",
+    "failedToSendVerification": "Slanje e-maila za verifikaciju nije uspjelo. Molim te, pokušaj ponovno kasnije.",
+    "invalidOrExpiredToken": "Nevažeći ili istekao token",
+    "loggedOut": "Uspješna odjava",
+    "magicLinkSent": "Ako račun za ovaj e-mail postoji, uskoro ćeš dobiti magičnu poveznicu.",
+    "quizCompleted": "Kviz je uspješno završen",
+    "tokenAlreadyUsed": "Token je već iskorišten",
+    "tokenExpired": "Token je istekao",
+    "userNotFound": "Korisnik nije pronađen",
+    "verificationSent": "E-mail za verifikaciju je poslan. Provjeri svoj inbox kako bi dovršio nadogradnju."
+  },
+  "catalog": {
+    "songNotFound": "Pjesma nije pronađena"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Prijavi se",
+      "copyLink": "Ili kopiraj i zalijepi ovu poveznicu u svoj preglednik:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klikni na gumb ispod za prijavu. Ova poveznica istječe za 24 sata.",
+      "footer": "Ako nisi zatražio ovaj e-mail, možeš ga slobodno zanemariti.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Prijavi se u Nomad Karaoke Decide",
+      "title": "Prijavi se na svoj račun"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Analizirani izvođači",
+      "button": "Pogledaj moje pjesme",
+      "copyright": "Nomad Karaoke",
+      "cta": "Otvori aplikaciju i istraži personalizirane karaoke preporuke na temelju tvog glazbenog ukusa!",
+      "description": "Završili smo sinkronizaciju tvoje povijesti slušanja s {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Pronađene karaoke pjesme",
+      "subject": "Tvoja sinkronizacija glazbe je završena!",
+      "title": "Tvoja sinkronizacija glazbe je završena!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Pjesma nije pronađena u poznatim pjesmama ili se ne može ukloniti",
+    "songNotFound": "Pjesma nije pronađena u korisnikovoj zbirci",
+    "trackNotFound": "Zapis nije pronađen u poznatim pjesmama ili se ne može ukloniti"
+  },
+  "myData": {
+    "artistNotFound": "Izvođač '{artist_name}' nije pronađen u korisnikovim podacima"
+  },
+  "playlists": {
+    "accessDenied": "Pristup ovoj playlisti je odbijen",
+    "notFound": "Playlista nije pronađena"
+  },
+  "services": {
+    "disconnected": "Uspješno odspojen {service_type}",
+    "failedToStartSync": "Pokretanje sinkronizacije nije uspjelo: {error}",
+    "invalidServiceType": "Nevažeća vrsta usluge: {service_type}",
+    "serviceNotConnected": "Usluga {service_type} nije spojena",
+    "syncStarted": "Zadatak sinkronizacije je pokrenut. Provjeri /sync/status za napredak."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Nepodarilo sa vymazať používateľa",
+    "mustProvideUserIdOrEmail": "Musíš zadať buď user_id alebo email",
+    "syncJobNotFound": "Úloha synchronizácie sa nenašla",
+    "userDeleted": "Používateľ a všetky pridružené dáta boli úspešne vymazané",
+    "userNotFound": "Používateľ sa nenašiel"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Účet je už overený",
+    "accountDeleted": "Účet a všetky pridružené dáta boli úspešne vymazané",
+    "emailCollected": "Email bol zaznamenaný",
+    "failedToSendMagicLink": "Nepodarilo sa odoslať email s magickým odkazom. Skús to prosím neskôr.",
+    "failedToSendVerification": "Nepodarilo sa odoslať overovací email. Skús to prosím neskôr.",
+    "invalidOrExpiredToken": "Neplatný alebo expirovaný token",
+    "loggedOut": "Úspešne odhlásený",
+    "magicLinkSent": "Ak pre tento email existuje účet, čoskoro dostaneš magický odkaz.",
+    "quizCompleted": "Kvíz bol úspešne dokončený",
+    "tokenAlreadyUsed": "Token už bol použitý",
+    "tokenExpired": "Token expiroval",
+    "userNotFound": "Používateľ sa nenašiel",
+    "verificationSent": "Overovací email bol odoslaný. Skontroluj si schránku pre dokončenie vylepšenia."
+  },
+  "catalog": {
+    "songNotFound": "Pieseň sa nenašla"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Prihlásiť sa",
+      "copyLink": "Alebo skopíruj a vlož tento odkaz do svojho prehliadača:",
+      "copyright": "Nomad Karaoke",
+      "description": "Klikni na tlačidlo nižšie pre prihlásenie. Tento odkaz vyprší za 24 hodín.",
+      "footer": "Ak si tento email nevyžiadal, môžeš ho bezpečne ignorovať.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Prihlásenie do Nomad Karaoke Decide",
+      "title": "Prihlás sa do svojho účtu"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Analyzovaní interpreti",
+      "button": "Zobraziť moje piesne",
+      "copyright": "Nomad Karaoke",
+      "cta": "Prejdi do aplikácie a objav personalizované karaoke odporúčania na základe tvojho hudobného vkusu!",
+      "description": "Dokončili sme synchronizáciu tvojej histórie počúvania z {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Nájdené karaoke piesne",
+      "subject": "Synchronizácia tvojej hudby je dokončená!",
+      "title": "Synchronizácia tvojej hudby je dokončená!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Pieseň sa nenašla v známych piesňach alebo ju nie je možné odstrániť",
+    "songNotFound": "Pieseň sa nenašla v knižnici používateľa",
+    "trackNotFound": "Skladba sa nenašla v známych piesňach alebo ju nie je možné odstrániť"
+  },
+  "myData": {
+    "artistNotFound": "Interpret '{artist_name}' sa nenašiel v dátach používateľa"
+  },
+  "playlists": {
+    "accessDenied": "Prístup k tomuto playlistu bol odmietnutý",
+    "notFound": "Playlist sa nenašiel"
+  },
+  "services": {
+    "disconnected": "Úspešne odpojené {service_type}",
+    "failedToStartSync": "Nepodarilo sa spustiť synchronizáciu: {error}",
+    "invalidServiceType": "Neplatný typ služby: {service_type}",
+    "serviceNotConnected": "Služba {service_type} nie je pripojená",
+    "syncStarted": "Úloha synchronizácie sa začala. Pre sledovanie priebehu dopytuj /sync/status."
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "删除用户失败",
+    "mustProvideUserIdOrEmail": "必须提供 user_id 或邮箱",
+    "syncJobNotFound": "未找到同步任务",
+    "userDeleted": "用户及所有相关数据已成功删除",
+    "userNotFound": "未找到用户"
+  },
+  "auth": {
+    "accountAlreadyVerified": "账户已验证",
+    "accountDeleted": "账户及所有相关数据已成功删除",
+    "emailCollected": "已收集邮箱",
+    "failedToSendMagicLink": "发送魔法链接邮件失败。请稍后再试。",
+    "failedToSendVerification": "发送验证邮件失败。请稍后再试。",
+    "invalidOrExpiredToken": "令牌无效或已过期",
+    "loggedOut": "已成功登出",
+    "magicLinkSent": "如果该邮箱存在关联账户，您将很快收到一条魔法链接。",
+    "quizCompleted": "测试已成功完成",
+    "tokenAlreadyUsed": "令牌已被使用",
+    "tokenExpired": "令牌已过期",
+    "userNotFound": "未找到用户",
+    "verificationSent": "验证邮件已发送。请检查您的收件箱以完成升级。"
+  },
+  "catalog": {
+    "songNotFound": "未找到歌曲"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "登录",
+      "copyLink": "或者复制并粘贴此链接到您的浏览器中：",
+      "copyright": "Nomad Karaoke",
+      "description": "点击下方按钮登录。此链接将在24小时后过期。",
+      "footer": "如果您没有请求此邮件，请放心忽略。",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "登录 Nomad Karaoke Decide",
+      "title": "登录您的账户"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "已分析的歌手",
+      "button": "查看我的歌曲",
+      "copyright": "Nomad Karaoke",
+      "cta": "前往应用，探索基于您音乐品味的个性化卡拉OK推荐！",
+      "description": "我们已完成从 {services} 同步您的收听历史记录。",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "找到的卡拉OK歌曲",
+      "subject": "您的音乐同步已完成！",
+      "title": "您的音乐同步已完成！"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "在已知歌曲中未找到该歌曲，或无法将其移除",
+    "songNotFound": "在用户曲库中未找到该歌曲",
+    "trackNotFound": "在已知歌曲中未找到该曲目，或无法将其移除"
+  },
+  "myData": {
+    "artistNotFound": "在用户数据中未找到歌手 '{artist_name}'"
+  },
+  "playlists": {
+    "accessDenied": "拒绝访问此播放列表",
+    "notFound": "未找到播放列表"
+  },
+  "services": {
+    "disconnected": "已成功断开 {service_type} 的连接",
+    "failedToStartSync": "启动同步失败：{error}",
+    "invalidServiceType": "无效的服务类型：{service_type}",
+    "serviceNotConnected": "服务 {service_type} 未连接",
+    "syncStarted": "同步任务已启动。请轮询 /sync/status 获取进度。"
+  }
+}

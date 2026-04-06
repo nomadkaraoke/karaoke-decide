@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Käyttäjän poistaminen epäonnistui",
+    "mustProvideUserIdOrEmail": "On annettava joko user_id tai sähköpostiosoite",
+    "syncJobNotFound": "Synkronointitehtävää ei löytynyt",
+    "userDeleted": "Käyttäjä ja kaikki siihen liittyvät tiedot poistettiin onnistuneesti",
+    "userNotFound": "Käyttäjää ei löytynyt"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Tili on jo vahvistettu",
+    "accountDeleted": "Tili ja kaikki siihen liittyvät tiedot poistettiin onnistuneesti",
+    "emailCollected": "Sähköposti kerätty",
+    "failedToSendMagicLink": "Taikalinkkisähköpostin lähettäminen epäonnistui. Yritä myöhemmin uudelleen.",
+    "failedToSendVerification": "Vahvistussähköpostin lähettäminen epäonnistui. Yritä myöhemmin uudelleen.",
+    "invalidOrExpiredToken": "Virheellinen tai vanhentunut tunniste",
+    "loggedOut": "Kirjauduttu ulos onnistuneesti",
+    "magicLinkSent": "Jos tällä sähköpostilla on tili, saat pian taikalinkin.",
+    "quizCompleted": "Kysely suoritettu onnistuneesti",
+    "tokenAlreadyUsed": "Tunniste on jo käytetty",
+    "tokenExpired": "Tunniste on vanhentunut",
+    "userNotFound": "Käyttäjää ei löytynyt",
+    "verificationSent": "Vahvistussähköposti lähetetty. Tarkista saapuneet-kansiosi viimeistelläksesi päivityksen."
+  },
+  "catalog": {
+    "songNotFound": "Kappaletta ei löytynyt"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Kirjaudu sisään",
+      "copyLink": "Tai kopioi ja liitä tämä linkki selaimeesi:",
+      "copyright": "Nomad Karaoke",
+      "description": "Napsauta alla olevaa painiketta kirjautuaksesi sisään. Tämä linkki vanhenee 24 tunnin kuluttua.",
+      "footer": "Jos et pyytänyt tätä sähköpostia, voit turvallisesti jättää sen huomiotta.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Kirjaudu sisään Nomad Karaoke Decide -palveluun",
+      "title": "Kirjaudu tilillesi"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Analysoidut artistit",
+      "button": "Näytä omat kappaleeni",
+      "copyright": "Nomad Karaoke",
+      "cta": "Siirry sovellukseen tutkiaksesi musiikkimakuusi perustuvia henkilökohtaisia karaokesuosituksia!",
+      "description": "Olemme saaneet valmiiksi kuunteluhistoriasi synkronoinnin ({services}).",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Löydetyt karaokekappaleet",
+      "subject": "Musiikin synkronointi on valmis!",
+      "title": "Musiikin synkronointi on valmis!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Kappaletta ei löytynyt tunnetuista kappaleista tai sitä ei voida poistaa",
+    "songNotFound": "Kappaletta ei löytynyt käyttäjän kirjastosta",
+    "trackNotFound": "Raitaa ei löytynyt tunnetuista kappaleista tai sitä ei voida poistaa"
+  },
+  "myData": {
+    "artistNotFound": "Artistia '{artist_name}' ei löytynyt käyttäjän tiedoista"
+  },
+  "playlists": {
+    "accessDenied": "Pääsy evätty tähän soittolistaan",
+    "notFound": "Soittolistaa ei löytynyt"
+  },
+  "services": {
+    "disconnected": "Yhteys katkaistu onnistuneesti: {service_type}",
+    "failedToStartSync": "Synkronoinnin aloittaminen epäonnistui: {error}",
+    "invalidServiceType": "Virheellinen palvelutyyppi: {service_type}",
+    "serviceNotConnected": "Palvelua {service_type} ei ole yhdistetty",
+    "syncStarted": "Synkronointitehtävä aloitettu. Seuraa edistymistä osoitteesta /sync/status."
+  }
+}

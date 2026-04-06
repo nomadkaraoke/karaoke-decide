@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "Nu s-a putut șterge utilizatorul",
+    "mustProvideUserIdOrEmail": "Trebuie să furnizezi fie user_id, fie email",
+    "syncJobNotFound": "Sarcina de sincronizare nu a fost găsită",
+    "userDeleted": "Utilizatorul și toate datele asociate au fost șterse cu succes",
+    "userNotFound": "Utilizatorul nu a fost găsit"
+  },
+  "auth": {
+    "accountAlreadyVerified": "Contul este deja verificat",
+    "accountDeleted": "Contul și toate datele asociate au fost șterse cu succes",
+    "emailCollected": "Email colectat",
+    "failedToSendMagicLink": "Nu s-a putut trimite emailul cu linkul magic. Te rugăm să încerci din nou mai târziu.",
+    "failedToSendVerification": "Nu s-a putut trimite emailul de verificare. Te rugăm să încerci din nou mai târziu.",
+    "invalidOrExpiredToken": "Token invalid sau expirat",
+    "loggedOut": "Te-ai deconectat cu succes",
+    "magicLinkSent": "Dacă există un cont pentru acest email, vei primi un link magic în scurt timp.",
+    "quizCompleted": "Chestionar completat cu succes",
+    "tokenAlreadyUsed": "Tokenul a fost deja folosit",
+    "tokenExpired": "Tokenul a expirat",
+    "userNotFound": "Utilizatorul nu a fost găsit",
+    "verificationSent": "Emailul de verificare a fost trimis. Verifică-ți căsuța de email pentru a finaliza actualizarea."
+  },
+  "catalog": {
+    "songNotFound": "Melodia nu a fost găsită"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "Conectează-te",
+      "copyLink": "Sau copiază și lipește acest link în browserul tău:",
+      "copyright": "Nomad Karaoke",
+      "description": "Fă clic pe butonul de mai jos pentru a te conecta. Acest link va expira în 24 de ore.",
+      "footer": "Dacă nu ai solicitat acest email, îl poți ignora în siguranță.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Conectează-te la Nomad Karaoke Decide",
+      "title": "Conectează-te la contul tău"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artiști analizați",
+      "button": "Vezi melodiile mele",
+      "copyright": "Nomad Karaoke",
+      "cta": "Intră în aplicație pentru a explora recomandări personalizate de karaoke bazate pe gusturile tale muzicale!",
+      "description": "Am terminat de sincronizat istoricul tău de ascultare din {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Melodii de karaoke găsite",
+      "subject": "Sincronizarea muzicii tale este completă!",
+      "title": "Sincronizarea muzicii tale este completă!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "Melodia nu a fost găsită în melodiile cunoscute sau nu poate fi eliminată",
+    "songNotFound": "Melodia nu a fost găsită în biblioteca utilizatorului",
+    "trackNotFound": "Piesa nu a fost găsită în melodiile cunoscute sau nu poate fi eliminată"
+  },
+  "myData": {
+    "artistNotFound": "Artistul '{artist_name}' nu a fost găsit în datele utilizatorului"
+  },
+  "playlists": {
+    "accessDenied": "Acces refuzat la acest playlist",
+    "notFound": "Playlistul nu a fost găsit"
+  },
+  "services": {
+    "disconnected": "Ai deconectat cu succes {service_type}",
+    "failedToStartSync": "Nu s-a putut porni sincronizarea: {error}",
+    "invalidServiceType": "Tip de serviciu invalid: {service_type}",
+    "serviceNotConnected": "Serviciul {service_type} nu este conectat",
+    "syncStarted": "Sarcina de sincronizare a început. Interoghează /sync/status pentru progres."
+  }
+}

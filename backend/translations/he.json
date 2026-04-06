@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "מחיקת המשתמש נכשלה",
+    "mustProvideUserIdOrEmail": "יש לספק user_id או אימייל",
+    "syncJobNotFound": "משימת הסנכרון לא נמצאה",
+    "userDeleted": "המשתמש וכל הנתונים הקשורים אליו נמחקו בהצלחה",
+    "userNotFound": "המשתמש לא נמצא"
+  },
+  "auth": {
+    "accountAlreadyVerified": "החשבון כבר מאומת",
+    "accountDeleted": "החשבון וכל הנתונים הקשורים אליו נמחקו בהצלחה",
+    "emailCollected": "האימייל נאסף",
+    "failedToSendMagicLink": "שליחת אימייל עם קישור הקסם נכשלה. אנא נסה שוב מאוחר יותר.",
+    "failedToSendVerification": "שליחת אימייל האימות נכשלה. אנא נסה שוב מאוחר יותר.",
+    "invalidOrExpiredToken": "האסימון לא חוקי או שפג תוקפו",
+    "loggedOut": "התנתקת בהצלחה",
+    "magicLinkSent": "אם קיים חשבון עבור אימייל זה, תקבל קישור קסם בקרוב.",
+    "quizCompleted": "החידון הושלם בהצלחה",
+    "tokenAlreadyUsed": "כבר נעשה שימוש באסימון זה",
+    "tokenExpired": "תוקף האסימון פג",
+    "userNotFound": "המשתמש לא נמצא",
+    "verificationSent": "אימייל אימות נשלח. בדוק את תיבת הדואר הנכנס שלך כדי להשלים את השדרוג."
+  },
+  "catalog": {
+    "songNotFound": "השיר לא נמצא"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "התחבר",
+      "copyLink": "או העתק והדבק את הקישור הזה בדפדפן שלך:",
+      "copyright": "Nomad Karaoke",
+      "description": "לחץ על הכפתור למטה כדי להתחבר. תוקף הקישור יפוג בעוד 24 שעות.",
+      "footer": "אם לא ביקשת את האימייל הזה, אתה יכול להתעלם ממנו בבטחה.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "התחבר ל-Nomad Karaoke Decide",
+      "title": "התחבר לחשבון שלך"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "אמנים שנותחו",
+      "button": "צפה בשירים שלי",
+      "copyright": "Nomad Karaoke",
+      "cta": "עבור לאפליקציה כדי לגלות המלצות קריוקי מותאמות אישית המבוססות על הטעם המוזיקלי שלך!",
+      "description": "סיימנו לסנכרן את היסטוריית ההאזנה שלך מ-{services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "שירי קריוקי שנמצאו",
+      "subject": "סנכרון המוזיקה שלך הושלם!",
+      "title": "סנכרון המוזיקה שלך הושלם!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "השיר לא נמצא בשירים המוכרים או שלא ניתן להסיר אותו",
+    "songNotFound": "השיר לא נמצא בספריית המשתמש",
+    "trackNotFound": "הרצועה לא נמצאה בשירים המוכרים או שלא ניתן להסיר אותה"
+  },
+  "myData": {
+    "artistNotFound": "האמן '{artist_name}' לא נמצא בנתוני המשתמש"
+  },
+  "playlists": {
+    "accessDenied": "הגישה לפלייליסט זה נדחתה",
+    "notFound": "הפלייליסט לא נמצא"
+  },
+  "services": {
+    "disconnected": "נותק בהצלחה מ-{service_type}",
+    "failedToStartSync": "הפעלת הסנכרון נכשלה: {error}",
+    "invalidServiceType": "סוג שירות לא חוקי: {service_type}",
+    "serviceNotConnected": "השירות {service_type} אינו מחובר",
+    "syncStarted": "משימת הסנכרון התחילה. בדוק את /sync/status להתקדמות."
+  }
+}

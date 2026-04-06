@@ -1,69 +1,69 @@
 {
-  "emails": {
-    "magicLink": {
-      "subject": "Inicia sesión en Nomad Karaoke Decide",
-      "heading": "Nomad Karaoke Decide",
-      "title": "Inicia sesión en tu cuenta",
-      "description": "Haz clic en el botón de abajo para iniciar sesión. Este enlace expirará en 24 horas.",
-      "button": "Iniciar sesión",
-      "copyLink": "O copia y pega este enlace en tu navegador:",
-      "footer": "Si no solicitaste este correo, puedes ignorarlo de forma segura.",
-      "copyright": "Nomad Karaoke"
-    },
-    "syncComplete": {
-      "subject": "¡Tu sincronización de música está completa!",
-      "heading": "Nomad Karaoke Decide",
-      "title": "¡Tu sincronización de música está completa!",
-      "description": "Hemos terminado de sincronizar tu historial de reproducción de {services}.",
-      "songsFound": "Canciones de karaoke encontradas",
-      "artistsAnalyzed": "Artistas analizados",
-      "cta": "¡Dirígete a la aplicación para explorar recomendaciones de karaoke personalizadas basadas en tus gustos musicales!",
-      "button": "Ver mis canciones",
-      "copyright": "Nomad Karaoke"
-    }
+  "admin": {
+    "failedToDeleteUser": "Error al eliminar el usuario",
+    "mustProvideUserIdOrEmail": "Debes proporcionar el user_id o el correo electrónico",
+    "syncJobNotFound": "Trabajo de sincronización no encontrado",
+    "userDeleted": "Usuario y todos los datos asociados eliminados con éxito",
+    "userNotFound": "Usuario no encontrado"
   },
   "auth": {
     "accountAlreadyVerified": "La cuenta ya está verificada",
-    "failedToSendVerification": "Error al enviar el correo de verificación. Por favor, inténtalo de nuevo más tarde.",
+    "accountDeleted": "Cuenta y todos los datos asociados eliminados con éxito",
+    "emailCollected": "Correo electrónico recopilado",
     "failedToSendMagicLink": "Error al enviar el correo con el enlace mágico. Por favor, inténtalo de nuevo más tarde.",
-    "verificationSent": "Correo de verificación enviado. Revisa tu bandeja de entrada para completar la actualización.",
+    "failedToSendVerification": "Error al enviar el correo de verificación. Por favor, inténtalo de nuevo más tarde.",
+    "invalidOrExpiredToken": "Token inválido o expirado",
+    "loggedOut": "Sesión cerrada con éxito",
     "magicLinkSent": "Si existe una cuenta para este correo electrónico, recibirás un enlace mágico en breve.",
     "quizCompleted": "Cuestionario completado con éxito",
-    "emailCollected": "Correo electrónico registrado",
-    "accountDeleted": "Cuenta y todos los datos asociados eliminados con éxito",
-    "loggedOut": "Sesión cerrada con éxito",
-    "userNotFound": "Usuario no encontrado",
-    "invalidOrExpiredToken": "Token inválido o expirado",
     "tokenAlreadyUsed": "El token ya ha sido utilizado",
-    "tokenExpired": "El token ha expirado"
-  },
-  "admin": {
+    "tokenExpired": "El token ha expirado",
     "userNotFound": "Usuario no encontrado",
-    "syncJobNotFound": "Tarea de sincronización no encontrada",
-    "mustProvideUserIdOrEmail": "Debes proporcionar user_id o email",
-    "failedToDeleteUser": "Error al eliminar el usuario",
-    "userDeleted": "Usuario y todos los datos asociados eliminados con éxito"
+    "verificationSent": "Correo de verificación enviado. Revisa tu bandeja de entrada para completar la actualización."
   },
   "catalog": {
     "songNotFound": "Canción no encontrada"
   },
-  "playlists": {
-    "notFound": "Lista de reproducción no encontrada",
-    "accessDenied": "Acceso denegado a esta lista de reproducción"
+  "emails": {
+    "magicLink": {
+      "button": "Iniciar sesión",
+      "copyLink": "O copia y pega este enlace en tu navegador:",
+      "copyright": "Nomad Karaoke",
+      "description": "Haz clic en el botón de abajo para iniciar sesión. Este enlace expirará en 24 horas.",
+      "footer": "Si no solicitaste este correo, puedes ignorarlo de forma segura.",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "Inicia sesión en Nomad Karaoke Decide",
+      "title": "Inicia sesión en tu cuenta"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "Artistas analizados",
+      "button": "Ver mis canciones",
+      "copyright": "Nomad Karaoke",
+      "cta": "¡Dirígete a la aplicación para explorar recomendaciones de karaoke personalizadas basadas en tus gustos musicales!",
+      "description": "Hemos terminado de sincronizar tu historial de reproducción de {services}.",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "Canciones de karaoke encontradas",
+      "subject": "¡Tu sincronización de música está completa!",
+      "title": "¡Tu sincronización de música está completa!"
+    }
   },
   "knownSongs": {
-    "trackNotFound": "Pista no encontrada en las canciones conocidas o no se puede eliminar",
+    "songCannotBeRemoved": "Canción no encontrada en las canciones conocidas o no se puede eliminar",
     "songNotFound": "Canción no encontrada en la biblioteca del usuario",
-    "songCannotBeRemoved": "Canción no encontrada en las canciones conocidas o no se puede eliminar"
+    "trackNotFound": "Pista no encontrada en las canciones conocidas o no se puede eliminar"
   },
   "myData": {
     "artistNotFound": "Artista '{artist_name}' no encontrado en los datos del usuario"
   },
+  "playlists": {
+    "accessDenied": "Acceso denegado a esta lista de reproducción",
+    "notFound": "Lista de reproducción no encontrada"
+  },
   "services": {
+    "disconnected": "{service_type} desconectado con éxito",
+    "failedToStartSync": "Error al iniciar la sincronización: {error}",
     "invalidServiceType": "Tipo de servicio inválido: {service_type}",
     "serviceNotConnected": "El servicio {service_type} no está conectado",
-    "failedToStartSync": "Error al iniciar la sincronización: {error}",
-    "disconnected": "{service_type} desconectado con éxito",
-    "syncStarted": "Tarea de sincronización iniciada. Consulta /sync/status para ver el progreso."
+    "syncStarted": "Trabajo de sincronización iniciado. Consulta /sync/status para ver el progreso."
   }
 }

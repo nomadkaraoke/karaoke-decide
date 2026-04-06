@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "failedToDeleteUser": "ลบผู้ใช้ไม่สำเร็จ",
+    "mustProvideUserIdOrEmail": "ต้องระบุ user_id หรืออีเมลอย่างใดอย่างหนึ่ง",
+    "syncJobNotFound": "ไม่พบงานซิงค์ข้อมูล",
+    "userDeleted": "ลบผู้ใช้และข้อมูลที่เกี่ยวข้องทั้งหมดเรียบร้อยแล้ว",
+    "userNotFound": "ไม่พบผู้ใช้"
+  },
+  "auth": {
+    "accountAlreadyVerified": "บัญชีนี้ได้รับการยืนยันแล้ว",
+    "accountDeleted": "ลบบัญชีและข้อมูลที่เกี่ยวข้องทั้งหมดเรียบร้อยแล้ว",
+    "emailCollected": "บันทึกอีเมลแล้ว",
+    "failedToSendMagicLink": "ไม่สามารถส่งอีเมล Magic Link ได้ โปรดลองอีกครั้งในภายหลัง",
+    "failedToSendVerification": "ไม่สามารถส่งอีเมลยืนยันได้ โปรดลองอีกครั้งในภายหลัง",
+    "invalidOrExpiredToken": "โทเค็นไม่ถูกต้องหรือหมดอายุแล้ว",
+    "loggedOut": "ออกจากระบบเรียบร้อยแล้ว",
+    "magicLinkSent": "หากมีบัญชีที่เชื่อมโยงกับอีเมลนี้ คุณจะได้รับ Magic Link ในไม่ช้า",
+    "quizCompleted": "ทำแบบทดสอบเสร็จสมบูรณ์",
+    "tokenAlreadyUsed": "โทเค็นนี้ถูกใช้งานไปแล้ว",
+    "tokenExpired": "โทเค็นหมดอายุแล้ว",
+    "userNotFound": "ไม่พบผู้ใช้",
+    "verificationSent": "ส่งอีเมลยืนยันแล้ว โปรดตรวจสอบกล่องจดหมายของคุณเพื่อดำเนินการอัปเกรดให้เสร็จสิ้น"
+  },
+  "catalog": {
+    "songNotFound": "ไม่พบเพลง"
+  },
+  "emails": {
+    "magicLink": {
+      "button": "เข้าสู่ระบบ",
+      "copyLink": "หรือคัดลอกและวางลิงก์นี้ลงในเบราว์เซอร์ของคุณ:",
+      "copyright": "Nomad Karaoke",
+      "description": "คลิกปุ่มด้านล่างเพื่อเข้าสู่ระบบ ลิงก์นี้จะหมดอายุภายใน 24 ชั่วโมง",
+      "footer": "หากคุณไม่ได้ร้องขออีเมลฉบับนี้ คุณสามารถเพิกเฉยต่ออีเมลนี้ได้เลย",
+      "heading": "Nomad Karaoke Decide",
+      "subject": "เข้าสู่ระบบ Nomad Karaoke Decide",
+      "title": "เข้าสู่ระบบบัญชีของคุณ"
+    },
+    "syncComplete": {
+      "artistsAnalyzed": "ศิลปินที่วิเคราะห์แล้ว",
+      "button": "ดูเพลงของฉัน",
+      "copyright": "Nomad Karaoke",
+      "cta": "ไปที่แอปเพื่อสำรวจเพลงคาราโอเกะที่แนะนำสำหรับคุณโดยเฉพาะตามรสนิยมการฟังเพลงของคุณ!",
+      "description": "เราซิงค์ประวัติการฟังของคุณจาก {services} เสร็จเรียบร้อยแล้ว",
+      "heading": "Nomad Karaoke Decide",
+      "songsFound": "เพลงคาราโอเกะที่พบ",
+      "subject": "ซิงค์เพลงของคุณเสร็จสมบูรณ์แล้ว!",
+      "title": "ซิงค์เพลงของคุณเสร็จสมบูรณ์แล้ว!"
+    }
+  },
+  "knownSongs": {
+    "songCannotBeRemoved": "ไม่พบเพลงในรายการเพลงที่รู้จักหรือไม่สามารถลบออกได้",
+    "songNotFound": "ไม่พบเพลงในคลังเพลงของผู้ใช้",
+    "trackNotFound": "ไม่พบแทร็กในรายการเพลงที่รู้จักหรือไม่สามารถลบออกได้"
+  },
+  "myData": {
+    "artistNotFound": "ไม่พบศิลปิน '{artist_name}' ในข้อมูลของผู้ใช้"
+  },
+  "playlists": {
+    "accessDenied": "ถูกปฏิเสธการเข้าถึงเพลย์ลิสต์นี้",
+    "notFound": "ไม่พบเพลย์ลิสต์"
+  },
+  "services": {
+    "disconnected": "ยกเลิกการเชื่อมต่อ {service_type} เรียบร้อยแล้ว",
+    "failedToStartSync": "ไม่สามารถเริ่มการซิงค์ได้: {error}",
+    "invalidServiceType": "ประเภทบริการไม่ถูกต้อง: {service_type}",
+    "serviceNotConnected": "บริการ {service_type} ยังไม่ได้เชื่อมต่อ",
+    "syncStarted": "เริ่มงานซิงค์ข้อมูลแล้ว ตรวจสอบความคืบหน้าได้ที่ /sync/status"
+  }
+}
