@@ -40,15 +40,31 @@ See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
 
 ### Internationalization (i18n)
 
-- All user-facing strings live in `frontend/messages/{locale}.json` (en, es, de), NOT in components
+- **33 locales** supported (en + 32 translations) — see `LOCALE_NAMES` in `scripts/translate.py`
+- All user-facing strings live in `frontend/messages/{locale}.json`, NOT in components
+- Backend translations in `backend/translations/{locale}.json`
 - Components use `useTranslations('namespace')` from next-intl
-- Pages are under `frontend/src/app/[locale]/` — static export generates `/en/`, `/es/`, `/de/`
+- Pages are under `frontend/src/app/[locale]/` — static export generates locale-prefixed routes
 - Internal links use `Link` from `@/i18n/routing` (locale-aware)
 - Root `/` detects browser language and redirects; preference saved in localStorage
 - API client sends `Accept-Language` header with every request
-- To add a new language: `python scripts/translate.py --messages-dir ./frontend/messages --target <code>`
-- Translation pipeline uses Gemini 3.1 Pro via Vertex AI (nomadkaraoke GCP project)
 - Don't hardcode user-facing strings — add to `messages/en.json` and use `t('key')`
+
+#### Translation Pipeline
+- `python scripts/translate.py --messages-dir ./frontend/messages --target all` — translate all locales
+- Uses Gemini 3.1 Pro via Vertex AI with two-pass (translate + review) and delta mode
+- **GCS cache** (`nomadkaraoke-translation-cache` bucket) — caches by SHA-256 of English string per locale
+  - `--no-cache` to disable, `--dry-run` to preview without calling Gemini
+  - Cache shared across repos (karaoke-gen, karaoke-decide, public-website)
+- Glossary: `scripts/glossary.json` — brand terms that must not be translated (all 33 locales covered)
+
+#### CI Enforcement
+- `translation-check` job in CI validates key parity (`--keys-only`) on every PR
+  - Frontend validation is warn-only; backend validation is required
+- **Pre-commit hook** (`.githooks/pre-commit`) — auto-translates when `en.json` changes
+  - Enable with: `git config core.hooksPath .githooks`
+- `scripts/validate-translations.py` — validates key parity, placeholders, empty values
+  - `--keys-only` flag skips placeholder/empty checks (used in CI)
 
 ### Git Workflow
 
