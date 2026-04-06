@@ -585,11 +585,18 @@ async def async_main(args):
         location=LOCATION,
     )
 
+    # Initialize translation cache
+    cache = TranslationCache(
+        bucket_name=args.cache_bucket,
+        enabled=not args.no_cache,
+    )
+
     print(f"Using model: {MODEL}")
     print(f"Project: {PROJECT}, Location: {LOCATION}")
     print(f"Locales: {', '.join(locales)} ({len(locales)} total)")
     print(f"Mode: {'full' if args.full or snapshot_data is None else 'incremental (delta)'}")
     print(f"Review: {'skip' if args.skip_review else 'enabled'}")
+    print(f"Cache: {'disabled' if args.no_cache else args.cache_bucket}")
     print(f"Max concurrent: {MAX_CONCURRENT}")
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -610,6 +617,8 @@ async def async_main(args):
             snapshot_data=snapshot_data,
             completed=completed,
             total=total,
+            cache=cache,
+            dry_run=args.dry_run,
         )
         for locale in locales
     ]
@@ -664,6 +673,21 @@ def main():
         "--full",
         action="store_true",
         help="Force full retranslation (ignore snapshot/delta)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Bypass GCS translation cache (force fresh Gemini translation)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be translated without calling Gemini or writing files",
+    )
+    parser.add_argument(
+        "--cache-bucket",
+        default="nomadkaraoke-translation-cache",
+        help="GCS bucket name for translation cache (default: nomadkaraoke-translation-cache)",
     )
     args = parser.parse_args()
 
