@@ -40,14 +40,17 @@ See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
 
 ### Internationalization (i18n)
 
-- All user-facing strings live in `frontend/messages/{locale}.json` (en, es, de), NOT in components
+- All user-facing strings live in `frontend/messages/{locale}.json` (33 locales), NOT in components
+- Backend strings live in `backend/translations/{locale}.json` (33 locales)
 - Components use `useTranslations('namespace')` from next-intl
-- Pages are under `frontend/src/app/[locale]/` — static export generates `/en/`, `/es/`, `/de/`
+- Pages are under `frontend/src/app/[locale]/` — static export generates locale-specific routes
 - Internal links use `Link` from `@/i18n/routing` (locale-aware)
 - Root `/` detects browser language and redirects; preference saved in localStorage
 - API client sends `Accept-Language` header with every request
-- To add a new language: `python scripts/translate.py --messages-dir ./frontend/messages --target <code>`
-- Translation pipeline uses Gemini 3.1 Pro via Vertex AI (nomadkaraoke GCP project)
+- After adding/changing English strings: `python scripts/translate.py --messages-dir ./frontend/messages --target all`
+- Translation uses Gemini 3.1 Pro via Vertex AI with GCS cache for efficiency
+- CI validates all locale files have matching keys — **PR will fail if translations are missing**
+- Pre-commit hook auto-translates when en.json changes (enable: `git config core.hooksPath .githooks`)
 - Don't hardcode user-facing strings — add to `messages/en.json` and use `t('key')`
 
 ### Git Workflow
