@@ -39,8 +39,11 @@ def extract_placeholders(text: str) -> set:
     return set(re.findall(r"\{(\w+)\}", str(text)))
 
 
-def validate_locale(en_flat: dict, locale_path: Path) -> list[str]:
-    """Validate a single locale file against English. Returns list of issues."""
+def validate_locale(en_flat: dict, locale_path: Path, keys_only: bool = False) -> list[str]:
+    """Validate a single locale file against English. Returns list of issues.
+
+    If keys_only is True, only check key parity (skip placeholder and empty value checks).
+    """
     issues = []
     locale = locale_path.stem
 
@@ -68,6 +71,9 @@ def validate_locale(en_flat: dict, locale_path: Path) -> list[str]:
     if extra:
         for key in sorted(extra):
             issues.append(f"[{locale}] Extra key: {key}")
+
+    if keys_only:
+        return issues
 
     # Check placeholders and empty values for shared keys
     for key in sorted(en_keys & tr_keys):
@@ -107,6 +113,11 @@ def main():
         nargs="*",
         help="Specific locale(s) to validate (default: all *.json except en.json)",
     )
+    parser.add_argument(
+        "--keys-only",
+        action="store_true",
+        help="Only check key parity (skip placeholder and empty value checks)",
+    )
     args = parser.parse_args()
 
     en_path = args.messages_dir / "en.json"
@@ -140,7 +151,7 @@ def main():
 
     all_issues = []
     for locale_path in locale_paths:
-        issues = validate_locale(en_flat, locale_path)
+        issues = validate_locale(en_flat, locale_path, keys_only=args.keys_only)
         if issues:
             all_issues.extend(issues)
             print(f"  {locale_path.stem}: {len(issues)} issue(s)")

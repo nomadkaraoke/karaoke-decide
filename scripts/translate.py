@@ -36,6 +36,7 @@ from pathlib import Path
 
 from google import genai
 from google.genai import types
+from translation_cache import TranslationCache
 
 MODEL = "gemini-3.1-pro-preview"
 PROJECT = "nomadkaraoke"
@@ -347,6 +348,8 @@ async def translate_locale(
     snapshot_data: dict | None,
     completed: list,
     total: int,
+    cache: TranslationCache | None = None,
+    dry_run: bool = False,
 ) -> bool:
     """Translate a single locale. Returns True on success."""
     async with semaphore:
@@ -354,6 +357,10 @@ async def translate_locale(
         print(f"\n[{target_locale}] Starting translation to {target_name}...")
 
         glossary_instructions = build_glossary_instructions(glossary, target_locale)
+
+        # Download cache for this locale
+        if cache is not None:
+            cache.download(target_locale)
 
         # Determine what to translate (full vs delta)
         json_to_translate = english_json_str
@@ -382,44 +389,108 @@ async def translate_locale(
             else:
                 print(f"[{target_locale}] No existing translation, doing full translation")
 
-        # Pass 1: Translate
-        print(f"[{target_locale}] Pass 1: Translating...")
-        t0 = time.time()
-        translated = await translate_pass_async(client, json_to_translate, target_locale, glossary_instructions)
-        translated = clean_json_response(translated)
-        t1 = time.time()
-        print(f"[{target_locale}] Pass 1 done ({t1 - t0:.1f}s)")
+        # Check cache for individual strings before sending to Gemini
+        data_to_translate = json.loads(json_to_translate)
+        flat_en = flatten_keys(data_to_translate)
+        cached_translations = {}
+        uncached_keys = set()
 
-        # Validate JSON
-        try:
-            parsed = json.loads(translated)
-        except json.JSONDecodeError as e:
-            print(f"[{target_locale}] ERROR: Pass 1 produced invalid JSON: {e}")
-            out_path = messages_dir / f"{target_locale}.raw.json"
-            with open(out_path, "w") as f:
-                f.write(translated)
-            print(f"[{target_locale}] Saved raw output to {out_path}")
+        if cache is not None:
+            for dot_key, en_val in flat_en.items():
+                if isinstance(en_val, str):
+                    hit = cache.lookup(en_val, target_locale)
+                    if hit is not None:
+                        cached_translations[dot_key] = hit
+                    else:
+                        uncached_keys.add(dot_key)
+                else:
+                    uncached_keys.add(dot_key)
+
+            stats = cache.stats(target_locale)
+            print(f"[{target_locale}] Cache: {stats['hits']} hits, {stats['misses']} misses")
+        else:
+            uncached_keys = set(flat_en.keys())
+
+        # Dry run: show what would be translated and exit
+        if dry_run:
             completed.append(target_locale)
-            print(f"[{target_locale}] FAILED ({len(completed)}/{total})")
-            return False
-
-        if not skip_review:
-            # Pass 2: Review
-            print(f"[{target_locale}] Pass 2: Reviewing and polishing...")
-            t0 = time.time()
-            reviewed = await review_pass_async(
-                client, json_to_translate, translated, target_locale, glossary_instructions
+            print(
+                f"[{target_locale}] DRY RUN: would translate {len(uncached_keys)} strings via Gemini, "
+                f"{len(cached_translations)} from cache ({len(completed)}/{total})"
             )
-            reviewed = clean_json_response(reviewed)
-            t1 = time.time()
-            print(f"[{target_locale}] Pass 2 done ({t1 - t0:.1f}s)")
+            return True
 
+        # If all strings are cached, assemble result from cache
+        if uncached_keys:
+            # Build subset of only uncached keys for Gemini
+            if cached_translations:
+                uncached_subset = extract_subset(data_to_translate, uncached_keys)
+                json_for_gemini = json.dumps(uncached_subset, ensure_ascii=False, indent=2)
+            else:
+                json_for_gemini = json_to_translate
+
+            # Pass 1: Translate
+            print(f"[{target_locale}] Pass 1: Translating {len(uncached_keys)} strings...")
+            t0 = time.time()
+            translated = await translate_pass_async(client, json_for_gemini, target_locale, glossary_instructions)
+            translated = clean_json_response(translated)
+            t1 = time.time()
+            print(f"[{target_locale}] Pass 1 done ({t1 - t0:.1f}s)")
+
+            # Validate JSON
             try:
-                parsed = json.loads(reviewed)
-            except json.JSONDecodeError as e:
-                print(f"[{target_locale}] Warning: Pass 2 produced invalid JSON: {e}")
-                print(f"[{target_locale}] Using Pass 1 output instead.")
                 parsed = json.loads(translated)
+            except json.JSONDecodeError as e:
+                print(f"[{target_locale}] ERROR: Pass 1 produced invalid JSON: {e}")
+                out_path = messages_dir / f"{target_locale}.raw.json"
+                with open(out_path, "w") as f:
+                    f.write(translated)
+                print(f"[{target_locale}] Saved raw output to {out_path}")
+                completed.append(target_locale)
+                print(f"[{target_locale}] FAILED ({len(completed)}/{total})")
+                return False
+
+            if not skip_review:
+                # Pass 2: Review
+                print(f"[{target_locale}] Pass 2: Reviewing and polishing...")
+                t0 = time.time()
+                reviewed = await review_pass_async(
+                    client, json_for_gemini, translated, target_locale, glossary_instructions
+                )
+                reviewed = clean_json_response(reviewed)
+                t1 = time.time()
+                print(f"[{target_locale}] Pass 2 done ({t1 - t0:.1f}s)")
+
+                try:
+                    parsed = json.loads(reviewed)
+                except json.JSONDecodeError as e:
+                    print(f"[{target_locale}] Warning: Pass 2 produced invalid JSON: {e}")
+                    print(f"[{target_locale}] Using Pass 1 output instead.")
+                    parsed = json.loads(translated)
+
+            # Store new Gemini translations in cache
+            if cache is not None:
+                gemini_flat = flatten_keys(parsed)
+                uncached_en_flat = flatten_keys(extract_subset(data_to_translate, uncached_keys))
+                for dot_key, tr_val in gemini_flat.items():
+                    en_val = uncached_en_flat.get(dot_key)
+                    if isinstance(en_val, str) and isinstance(tr_val, str):
+                        cache.store(en_val, target_locale, tr_val)
+        else:
+            # All from cache, build parsed from scratch
+            parsed = {}
+
+        # Merge cached translations into result
+        if cached_translations:
+            # Rebuild cached subset as nested dict
+            cached_nested = {}
+            for dot_key, tr_val in cached_translations.items():
+                parts = dot_key.split(".")
+                dst = cached_nested
+                for part in parts[:-1]:
+                    dst = dst.setdefault(part, {})
+                dst[parts[-1]] = tr_val
+            parsed = merge_deep(cached_nested, parsed)
 
         # Merge delta into existing if applicable
         if existing_data is not None and delta_keys is not None:
@@ -430,6 +501,10 @@ async def translate_locale(
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(parsed, f, ensure_ascii=False, indent=2)
             f.write("\n")
+
+        # Upload cache to GCS
+        if cache is not None:
+            cache.upload(target_locale)
 
         completed.append(target_locale)
         en_keys = count_keys(english_data)
@@ -476,6 +551,12 @@ async def async_main(args):
     elif not args.full:
         print("No snapshot found — will do full translation (use --full to force)")
 
+    # Initialize translation cache
+    cache = TranslationCache(
+        bucket_name=args.cache_bucket,
+        enabled=not args.no_cache,
+    )
+
     # Initialize Vertex AI client
     client = genai.Client(
         vertexai=True,
@@ -488,6 +569,8 @@ async def async_main(args):
     print(f"Locales: {', '.join(locales)} ({len(locales)} total)")
     print(f"Mode: {'full' if args.full or snapshot_data is None else 'incremental (delta)'}")
     print(f"Review: {'skip' if args.skip_review else 'enabled'}")
+    print(f"Cache: {'disabled' if args.no_cache else args.cache_bucket}")
+    print(f"Dry run: {'yes' if args.dry_run else 'no'}")
     print(f"Max concurrent: {MAX_CONCURRENT}")
 
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -508,6 +591,8 @@ async def async_main(args):
             snapshot_data=snapshot_data,
             completed=completed,
             total=total,
+            cache=cache,
+            dry_run=args.dry_run,
         )
         for locale in locales
     ]
@@ -562,6 +647,21 @@ def main():
         "--full",
         action="store_true",
         help="Force full retranslation (ignore snapshot/delta)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="Disable GCS translation cache",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be translated without calling Gemini",
+    )
+    parser.add_argument(
+        "--cache-bucket",
+        default="nomadkaraoke-translation-cache",
+        help="GCS bucket for translation cache (default: nomadkaraoke-translation-cache)",
     )
     args = parser.parse_args()
 

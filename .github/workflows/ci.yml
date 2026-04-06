@@ -189,11 +189,27 @@ jobs:
       - name: Build
         run: npm run build
 
+  translation-check:
+    name: Translation Validation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate frontend translations (key parity)
+        run: |
+          python scripts/validate-translations.py --messages-dir frontend/messages --keys-only || echo "::warning::Frontend translation validation failed"
+      - name: Validate backend translations (key parity)
+        run: python scripts/validate-translations.py --messages-dir backend/translations --keys-only
+
   # Summary job for branch protection (PRs only)
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, test-unit, test-backend, test-frontend]
+    needs: [lint, test-unit, test-backend, test-frontend, translation-check]
     if: github.event_name == 'pull_request' && always()
     steps:
       - name: Check all jobs passed
@@ -204,6 +220,10 @@ jobs:
              [[ "${{ needs.test-frontend.result }}" != "success" ]]; then
             echo "One or more required jobs failed"
             exit 1
+          fi
+          # Translation check is warn-only (not blocking)
+          if [[ "${{ needs.translation-check.result }}" != "success" ]]; then
+            echo "Warning: Translation validation failed (non-blocking)"
           fi
           echo "All required jobs passed!"
 
