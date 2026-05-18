@@ -126,7 +126,7 @@ See `.env.example` for all available variables. Key ones:
 | `SPOTIFY_CLIENT_SECRET` | Spotify app client secret | Yes |
 | `LASTFM_API_KEY` | Last.fm API key | Yes |
 | `JWT_SECRET` | Secret for signing tokens | Yes |
-| `SENDGRID_API_KEY` | For magic link emails | Yes |
+| `POSTMARK_SERVER_TOKEN` | For magic link emails | Yes |
 
 ## Admin User Setup
 

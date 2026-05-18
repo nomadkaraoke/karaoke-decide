@@ -284,7 +284,7 @@ karaoke-decide playlist show <playlist_id>
 5. [x] Basic song search API with BigQuery backend
 
 ### Phase 2: Auth & User Management ✅ COMPLETE
-1. [x] Magic link email flow (SendGrid)
+1. [x] Magic link email flow (Postmark)
 2. [x] JWT token management
 3. [x] User profile storage
 4. [x] Session management

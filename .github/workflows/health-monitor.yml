@@ -47,10 +47,10 @@ jobs:
         if: failure()
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: smtp.sendgrid.net
+          server_address: smtp.postmarkapp.com
           server_port: 587
-          username: apikey
-          password: ${{ secrets.SENDGRID_API_KEY }}
+          username: ${{ secrets.POSTMARK_SERVER_TOKEN }}
+          password: ${{ secrets.POSTMARK_SERVER_TOKEN }}
           subject: "⚠️ Karaoke Decide Health Check Failed"
           to: andrew@beveridge.uk
           from: noreply@nomadkaraoke.com

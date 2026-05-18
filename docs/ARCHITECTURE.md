@@ -44,7 +44,7 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │ karaokenerds_   │ │  Last.fm API     - Scrobbles and loved tracks   │
 │   raw (275K)    │ │  ListenBrainz    - Similar artist data          │
 │ spotify_tracks  │ │  KaraokeNerds    - Karaoke song catalog         │
-│   (256M)        │ │  SendGrid        - Magic link emails            │
+│   (256M)        │ │  Postmark        - Magic link emails            │
 ├─────────────────┤ └─────────────────────────────────────────────────┘
 │   Firestore     │
 │   (User Data)   │
@@ -77,7 +77,7 @@ Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
 ### 1. User Registration & Auth
 
 ```
-User → CLI/Web → POST /api/auth/magic-link → SendGrid → Email
+User → CLI/Web → POST /api/auth/magic-link → Postmark → Email
 User → Click Link → POST /api/auth/verify → JWT Token → Authenticated
 ```
 
@@ -226,6 +226,6 @@ gcloud run deploy SERVICE_NAME \
 | `spotipy-client-id` | `SPOTIFY_CLIENT_ID` | Spotify OAuth |
 | `spotipy-client-secret` | `SPOTIFY_CLIENT_SECRET` | Spotify OAuth |
 | `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
-| `sendgrid-api-key` | `SENDGRID_API_KEY` | Email delivery |
+| `postmark-server-token` | `POSTMARK_SERVER_TOKEN` | Email delivery |
 
 **IAM requirement:** Cloud Run service account needs `roles/secretmanager.secretAccessor` on each secret. Managed via Pulumi in `infrastructure/__main__.py`.

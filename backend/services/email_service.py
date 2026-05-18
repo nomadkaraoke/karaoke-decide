@@ -1,9 +1,8 @@
-"""Email service for sending transactional emails via SendGrid."""
+"""Email service for sending transactional emails via Postmark."""
 
 import logging
 
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import httpx
 
 from backend.config import BackendSettings
 from backend.i18n import get_locale_prefix, t
@@ -11,26 +10,65 @@ from backend.i18n import get_locale_prefix, t
 logger = logging.getLogger(__name__)
 
 
+POSTMARK_API_URL = "https://api.postmarkapp.com/email"
+
+
 class EmailService:
-    """Service for sending emails via SendGrid."""
+    """Service for sending emails via Postmark's REST API."""
 
     def __init__(self, settings: BackendSettings):
         self.settings = settings
-        self._client: SendGridAPIClient | None = None
 
     @property
     def is_configured(self) -> bool:
-        """Check if SendGrid is properly configured."""
-        return bool(self.settings.sendgrid_api_key)
+        """Check if Postmark is properly configured."""
+        return bool(self.settings.postmark_server_token)
 
-    @property
-    def client(self) -> SendGridAPIClient | None:
-        """Get or create SendGrid client. Returns None if not configured."""
-        if not self.is_configured:
-            return None
-        if self._client is None:
-            self._client = SendGridAPIClient(api_key=self.settings.sendgrid_api_key)
-        return self._client
+    async def _send(
+        self,
+        to_email: str,
+        subject: str,
+        html_content: str,
+    ) -> bool:
+        """Send a single email via Postmark's REST API.
+
+        Returns True on 2xx, False otherwise. Logs Postmark's structured
+        error (ErrorCode/Message) when available so suppressions or
+        unverified-signature errors surface clearly.
+        """
+        payload = {
+            "From": self.settings.postmark_from_email,
+            "To": to_email,
+            "Subject": subject,
+            "HtmlBody": html_content,
+            "MessageStream": "outbound",
+        }
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-Postmark-Server-Token": self.settings.postmark_server_token,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.post(POSTMARK_API_URL, json=payload, headers=headers)
+        except httpx.HTTPError:
+            logger.exception(f"Failed to send email to {to_email} via Postmark")
+            return False
+
+        if 200 <= response.status_code < 300:
+            logger.info(f"Email sent to {to_email} via Postmark")
+            return True
+
+        try:
+            err = response.json()
+            logger.error(
+                f"Postmark returned status {response.status_code}: "
+                f"ErrorCode={err.get('ErrorCode')} Message={err.get('Message')}"
+            )
+        except ValueError:
+            logger.error(f"Postmark returned status {response.status_code}: {response.text[:200]}")
+        return False
 
     async def send_magic_link(self, email: str, token: str, locale: str = "en") -> bool:
         """Send a magic link email to the user.
@@ -49,41 +87,23 @@ class EmailService:
         locale_prefix = get_locale_prefix(locale)
         magic_link_url = f"{self.settings.frontend_url}{locale_prefix}/auth/verify?token={token}"
 
-        # Check if SendGrid is configured
         if not self.is_configured:
             if self.settings.is_production:
-                # In production, this is a critical error - don't silently fail
-                logger.error("SENDGRID_API_KEY is not configured in production!")
+                logger.error("POSTMARK_SERVER_TOKEN is not configured in production!")
                 raise RuntimeError("Email service is not configured. Please contact support.")
-            else:
-                # Dev mode: log to console instead of sending
-                logger.info("=" * 60)
-                logger.info("MAGIC LINK (SendGrid not configured - dev mode)")
-                logger.info(f"To: {email}")
-                logger.info(f"Locale: {locale}")
-                logger.info(f"Link: {magic_link_url}")
-                logger.info("=" * 60)
-                return True
+            logger.info("=" * 60)
+            logger.info("MAGIC LINK (Postmark not configured - dev mode)")
+            logger.info(f"To: {email}")
+            logger.info(f"Locale: {locale}")
+            logger.info(f"Link: {magic_link_url}")
+            logger.info("=" * 60)
+            return True
 
-        # Production mode: send via SendGrid
-        message = Mail(
-            from_email=self.settings.sendgrid_from_email,
-            to_emails=email,
+        return await self._send(
+            to_email=email,
             subject=t(locale, "emails.magicLink.subject"),
             html_content=self._build_magic_link_html(magic_link_url, locale),
         )
-
-        try:
-            response = self.client.send(message)  # type: ignore[union-attr]
-            if response.status_code >= 200 and response.status_code < 300:
-                logger.info(f"Magic link email sent to {email}")
-                return True
-            else:
-                logger.error(f"SendGrid error: {response.status_code}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to send magic link email: {e}")
-            return False
 
     def _build_magic_link_html(self, magic_link_url: str, locale: str = "en") -> str:
         """Build the HTML content for the magic link email."""
@@ -160,13 +180,12 @@ class EmailService:
         else:
             services_str = ", ".join(services[:-1]) + f", and {services[-1]}"
 
-        # Skip if not configured (sync emails are optional)
         if not self.is_configured:
             if self.settings.is_production:
-                logger.warning("SENDGRID_API_KEY not configured - skipping sync complete email")
+                logger.warning("POSTMARK_SERVER_TOKEN not configured - skipping sync complete email")
             else:
                 logger.info("=" * 60)
-                logger.info("SYNC COMPLETE EMAIL (SendGrid not configured - dev mode)")
+                logger.info("SYNC COMPLETE EMAIL (Postmark not configured - dev mode)")
                 logger.info(f"To: {to_email}")
                 logger.info(f"Locale: {locale}")
                 logger.info(f"Songs matched: {songs_matched}")
@@ -175,27 +194,13 @@ class EmailService:
                 logger.info("=" * 60)
             return True
 
-        # Production mode: send via SendGrid
-        message = Mail(
-            from_email=self.settings.sendgrid_from_email,
-            to_emails=to_email,
+        return await self._send(
+            to_email=to_email,
             subject=t(locale, "emails.syncComplete.subject"),
             html_content=self._build_sync_complete_html(
                 songs_matched, artists_stored, services_str, frontend_url, locale
             ),
         )
-
-        try:
-            response = self.client.send(message)  # type: ignore[union-attr]
-            if response.status_code >= 200 and response.status_code < 300:
-                logger.info(f"Sync complete email sent to {to_email}")
-                return True
-            else:
-                logger.error(f"SendGrid error: {response.status_code}")
-                return False
-        except Exception as e:
-            logger.error(f"Failed to send sync complete email: {e}")
-            return False
 
     def _build_sync_complete_html(
         self,

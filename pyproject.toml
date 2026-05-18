@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.3.22"
+version = "0.3.23"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"
@@ -34,8 +34,6 @@ httpx = "^0.27.0"
 aiohttp = "^3.9.0"
 # Auth
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
-# Email
-sendgrid = "^6.11.0"
 # Utilities
 python-slugify = "^8.0.1"
 python-dotenv = "^1.0.0"
