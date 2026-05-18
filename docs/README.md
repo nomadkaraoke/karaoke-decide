@@ -51,7 +51,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Karaoke Links:** YouTube search + Karaoke Generator integration (Phase 6 Part 2)
 - **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 37.5M recordings + 5.5M ISRCs + 693K tags + 1.5M MLHD+ artist similarity pairs**
 - **CI/Testing:** 185 unit tests, 403 backend tests, E2E tests with Playwright
-- **Email Delivery:** SendGrid configured for production magic link emails
+- **Email Delivery:** Postmark configured for production magic link emails
 - **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
 - **Spotify Audio Analysis ETL:** Complete! 33.5M tracks + 325M sections from 3.88TB torrent (backed up to GCS)
 

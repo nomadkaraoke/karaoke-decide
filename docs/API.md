@@ -82,7 +82,7 @@ Guest sessions last 30 days. Guest users cannot connect music services until the
 
 ### POST /api/auth/magic-link
 
-Request a magic link to be sent via email. In dev mode (no SendGrid configured), the link is logged to console.
+Request a magic link to be sent via email. In dev mode (no Postmark configured), the link is logged to console.
 
 **Request:**
 ```json

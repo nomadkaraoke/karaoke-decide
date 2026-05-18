@@ -38,9 +38,9 @@ class Settings(BaseSettings):
     lastfm_api_key: str = ""
     lastfm_shared_secret: str = ""
 
-    # SendGrid
-    sendgrid_api_key: str = ""
-    sendgrid_from_email: str = "noreply@nomadkaraoke.com"
+    # Postmark (transactional email)
+    postmark_server_token: str = ""
+    postmark_from_email: str = "noreply@nomadkaraoke.com"
 
     # JWT
     jwt_secret: str = ""

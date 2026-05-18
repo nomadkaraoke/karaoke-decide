@@ -305,10 +305,10 @@ cloud_run_service = gcp.cloudrunv2.Service(
                         },
                     },
                     {
-                        "name": "SENDGRID_API_KEY",
+                        "name": "POSTMARK_SERVER_TOKEN",
                         "value_source": {
                             "secret_key_ref": {
-                                "secret": "sendgrid-api-key",
+                                "secret": "postmark-server-token",
                                 "version": "latest",
                             }
                         },
@@ -370,7 +370,7 @@ REQUIRED_SECRETS = [
     "spotipy-client-id",
     "spotipy-client-secret",
     "lastfm-api-key",
-    "sendgrid-api-key",
+    "postmark-server-token",
 ]
 
 # Grant Cloud Run service account access to secrets

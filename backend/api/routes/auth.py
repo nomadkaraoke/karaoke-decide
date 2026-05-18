@@ -159,7 +159,7 @@ async def request_magic_link(
     This endpoint generates a secure token, stores it with a 15-minute TTL,
     and sends an email with a link to verify the token.
 
-    In development mode (when SendGrid is not configured), the magic link
+    In development mode (when Postmark is not configured), the magic link
     is logged to the console instead of being sent via email.
     """
     locale = get_locale_from_request(request)
@@ -175,7 +175,7 @@ async def request_magic_link(
 
         return MagicLinkResponse(message=t(locale, "auth.magicLinkSent"))
     except RuntimeError as e:
-        # Email service configuration error (e.g., SendGrid not configured in production)
+        # Email service configuration error (e.g., Postmark not configured in production)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(e),

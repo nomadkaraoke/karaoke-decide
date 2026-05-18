@@ -78,10 +78,10 @@ class TestSettings:
         settings = Settings()
         assert settings.firestore_database == "(default)"
 
-    def test_default_sendgrid_from_email(self) -> None:
-        """Test default SendGrid from email."""
+    def test_default_postmark_from_email(self) -> None:
+        """Test default Postmark from email."""
         settings = Settings()
-        assert settings.sendgrid_from_email == "noreply@nomadkaraoke.com"
+        assert settings.postmark_from_email == "noreply@nomadkaraoke.com"
 
 
 class TestGetSettings:
