@@ -189,6 +189,7 @@ sync_jobs_status_index = gcp.firestore.Index(
         {"field_path": "status", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "ASCENDING"},
     ],
+    opts=pulumi.ResourceOptions(protect=True),
 )
 
 # Composite index for decide_users filtering by is_guest and ordering by created_at
@@ -202,6 +203,7 @@ decide_users_is_guest_index = gcp.firestore.Index(
         {"field_path": "is_guest", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "DESCENDING"},
     ],
+    opts=pulumi.ResourceOptions(protect=True),
 )
 
 # Composite index for decide_users filtering by user_id
@@ -217,6 +219,7 @@ decide_users_user_id_index = gcp.firestore.Index(
         {"field_path": "user_id", "order": "ASCENDING"},
         {"field_path": "created_at", "order": "DESCENDING"},
     ],
+    opts=pulumi.ResourceOptions(protect=True),
 )
 
 # Index #2: created_at DESC, user_id DESC - for pagination ordering
@@ -229,6 +232,7 @@ decide_users_created_user_id_index = gcp.firestore.Index(
         {"field_path": "created_at", "order": "DESCENDING"},
         {"field_path": "user_id", "order": "DESCENDING"},
     ],
+    opts=pulumi.ResourceOptions(protect=True),
 )
 
 
