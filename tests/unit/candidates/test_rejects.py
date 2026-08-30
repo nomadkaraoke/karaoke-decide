@@ -38,3 +38,15 @@ class TestRejectList:
         rl = RejectList(tmp_path / "nope.jsonl")
         assert rl.load() == []
         assert rl.key_set() == set()
+
+    def test_skips_non_string_and_incomplete_rows(self, tmp_path):
+        path = tmp_path / "rejects.jsonl"
+        path.write_text(
+            '{"artist": 7, "title": "Song"}\n'  # non-string artist
+            '{"artist": "A"}\n'  # missing title
+            '["not", "an", "object"]\n'  # JSON array, not object
+            '{"artist": "Good", "title": "Song", "reason": "r", "date": "d"}\n'
+        )
+        entries = RejectList(path).load()
+        assert len(entries) == 1
+        assert entries[0].artist == "Good"

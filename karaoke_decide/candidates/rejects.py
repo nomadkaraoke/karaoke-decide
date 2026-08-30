@@ -47,12 +47,24 @@ class RejectList:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            # Hand-edited files can contain malformed rows; require a JSON object
+            # with string artist/title, and skip anything else rather than crash.
+            if not isinstance(obj, dict):
+                continue
+            artist = obj.get("artist", "")
+            title = obj.get("title", "")
+            if not isinstance(artist, str) or not isinstance(title, str):
+                continue
+            if not artist or not title:
+                continue
+            reason = obj.get("reason", "")
+            date = obj.get("date", "")
             entries.append(
                 RejectEntry(
-                    artist=obj.get("artist", ""),
-                    title=obj.get("title", ""),
-                    reason=obj.get("reason", ""),
-                    date=obj.get("date", ""),
+                    artist=artist,
+                    title=title,
+                    reason=reason if isinstance(reason, str) else "",
+                    date=date if isinstance(date, str) else "",
                 )
             )
         return entries

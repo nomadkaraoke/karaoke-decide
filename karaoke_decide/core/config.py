@@ -48,8 +48,11 @@ class Settings(BaseSettings):
             "lastfm_shared_secret", "andrew_lastfm_sharedsecret"
         ),
     )
+    # No default: set LASTFM_USERNAME (or the workspace's ANDREW_LASTFM_USERNAME)
+    # so this public repo doesn't ship a personal account identifier and
+    # unconfigured callers don't silently query the wrong listening history.
     lastfm_username: str = Field(
-        default="beveradb",
+        default="",
         validation_alias=AliasChoices("lastfm_username", "andrew_lastfm_username"),
     )
 

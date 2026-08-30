@@ -169,3 +169,30 @@ class TestSuggest:
         assert "GoodSong" in paths["json"].read_text()
         assert paths["misses"].exists()
         assert "UnsrcSong" in paths["misses"].read_text()
+
+    async def test_empty_result_still_writes_csv_header(self, generator):
+        # No survivors (impossible min_plays) -> CSV must be rewritten, not stale.
+        result = await generator.suggest(count=5, min_plays=10_000, max_checks=50)
+        paths = generator.write_reports(result)
+        text = paths["csv"].read_text()
+        assert text.startswith("artist,title,playcount")
+        assert len(text.strip().splitlines()) == 1  # header only
+
+    async def test_csv_escapes_formula_injection(self, generator):
+        from karaoke_decide.candidates.generator import Candidate
+
+        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        result.confirmed.append(
+            Candidate(
+                artist="=cmd()",
+                title="+evil",
+                playcount=1,
+                is_electronic=False,
+                stats=result.confirmed[0].stats,
+                flac={"provider": "RED", "seeders": 1},
+            )
+        )
+        paths = generator.write_reports(result)
+        text = paths["csv"].read_text()
+        assert "'=cmd()" in text
+        assert "'+evil" in text

@@ -58,6 +58,27 @@ _ELECTRONIC_TAGS = {
     "breakbeat", "trap", "instrumental", "downtempo", "chillout", "synthwave",
 }
 
+# Stable CSV header for candidates.csv (also written when there are 0 rows).
+_CSV_FIELDS = [
+    "artist", "title", "playcount", "electronic",
+    "lyrics_total_lines", "lyrics_unique_lines", "lyrics_total_words",
+    "lyrics_unique_words", "lyrics_unique_line_ratio", "lyrics_unique_word_ratio",
+    "flac_provider", "flac_format", "flac_bit_depth", "flac_seeders",
+    "flac_match_score",
+]
+
+
+def _csv_safe(value: Any) -> Any:
+    """Neutralize spreadsheet formula injection in text cells.
+
+    Artist/title come from external catalogs; a cell starting with =, +, -, @
+    (or a control char) can execute when opened in a spreadsheet. Prefix such
+    text with an apostrophe. Non-str values pass through unchanged.
+    """
+    if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
 
 @dataclass
 class Candidate:
@@ -382,13 +403,13 @@ class CandidateGenerator:
         out.mkdir(parents=True, exist_ok=True)
 
         csv_path = out / "candidates.csv"
-        rows = [c.as_row() for c in result.confirmed]
-        if rows:
-            with csv_path.open("w", newline="") as f:
-                w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-                w.writeheader()
-                for i, row in enumerate(rows, 1):
-                    w.writerow(row)
+        # Always (re)write with a header so a stale report never survives a run
+        # that confirmed nothing.
+        with csv_path.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
+            w.writeheader()
+            for c in result.confirmed:
+                w.writerow({k: _csv_safe(v) for k, v in c.as_row().items()})
 
         json_path = out / "candidates.json"
         json_path.write_text(
@@ -421,7 +442,9 @@ class CandidateGenerator:
             for m in sorted(result.misses, key=lambda x: -x.playcount):
                 sw = m.stats.unique_words if m.stats else ""
                 sl = m.stats.unique_lines if m.stats else ""
-                mw.writerow([m.playcount, m.artist, m.title, sl, sw])
+                mw.writerow(
+                    [m.playcount, _csv_safe(m.artist), _csv_safe(m.title), sl, sw]
+                )
 
         return {
             "csv": csv_path,

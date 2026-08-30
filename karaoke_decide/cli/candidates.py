@@ -54,6 +54,11 @@ def _build_generator(
             "Last.fm API key not set. Run `direnv allow` in the workspace root "
             "(ANDREW_LASTFM_APIKEY) or set LASTFM_API_KEY."
         )
+    if not settings.lastfm_username:
+        raise click.ClickException(
+            "Last.fm username not set. Set LASTFM_USERNAME (or the workspace's "
+            "ANDREW_LASTFM_USERNAME) to the account whose history to mine."
+        )
     return CandidateGenerator(
         base_dir=_base_dir(),
         lastfm=LastFmClient(settings),
