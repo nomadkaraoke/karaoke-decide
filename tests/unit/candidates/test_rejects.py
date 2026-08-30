@@ -26,11 +26,7 @@ class TestRejectList:
 
     def test_ignores_comments_and_blank_lines(self, tmp_path):
         path = tmp_path / "rejects.jsonl"
-        path.write_text(
-            "# a comment\n\n"
-            '{"artist":"A","title":"B","reason":"r","date":"d"}\n'
-            "not-json\n"
-        )
+        path.write_text("# a comment\n\n" '{"artist":"A","title":"B","reason":"r","date":"d"}\n' "not-json\n")
         rl = RejectList(path)
         assert len(rl.load()) == 1
 

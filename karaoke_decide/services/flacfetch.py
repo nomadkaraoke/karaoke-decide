@@ -58,17 +58,13 @@ class FlacHit:
 class FlacfetchClient:
     """Async client for the flacfetch search API."""
 
-    def __init__(
-        self, base_url: str, api_key: str, timeout: float = 150.0, max_retries: int = 2
-    ):
+    def __init__(self, base_url: str, api_key: str, timeout: float = 150.0, max_retries: int = 2):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
 
-    async def search(
-        self, artist: str, title: str, exhaustive: bool = False
-    ) -> list[dict[str, Any]]:
+    async def search(self, artist: str, title: str, exhaustive: bool = False) -> list[dict[str, Any]]:
         """Raw flacfetch search results (may be empty). Never downloads.
 
         Retries transient 429/5xx errors with backoff; raises
@@ -82,9 +78,7 @@ class FlacfetchClient:
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    resp = await client.post(
-                        f"{self.base_url}/search", json=body, headers=headers
-                    )
+                    resp = await client.post(f"{self.base_url}/search", json=body, headers=headers)
             except httpx.HTTPError as exc:
                 last_error = str(exc)
             else:

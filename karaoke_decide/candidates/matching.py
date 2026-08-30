@@ -101,6 +101,4 @@ def build_match_index(rows: list[tuple[str, str]]) -> set[tuple[str, str]]:
 
 def index_contains(index: set[tuple[str, str]], artist: str, title: str) -> bool:
     """True if any artist/title variant pair is present in the match index."""
-    return any(
-        (a, t) in index for a in artist_variants(artist) for t in title_variants(title)
-    )
+    return any((a, t) in index for a in artist_variants(artist) for t in title_variants(title))

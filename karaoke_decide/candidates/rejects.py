@@ -80,10 +80,5 @@ class RejectList:
             return entry
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a") as f:
-            f.write(
-                json.dumps(
-                    {"artist": artist, "title": title, "reason": reason, "date": date}
-                )
-                + "\n"
-            )
+            f.write(json.dumps({"artist": artist, "title": title, "reason": reason, "date": date}) + "\n")
         return entry

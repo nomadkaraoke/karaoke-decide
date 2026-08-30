@@ -1,9 +1,9 @@
 """CLI: karaoke-job candidate generation.
 
-    karaoke-decide candidates suggest --count 5
-    karaoke-decide candidates calibrate --sample 200
-    karaoke-decide candidates reject "Artist" "Title" --reason "..."
-    karaoke-decide candidates review-rejects
+karaoke-decide candidates suggest --count 5
+karaoke-decide candidates calibrate --sample 200
+karaoke-decide candidates reject "Artist" "Title" --reason "..."
+karaoke-decide candidates review-rejects
 """
 
 from __future__ import annotations
@@ -63,9 +63,7 @@ def _build_generator(
         base_dir=_base_dir(),
         lastfm=LastFmClient(settings),
         lrclib=LrclibClient(settings.lrclib_user_agent),
-        flacfetch=FlacfetchClient(
-            settings.flacfetch_api_url, settings.flacfetch_api_key
-        ),
+        flacfetch=FlacfetchClient(settings.flacfetch_api_url, settings.flacfetch_api_key),
         gen_jobs=GenJobsService(),
         catalog=BigQueryCatalogService(),
         username=settings.lastfm_username,
@@ -89,18 +87,22 @@ def candidates() -> None:
 @click.option("--min-unique-lines", default=10, help="Richness gate (non-electronic)")
 @click.option("--min-unique-words", default=30, help="Richness gate (non-electronic)")
 @click.option(
-    "--electronic-min-unique-lines", default=12,
+    "--electronic-min-unique-lines",
+    default=12,
     help="Stricter richness gate for electronic artists",
 )
 @click.option(
-    "--electronic-min-ratio", default=0.40,
+    "--electronic-min-ratio",
+    default=0.40,
     help="Min unique-line ratio for electronic artists (anti-repetition)",
 )
 @click.option("--refresh-lastfm", is_flag=True, help="Re-pull Last.fm top tracks")
 @click.option("--refresh-catalog", is_flag=True, help="Re-pull KaraokeNerds dump")
 @click.option(
-    "--format", "output_format",
-    type=click.Choice(["table", "json", "md"]), default="table",
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json", "md"]),
+    default="table",
 )
 def suggest(
     count: int,
@@ -146,9 +148,7 @@ def suggest(
     paths = gen.write_reports(result)
 
     if output_format == "json":
-        console.print_json(
-            data=[c.submit_line() for c in result.confirmed]
-        )
+        console.print_json(data=[c.submit_line() for c in result.confirmed])
         return
     if output_format == "md":
         console.print(paths["md"].read_text())
@@ -164,8 +164,12 @@ def suggest(
     for i, c in enumerate(result.confirmed, 1):
         flac = f"{c.flac.get('provider')} {c.flac.get('seeders')}s"
         table.add_row(
-            str(i), str(c.playcount), c.artist, c.title,
-            str(c.stats.unique_lines), flac,
+            str(i),
+            str(c.playcount),
+            c.artist,
+            c.title,
+            str(c.stats.unique_lines),
+            flac,
         )
     console.print(table)
     console.print(
@@ -211,10 +215,7 @@ def calibrate(sample: int, min_plays: int) -> None:
     _dist("Non-electronic", [r for r in with_lyrics if not r["electronic"]])
 
     # Show what the current default gate would do.
-    passed = sum(
-        1 for r in with_lyrics
-        if is_rich(r["stats"], thresholds, r["electronic"])[0]
-    )
+    passed = sum(1 for r in with_lyrics if is_rich(r["stats"], thresholds, r["electronic"])[0])
     console.print(
         f"\nCurrent default gate would PASS [green]{passed}[/green]/"
         f"{len(with_lyrics)} songs-with-lyrics "
@@ -233,9 +234,12 @@ def calibrate(sample: int, min_plays: int) -> None:
     for r in ranked[:40]:
         ok = is_rich(r["stats"], thresholds, r["electronic"])[0]
         table.add_row(
-            str(r["playcount"]), r["artist"], r["title"],
+            str(r["playcount"]),
+            r["artist"],
+            r["title"],
             "⚡" if r["electronic"] else "",
-            str(r["stats"].unique_lines), str(r["stats"].unique_words),
+            str(r["stats"].unique_lines),
+            str(r["stats"].unique_words),
             "[green]✓[/green]" if ok else "[red]✗[/red]",
         )
     console.print(table)

@@ -48,9 +48,7 @@ class LrclibClient:
         for attempt in range(self.max_retries):
             try:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    resp = await client.get(
-                        f"{self.API_BASE}/search", params=params, headers=headers
-                    )
+                    resp = await client.get(f"{self.API_BASE}/search", params=params, headers=headers)
             except httpx.HTTPError as exc:
                 last_error = str(exc)
             else:

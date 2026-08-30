@@ -11,9 +11,7 @@ from karaoke_decide.services.flacfetch import FlacfetchClient
 
 def _rich_text(n_lines: int = 15) -> str:
     # 3 distinct words per line -> >=30 unique words, >=10 unique lines.
-    return "\n".join(
-        f"word{3 * i} word{3 * i + 1} word{3 * i + 2}" for i in range(n_lines)
-    )
+    return "\n".join(f"word{3 * i} word{3 * i + 1} word{3 * i + 2}" for i in range(n_lines))
 
 
 class FakeLastFm:
@@ -22,10 +20,7 @@ class FakeLastFm:
         self._electronic = set(electronic_artists)
 
     async def get_all_top_tracks(self, username, period="overall", max_tracks=5000):
-        return [
-            {"artist": t["artist"], "name": t["title"], "playcount": t["playcount"]}
-            for t in self._tracks
-        ]
+        return [{"artist": t["artist"], "name": t["title"], "playcount": t["playcount"]} for t in self._tracks]
 
     async def get_artist_top_tags(self, artist):
         return ["drum and bass"] if artist in self._electronic else ["rock"]
@@ -50,8 +45,11 @@ class FakeFlac:
         if title in self._sourceable:
             return [
                 {
-                    "provider": "RED", "is_lossless": True, "seeders": 50,
-                    "match_score": 1.0, "release_type": "Album",
+                    "provider": "RED",
+                    "is_lossless": True,
+                    "seeders": 50,
+                    "match_score": 1.0,
+                    "release_type": "Album",
                     "quality_data": {"format": "FLAC", "bit_depth": 16},
                 }
             ]
@@ -66,9 +64,7 @@ class FakeCatalog:
 
     def __init__(self, rows):
         self.client = MagicMock()
-        self.client.query.return_value.result.return_value = [
-            {"Artist": a, "Title": t} for a, t in rows
-        ]
+        self.client.query.return_value.result.return_value = [{"Artist": a, "Title": t} for a, t in rows]
 
 
 class FakeGenJobs:

@@ -53,17 +53,42 @@ LRCLIB_TTL: float | None = None  # lyrics never change -> cache forever
 TAGS_TTL: float | None = None
 
 _ELECTRONIC_TAGS = {
-    "electronic", "electronica", "drum and bass", "drum n bass", "dnb",
-    "techno", "house", "edm", "dubstep", "trance", "ambient", "idm",
-    "breakbeat", "trap", "instrumental", "downtempo", "chillout", "synthwave",
+    "electronic",
+    "electronica",
+    "drum and bass",
+    "drum n bass",
+    "dnb",
+    "techno",
+    "house",
+    "edm",
+    "dubstep",
+    "trance",
+    "ambient",
+    "idm",
+    "breakbeat",
+    "trap",
+    "instrumental",
+    "downtempo",
+    "chillout",
+    "synthwave",
 }
 
 # Stable CSV header for candidates.csv (also written when there are 0 rows).
 _CSV_FIELDS = [
-    "artist", "title", "playcount", "electronic",
-    "lyrics_total_lines", "lyrics_unique_lines", "lyrics_total_words",
-    "lyrics_unique_words", "lyrics_unique_line_ratio", "lyrics_unique_word_ratio",
-    "flac_provider", "flac_format", "flac_bit_depth", "flac_seeders",
+    "artist",
+    "title",
+    "playcount",
+    "electronic",
+    "lyrics_total_lines",
+    "lyrics_unique_lines",
+    "lyrics_total_words",
+    "lyrics_unique_words",
+    "lyrics_unique_line_ratio",
+    "lyrics_unique_word_ratio",
+    "flac_provider",
+    "flac_format",
+    "flac_bit_depth",
+    "flac_seeders",
     "flac_match_score",
 ]
 
@@ -168,15 +193,11 @@ class CandidateGenerator:
         self._last_flac = 0.0
 
     # ------------------------------------------------------------ data loads
-    async def load_lastfm_tracks(
-        self, max_tracks: int = 5000, refresh: bool = False
-    ) -> list[dict[str, Any]]:
+    async def load_lastfm_tracks(self, max_tracks: int = 5000, refresh: bool = False) -> list[dict[str, Any]]:
         """Merged, playcount-desc top tracks (cached)."""
         cached = None if refresh else self.cache.get_blob("lastfm_toptracks", LASTFM_TTL)
         if cached is None:
-            raw = await self.lastfm.get_all_top_tracks(
-                self.username, period="overall", max_tracks=max_tracks
-            )
+            raw = await self.lastfm.get_all_top_tracks(self.username, period="overall", max_tracks=max_tracks)
             cached = [
                 {
                     "artist": (t.get("artist") or {}).get("name", "")
@@ -203,19 +224,13 @@ class CandidateGenerator:
                 merged[key] = dict(t)
         return sorted(merged.values(), key=lambda x: -x["playcount"])
 
-    def load_karaokenerds_index(
-        self, refresh: bool = False
-    ) -> set[tuple[str, str]]:
+    def load_karaokenerds_index(self, refresh: bool = False) -> set[tuple[str, str]]:
         rows = None if refresh else self.cache.get_blob("karaokenerds", KARAOKENERDS_TTL)
         if rows is None:
             sql = (
-                f"SELECT Artist, Title FROM "
-                f"`{self.catalog.PROJECT_ID}.{self.catalog.DATASET_ID}.karaokenerds_raw`"
+                f"SELECT Artist, Title FROM " f"`{self.catalog.PROJECT_ID}.{self.catalog.DATASET_ID}.karaokenerds_raw`"
             )
-            rows = [
-                [r["Artist"] or "", r["Title"] or ""]
-                for r in self.catalog.client.query(sql).result()
-            ]
+            rows = [[r["Artist"] or "", r["Title"] or ""] for r in self.catalog.client.query(sql).result()]
             self.cache.set_blob("karaokenerds", rows)
         return build_match_index([(a, t) for a, t in rows])
 
@@ -257,9 +272,7 @@ class CandidateGenerator:
             await asyncio.sleep(wait)
         results = await self.flacfetch.search(artist, strip_decorations(title))
         self._last_flac = time.monotonic()
-        hit = self.flacfetch.best_flac(
-            results, min_seeders=self.min_seeders, min_match_score=self.min_match_score
-        )
+        hit = self.flacfetch.best_flac(results, min_seeders=self.min_seeders, min_match_score=self.min_match_score)
         payload = hit.as_dict() if hit else {}
         self.cache.set_item("flacfetch", cache_key, payload)
         return payload or None
@@ -279,9 +292,7 @@ class CandidateGenerator:
 
         reject_keys = self.rejects.key_set()
         produced_keys = await asyncio.to_thread(self.gen_jobs.produced_keys)
-        catalog_index = await asyncio.to_thread(
-            self.load_karaokenerds_index, refresh_catalog
-        )
+        catalog_index = await asyncio.to_thread(self.load_karaokenerds_index, refresh_catalog)
 
         result = SuggestResult()
         for t in tracks:
@@ -310,9 +321,7 @@ class CandidateGenerator:
             except ExternalServiceError:
                 result.skipped["lrclib_error"] += 1
                 continue
-            if not lyrics or lyrics.get("instrumental") or not (
-                lyrics.get("plain") or lyrics.get("synced")
-            ):
+            if not lyrics or lyrics.get("instrumental") or not (lyrics.get("plain") or lyrics.get("synced")):
                 result.skipped["no_lrclib_lyrics"] += 1
                 continue
 
@@ -330,9 +339,7 @@ class CandidateGenerator:
                 continue
             if not flac:
                 result.skipped["unsourceable"] += 1
-                result.misses.append(
-                    Miss(artist, title, plays, "unsourceable", stats)
-                )
+                result.misses.append(Miss(artist, title, plays, "unsourceable", stats))
                 continue
 
             cand = Candidate(artist, title, plays, is_elec, stats, flac)
@@ -358,9 +365,7 @@ class CandidateGenerator:
         tracks = [t for t in tracks if t["playcount"] >= min_plays]
         reject_keys = self.rejects.key_set()
         produced_keys = await asyncio.to_thread(self.gen_jobs.produced_keys)
-        catalog_index = await asyncio.to_thread(
-            self.load_karaokenerds_index, refresh_catalog
-        )
+        catalog_index = await asyncio.to_thread(self.load_karaokenerds_index, refresh_catalog)
 
         rows: list[dict[str, Any]] = []
         for t in tracks:
@@ -378,21 +383,27 @@ class CandidateGenerator:
             except ExternalServiceError:
                 continue  # transient; skip from the calibration sample
             is_elec = await self._artist_is_electronic(artist)
-            if not lyrics or lyrics.get("instrumental") or not (
-                lyrics.get("plain") or lyrics.get("synced")
-            ):
+            if not lyrics or lyrics.get("instrumental") or not (lyrics.get("plain") or lyrics.get("synced")):
                 rows.append(
                     {
-                        "artist": artist, "title": title, "playcount": plays,
-                        "electronic": is_elec, "has_lyrics": False, "stats": None,
+                        "artist": artist,
+                        "title": title,
+                        "playcount": plays,
+                        "electronic": is_elec,
+                        "has_lyrics": False,
+                        "stats": None,
                     }
                 )
                 continue
             stats = analyze(lyrics.get("plain") or lyrics.get("synced") or "")
             rows.append(
                 {
-                    "artist": artist, "title": title, "playcount": plays,
-                    "electronic": is_elec, "has_lyrics": True, "stats": stats,
+                    "artist": artist,
+                    "title": title,
+                    "playcount": plays,
+                    "electronic": is_elec,
+                    "has_lyrics": True,
+                    "stats": stats,
                 }
             )
         return rows
@@ -412,9 +423,7 @@ class CandidateGenerator:
                 w.writerow({k: _csv_safe(v) for k, v in c.as_row().items()})
 
         json_path = out / "candidates.json"
-        json_path.write_text(
-            json.dumps([c.submit_line() for c in result.confirmed], indent=2)
-        )
+        json_path.write_text(json.dumps([c.submit_line() for c in result.confirmed], indent=2))
 
         md_path = out / "candidates.md"
         lines = [
@@ -442,9 +451,7 @@ class CandidateGenerator:
             for m in sorted(result.misses, key=lambda x: -x.playcount):
                 sw = m.stats.unique_words if m.stats else ""
                 sl = m.stats.unique_lines if m.stats else ""
-                mw.writerow(
-                    [m.playcount, _csv_safe(m.artist), _csv_safe(m.title), sl, sw]
-                )
+                mw.writerow([m.playcount, _csv_safe(m.artist), _csv_safe(m.title), sl, sw])
 
         return {
             "csv": csv_path,

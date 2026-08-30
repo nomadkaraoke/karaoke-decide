@@ -49,9 +49,7 @@ def _patch_post(responses):
 
 @pytest.fixture(autouse=True)
 def _fast_sleep(monkeypatch):
-    monkeypatch.setattr(
-        "karaoke_decide.services.flacfetch.asyncio.sleep", AsyncMock()
-    )
+    monkeypatch.setattr("karaoke_decide.services.flacfetch.asyncio.sleep", AsyncMock())
 
 
 class TestBestFlac:

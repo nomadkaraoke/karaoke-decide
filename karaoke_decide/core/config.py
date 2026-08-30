@@ -44,9 +44,7 @@ class Settings(BaseSettings):
     )
     lastfm_shared_secret: str = Field(
         default="",
-        validation_alias=AliasChoices(
-            "lastfm_shared_secret", "andrew_lastfm_sharedsecret"
-        ),
+        validation_alias=AliasChoices("lastfm_shared_secret", "andrew_lastfm_sharedsecret"),
     )
     # No default: set LASTFM_USERNAME (or the workspace's ANDREW_LASTFM_USERNAME)
     # so this public repo doesn't ship a personal account identifier and

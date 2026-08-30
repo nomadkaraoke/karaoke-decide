@@ -108,9 +108,7 @@ class TestBestLyrics:
             patcher.stop()
 
     async def test_retries_5xx_then_raises(self, monkeypatch):
-        monkeypatch.setattr(
-            "karaoke_decide.services.lrclib.asyncio.sleep", AsyncMock()
-        )
+        monkeypatch.setattr("karaoke_decide.services.lrclib.asyncio.sleep", AsyncMock())
         patcher, mock_get = _patch_get([_resp(503), _resp(503)])
         try:
             with pytest.raises(ExternalServiceError):

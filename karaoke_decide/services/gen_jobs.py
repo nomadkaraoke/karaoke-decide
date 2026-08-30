@@ -44,9 +44,7 @@ class GenJobsService:
     def produced_keys(self) -> set[tuple[str, str]]:
         """Canonical (artist, title) keys for every non-failed/cancelled job."""
         keys: set[tuple[str, str]] = set()
-        query = self.client.collection(self.collection).select(
-            ["artist", "title", "status"]
-        )
+        query = self.client.collection(self.collection).select(["artist", "title", "status"])
         for doc in query.stream():
             data = doc.to_dict() or {}
             status = (data.get("status") or "").lower()

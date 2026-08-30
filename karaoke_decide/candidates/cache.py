@@ -73,6 +73,4 @@ class CandidateCache:
         return payload.get("value")
 
     def set_item(self, namespace: str, key: str, value: Any) -> None:
-        self._item_path(namespace, key).write_text(
-            json.dumps({"ts": time.time(), "value": value})
-        )
+        self._item_path(namespace, key).write_text(json.dumps({"ts": time.time(), "value": value}))

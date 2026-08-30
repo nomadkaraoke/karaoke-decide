@@ -53,16 +53,16 @@ class TestSuggestCommand:
         gen = MagicMock()
         gen.suggest = AsyncMock(return_value=result)
         gen.write_reports.return_value = {
-            "csv": MagicMock(), "json": MagicMock(), "md": MagicMock(),
+            "csv": MagicMock(),
+            "json": MagicMock(),
+            "md": MagicMock(),
             "misses": MagicMock(),
         }
         return gen
 
     def test_suggest_table_output(self):
         gen = self._fake_gen()
-        with patch(
-            "karaoke_decide.cli.candidates._build_generator", return_value=gen
-        ):
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
             res = CliRunner().invoke(cli, ["candidates", "suggest", "--count", "1"])
         assert res.exit_code == 0, res.output
         assert "Pendulum" in res.output
@@ -71,21 +71,15 @@ class TestSuggestCommand:
 
     def test_suggest_json_output(self):
         gen = self._fake_gen()
-        with patch(
-            "karaoke_decide.cli.candidates._build_generator", return_value=gen
-        ):
-            res = CliRunner().invoke(
-                cli, ["candidates", "suggest", "--format", "json"]
-            )
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            res = CliRunner().invoke(cli, ["candidates", "suggest", "--format", "json"])
         assert res.exit_code == 0, res.output
         assert "Pendulum" in res.output
         assert "NOMAD" in res.output
 
     def test_suggest_passes_thresholds(self):
         gen = self._fake_gen()
-        with patch(
-            "karaoke_decide.cli.candidates._build_generator", return_value=gen
-        ) as build:
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen) as build:
             CliRunner().invoke(
                 cli,
                 ["candidates", "suggest", "--electronic-min-unique-lines", "20"],
