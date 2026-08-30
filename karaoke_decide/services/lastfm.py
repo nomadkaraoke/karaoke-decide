@@ -333,6 +333,19 @@ class LastFmClient:
             {"artist": artist, "track": track},
         )
 
+    async def get_artist_top_tags(self, artist: str) -> list[str]:
+        """Return an artist's top tag names (lowercased). Empty on failure.
+
+        Artist-level tags are far more reliably populated than track-level ones,
+        so they're the better signal for genre (e.g. electronic/DnB).
+        """
+        data = await self._api_request(
+            "artist.getTopTags",
+            {"artist": artist, "autocorrect": 1},
+        )
+        tags = (data.get("toptags", {}) or {}).get("tag", []) or []
+        return [(t.get("name") or "").lower() for t in tags]
+
     def _generate_signature(self, params: dict[str, Any]) -> str:
         """Generate API signature for authenticated requests."""
         sorted_params = sorted(params.items())

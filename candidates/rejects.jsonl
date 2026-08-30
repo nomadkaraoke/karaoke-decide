@@ -1,0 +1,4 @@
+# Manual reject list — songs Andrew looked at and decided NOT to make.
+# One JSON object per line: {"artist","title","reason","date"}.
+# Add via: karaoke-decide candidates reject "Artist" "Title" --reason "..."
+# Lines starting with # are ignored. Reviewed periodically to improve heuristics.

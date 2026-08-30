@@ -48,6 +48,39 @@ karaoke-decide songs mine
 karaoke-decide songs search "bohemian rhapsody"
 ```
 
+### Karaoke-job candidates (internal tool)
+
+Find good songs to *make* as Nomad karaoke jobs from Andrew's Last.fm history —
+songs he plays a lot, that have **no existing community/Nomad karaoke version**,
+that have **real singable lyrics** (LRCLIB), and that can be **sourced as a
+high-quality FLAC** (flacfetch). Designed to be run by any agent to get "the next
+N real karaoke tracks to make".
+
+```bash
+# The next 5 songs worth making (pure Last.fm-playcount order among survivors)
+karaoke-decide candidates suggest --count 5
+
+# JSON output, ready to feed into the gen create-job flow
+karaoke-decide candidates suggest --count 5 --format json
+
+# Tune the lyric-richness gate against real data before trusting it
+karaoke-decide candidates calibrate --sample 200
+
+# Mark a song you've decided not to make (never suggested again)
+karaoke-decide candidates reject "Pendulum" "Slam" --reason "too repetitive live"
+karaoke-decide candidates review-rejects
+```
+
+Pipeline (cheap → expensive, so the rate-limited APIs only see survivors):
+Last.fm top tracks → reject list + "already ours" (fresh Firestore `jobs`) +
+KaraokeNerds community versions → LRCLIB lyrics + richness heuristic → flacfetch
+high-quality-FLAC hard gate (misses logged to `candidates/output/`).
+
+Requires (workspace `.envrc` / direnv): `ANDREW_LASTFM_APIKEY` (or `LASTFM_API_KEY`),
+`FLACFETCH_API_KEY`, and read-only GCP ADC for BigQuery + Firestore. Data + caches
+live in `candidates/` (reject list committed; caches/reports gitignored). See
+`docs/archive/2026-08-30-karaoke-candidate-tool-v2-kickoff.md` for the full design.
+
 ## Development
 
 See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for setup instructions.
