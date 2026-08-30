@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,8 +36,29 @@ class Settings(BaseSettings):
     spotify_redirect_uri: str = "http://localhost:8000/api/services/spotify/callback"
 
     # Last.fm
-    lastfm_api_key: str = ""
-    lastfm_shared_secret: str = ""
+    # Accept the workspace .envrc's ANDREW_LASTFM_* names as well as the
+    # canonical LASTFM_* names, so the CLI works with Andrew's existing direnv.
+    lastfm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("lastfm_api_key", "andrew_lastfm_apikey"),
+    )
+    lastfm_shared_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "lastfm_shared_secret", "andrew_lastfm_sharedsecret"
+        ),
+    )
+    lastfm_username: str = Field(
+        default="beveradb",
+        validation_alias=AliasChoices("lastfm_username", "andrew_lastfm_username"),
+    )
+
+    # flacfetch (sourceability pre-check)
+    flacfetch_api_url: str = "https://flacfetch.nomadkaraoke.com"
+    flacfetch_api_key: str = ""
+
+    # LRCLIB (lyrics text source for richness heuristics)
+    lrclib_user_agent: str = "karaoke-decide-candidates/2.0 (https://nomadkaraoke.com)"
 
     # Postmark (transactional email)
     postmark_server_token: str = ""

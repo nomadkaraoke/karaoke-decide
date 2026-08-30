@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from karaoke_decide import __version__
+from karaoke_decide.cli.candidates import candidates as candidates_group
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 console = Console()
@@ -280,6 +281,9 @@ def history() -> None:
     """Show songs I've sung."""
     console.print("[yellow]History not yet implemented[/yellow]")
     # TODO: Show history
+
+
+cli.add_command(candidates_group, name="candidates")
 
 
 def main() -> None:
