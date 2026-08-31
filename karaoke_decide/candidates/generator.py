@@ -1,25 +1,30 @@
-"""Candidate generation pipeline.
+"""Candidate generation pipeline (v3: Spotify features + suitability score + LLM judge).
 
-Cheap-to-expensive ordering so the rate-limited APIs only ever see songs that
-already survived everything else:
+Cheap-to-expensive ordering so the slow/rate-limited steps only ever see songs
+that survived everything cheaper:
 
 1. Last.fm top tracks, highest playcount first (this IS the ranking).
 2. Free local eliminators (no per-song network):
    a. manual reject list,
    b. "already ours" — a fresh query of gen's Firestore ``jobs``,
    c. KaraokeNerds community versions (cached BigQuery dump).
-3. Expensive per-song gates, walking survivors in playcount order, capped at
+3. Spotify audio-features match (MANDATORY, batched BigQuery + cache) — we only
+   propose tracks we can fully characterize; unmatched are dropped.
+4. Expensive per-song gates, walking survivors in playcount order, capped at
    ``max_checks`` per run, stopping once ``count`` are confirmed:
-   a. LRCLIB lyrics (mandatory) + richness heuristic,
-   b. flacfetch high-quality-FLAC check (hard gate; misses recorded).
+   a. LRCLIB lyrics (mandatory),
+   b. karaoke-suitability score (cheap pre-filter; recall-biased),
+   c. LLM judge over lyrics + metadata (the real quality gate),
+   d. flacfetch high-quality-FLAC check (hard gate; misses recorded).
 
-Ranking is pure playcount; everything else is a pass/fail gate.
+Ranking is pure playcount; the score and LLM are pass/fail gates.
 """
 
 from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import json
 import time
 from collections import Counter
@@ -32,17 +37,15 @@ from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 from karaoke_decide.services.flacfetch import FlacfetchClient
 from karaoke_decide.services.gen_jobs import GenJobsService
 from karaoke_decide.services.lastfm import LastFmClient
+from karaoke_decide.services.llm_judge import LlmJudge
 from karaoke_decide.services.lrclib import LrclibClient
+from karaoke_decide.services.spotify_features import SpotifyFeatures, SpotifyFeaturesService
 
 from .cache import CandidateCache
-from .lyrics import LyricsStats, RichnessThresholds, analyze, is_rich
-from .matching import (
-    build_match_index,
-    canonical_key,
-    index_contains,
-    strip_decorations,
-)
+from .lyrics import LyricsStats, analyze
+from .matching import build_match_index, canonical_key, index_contains, strip_decorations
 from .rejects import RejectList
+from .scoring import ScoreWeights, suitability
 
 # Cache TTLs (seconds).
 _MONTH = 30 * 24 * 3600
@@ -50,43 +53,24 @@ LASTFM_TTL = 7 * 24 * 3600
 KARAOKENERDS_TTL = _MONTH
 FLACFETCH_TTL = _MONTH
 LRCLIB_TTL: float | None = None  # lyrics never change -> cache forever
-TAGS_TTL: float | None = None
-
-_ELECTRONIC_TAGS = {
-    "electronic",
-    "electronica",
-    "drum and bass",
-    "drum n bass",
-    "dnb",
-    "techno",
-    "house",
-    "edm",
-    "dubstep",
-    "trance",
-    "ambient",
-    "idm",
-    "breakbeat",
-    "trap",
-    "instrumental",
-    "downtempo",
-    "chillout",
-    "synthwave",
-}
+SPOTIFY_TTL: float | None = None  # audio features never change -> forever
+LLM_TTL: float | None = None  # keyed by lyrics hash -> forever
 
 # Stable CSV header for candidates.csv (also written when there are 0 rows).
 _CSV_FIELDS = [
     "artist",
     "title",
     "playcount",
-    "electronic",
-    "lyrics_total_lines",
-    "lyrics_unique_lines",
-    "lyrics_total_words",
-    "lyrics_unique_words",
-    "lyrics_unique_line_ratio",
-    "lyrics_unique_word_ratio",
+    "score",
+    "instrumentalness",
+    "duration_min",
+    "speechiness",
+    "popularity",
+    "unique_lines",
+    "unique_words",
+    "llm_confidence",
+    "llm_reason",
     "flac_provider",
-    "flac_format",
     "flac_bit_depth",
     "flac_seeders",
     "flac_match_score",
@@ -94,12 +78,7 @@ _CSV_FIELDS = [
 
 
 def _csv_safe(value: Any) -> Any:
-    """Neutralize spreadsheet formula injection in text cells.
-
-    Artist/title come from external catalogs; a cell starting with =, +, -, @
-    (or a control char) can execute when opened in a spreadsheet. Prefix such
-    text with an apostrophe. Non-str values pass through unchanged.
-    """
+    """Neutralize spreadsheet formula injection in text cells."""
     if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
         return "'" + value
     return value
@@ -110,8 +89,10 @@ class Candidate:
     artist: str
     title: str
     playcount: int
-    is_electronic: bool
     stats: LyricsStats
+    features: SpotifyFeatures
+    score: float
+    llm: dict[str, Any]
     flac: dict[str, Any]
 
     def as_row(self) -> dict[str, Any]:
@@ -119,10 +100,16 @@ class Candidate:
             "artist": self.artist,
             "title": self.title,
             "playcount": self.playcount,
-            "electronic": self.is_electronic,
-            **{f"lyrics_{k}": v for k, v in self.stats.as_dict().items()},
+            "score": round(self.score, 1),
+            "instrumentalness": round(self.features.instrumentalness, 3),
+            "duration_min": round(self.features.duration_min, 2),
+            "speechiness": round(self.features.speechiness, 3),
+            "popularity": self.features.popularity,
+            "unique_lines": self.stats.unique_lines,
+            "unique_words": self.stats.unique_words,
+            "llm_confidence": self.llm.get("confidence"),
+            "llm_reason": self.llm.get("reason"),
             "flac_provider": self.flac.get("provider"),
-            "flac_format": self.flac.get("format"),
             "flac_bit_depth": self.flac.get("bit_depth"),
             "flac_seeders": self.flac.get("seeders"),
             "flac_match_score": self.flac.get("match_score"),
@@ -135,6 +122,7 @@ class Candidate:
             "title": strip_decorations(self.title),
             "brand_prefix": "NOMAD",
             "playcount": self.playcount,
+            "score": round(self.score, 1),
         }
 
 
@@ -169,10 +157,12 @@ class CandidateGenerator:
         flacfetch: FlacfetchClient,
         gen_jobs: GenJobsService,
         catalog: BigQueryCatalogService,
+        spotify: SpotifyFeaturesService,
+        llm: LlmJudge,
         username: str,
-        thresholds: RichnessThresholds | None = None,
-        min_seeders: int = 1,
-        min_match_score: float = 0.8,
+        weights: ScoreWeights | None = None,
+        min_score: float = 45.0,
+        spotify_batch_cap: int = 500,
         flacfetch_min_interval: float = 12.0,
         lrclib_min_interval: float = 0.3,
     ):
@@ -184,10 +174,12 @@ class CandidateGenerator:
         self.flacfetch = flacfetch
         self.gen_jobs = gen_jobs
         self.catalog = catalog
+        self.spotify = spotify
+        self.llm = llm
         self.username = username
-        self.thresholds = thresholds or RichnessThresholds()
-        self.min_seeders = min_seeders
-        self.min_match_score = min_match_score
+        self.weights = weights or ScoreWeights()
+        self.min_score = min_score
+        self.spotify_batch_cap = spotify_batch_cap
         self.flacfetch_min_interval = flacfetch_min_interval
         self.lrclib_min_interval = lrclib_min_interval
         self._last_flac = 0.0
@@ -235,44 +227,58 @@ class CandidateGenerator:
         return build_match_index([(a, t) for a, t in rows])
 
     # ------------------------------------------------------------ per-song
-    async def _artist_is_electronic(self, artist: str) -> bool:
-        """Genre check via Last.fm artist top tags (cached per artist).
+    def _spotify_features(self, artist: str, title: str) -> SpotifyFeatures | None:
+        """Cached Spotify features for one track ({} sentinel = confirmed-absent)."""
+        cached = self.cache.get_item("spotify", f"{artist}::{title}", SPOTIFY_TTL)
+        if cached is None:
+            return None  # caller must batch-load first
+        return SpotifyFeatures.from_dict(cached) if cached else None
 
-        Artist-level tags are used because track-level tags are usually empty.
-        """
-        tags = self.cache.get_item("lastfm_artist_tags", artist, TAGS_TTL)
-        if tags is None:
-            try:
-                tags = (await self.lastfm.get_artist_top_tags(artist))[:8]
-            except Exception:  # noqa: BLE001 - tags are best-effort
-                tags = []
-            self.cache.set_item("lastfm_artist_tags", artist, tags)
-        return any(any(et in tag for et in _ELECTRONIC_TAGS) for tag in tags)
+    def batch_load_spotify(self, tracks: list[dict[str, Any]]) -> None:
+        """Batch-fetch Spotify features for uncached tracks (one BigQuery scan)."""
+        misses = [
+            (t["artist"], t["title"])
+            for t in tracks
+            if self.cache.get_item("spotify", f'{t["artist"]}::{t["title"]}', SPOTIFY_TTL) is None
+        ]
+        if not misses:
+            return
+        found = self.spotify.lookup(misses)
+        for artist, title in misses:
+            feats = found.get((artist, title))
+            self.cache.set_item("spotify", f"{artist}::{title}", feats.as_dict() if feats else {})
 
     async def _lyrics(self, artist: str, title: str) -> dict[str, Any] | None:
         cache_key = f"{artist}::{title}"
         cached = self.cache.get_item("lrclib", cache_key, LRCLIB_TTL)
         if cached is not None:
-            return cached if cached else None  # {} sentinel = confirmed-absent
+            return cached if cached else None
         await asyncio.sleep(self.lrclib_min_interval)
-        # Errors propagate to the caller (recorded as a skip, not cached, so the
-        # song is retried on the next run).
         result = await self.lrclib.best_lyrics(artist, title)
         self.cache.set_item("lrclib", cache_key, result or {})
         return result
+
+    def _judge(self, artist: str, title: str, lyrics_text: str, metadata: dict[str, Any]) -> dict[str, Any]:
+        lyrics_hash = hashlib.sha1(lyrics_text.encode("utf-8")).hexdigest()[:12]
+        cache_key = f"{artist}::{title}::{lyrics_hash}"
+        cached = self.cache.get_item("llm", cache_key, LLM_TTL)
+        if cached is not None:
+            return dict(cached)
+        verdict = self.llm.judge(artist, title, lyrics_text, metadata).as_dict()
+        self.cache.set_item("llm", cache_key, verdict)
+        return verdict
 
     async def _flac(self, artist: str, title: str) -> dict[str, Any] | None:
         cache_key = f"{artist}::{title}"
         cached = self.cache.get_item("flacfetch", cache_key, FLACFETCH_TTL)
         if cached is not None:
             return cached if cached else None
-        # rate-limit real calls only
         wait = self.flacfetch_min_interval - (time.monotonic() - self._last_flac)
         if wait > 0:
             await asyncio.sleep(wait)
         results = await self.flacfetch.search(artist, strip_decorations(title))
         self._last_flac = time.monotonic()
-        hit = self.flacfetch.best_flac(results, min_seeders=self.min_seeders, min_match_score=self.min_match_score)
+        hit = self.flacfetch.best_flac(results)
         payload = hit.as_dict() if hit else {}
         self.cache.set_item("flacfetch", cache_key, payload)
         return payload or None
@@ -294,24 +300,36 @@ class CandidateGenerator:
         produced_keys = await asyncio.to_thread(self.gen_jobs.produced_keys)
         catalog_index = await asyncio.to_thread(self.load_karaokenerds_index, refresh_catalog)
 
+        # Survivors of the free eliminators, in playcount order.
+        survivors = [
+            t
+            for t in tracks
+            if canonical_key(t["artist"], t["title"]) not in reject_keys
+            and canonical_key(t["artist"], t["title"]) not in produced_keys
+            and not index_contains(catalog_index, t["artist"], t["title"])
+        ]
         result = SuggestResult()
-        for t in tracks:
+        result.skipped["rejected"] = sum(1 for t in tracks if canonical_key(t["artist"], t["title"]) in reject_keys)
+        result.skipped["already_ours"] = sum(
+            1 for t in tracks if canonical_key(t["artist"], t["title"]) in produced_keys
+        )
+        result.skipped["community_version"] = (
+            len(tracks) - len(survivors) - (result.skipped["rejected"] + result.skipped["already_ours"])
+        )
+
+        # Mandatory Spotify features: batch the top survivors in one scan.
+        await asyncio.to_thread(self.batch_load_spotify, survivors[: self.spotify_batch_cap])
+
+        for t in survivors:
             if len(result.confirmed) >= count or result.checks >= max_checks:
                 break
             artist, title, plays = t["artist"], t["title"], t["playcount"]
-            key = canonical_key(artist, title)
 
-            if key in reject_keys:
-                result.skipped["rejected"] += 1
-                continue
-            if key in produced_keys:
-                result.skipped["already_ours"] += 1
-                continue
-            if index_contains(catalog_index, artist, title):
-                result.skipped["community_version"] += 1
+            features = self._spotify_features(artist, title)
+            if features is None:
+                result.skipped["no_spotify_features"] += 1
                 continue
 
-            # survivor -> expensive checks
             result.no_karaoke += 1
             result.considered += 1
             result.checks += 1
@@ -325,11 +343,28 @@ class CandidateGenerator:
                 result.skipped["no_lrclib_lyrics"] += 1
                 continue
 
-            stats = analyze(lyrics.get("plain") or lyrics.get("synced") or "")
-            is_elec = await self._artist_is_electronic(artist)
-            passes, reason = is_rich(stats, self.thresholds, is_elec)
-            if not passes:
-                result.skipped[reason] += 1
+            text = lyrics.get("plain") or lyrics.get("synced") or ""
+            stats = analyze(text)
+            score = suitability(features, stats, self.weights).score
+            if score < self.min_score:
+                result.skipped["low_score"] += 1
+                result.misses.append(Miss(artist, title, plays, "low_score", stats))
+                continue
+
+            metadata = {
+                **features.as_dict(),
+                "unique_lines": stats.unique_lines,
+                "unique_words": stats.unique_words,
+                "suitability_score": round(score, 1),
+            }
+            try:
+                verdict = self._judge(artist, title, text, metadata)
+            except ExternalServiceError:
+                result.skipped["llm_error"] += 1
+                continue
+            if not verdict.get("keep", True):
+                result.skipped["llm_reject"] += 1
+                result.misses.append(Miss(artist, title, plays, f"llm: {verdict.get('reason', '')}", stats))
                 continue
 
             try:
@@ -342,71 +377,12 @@ class CandidateGenerator:
                 result.misses.append(Miss(artist, title, plays, "unsourceable", stats))
                 continue
 
-            cand = Candidate(artist, title, plays, is_elec, stats, flac)
+            cand = Candidate(artist, title, plays, stats, features, score, verdict, flac)
             result.confirmed.append(cand)
             if progress is not None:
                 progress(cand)
 
         return result
-
-    async def calibrate(
-        self,
-        sample: int = 200,
-        min_plays: int = 6,
-        refresh_catalog: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Fetch lyrics for a sample of no-karaoke survivors and return per-song
-        richness stats (regardless of pass/fail), so thresholds can be tuned.
-
-        This exercises exactly the songs the lyrics gate would see: after the
-        cheap eliminators, in playcount order. flacfetch is NOT called.
-        """
-        tracks = await self.load_lastfm_tracks()
-        tracks = [t for t in tracks if t["playcount"] >= min_plays]
-        reject_keys = self.rejects.key_set()
-        produced_keys = await asyncio.to_thread(self.gen_jobs.produced_keys)
-        catalog_index = await asyncio.to_thread(self.load_karaokenerds_index, refresh_catalog)
-
-        rows: list[dict[str, Any]] = []
-        for t in tracks:
-            if len(rows) >= sample:
-                break
-            artist, title, plays = t["artist"], t["title"], t["playcount"]
-            key = canonical_key(artist, title)
-            if key in reject_keys or key in produced_keys:
-                continue
-            if index_contains(catalog_index, artist, title):
-                continue
-
-            try:
-                lyrics = await self._lyrics(artist, title)
-            except ExternalServiceError:
-                continue  # transient; skip from the calibration sample
-            is_elec = await self._artist_is_electronic(artist)
-            if not lyrics or lyrics.get("instrumental") or not (lyrics.get("plain") or lyrics.get("synced")):
-                rows.append(
-                    {
-                        "artist": artist,
-                        "title": title,
-                        "playcount": plays,
-                        "electronic": is_elec,
-                        "has_lyrics": False,
-                        "stats": None,
-                    }
-                )
-                continue
-            stats = analyze(lyrics.get("plain") or lyrics.get("synced") or "")
-            rows.append(
-                {
-                    "artist": artist,
-                    "title": title,
-                    "playcount": plays,
-                    "electronic": is_elec,
-                    "has_lyrics": True,
-                    "stats": stats,
-                }
-            )
-        return rows
 
     # ------------------------------------------------------------ outputs
     def write_reports(self, result: SuggestResult) -> dict[str, Path]:
@@ -414,8 +390,6 @@ class CandidateGenerator:
         out.mkdir(parents=True, exist_ok=True)
 
         csv_path = out / "candidates.csv"
-        # Always (re)write with a header so a stale report never survives a run
-        # that confirmed nothing.
         with csv_path.open("w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
             w.writeheader()
@@ -430,32 +404,24 @@ class CandidateGenerator:
             "# Karaoke Candidates",
             "",
             f"{len(result.confirmed)} confirmed "
-            f"(considered {result.considered}, {result.no_karaoke} had no existing "
-            f"karaoke; {len(result.misses)} unsourceable).",
+            f"(considered {result.considered}; {len(result.misses)} rejected/unsourceable).",
             "",
-            "| # | Plays | Artist | Title | Uniq lines | Uniq words | FLAC |",
-            "|---|-------|--------|-------|-----------|-----------|------|",
+            "| # | Plays | Artist | Title | Score | Inst | Dur | LLM reason |",
+            "|---|-------|--------|-------|-------|------|-----|-----------|",
         ]
         for i, c in enumerate(result.confirmed, 1):
             lines.append(
                 f"| {i} | {c.playcount} | {c.artist} | {c.title} "
-                f"| {c.stats.unique_lines} | {c.stats.unique_words} "
-                f"| {c.flac.get('provider')} {c.flac.get('seeders')}s |"
+                f"| {c.score:.0f} | {c.features.instrumentalness:.2f} "
+                f"| {c.features.duration_min:.1f}m | {c.llm.get('reason', '')} |"
             )
         md_path.write_text("\n".join(lines) + "\n")
 
-        misses_path = out / "unsourceable_misses.csv"
+        misses_path = out / "rejected_misses.csv"
         with misses_path.open("w", newline="") as f:
             mw = csv.writer(f)
-            mw.writerow(["playcount", "artist", "title", "unique_lines", "unique_words"])
+            mw.writerow(["playcount", "artist", "title", "reason"])
             for m in sorted(result.misses, key=lambda x: -x.playcount):
-                sw = m.stats.unique_words if m.stats else ""
-                sl = m.stats.unique_lines if m.stats else ""
-                mw.writerow([m.playcount, _csv_safe(m.artist), _csv_safe(m.title), sl, sw])
+                mw.writerow([m.playcount, _csv_safe(m.artist), _csv_safe(m.title), m.reason])
 
-        return {
-            "csv": csv_path,
-            "json": json_path,
-            "md": md_path,
-            "misses": misses_path,
-        }
+        return {"csv": csv_path, "json": json_path, "md": md_path, "misses": misses_path}

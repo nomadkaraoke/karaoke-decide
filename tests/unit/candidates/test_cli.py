@@ -7,24 +7,20 @@ from click.testing import CliRunner
 from karaoke_decide.candidates.generator import Candidate, SuggestResult
 from karaoke_decide.candidates.lyrics import analyze
 from karaoke_decide.cli.main import cli
+from karaoke_decide.services.spotify_features import SpotifyFeatures
 
 
 class TestRejectCommands:
     def test_reject_and_review(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CANDIDATES_DIR", str(tmp_path))
         runner = CliRunner()
-
-        res = runner.invoke(
-            cli,
-            ["candidates", "reject", "Pendulum", "Slam", "--reason", "too repetitive"],
-        )
+        res = runner.invoke(cli, ["candidates", "reject", "Pendulum", "Slam", "--reason", "too repetitive"])
         assert res.exit_code == 0, res.output
         assert "Rejected" in res.output
 
         res = runner.invoke(cli, ["candidates", "review-rejects"])
         assert res.exit_code == 0
-        assert "Pendulum" in res.output
-        assert "too repetitive" in res.output
+        assert "Pendulum" in res.output and "too repetitive" in res.output
 
     def test_review_empty(self, tmp_path, monkeypatch):
         monkeypatch.setenv("CANDIDATES_DIR", str(tmp_path))
@@ -35,8 +31,22 @@ class TestRejectCommands:
     def test_help_lists_subcommands(self):
         res = CliRunner().invoke(cli, ["candidates", "--help"])
         assert res.exit_code == 0
-        for cmd in ("suggest", "calibrate", "reject", "review-rejects"):
+        for cmd in ("suggest", "reject", "review-rejects"):
             assert cmd in res.output
+
+
+def _feat():
+    return SpotifyFeatures(
+        instrumentalness=0.05,
+        speechiness=0.05,
+        energy=0.8,
+        valence=0.5,
+        danceability=0.6,
+        tempo=174.0,
+        duration_ms=210000,
+        popularity=40,
+        explicit=False,
+    )
 
 
 class TestSuggestCommand:
@@ -45,9 +55,11 @@ class TestSuggestCommand:
             artist="Pendulum",
             title="Slam",
             playcount=88,
-            is_electronic=True,
             stats=analyze("line one\nline two\nline three"),
-            flac={"provider": "RED", "seeders": 388, "format": "FLAC"},
+            features=_feat(),
+            score=92.0,
+            llm={"keep": True, "confidence": 0.9, "reason": "vocal-forward"},
+            flac={"provider": "RED", "seeders": 388, "bit_depth": 16},
         )
         result = SuggestResult(confirmed=[cand], considered=1, no_karaoke=1)
         gen = MagicMock()
@@ -65,8 +77,7 @@ class TestSuggestCommand:
         with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
             res = CliRunner().invoke(cli, ["candidates", "suggest", "--count", "1"])
         assert res.exit_code == 0, res.output
-        assert "Pendulum" in res.output
-        assert "Slam" in res.output
+        assert "Pendulum" in res.output and "Slam" in res.output
         gen.suggest.assert_awaited_once()
 
     def test_suggest_json_output(self):
@@ -74,15 +85,10 @@ class TestSuggestCommand:
         with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
             res = CliRunner().invoke(cli, ["candidates", "suggest", "--format", "json"])
         assert res.exit_code == 0, res.output
-        assert "Pendulum" in res.output
-        assert "NOMAD" in res.output
+        assert "Pendulum" in res.output and "NOMAD" in res.output
 
-    def test_suggest_passes_thresholds(self):
+    def test_suggest_passes_min_score(self):
         gen = self._fake_gen()
         with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen) as build:
-            CliRunner().invoke(
-                cli,
-                ["candidates", "suggest", "--electronic-min-unique-lines", "20"],
-            )
-        thresholds = build.call_args.kwargs["thresholds"]
-        assert thresholds.electronic_min_unique_lines == 20
+            CliRunner().invoke(cli, ["candidates", "suggest", "--min-score", "60"])
+        assert build.call_args.kwargs["min_score"] == 60.0

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.4.0"
+version = "0.5.0"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"
@@ -29,6 +29,8 @@ google-cloud-storage = "^2.14.0"
 google-cloud-secret-manager = "^2.16.0"
 google-cloud-bigquery = "^3.13.0"
 google-cloud-tasks = "^2.20.0"
+# LLM (Vertex AI Gemini — karaoke-suitability judge for the candidates tool)
+google-genai = "^1.0.0"
 # HTTP clients
 httpx = "^0.27.0"
 aiohttp = "^3.9.0"
