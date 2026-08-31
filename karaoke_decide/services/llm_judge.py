@@ -16,6 +16,15 @@ from typing import Any
 
 from karaoke_decide.core.exceptions import ExternalServiceError
 
+
+def _as_float(value: Any) -> float:
+    """Coerce a model-supplied confidence to float; 0.0 if non-numeric."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 _SYSTEM = """You are judging whether a song is a good KARAOKE candidate — a song a \
 person would actually enjoy singing at a karaoke night. The user reviews every \
 suggestion before producing it and can trim/fade tracks, so bias toward KEEP: \
@@ -55,17 +64,25 @@ class Verdict:
 class LlmJudge:
     """Karaoke-suitability judge backed by Vertex AI Gemini."""
 
-    def __init__(self, project: str, location: str, model: str):
+    def __init__(self, project: str, location: str, model: str, timeout_ms: int = 60000):
         self.project = project
         self.location = location
         self.model = model
+        self.timeout_ms = timeout_ms
         self._client: Any = None
 
     def _get_client(self) -> Any:
         if self._client is None:
             from google import genai  # imported lazily; heavy optional dep
+            from google.genai import types
 
-            self._client = genai.Client(vertexai=True, project=self.project, location=self.location)
+            self._client = genai.Client(
+                vertexai=True,
+                project=self.project,
+                location=self.location,
+                # Bound each request so a stalled call can't hang the run.
+                http_options=types.HttpOptions(timeout=self.timeout_ms),
+            )
         return self._client
 
     def _build_prompt(self, artist: str, title: str, lyrics: str, metadata: dict[str, Any]) -> str:
@@ -100,7 +117,7 @@ class LlmJudge:
         verdict = str(data.get("verdict", "")).lower()
         return Verdict(
             keep=verdict != "reject",  # fail-safe: only an explicit reject drops
-            confidence=float(data.get("confidence", 0.0) or 0.0),
+            confidence=_as_float(data.get("confidence")),
             reason=str(data.get("reason", "")).strip(),
         )
 

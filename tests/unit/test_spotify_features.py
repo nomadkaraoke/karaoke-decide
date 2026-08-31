@@ -6,18 +6,21 @@ from karaoke_decide.services.spotify_features import SpotifyFeaturesService
 
 
 def _row(na, nt, inst=0.1, dur=240000, pop=30):
+    # The query returns one nested STRUCT per (na, nt) key under column "f".
     return {
         "na": na,
         "nt": nt,
-        "instrumentalness": inst,
-        "speechiness": 0.05,
-        "energy": 0.8,
-        "valence": 0.5,
-        "danceability": 0.6,
-        "tempo": 174.0,
-        "duration_ms": dur,
-        "popularity": pop,
-        "explicit": 0,
+        "f": {
+            "instrumentalness": inst,
+            "speechiness": 0.05,
+            "energy": 0.8,
+            "valence": 0.5,
+            "danceability": 0.6,
+            "tempo": 174.0,
+            "duration_ms": dur,
+            "popularity": pop,
+            "explicit": 0,
+        },
     }
 
 

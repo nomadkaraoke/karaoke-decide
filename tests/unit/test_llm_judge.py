@@ -32,6 +32,11 @@ class TestJudge:
         j = _judge_with_response('{"verdict":"maybe","confidence":0.5,"reason":"?"}')
         assert j.judge("A", "B", "x", {}).keep is True
 
+    def test_non_numeric_confidence_does_not_crash(self):
+        j = _judge_with_response('{"verdict":"keep","confidence":"high","reason":"ok"}')
+        v = j.judge("A", "B", "x", {})
+        assert v.keep is True and v.confidence == 0.0
+
     def test_tolerates_code_fences(self):
         j = _judge_with_response('```json\n{"verdict":"reject","reason":"r"}\n```')
         assert j.judge("A", "B", "x", {}).keep is False

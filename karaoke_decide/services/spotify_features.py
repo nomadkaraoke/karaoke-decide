@@ -124,19 +124,27 @@ class SpotifyFeaturesService:
                 arts.add(a)
                 tits.add(t)
 
+        # Pick ONE real row per (artist, title) key — the most popular — rather
+        # than MAX()-ing each column independently, which would frankenstein a
+        # live version's duration with a studio version's instrumentalness.
         sql = f"""
         SELECT
           REGEXP_REPLACE(LOWER(t.artist_name), r'[^a-z0-9]+', '') AS na,
           REGEXP_REPLACE(LOWER(t.title),       r'[^a-z0-9]+', '') AS nt,
-          MAX(af.instrumentalness) AS instrumentalness,
-          MAX(af.speechiness) AS speechiness,
-          MAX(af.energy) AS energy,
-          MAX(af.valence) AS valence,
-          MAX(af.danceability) AS danceability,
-          MAX(af.tempo) AS tempo,
-          MAX(t.duration_ms) AS duration_ms,
-          MAX(t.popularity) AS popularity,
-          MAX(CAST(t.explicit AS INT64)) AS explicit
+          ARRAY_AGG(
+            STRUCT(
+              af.instrumentalness AS instrumentalness,
+              af.speechiness AS speechiness,
+              af.energy AS energy,
+              af.valence AS valence,
+              af.danceability AS danceability,
+              af.tempo AS tempo,
+              t.duration_ms AS duration_ms,
+              t.popularity AS popularity,
+              CAST(t.explicit AS INT64) AS explicit
+            )
+            ORDER BY t.popularity DESC LIMIT 1
+          )[OFFSET(0)] AS f
         FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` t
         JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_audio_features` af
           ON af.track_id = t.spotify_id
@@ -155,16 +163,17 @@ class SpotifyFeaturesService:
         )
         found: dict[tuple[str, str], SpotifyFeatures] = {}
         for row in job.result():
+            f = row["f"]
             found[(row["na"], row["nt"])] = SpotifyFeatures(
-                instrumentalness=float(row["instrumentalness"] or 0.0),
-                speechiness=float(row["speechiness"] or 0.0),
-                energy=float(row["energy"] or 0.0),
-                valence=float(row["valence"] or 0.0),
-                danceability=float(row["danceability"] or 0.0),
-                tempo=float(row["tempo"] or 0.0),
-                duration_ms=int(row["duration_ms"] or 0),
-                popularity=int(row["popularity"] or 0),
-                explicit=bool(row["explicit"]),
+                instrumentalness=float(f["instrumentalness"] or 0.0),
+                speechiness=float(f["speechiness"] or 0.0),
+                energy=float(f["energy"] or 0.0),
+                valence=float(f["valence"] or 0.0),
+                danceability=float(f["danceability"] or 0.0),
+                tempo=float(f["tempo"] or 0.0),
+                duration_ms=int(f["duration_ms"] or 0),
+                popularity=int(f["popularity"] or 0),
+                explicit=bool(f["explicit"]),
             )
 
         result: dict[tuple[str, str], SpotifyFeatures] = {}

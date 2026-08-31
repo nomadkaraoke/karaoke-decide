@@ -317,8 +317,11 @@ class CandidateGenerator:
             len(tracks) - len(survivors) - (result.skipped["rejected"] + result.skipped["already_ours"])
         )
 
-        # Mandatory Spotify features: batch the top survivors in one scan.
-        await asyncio.to_thread(self.batch_load_spotify, survivors[: self.spotify_batch_cap])
+        # Mandatory Spotify features: batch the top survivors in one scan, and
+        # only walk that batch-loaded slice (tracks past the cap were never
+        # looked up, so they must not be counted as no_spotify_features).
+        survivors = survivors[: self.spotify_batch_cap]
+        await asyncio.to_thread(self.batch_load_spotify, survivors)
 
         for t in survivors:
             if len(result.confirmed) >= count or result.checks >= max_checks:
