@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     # LRCLIB (lyrics text source for richness heuristics)
     lrclib_user_agent: str = "karaoke-decide-candidates/2.0 (https://nomadkaraoke.com)"
 
+    # Vertex AI (LLM karaoke-suitability judge for the candidates tool)
+    vertex_project: str = "nomadkaraoke"
+    vertex_location: str = "global"
+    candidates_llm_model: str = "gemini-2.5-flash"
+
     # Postmark (transactional email)
     postmark_server_token: str = ""
     postmark_from_email: str = "noreply@nomadkaraoke.com"

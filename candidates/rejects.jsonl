@@ -2,3 +2,11 @@
 # One JSON object per line: {"artist","title","reason","date"}.
 # Add via: karaoke-decide candidates reject "Artist" "Title" --reason "..."
 # Lines starting with # are ignored. Reviewed periodically to improve heuristics.
+{"artist": "Maduk", "title": "One Way", "reason": "barely any real lyrics; LRCLIB text inaccurate (song only repeats 'there is only one way')", "date": "2026-08-30"}
+{"artist": "Maduk", "title": "Nothing More", "reason": "~50% of the song has no singing; too instrumental", "date": "2026-08-30"}
+{"artist": "Pendulum", "title": "Streamline", "reason": "not enough real lyrics; repetitive DnB", "date": "2026-08-30"}
+{"artist": "Infected Mushroom", "title": "Albibeno", "reason": "track is 100% instrumental; LRCLIB lyrics are a DIFFERENT song (Blink)", "date": "2026-08-30"}
+{"artist": "Noisia", "title": "Shellshock", "reason": "vocals only ~1/3 of the song; mostly instrumental", "date": "2026-08-30"}
+{"artist": "S.P.Y", "title": "By Your Side", "reason": "7min DnB, handful of lyrics; LRCLIB lyrics wrong/for another track", "date": "2026-08-30"}
+{"artist": "Pendulum", "title": "Sounds Of Life", "reason": "most of the song is instrumental", "date": "2026-08-30"}
+{"artist": "Infected Mushroom", "title": "Can't Stop", "reason": "7+ min, mostly repetitive 'can't stop'", "date": "2026-08-30"}

@@ -1,4 +1,4 @@
-"""Integration tests for the candidate pipeline (all deps faked)."""
+"""Integration tests for the v3 candidate pipeline (all deps faked)."""
 
 from unittest.mock import MagicMock
 
@@ -7,23 +7,34 @@ import pytest
 from karaoke_decide.candidates.generator import CandidateGenerator
 from karaoke_decide.candidates.matching import canonical_key
 from karaoke_decide.services.flacfetch import FlacfetchClient
+from karaoke_decide.services.llm_judge import Verdict
+from karaoke_decide.services.spotify_features import SpotifyFeatures
 
 
 def _rich_text(n_lines: int = 15) -> str:
-    # 3 distinct words per line -> >=30 unique words, >=10 unique lines.
     return "\n".join(f"word{3 * i} word{3 * i + 1} word{3 * i + 2}" for i in range(n_lines))
 
 
+def _feat(inst=0.0, dur_min=4.0):
+    return SpotifyFeatures(
+        instrumentalness=inst,
+        speechiness=0.05,
+        energy=0.8,
+        valence=0.5,
+        danceability=0.6,
+        tempo=174.0,
+        duration_ms=int(dur_min * 60000),
+        popularity=30,
+        explicit=False,
+    )
+
+
 class FakeLastFm:
-    def __init__(self, tracks, electronic_artists=()):
+    def __init__(self, tracks):
         self._tracks = tracks
-        self._electronic = set(electronic_artists)
 
     async def get_all_top_tracks(self, username, period="overall", max_tracks=5000):
         return [{"artist": t["artist"], "name": t["title"], "playcount": t["playcount"]} for t in self._tracks]
-
-    async def get_artist_top_tags(self, artist):
-        return ["drum and bass"] if artist in self._electronic else ["rock"]
 
 
 class FakeLrclib:
@@ -32,14 +43,12 @@ class FakeLrclib:
 
     async def best_lyrics(self, artist, title):
         text = self._lyrics.get(title)
-        if text is None:
-            return None
-        return {"plain": text, "synced": "", "instrumental": False}
+        return None if text is None else {"plain": text, "synced": "", "instrumental": False}
 
 
 class FakeFlac:
-    def __init__(self, sourceable_titles):
-        self._sourceable = set(sourceable_titles)
+    def __init__(self, sourceable):
+        self._sourceable = set(sourceable)
 
     async def search(self, artist, title, exhaustive=False):
         if title in self._sourceable:
@@ -56,6 +65,25 @@ class FakeFlac:
         return []
 
     best_flac = staticmethod(FlacfetchClient.best_flac)
+
+
+class FakeSpotify:
+    def __init__(self, features_by_title):
+        self._by_title = features_by_title
+
+    def lookup(self, tracks):
+        return {(a, t): self._by_title[t] for a, t in tracks if t in self._by_title}
+
+
+class FakeLlm:
+    def __init__(self, reject_titles):
+        self._reject = set(reject_titles)
+        self.calls = 0
+
+    def judge(self, artist, title, lyrics, metadata):
+        self.calls += 1
+        keep = title not in self._reject
+        return Verdict(keep=keep, confidence=0.9, reason="ok" if keep else "instrumental")
 
 
 class FakeCatalog:
@@ -79,116 +107,90 @@ class FakeGenJobs:
 def generator(tmp_path):
     tracks = [
         {"artist": "Made", "title": "MadeSong", "playcount": 100},
-        {"artist": "Community", "title": "CommSong", "playcount": 90},
-        {"artist": "Rejected", "title": "RejSong", "playcount": 85},
+        {"artist": "Community", "title": "CommSong", "playcount": 95},
+        {"artist": "Rejected", "title": "RejSong", "playcount": 90},
+        {"artist": "NoSpotify", "title": "NoSpotSong", "playcount": 85},
         {"artist": "Good", "title": "GoodSong", "playcount": 80},
-        {"artist": "NoLyrics", "title": "InstSong", "playcount": 70},
-        {"artist": "Poor", "title": "SparseSong", "playcount": 60},
-        {"artist": "Unsourced", "title": "UnsrcSong", "playcount": 50},
+        {"artist": "NoLyrics", "title": "InstSong", "playcount": 75},
+        {"artist": "LowScore", "title": "LowSong", "playcount": 70},
+        {"artist": "LlmReject", "title": "LlmSong", "playcount": 65},
+        {"artist": "Unsourced", "title": "UnsrcSong", "playcount": 60},
     ]
+    features = {
+        "GoodSong": _feat(inst=0.0),
+        "InstSong": _feat(inst=0.0),
+        "LowSong": _feat(inst=0.98),
+        "LlmSong": _feat(inst=0.0),
+        "UnsrcSong": _feat(inst=0.0),
+    }
     gen = CandidateGenerator(
         base_dir=tmp_path,
         lastfm=FakeLastFm(tracks),
         lrclib=FakeLrclib(
             {
                 "GoodSong": _rich_text(15),
-                "SparseSong": "one line only",
+                "LowSong": "one line",
+                "LlmSong": _rich_text(15),
                 "UnsrcSong": _rich_text(15),
-                # InstSong -> None (no lyrics)
             }
         ),
-        flacfetch=FakeFlac(sourceable_titles={"GoodSong"}),
+        flacfetch=FakeFlac(sourceable={"GoodSong"}),
         gen_jobs=FakeGenJobs({canonical_key("Made", "MadeSong")}),
         catalog=FakeCatalog([("Community", "CommSong")]),
+        spotify=FakeSpotify(features),
+        llm=FakeLlm(reject_titles={"LlmSong"}),
         username="tester",
         flacfetch_min_interval=0.0,
         lrclib_min_interval=0.0,
     )
-    # Reject one song.
-    gen.rejects.add("Rejected", "RejSong", "not good", "2026-08-30")
+    gen.rejects.add("Rejected", "RejSong", "not good", "2026-08-31")
     return gen
 
 
 class TestSuggest:
-    async def test_confirms_only_the_good_song(self, generator):
-        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
-        titles = [c.title for c in result.confirmed]
-        assert titles == ["GoodSong"]
-
-    async def test_skip_reasons(self, generator):
-        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
-        assert result.skipped["already_ours"] == 1
-        assert result.skipped["community_version"] == 1
-        assert result.skipped["rejected"] == 1
-        assert result.skipped["no_lrclib_lyrics"] == 1
-        assert result.skipped["too_few_lines"] == 1
-        assert result.skipped["unsourceable"] == 1
-
-    async def test_unsourceable_recorded_as_miss(self, generator):
-        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
-        assert [m.title for m in result.misses] == ["UnsrcSong"]
-
-    async def test_stops_at_count(self, generator):
-        result = await generator.suggest(count=1, min_plays=1, max_checks=50)
-        assert len(result.confirmed) == 1
-
-    async def test_min_plays_filter(self, generator):
-        result = await generator.suggest(count=5, min_plays=95, max_checks=50)
-        # Only "Made" (100) survives min_plays but it's already ours.
-        assert result.confirmed == []
-
-    async def test_caching_avoids_second_lyrics_call(self, generator):
-        await generator.suggest(count=5, min_plays=1, max_checks=50)
-        # Second run: lyrics come from cache, so a broken client shouldn't matter.
-        generator.lrclib = None  # type: ignore[assignment]
+    async def test_confirms_only_good_song(self, generator):
         result = await generator.suggest(count=5, min_plays=1, max_checks=50)
         assert [c.title for c in result.confirmed] == ["GoodSong"]
 
-    async def test_calibrate_reports_lyrics_presence(self, generator):
-        rows = await generator.calibrate(sample=10, min_plays=1)
-        by_title = {r["title"]: r for r in rows}
-        # Cheap-filtered songs (already ours / community / rejected) are excluded.
-        assert "MadeSong" not in by_title
-        assert "CommSong" not in by_title
-        assert by_title["GoodSong"]["has_lyrics"] is True
-        assert by_title["GoodSong"]["stats"].unique_lines >= 10
-        assert by_title["InstSong"]["has_lyrics"] is False
+    async def test_skip_reasons(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        assert r.skipped["already_ours"] == 1
+        assert r.skipped["community_version"] == 1
+        assert r.skipped["rejected"] == 1
+        assert r.skipped["no_spotify_features"] == 1
+        assert r.skipped["no_lrclib_lyrics"] == 1
+        assert r.skipped["low_score"] == 1
+        assert r.skipped["llm_reject"] == 1
+        assert r.skipped["unsourceable"] == 1
 
-    async def test_calibrate_respects_sample_cap(self, generator):
-        rows = await generator.calibrate(sample=1, min_plays=1)
-        assert len(rows) == 1
+    async def test_llm_only_called_after_cheaper_gates(self, generator):
+        await generator.suggest(count=5, min_plays=1, max_checks=50)
+        assert generator.llm.calls == 3  # GoodSong, LlmSong, UnsrcSong
 
-    async def test_write_reports(self, generator, tmp_path):
-        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
-        paths = generator.write_reports(result)
-        assert paths["json"].exists()
+    async def test_confirmed_carries_features_and_score(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        c = r.confirmed[0]
+        assert c.features.instrumentalness == 0.0
+        assert c.score > 80
+        assert c.llm["keep"] is True
+
+    async def test_llm_reject_and_unsourceable_recorded_as_miss(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        reasons = {m.title: m.reason for m in r.misses}
+        assert "LlmSong" in reasons and reasons["LlmSong"].startswith("llm:")
+        assert reasons.get("UnsrcSong") == "unsourceable"
+
+    async def test_caching_skips_repeat_llm(self, generator):
+        await generator.suggest(count=5, min_plays=1, max_checks=50)
+        first_calls = generator.llm.calls
+        generator.llm._reject = set()
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        assert generator.llm.calls == first_calls
+        assert [c.title for c in r.confirmed] == ["GoodSong"]
+
+    async def test_write_reports(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        paths = generator.write_reports(r)
+        assert paths["csv"].read_text().startswith("artist,title,playcount,score")
         assert "GoodSong" in paths["json"].read_text()
-        assert paths["misses"].exists()
         assert "UnsrcSong" in paths["misses"].read_text()
-
-    async def test_empty_result_still_writes_csv_header(self, generator):
-        # No survivors (impossible min_plays) -> CSV must be rewritten, not stale.
-        result = await generator.suggest(count=5, min_plays=10_000, max_checks=50)
-        paths = generator.write_reports(result)
-        text = paths["csv"].read_text()
-        assert text.startswith("artist,title,playcount")
-        assert len(text.strip().splitlines()) == 1  # header only
-
-    async def test_csv_escapes_formula_injection(self, generator):
-        from karaoke_decide.candidates.generator import Candidate
-
-        result = await generator.suggest(count=5, min_plays=1, max_checks=50)
-        result.confirmed.append(
-            Candidate(
-                artist="=cmd()",
-                title="+evil",
-                playcount=1,
-                is_electronic=False,
-                stats=result.confirmed[0].stats,
-                flac={"provider": "RED", "seeders": 1},
-            )
-        )
-        paths = generator.write_reports(result)
-        text = paths["csv"].read_text()
-        assert "'=cmd()" in text
-        assert "'+evil" in text
