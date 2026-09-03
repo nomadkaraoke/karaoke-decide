@@ -123,8 +123,9 @@ We serve two user types **equally from day one**:
 
 ### Available Now:
 1. **KaraokeNerds Catalog** - Existing karaoke songs with brand coverage as popularity signal
-   - Location: `gs://projectbread-karaokay.appspot.com/karaokenerds-data/full/full-data-latest.json.gz`
-   - Synced daily
+   - Location: BigQuery `nomadkaraoke.karaoke_decide.karaokenerds_raw` / `karaokenerds_community` (also `gs://nomadkaraoke-kn-data/{full,community}/`)
+   - Synced daily by the `kn-data-sync` function in the `nomadkaraoke` project
+   - (Legacy `gs://projectbread-karaokay.appspot.com/karaokenerds-data/` decommissioned 2026-09-03)
 
 2. **Spotify Metadata Archive** (July 2025)
    - 256M tracks with popularity scores (0-100)

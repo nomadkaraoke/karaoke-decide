@@ -778,7 +778,7 @@ Daily automated data pipelines running as Cloud Functions in the `nomadkaraoke` 
 
 **GCS Archives:**
 - KN exports: `gs://nomadkaraoke-kn-data/{full,community}/` (date-stamped + latest pointer, 1-year retention)
-- Legacy KN exports: `gs://projectbread-karaokay.appspot.com/karaokenerds-data/` (still running in parallel, to be decommissioned)
+- Legacy KN exports (DECOMMISSIONED 2026-09-03): were at `gs://projectbread-karaokay.appspot.com/karaokenerds-data/`; the old daily Cloud Functions are paused and the 3yr of historical snapshots are archived at `gs://nomadkaraoke-karaokehunt-archive/karaokenerds-data/`. The live pipeline is `gs://nomadkaraoke-kn-data/` + the BigQuery tables above.
 
 **API Key:** KaraokeNerds API key stored in Secret Manager as `karaokenerds-api-key`
 

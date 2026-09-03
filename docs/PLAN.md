@@ -47,13 +47,13 @@
 
 ### 2. KaraokeNerds Catalog (Daily Sync)
 
-**Location:** `gs://projectbread-karaokay.appspot.com/karaokenerds-data/full/full-data-latest.json.gz`
+**Location:** BigQuery `nomadkaraoke.karaoke_decide.karaokenerds_raw` / `karaokenerds_community` (also `gs://nomadkaraoke-kn-data/{full,community}/`)
 
 **Data Available:**
 - Artist, title, brands that have covered it
 - Brand count as primitive popularity signal
 
-**Access:** Requires projectbread-karaokay GCP credentials.
+**Access:** BigQuery in the `nomadkaraoke` project (no external credentials). Legacy `gs://projectbread-karaokay.appspot.com/karaokenerds-data/` decommissioned 2026-09-03.
 
 ### 3. User Listening History (Real-Time)
 
@@ -365,10 +365,10 @@ make test-e2e     # With emulators
 ## Notes on Data Access
 
 ### KaraokeNerds Catalog
-Currently requires `projectbread-karaokay` GCP credentials. Options:
-1. Copy data to `nomadkaraoke` project
-2. Set up cross-project access
-3. Download manually and upload to new location
+MIGRATED (2026-09-03): now served from BigQuery `nomadkaraoke.karaoke_decide.karaokenerds_raw` /
+`karaokenerds_community` in the `nomadkaraoke` project (daily `kn-data-sync`) — no external
+credentials needed. The legacy `projectbread-karaokay` pipeline is decommissioned (historical
+snapshots archived at `gs://nomadkaraoke-karaokehunt-archive/karaokenerds-data/`).
 
 ### Spotify Dump
 Large files require:
