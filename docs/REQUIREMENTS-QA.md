@@ -90,7 +90,7 @@ Still offer power features (vocal range detection, music streaming connection) p
 
 **Answer:**
 
-1. **KaraokeNerds catalog** - Available at `gs://projectbread-karaokay.appspot.com/karaokenerds-data/full/full-data-latest.json.gz` (synced daily). Doesn't have explicit popularity but can use brand coverage as a signal (e.g., Bohemian Rhapsody covered by 45 different brands)
+1. **KaraokeNerds catalog** - Available in BigQuery `nomadkaraoke.karaoke_decide.karaokenerds_raw` / `karaokenerds_community` (synced daily by `kn-data-sync`; legacy `gs://projectbread-karaokay.appspot.com/karaokenerds-data/` decommissioned 2026-09-03). Doesn't have explicit popularity but can use brand coverage as a signal (e.g., Bohemian Rhapsody covered by 45 different brands)
 
 2. **Spotify metadata archive** (July 2025) from Anna's Archive - Very rich, accurate and complete popularity data for all songs on Spotify as of 2025. Location: `/Volumes/AndrewMacSD/spotify-metadata-dump/annas_archive_spotify_2025_07_metadata/`
 
