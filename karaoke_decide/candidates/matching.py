@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
+from typing import Any
 
 _PAREN_JUNK = re.compile(
     r"\s*[\(\[][^)\]]*(remaster|remix|live|edit|version|mix|mono|stereo|deluxe|"
@@ -102,3 +104,43 @@ def build_match_index(rows: list[tuple[str, str]]) -> set[tuple[str, str]]:
 def index_contains(index: set[tuple[str, str]], artist: str, title: str) -> bool:
     """True if any artist/title variant pair is present in the match index."""
     return any((a, t) in index for a in artist_variants(artist) for t in title_variants(title))
+
+
+def build_payload_index(
+    rows: Iterable[tuple[str, str, dict[str, Any]]],
+) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """Map every artist/title variant pair to the source rows behind it.
+
+    Like :func:`build_match_index`, but retrieval-oriented: each variant key
+    keeps the payload(s) it came from so a later lookup can return the matched
+    catalog rows (e.g. brand + watch URL), not just a yes/no. One song can
+    contribute several rows (multiple community brands), so values are lists.
+    """
+    index: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for artist, title, payload in rows:
+        for a in artist_variants(artist):
+            for t in title_variants(title):
+                index.setdefault((a, t), []).append(payload)
+    return index
+
+
+def index_get(
+    index: dict[tuple[str, str], list[dict[str, Any]]],
+    artist: str,
+    title: str,
+) -> list[dict[str, Any]]:
+    """Return the deduped payloads for any matching artist/title variant pair.
+
+    A payload is reachable through several variant pairs, so we dedup by the
+    payload's identity (its sorted items) to avoid double-counting versions.
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[tuple[str, Any], ...]] = set()
+    for a in artist_variants(artist):
+        for t in title_variants(title):
+            for payload in index.get((a, t), ()):
+                fingerprint = tuple(sorted(payload.items()))
+                if fingerprint not in seen:
+                    seen.add(fingerprint)
+                    out.append(payload)
+    return out

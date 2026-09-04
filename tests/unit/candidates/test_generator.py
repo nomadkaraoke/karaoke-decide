@@ -194,3 +194,90 @@ class TestSuggest:
         assert paths["csv"].read_text().startswith("artist,title,playcount,score")
         assert "GoodSong" in paths["json"].read_text()
         assert "UnsrcSong" in paths["misses"].read_text()
+
+
+class TestSingable:
+    """singable() lists played tracks that ALREADY have a community version."""
+
+    def _seed_community(self, generator, rows):
+        # Prime the blob cache so load_karaokenerds_community_index skips BigQuery.
+        generator.cache.set_blob("karaokenerds_community", rows)
+
+    async def test_lists_matches_in_playcount_order(self, generator):
+        self._seed_community(
+            generator,
+            [
+                ["Good", "GoodSong", "WTF", "https://youtu.be/g2"],
+                ["Good", "GoodSong", "KV", ""],
+                ["Community", "CommSong", "NOMAD", "https://youtu.be/c1"],
+            ],
+        )
+        result = await generator.singable(count=50, min_plays=1)
+        assert [s.title for s in result.songs] == ["CommSong", "GoodSong"]
+        assert result.considered == 9
+        assert result.matched == 2
+
+    async def test_enriches_brands_watch_and_version_count(self, generator):
+        self._seed_community(
+            generator,
+            [
+                ["Good", "GoodSong", "WTF", "https://youtu.be/g2"],
+                ["Good", "GoodSong", "KV", ""],
+            ],
+        )
+        result = await generator.singable(count=50, min_plays=1)
+        song = result.songs[0]
+        assert song.title == "GoodSong"
+        assert song.brands == ["KV", "WTF"]  # sorted, deduped
+        assert song.version_count == 2
+        assert song.watch == "https://youtu.be/g2"  # first non-empty watch
+
+    async def test_count_caps_collected_but_keeps_counting_matched(self, generator):
+        self._seed_community(
+            generator,
+            [
+                ["Community", "CommSong", "NOMAD", "https://youtu.be/c1"],
+                ["Good", "GoodSong", "WTF", "https://youtu.be/g2"],
+            ],
+        )
+        result = await generator.singable(count=1, min_plays=1)
+        assert [s.title for s in result.songs] == ["CommSong"]
+        assert result.matched == 2
+
+    async def test_min_plays_filters_before_matching(self, generator):
+        self._seed_community(generator, [["Good", "GoodSong", "WTF", "https://youtu.be/g2"]])
+        # GoodSong has 80 plays; a threshold above it removes it entirely.
+        result = await generator.singable(count=50, min_plays=90)
+        assert result.songs == []
+
+    async def test_no_matches_when_catalog_empty(self, generator):
+        self._seed_community(generator, [])
+        result = await generator.singable(count=50, min_plays=1)
+        assert result.songs == [] and result.matched == 0 and result.considered == 9
+
+    async def test_write_singable_reports(self, generator):
+        self._seed_community(
+            generator,
+            [["Community", "CommSong", "NOMAD", "https://youtu.be/c1"]],
+        )
+        result = await generator.singable(count=50, min_plays=1)
+        paths = generator.write_singable_reports(result)
+        assert paths["csv"].read_text().startswith("playcount,artist,title,brands")
+        assert "CommSong" in paths["json"].read_text()
+        assert "youtu.be/c1" in paths["md"].read_text()
+
+    async def test_write_singable_reports_escapes_markdown_pipes(self, generator, tmp_path):
+        # A pipe in a title must not spawn phantom Markdown table columns.
+        from karaoke_decide.candidates.generator import SingableResult, SingableSong
+
+        result = SingableResult(
+            songs=[SingableSong("A|B", "Song | Remix", 10, ["NOMAD"], None, 1)],
+            considered=1,
+            matched=1,
+        )
+        paths = generator.write_singable_reports(result)
+        md = paths["md"].read_text()
+        row = next(line for line in md.splitlines() if "Song" in line and line.startswith("|"))
+        # 6 columns => 7 pipes when none are stray; escaped pipes are "\|".
+        assert row.count("|") - row.count("\\|") == 7
+        assert "Song \\| Remix" in md

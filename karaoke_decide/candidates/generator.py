@@ -43,7 +43,14 @@ from karaoke_decide.services.spotify_features import SpotifyFeatures, SpotifyFea
 
 from .cache import CandidateCache
 from .lyrics import LyricsStats, analyze
-from .matching import build_match_index, canonical_key, index_contains, strip_decorations
+from .matching import (
+    build_match_index,
+    build_payload_index,
+    canonical_key,
+    index_contains,
+    index_get,
+    strip_decorations,
+)
 from .rejects import RejectList
 from .scoring import ScoreWeights, suitability
 
@@ -51,6 +58,7 @@ from .scoring import ScoreWeights, suitability
 _MONTH = 30 * 24 * 3600
 LASTFM_TTL = 7 * 24 * 3600
 KARAOKENERDS_TTL = _MONTH
+KARAOKENERDS_COMMUNITY_TTL = _MONTH
 FLACFETCH_TTL = _MONTH
 LRCLIB_TTL: float | None = None  # lyrics never change -> cache forever
 SPOTIFY_TTL: float | None = None  # audio features never change -> forever
@@ -82,6 +90,15 @@ def _csv_safe(value: Any) -> Any:
     if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
         return "'" + value
     return value
+
+
+def _md_cell(value: Any) -> str:
+    """Escape a value for safe interpolation into a Markdown table cell.
+
+    Artist/title/brand strings can contain ``|`` or newlines (Last.fm and the
+    catalog are free text), which would otherwise spawn phantom columns/rows.
+    """
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", "<br>").replace("\r", "")
 
 
 @dataclass
@@ -143,6 +160,35 @@ class SuggestResult:
     considered: int = 0
     checks: int = 0
     no_karaoke: int = 0
+
+
+@dataclass
+class SingableSong:
+    """A well-played Last.fm track that already has a community karaoke version."""
+
+    artist: str
+    title: str
+    playcount: int
+    brands: list[str]
+    watch: str | None
+    version_count: int
+
+    def as_row(self) -> dict[str, Any]:
+        return {
+            "playcount": self.playcount,
+            "artist": self.artist,
+            "title": self.title,
+            "brands": ", ".join(self.brands),
+            "version_count": self.version_count,
+            "watch": self.watch or "",
+        }
+
+
+@dataclass
+class SingableResult:
+    songs: list[SingableSong] = field(default_factory=list)
+    considered: int = 0  # Last.fm tracks examined (>= min_plays)
+    matched: int = 0  # of those, how many had a community version
 
 
 class CandidateGenerator:
@@ -225,6 +271,27 @@ class CandidateGenerator:
             rows = [[r["Artist"] or "", r["Title"] or ""] for r in self.catalog.client.query(sql).result()]
             self.cache.set_blob("karaokenerds", rows)
         return build_match_index([(a, t) for a, t in rows])
+
+    def load_karaokenerds_community_index(self, refresh: bool = False) -> dict[tuple[str, str], list[dict[str, Any]]]:
+        """Retrieval index over the community catalog (brand + YouTube watch URL).
+
+        Unlike the full ``karaokenerds_raw`` eliminator, this uses
+        ``karaokenerds_community`` — free, directly-playable versions (NOMAD, WTF,
+        etc.) — and keeps each row's brand/watch so ``singable`` can show which
+        versions exist and link straight to them.
+        """
+        rows = None if refresh else self.cache.get_blob("karaokenerds_community", KARAOKENERDS_COMMUNITY_TTL)
+        if rows is None:
+            sql = (
+                f"SELECT Artist, Title, Brand, Watch FROM "
+                f"`{self.catalog.PROJECT_ID}.{self.catalog.DATASET_ID}.karaokenerds_community`"
+            )
+            rows = [
+                [r["Artist"] or "", r["Title"] or "", r["Brand"] or "", r["Watch"] or ""]
+                for r in self.catalog.client.query(sql).result()
+            ]
+            self.cache.set_blob("karaokenerds_community", rows)
+        return build_payload_index((a, t, {"brand": b, "watch": w}) for a, t, b, w in rows)
 
     # ------------------------------------------------------------ per-song
     def _spotify_features(self, artist: str, title: str) -> SpotifyFeatures | None:
@@ -387,6 +454,51 @@ class CandidateGenerator:
 
         return result
 
+    # ------------------------------------------------------------ singable
+    async def singable(
+        self,
+        count: int = 50,
+        min_plays: int = 6,
+        refresh_lastfm: bool = False,
+        refresh_community: bool = False,
+        progress: Any | None = None,
+    ) -> SingableResult:
+        """Your most-played Last.fm tracks that ALREADY have a community version.
+
+        The inverse of :meth:`suggest`: instead of finding catalog gaps to
+        produce, this surfaces songs you love that you can go sing tonight
+        because a free community version exists. Pure playcount ranking; no
+        production gates (Spotify/lyrics/LLM/flacfetch) — a version already
+        exists, so suitability and sourcing don't apply.
+        """
+        tracks = await self.load_lastfm_tracks(refresh=refresh_lastfm)
+        tracks = [t for t in tracks if t["playcount"] >= min_plays]
+        community_index = await asyncio.to_thread(self.load_karaokenerds_community_index, refresh_community)
+
+        result = SingableResult()
+        for t in tracks:
+            result.considered += 1
+            matches = index_get(community_index, t["artist"], t["title"])
+            if not matches:
+                continue
+            result.matched += 1
+            if len(result.songs) >= count:
+                continue  # keep counting matched for the summary, but stop collecting
+            brands = sorted({m["brand"] for m in matches if m.get("brand")})
+            watch = next((m["watch"] for m in matches if m.get("watch")), None)
+            song = SingableSong(
+                artist=t["artist"],
+                title=t["title"],
+                playcount=t["playcount"],
+                brands=brands,
+                watch=watch,
+                version_count=len(matches),
+            )
+            result.songs.append(song)
+            if progress is not None:
+                progress(song)
+        return result
+
     # ------------------------------------------------------------ outputs
     def write_reports(self, result: SuggestResult) -> dict[str, Path]:
         out = self.base_dir / "output"
@@ -428,3 +540,38 @@ class CandidateGenerator:
                 mw.writerow([m.playcount, _csv_safe(m.artist), _csv_safe(m.title), m.reason])
 
         return {"csv": csv_path, "json": json_path, "md": md_path, "misses": misses_path}
+
+    def write_singable_reports(self, result: SingableResult) -> dict[str, Path]:
+        out = self.base_dir / "output"
+        out.mkdir(parents=True, exist_ok=True)
+
+        fields = ["playcount", "artist", "title", "brands", "version_count", "watch"]
+        csv_path = out / "singable.csv"
+        with csv_path.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for s in result.songs:
+                w.writerow({k: _csv_safe(v) for k, v in s.as_row().items()})
+
+        json_path = out / "singable.json"
+        json_path.write_text(json.dumps([s.as_row() for s in result.songs], indent=2))
+
+        md_path = out / "singable.md"
+        lines = [
+            "# Singable (already have community karaoke versions)",
+            "",
+            f"{len(result.songs)} shown of {result.matched} matched "
+            f"(considered {result.considered} played tracks).",
+            "",
+            "| # | Plays | Artist | Title | Brands | Watch |",
+            "|---|-------|--------|-------|--------|-------|",
+        ]
+        for i, s in enumerate(result.songs, 1):
+            watch = f"[link]({s.watch})" if s.watch else ""
+            lines.append(
+                f"| {i} | {s.playcount} | {_md_cell(s.artist)} | {_md_cell(s.title)} "
+                f"| {_md_cell(', '.join(s.brands))} | {watch} |"
+            )
+        md_path.write_text("\n".join(lines) + "\n")
+
+        return {"csv": csv_path, "json": json_path, "md": md_path}

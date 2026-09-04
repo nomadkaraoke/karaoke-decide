@@ -72,6 +72,25 @@ karaoke-decide candidates reject "Pendulum" "Slam" --reason "too repetitive live
 karaoke-decide candidates review-rejects
 ```
 
+**The inverse — songs you already *can* sing.** `singable` lists your most-played
+Last.fm tracks that **already have a community karaoke version** (KaraokeNerds
+`karaokenerds_community` — free, YouTube-playable versions like NOMAD/WTF), so you
+get a "go sing these tonight" list instead of a "make these" list. No production
+gates (Spotify/lyrics/LLM/flacfetch) run — a version already exists, so suitability
+and sourcing don't apply; it's a pure playcount-ranked intersection, enriched with
+the brands that carry it and a watch link.
+
+```bash
+# Top 50 played songs that already have a community karaoke version
+karaoke-decide candidates singable
+
+# Tighten to your heaviest rotation, JSON for scripting
+karaoke-decide candidates singable --count 20 --min-plays 20 --format json
+```
+
+Output columns: playcount · artist · title · brands · versions · watch (youtu.be
+link where available). Reports written to `candidates/output/singable.{csv,md,json}`.
+
 Pipeline (cheap → expensive, so the slow/rate-limited steps only see survivors):
 Last.fm top tracks (playcount order = the ranking) → **free eliminators** [reject
 list · "already ours" (fresh Firestore `jobs`) · KaraokeNerds community versions]

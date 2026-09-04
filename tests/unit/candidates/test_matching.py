@@ -3,8 +3,10 @@
 from karaoke_decide.candidates.matching import (
     artist_variants,
     build_match_index,
+    build_payload_index,
     canonical_key,
     index_contains,
+    index_get,
     norm,
     strip_decorations,
     title_variants,
@@ -85,3 +87,30 @@ class TestMatchIndex:
     def test_absent_song_not_matched(self):
         index = build_match_index([("The Beatles", "Hey Jude")])
         assert not index_contains(index, "Pendulum", "Slam")
+
+
+class TestPayloadIndex:
+    def test_returns_payload_for_variant_match(self):
+        index = build_payload_index([("The Beatles", "Hey Jude", {"brand": "NOMAD", "watch": "u1"})])
+        hits = index_get(index, "Beatles", "Hey Jude - Remaster")
+        assert hits == [{"brand": "NOMAD", "watch": "u1"}]
+
+    def test_absent_song_returns_empty(self):
+        index = build_payload_index([("The Beatles", "Hey Jude", {"brand": "NOMAD"})])
+        assert index_get(index, "Pendulum", "Slam") == []
+
+    def test_multiple_versions_collected(self):
+        index = build_payload_index(
+            [
+                ("Queen", "Bohemian Rhapsody", {"brand": "NOMAD", "watch": "a"}),
+                ("Queen", "Bohemian Rhapsody", {"brand": "WTF", "watch": "b"}),
+            ]
+        )
+        hits = index_get(index, "Queen", "Bohemian Rhapsody")
+        brands = sorted(h["brand"] for h in hits)
+        assert brands == ["NOMAD", "WTF"]
+
+    def test_dedupes_payload_reached_via_multiple_variants(self):
+        # One row, but artist/title expand to many variant pairs — must not double-count.
+        index = build_payload_index([("The Beatles", "Hey Jude", {"brand": "NOMAD", "watch": "u1"})])
+        assert len(index_get(index, "The Beatles", "Hey Jude")) == 1
