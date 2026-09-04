@@ -157,6 +157,75 @@ def suggest(
 
 
 @candidates.command()
+@click.option("--count", "-n", default=50, help="Max songs to list")
+@click.option("--min-plays", "-p", default=6, help="Minimum Last.fm playcount")
+@click.option("--refresh-lastfm", is_flag=True, help="Re-pull Last.fm top tracks")
+@click.option("--refresh-community", is_flag=True, help="Re-pull KaraokeNerds community catalog")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["table", "json", "md"]),
+    default="table",
+)
+def singable(
+    count: int,
+    min_plays: int,
+    refresh_lastfm: bool,
+    refresh_community: bool,
+    output_format: str,
+) -> None:
+    """List your most-played songs that ALREADY have a community karaoke version."""
+    gen = _build_generator()
+
+    def _tick(song: object) -> None:
+        console.print(f"  [green]✓[/green] {song.artist} — {song.title}")  # type: ignore[attr-defined]
+
+    with console.status("Finding singable songs (Last.fm × KaraokeNerds community catalog)..."):
+        result = asyncio.run(
+            gen.singable(
+                count=count,
+                min_plays=min_plays,
+                refresh_lastfm=refresh_lastfm,
+                refresh_community=refresh_community,
+                progress=None if output_format != "table" else _tick,
+            )
+        )
+    paths = gen.write_singable_reports(result)
+
+    if output_format == "json":
+        console.print_json(data=[s.as_row() for s in result.songs])
+        return
+    if output_format == "md":
+        console.print(paths["md"].read_text())
+        return
+
+    table = Table(title=f"Singable — already have community versions (top {len(result.songs)})")
+    table.add_column("#", style="dim")
+    table.add_column("Plays", justify="right", style="magenta")
+    table.add_column("Artist", style="cyan")
+    table.add_column("Title", style="green")
+    table.add_column("Brands", style="yellow")
+    table.add_column("Vers", justify="right")
+    table.add_column("Watch", style="blue")
+    for i, s in enumerate(result.songs, 1):
+        table.add_row(
+            str(i),
+            str(s.playcount),
+            s.artist,
+            s.title,
+            ", ".join(s.brands),
+            str(s.version_count),
+            s.watch or "",
+        )
+    console.print(table)
+    console.print(
+        f"[dim]considered {result.considered} played tracks · "
+        f"{result.matched} have a community version[/dim]"
+    )
+    console.print(f"[dim]reports → {paths['csv'].parent}[/dim]")
+
+
+@candidates.command()
 @click.argument("artist")
 @click.argument("title")
 @click.option("--reason", "-r", required=True, help="Why it's not a good candidate")

@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from click.testing import CliRunner
 
-from karaoke_decide.candidates.generator import Candidate, SuggestResult
+from karaoke_decide.candidates.generator import (
+    Candidate,
+    SingableResult,
+    SingableSong,
+    SuggestResult,
+)
 from karaoke_decide.candidates.lyrics import analyze
 from karaoke_decide.cli.main import cli
 from karaoke_decide.services.spotify_features import SpotifyFeatures
@@ -31,7 +36,7 @@ class TestRejectCommands:
     def test_help_lists_subcommands(self):
         res = CliRunner().invoke(cli, ["candidates", "--help"])
         assert res.exit_code == 0
-        for cmd in ("suggest", "reject", "review-rejects"):
+        for cmd in ("suggest", "singable", "reject", "review-rejects"):
             assert cmd in res.output
 
 
@@ -92,3 +97,46 @@ class TestSuggestCommand:
         with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen) as build:
             CliRunner().invoke(cli, ["candidates", "suggest", "--min-score", "60"])
         assert build.call_args.kwargs["min_score"] == 60.0
+
+
+class TestSingableCommand:
+    def _fake_gen(self):
+        song = SingableSong(
+            artist="Pendulum",
+            title="Slam",
+            playcount=88,
+            brands=["NOMAD", "WTF"],
+            watch="https://youtu.be/abc123",
+            version_count=2,
+        )
+        result = SingableResult(songs=[song], considered=500, matched=1)
+        gen = MagicMock()
+        gen.singable = AsyncMock(return_value=result)
+        gen.write_singable_reports.return_value = {
+            "csv": MagicMock(),
+            "json": MagicMock(),
+            "md": MagicMock(),
+        }
+        return gen
+
+    def test_singable_table_output(self):
+        gen = self._fake_gen()
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            res = CliRunner().invoke(cli, ["candidates", "singable", "--count", "10"])
+        assert res.exit_code == 0, res.output
+        assert "Pendulum" in res.output and "Slam" in res.output
+        gen.singable.assert_awaited_once()
+
+    def test_singable_json_output(self):
+        gen = self._fake_gen()
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            res = CliRunner().invoke(cli, ["candidates", "singable", "--format", "json"])
+        assert res.exit_code == 0, res.output
+        assert "Pendulum" in res.output and "youtu.be/abc123" in res.output
+
+    def test_singable_passes_options(self):
+        gen = self._fake_gen()
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            CliRunner().invoke(cli, ["candidates", "singable", "--count", "7", "--min-plays", "3"])
+        kwargs = gen.singable.await_args.kwargs
+        assert kwargs["count"] == 7 and kwargs["min_plays"] == 3
