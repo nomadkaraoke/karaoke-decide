@@ -219,8 +219,7 @@ def singable(
         )
     console.print(table)
     console.print(
-        f"[dim]considered {result.considered} played tracks · "
-        f"{result.matched} have a community version[/dim]"
+        f"[dim]considered {result.considered} played tracks · " f"{result.matched} have a community version[/dim]"
     )
     console.print(f"[dim]reports → {paths['csv'].parent}[/dim]")
 

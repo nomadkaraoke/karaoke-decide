@@ -272,9 +272,7 @@ class CandidateGenerator:
             self.cache.set_blob("karaokenerds", rows)
         return build_match_index([(a, t) for a, t in rows])
 
-    def load_karaokenerds_community_index(
-        self, refresh: bool = False
-    ) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    def load_karaokenerds_community_index(self, refresh: bool = False) -> dict[tuple[str, str], list[dict[str, Any]]]:
         """Retrieval index over the community catalog (brand + YouTube watch URL).
 
         Unlike the full ``karaokenerds_raw`` eliminator, this uses
