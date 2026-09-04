@@ -92,6 +92,15 @@ def _csv_safe(value: Any) -> Any:
     return value
 
 
+def _md_cell(value: Any) -> str:
+    """Escape a value for safe interpolation into a Markdown table cell.
+
+    Artist/title/brand strings can contain ``|`` or newlines (Last.fm and the
+    catalog are free text), which would otherwise spawn phantom columns/rows.
+    """
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", "<br>").replace("\r", "")
+
+
 @dataclass
 class Candidate:
     artist: str
@@ -562,8 +571,8 @@ class CandidateGenerator:
         for i, s in enumerate(result.songs, 1):
             watch = f"[link]({s.watch})" if s.watch else ""
             lines.append(
-                f"| {i} | {s.playcount} | {s.artist} | {s.title} "
-                f"| {', '.join(s.brands)} | {watch} |"
+                f"| {i} | {s.playcount} | {_md_cell(s.artist)} | {_md_cell(s.title)} "
+                f"| {_md_cell(', '.join(s.brands))} | {watch} |"
             )
         md_path.write_text("\n".join(lines) + "\n")
 

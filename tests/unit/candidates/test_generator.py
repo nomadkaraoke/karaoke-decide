@@ -265,3 +265,19 @@ class TestSingable:
         assert paths["csv"].read_text().startswith("playcount,artist,title,brands")
         assert "CommSong" in paths["json"].read_text()
         assert "youtu.be/c1" in paths["md"].read_text()
+
+    async def test_write_singable_reports_escapes_markdown_pipes(self, generator, tmp_path):
+        # A pipe in a title must not spawn phantom Markdown table columns.
+        from karaoke_decide.candidates.generator import SingableResult, SingableSong
+
+        result = SingableResult(
+            songs=[SingableSong("A|B", "Song | Remix", 10, ["NOMAD"], None, 1)],
+            considered=1,
+            matched=1,
+        )
+        paths = generator.write_singable_reports(result)
+        md = paths["md"].read_text()
+        row = next(line for line in md.splitlines() if "Song" in line and line.startswith("|"))
+        # 6 columns => 7 pipes when none are stray; escaped pipes are "\|".
+        assert row.count("|") - row.count("\\|") == 7
+        assert "Song \\| Remix" in md
