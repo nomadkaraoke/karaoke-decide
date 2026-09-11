@@ -60,6 +60,7 @@ LASTFM_TTL = 7 * 24 * 3600
 KARAOKENERDS_TTL = _MONTH
 KARAOKENERDS_COMMUNITY_TTL = _MONTH
 FLACFETCH_TTL = _MONTH
+GENRES_TTL = _MONTH  # artist genres/tags shift slowly -> refresh monthly
 LRCLIB_TTL: float | None = None  # lyrics never change -> cache forever
 SPOTIFY_TTL: float | None = None  # audio features never change -> forever
 LLM_TTL: float | None = None  # keyed by lyrics hash -> forever
@@ -90,6 +91,21 @@ def _csv_safe(value: Any) -> Any:
     if isinstance(value, str) and value and value[0] in ("=", "+", "-", "@", "\t", "\r"):
         return "'" + value
     return value
+
+
+def _genre_terms(raw: Any) -> tuple[str, ...]:
+    """Normalize CLI genre args to lowercased, stripped, non-empty terms."""
+    return tuple(term for term in ((g or "").strip().lower() for g in (raw or ())) if term)
+
+
+def _genre_matches(genres: list[str], terms: tuple[str, ...]) -> bool:
+    """True if any term is a case-insensitive substring of any genre descriptor.
+
+    ``genres`` are already lowercased (see ``batch_lookup_artist_genres``); ``terms``
+    are lowercased by :func:`_genre_terms`. Substring so ``rock`` matches
+    "classic rock" and "drum and bass" matches "liquid drum and bass".
+    """
+    return any(term in genre for term in terms for genre in genres)
 
 
 def _md_cell(value: Any) -> str:
@@ -172,6 +188,7 @@ class SingableSong:
     brands: list[str]
     watch: str | None
     version_count: int
+    genres: list[str] = field(default_factory=list)
 
     def as_row(self) -> dict[str, Any]:
         return {
@@ -181,6 +198,7 @@ class SingableSong:
             "brands": ", ".join(self.brands),
             "version_count": self.version_count,
             "watch": self.watch or "",
+            "genres": ", ".join(self.genres),
         }
 
 
@@ -188,7 +206,8 @@ class SingableSong:
 class SingableResult:
     songs: list[SingableSong] = field(default_factory=list)
     considered: int = 0  # Last.fm tracks examined (>= min_plays)
-    matched: int = 0  # of those, how many had a community version
+    matched: int = 0  # of those, how many survived (community version + genre filter)
+    community_matched: int = 0  # had a community version, before any genre filter
 
 
 class CandidateGenerator:
@@ -350,6 +369,30 @@ class CandidateGenerator:
         self.cache.set_item("flacfetch", cache_key, payload)
         return payload or None
 
+    def _load_artist_genres(self, artists: list[str]) -> dict[str, list[str]]:
+        """Return {artist: [genre/tag descriptors]}, cached per artist.
+
+        MusicBrainz-first (mb_tags ∪ spotify_genres) via the catalog. Cached
+        results include the confirmed-empty case (``[]``) so repeat runs never
+        re-hit BigQuery. This is blocking BigQuery I/O — call via
+        ``asyncio.to_thread`` from async code.
+        """
+        result: dict[str, list[str]] = {}
+        misses: list[str] = []
+        for artist in dict.fromkeys(artists):  # de-dup, preserve order
+            cached = self.cache.get_item("genres", artist, GENRES_TTL)
+            if cached is None:
+                misses.append(artist)
+            else:
+                result[artist] = list(cached)
+        if misses:
+            found = self.catalog.batch_lookup_artist_genres(misses)
+            for artist in misses:
+                genres = found.get(artist, [])
+                self.cache.set_item("genres", artist, genres)
+                result[artist] = genres
+        return result
+
     # ------------------------------------------------------------ main
     async def suggest(
         self,
@@ -461,6 +504,8 @@ class CandidateGenerator:
         min_plays: int = 6,
         refresh_lastfm: bool = False,
         refresh_community: bool = False,
+        include_genres: Any | None = None,
+        exclude_genres: Any | None = None,
         progress: Any | None = None,
     ) -> SingableResult:
         """Your most-played Last.fm tracks that ALREADY have a community version.
@@ -470,29 +515,61 @@ class CandidateGenerator:
         because a free community version exists. Pure playcount ranking; no
         production gates (Spotify/lyrics/LLM/flacfetch) — a version already
         exists, so suitability and sourcing don't apply.
+
+        ``include_genres`` / ``exclude_genres`` optionally filter by the artist's
+        genre/tag descriptors (MusicBrainz-first, Spotify as backup). Matching is
+        case-insensitive substring; exclude wins over include. Artists with no
+        genre data are dropped when an include filter is set (can't confirm a
+        match) and kept when only excluding. Genre data is loaded lazily — only
+        when a filter is active — so the unfiltered path is unchanged.
         """
+        include = _genre_terms(include_genres)
+        exclude = _genre_terms(exclude_genres)
+        genre_filtering = bool(include or exclude)
+
         tracks = await self.load_lastfm_tracks(refresh=refresh_lastfm)
         tracks = [t for t in tracks if t["playcount"] >= min_plays]
         community_index = await asyncio.to_thread(self.load_karaokenerds_community_index, refresh_community)
 
         result = SingableResult()
+
+        # First pass: every played track that has a community version. We collect
+        # ALL matches (not just the top ``count``) so a genre filter doesn't
+        # starve on a head of the list that gets filtered out.
+        matched: list[tuple[dict[str, Any], list[dict[str, Any]]]] = []
         for t in tracks:
             result.considered += 1
-            matches = index_get(community_index, t["artist"], t["title"])
-            if not matches:
-                continue
+            versions = index_get(community_index, t["artist"], t["title"])
+            if versions:
+                matched.append((t, versions))
+        result.community_matched = len(matched)
+
+        # Genre data only for the artists we might surface, and only when needed.
+        genre_map: dict[str, list[str]] = {}
+        if genre_filtering:
+            artists = [t["artist"] for t, _ in matched]
+            genre_map = await asyncio.to_thread(self._load_artist_genres, artists)
+
+        for t, versions in matched:
+            genres = genre_map.get(t["artist"], [])
+            if genre_filtering:
+                if include and not _genre_matches(genres, include):
+                    continue
+                if exclude and _genre_matches(genres, exclude):
+                    continue
             result.matched += 1
             if len(result.songs) >= count:
                 continue  # keep counting matched for the summary, but stop collecting
-            brands = sorted({m["brand"] for m in matches if m.get("brand")})
-            watch = next((m["watch"] for m in matches if m.get("watch")), None)
+            brands = sorted({m["brand"] for m in versions if m.get("brand")})
+            watch = next((m["watch"] for m in versions if m.get("watch")), None)
             song = SingableSong(
                 artist=t["artist"],
                 title=t["title"],
                 playcount=t["playcount"],
                 brands=brands,
                 watch=watch,
-                version_count=len(matches),
+                version_count=len(versions),
+                genres=genres,
             )
             result.songs.append(song)
             if progress is not None:
@@ -545,7 +622,7 @@ class CandidateGenerator:
         out = self.base_dir / "output"
         out.mkdir(parents=True, exist_ok=True)
 
-        fields = ["playcount", "artist", "title", "brands", "version_count", "watch"]
+        fields = ["playcount", "artist", "title", "brands", "version_count", "watch", "genres"]
         csv_path = out / "singable.csv"
         with csv_path.open("w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fields)
@@ -563,14 +640,14 @@ class CandidateGenerator:
             f"{len(result.songs)} shown of {result.matched} matched "
             f"(considered {result.considered} played tracks).",
             "",
-            "| # | Plays | Artist | Title | Brands | Watch |",
-            "|---|-------|--------|-------|--------|-------|",
+            "| # | Plays | Artist | Title | Brands | Watch | Genres |",
+            "|---|-------|--------|-------|--------|-------|--------|",
         ]
         for i, s in enumerate(result.songs, 1):
             watch = f"[link]({s.watch})" if s.watch else ""
             lines.append(
                 f"| {i} | {s.playcount} | {_md_cell(s.artist)} | {_md_cell(s.title)} "
-                f"| {_md_cell(', '.join(s.brands))} | {watch} |"
+                f"| {_md_cell(', '.join(s.brands))} | {watch} | {_md_cell(', '.join(s.genres))} |"
             )
         md_path.write_text("\n".join(lines) + "\n")
 

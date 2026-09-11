@@ -162,6 +162,20 @@ def suggest(
 @click.option("--refresh-lastfm", is_flag=True, help="Re-pull Last.fm top tracks")
 @click.option("--refresh-community", is_flag=True, help="Re-pull KaraokeNerds community catalog")
 @click.option(
+    "--genre",
+    "-g",
+    "include_genres",
+    multiple=True,
+    help="Only include artists whose genre/tag matches (substring, case-insensitive; repeatable)",
+)
+@click.option(
+    "--exclude-genre",
+    "-x",
+    "exclude_genres",
+    multiple=True,
+    help="Exclude artists whose genre/tag matches (substring, case-insensitive; repeatable)",
+)
+@click.option(
     "--format",
     "output_format",
     type=click.Choice(["table", "json", "md"]),
@@ -172,9 +186,17 @@ def singable(
     min_plays: int,
     refresh_lastfm: bool,
     refresh_community: bool,
+    include_genres: tuple[str, ...],
+    exclude_genres: tuple[str, ...],
     output_format: str,
 ) -> None:
-    """List your most-played songs that ALREADY have a community karaoke version."""
+    """List your most-played songs that ALREADY have a community karaoke version.
+
+    Optionally filter by artist genre/tag (MusicBrainz-first, Spotify backup):
+    ``-g "drum and bass" -g rock`` to include, ``-x classical`` to exclude.
+    Exclude wins over include; artists with no genre data are dropped when
+    ``-g`` is used and kept when only ``-x`` is used.
+    """
     gen = _build_generator()
 
     def _tick(song: object) -> None:
@@ -187,6 +209,8 @@ def singable(
                 min_plays=min_plays,
                 refresh_lastfm=refresh_lastfm,
                 refresh_community=refresh_community,
+                include_genres=include_genres,
+                exclude_genres=exclude_genres,
                 progress=None if output_format != "table" else _tick,
             )
         )
@@ -207,6 +231,7 @@ def singable(
     table.add_column("Brands", style="yellow")
     table.add_column("Vers", justify="right")
     table.add_column("Watch", style="blue")
+    table.add_column("Genres", style="dim")
     for i, s in enumerate(result.songs, 1):
         table.add_row(
             str(i),
@@ -216,11 +241,19 @@ def singable(
             ", ".join(s.brands),
             str(s.version_count),
             s.watch or "",
+            ", ".join(s.genres),
         )
     console.print(table)
-    console.print(
-        f"[dim]considered {result.considered} played tracks · " f"{result.matched} have a community version[/dim]"
-    )
+    if include_genres or exclude_genres:
+        console.print(
+            f"[dim]considered {result.considered} played tracks · "
+            f"{result.community_matched} have a community version · "
+            f"{result.matched} pass the genre filter[/dim]"
+        )
+    else:
+        console.print(
+            f"[dim]considered {result.considered} played tracks · " f"{result.matched} have a community version[/dim]"
+        )
     console.print(f"[dim]reports → {paths['csv'].parent}[/dim]")
 
 

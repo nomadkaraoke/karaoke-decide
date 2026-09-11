@@ -1237,3 +1237,57 @@ class TestTrackSearchRoute:
         mock_service.search_tracks_combined.assert_called_once_with("test", artist="Test Artist", limit=10)
         assert len(result.tracks) == 1
         assert result.tracks[0].track_id == "spotify:1"
+
+
+class TestBatchLookupArtistGenres:
+    """batch_lookup_artist_genres unions MusicBrainz tags + Spotify genres."""
+
+    def _row(self, name_normalized, popularity, mb_tags, spotify_genres):
+        row = MagicMock()
+        row.name_normalized = name_normalized
+        row.popularity = popularity
+        row.mb_tags = mb_tags
+        row.spotify_genres = spotify_genres
+        return row
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_empty_input_skips_query(self, mock_client_class: MagicMock) -> None:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        service = BigQueryCatalogService()
+        assert service.batch_lookup_artist_genres([]) == {}
+        mock_client.query.assert_not_called()
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_merges_and_lowercases_keyed_by_original_name(self, mock_client_class: MagicMock) -> None:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        # "Pendulum" normalizes to "pendulum"; row unions mb_tags + spotify_genres.
+        mock_client.query.return_value.result.return_value = [
+            self._row("pendulum", 80, ["Drum And Bass", "electronic"], ["drum and bass", "big beat"]),
+        ]
+        service = BigQueryCatalogService()
+        result = service.batch_lookup_artist_genres(["Pendulum", "UnknownArtist"])
+        # Keyed by the ORIGINAL input name; de-duped, lowercased, mb tags first.
+        assert result == {"Pendulum": ["drum and bass", "electronic", "big beat"]}
+        assert "UnknownArtist" not in result
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_picks_highest_popularity_row_per_name(self, mock_client_class: MagicMock) -> None:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_client.query.return_value.result.return_value = [
+            self._row("queen", 40, ["tribute"], []),
+            self._row("queen", 95, ["rock", "classic rock"], []),
+        ]
+        service = BigQueryCatalogService()
+        result = service.batch_lookup_artist_genres(["Queen"])
+        assert result == {"Queen": ["rock", "classic rock"]}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_query_failure_returns_partial(self, mock_client_class: MagicMock) -> None:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        mock_client.query.side_effect = Exception("table not found")
+        service = BigQueryCatalogService()
+        assert service.batch_lookup_artist_genres(["Queen"]) == {}

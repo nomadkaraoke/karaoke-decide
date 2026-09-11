@@ -86,10 +86,23 @@ karaoke-decide candidates singable
 
 # Tighten to your heaviest rotation, JSON for scripting
 karaoke-decide candidates singable --count 20 --min-plays 20 --format json
+
+# Filter by genre/tag: keep drum & bass and rock, drop anything classical
+karaoke-decide candidates singable -g "drum and bass" -g rock -x classical
 ```
 
 Output columns: playcount · artist · title · brands · versions · watch (youtu.be
-link where available). Reports written to `candidates/output/singable.{csv,md,json}`.
+link where available) · genres. Reports written to
+`candidates/output/singable.{csv,md,json}`.
+
+**Genre filter** (`-g/--genre` to include, `-x/--exclude-genre` to exclude, both
+repeatable): matches the artist's genre/tag descriptors — **MusicBrainz-first**
+(`mb_artists_normalized.mb_tags`, wider artist coverage) unioned with Spotify
+genres. Matching is case-insensitive **substring** (so `-g rock` catches "classic
+rock", `-g "drum and bass"` catches "liquid drum and bass"); **exclude wins over
+include**. Artists with no genre data are dropped when `-g` is used and kept when
+only `-x` is used. Genre data is loaded lazily (only when a filter is active) and
+cached per-artist (~30d), so the unfiltered path costs nothing extra.
 
 Pipeline (cheap → expensive, so the slow/rate-limited steps only see survivors):
 Last.fm top tracks (playcount order = the ranking) → **free eliminators** [reject
