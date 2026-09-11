@@ -93,9 +93,58 @@ def _csv_safe(value: Any) -> Any:
     return value
 
 
+# Curated "umbrella" aliases: a single group name on the CLI (``-x electronic``)
+# expands to the family of subgenre terms below. Kept deliberately free of
+# ambiguous substrings ("garage" → garage rock/punk, bare "hardcore" → hardcore
+# punk); phrases like "uk garage"/"happy hardcore" scope those safely.
+GENRE_GROUPS: dict[str, tuple[str, ...]] = {
+    "electronic": (
+        "electronic",
+        "electronica",
+        "edm",
+        "electro",
+        "house",
+        "techno",
+        "trance",
+        "dubstep",
+        "drum and bass",
+        "drum n bass",
+        "dnb",
+        "jungle",
+        "liquid funk",
+        "neurofunk",
+        "breakbeat",
+        "big beat",
+        "idm",
+        "ambient",
+        "downtempo",
+        "trip hop",
+        "synthwave",
+        "hardstyle",
+        "happy hardcore",
+        "uk garage",
+    ),
+}
+
+
 def _genre_terms(raw: Any) -> tuple[str, ...]:
-    """Normalize CLI genre args to lowercased, stripped, non-empty terms."""
-    return tuple(term for term in ((g or "").strip().lower() for g in (raw or ())) if term)
+    """Normalize CLI genre args to lowercased, stripped, non-empty terms.
+
+    Known group aliases (see :data:`GENRE_GROUPS`, e.g. ``electronic``) expand
+    to their umbrella of subgenre terms; everything else passes through as a
+    literal term. De-duplicated, order preserved.
+    """
+    terms: list[str] = []
+    seen: set[str] = set()
+    for g in raw or ():
+        term = (g or "").strip().lower()
+        if not term:
+            continue
+        for expanded in GENRE_GROUPS.get(term, (term,)):
+            if expanded not in seen:
+                seen.add(expanded)
+                terms.append(expanded)
+    return tuple(terms)
 
 
 def _genre_matches(genres: list[str], terms: tuple[str, ...]) -> bool:
@@ -106,6 +155,20 @@ def _genre_matches(genres: list[str], terms: tuple[str, ...]) -> bool:
     "classic rock" and "drum and bass" matches "liquid drum and bass".
     """
     return any(term in genre for term in terms for genre in genres)
+
+
+def _passes_genre_filter(genres: list[str], include: tuple[str, ...], exclude: tuple[str, ...]) -> bool:
+    """Apply include/exclude genre terms to one artist's descriptors.
+
+    Exclude wins over include. An artist with no genre data (``genres`` empty)
+    fails an include filter (can't confirm a match) but survives an
+    exclude-only filter (nothing to exclude on).
+    """
+    if include and not _genre_matches(genres, include):
+        return False
+    if exclude and _genre_matches(genres, exclude):
+        return False
+    return True
 
 
 def _md_cell(value: Any) -> str:
@@ -401,8 +464,23 @@ class CandidateGenerator:
         max_checks: int = 120,
         refresh_lastfm: bool = False,
         refresh_catalog: bool = False,
+        include_genres: Any | None = None,
+        exclude_genres: Any | None = None,
         progress: Any | None = None,
     ) -> SuggestResult:
+        """Return songs worth producing as karaoke jobs.
+
+        ``include_genres`` / ``exclude_genres`` optionally filter by the artist's
+        genre/tag descriptors (MusicBrainz-first, Spotify backup) — same
+        semantics as :meth:`singable`, applied as a free eliminator BEFORE the
+        expensive per-song gates (lyrics/LLM/flacfetch) so they never run on
+        out-of-scope genres. Group aliases like ``electronic`` expand (see
+        :data:`GENRE_GROUPS`).
+        """
+        include = _genre_terms(include_genres)
+        exclude = _genre_terms(exclude_genres)
+        genre_filtering = bool(include or exclude)
+
         tracks = await self.load_lastfm_tracks(refresh=refresh_lastfm)
         tracks = [t for t in tracks if t["playcount"] >= min_plays]
 
@@ -431,6 +509,16 @@ class CandidateGenerator:
         # only walk that batch-loaded slice (tracks past the cap were never
         # looked up, so they must not be counted as no_spotify_features).
         survivors = survivors[: self.spotify_batch_cap]
+
+        # Genre filter is a free eliminator: drop out-of-scope artists here so
+        # the expensive gates below never see them. Only runs (and only hits
+        # BigQuery) when a filter is active.
+        if genre_filtering:
+            genre_map = await asyncio.to_thread(self._load_artist_genres, [t["artist"] for t in survivors])
+            kept = [t for t in survivors if _passes_genre_filter(genre_map.get(t["artist"], []), include, exclude)]
+            result.skipped["genre_filtered"] = len(survivors) - len(kept)
+            survivors = kept
+
         await asyncio.to_thread(self.batch_load_spotify, survivors)
 
         for t in survivors:
@@ -552,11 +640,8 @@ class CandidateGenerator:
 
         for t, versions in matched:
             genres = genre_map.get(t["artist"], [])
-            if genre_filtering:
-                if include and not _genre_matches(genres, include):
-                    continue
-                if exclude and _genre_matches(genres, exclude):
-                    continue
+            if genre_filtering and not _passes_genre_filter(genres, include, exclude):
+                continue
             result.matched += 1
             if len(result.songs) >= count:
                 continue  # keep counting matched for the summary, but stop collecting

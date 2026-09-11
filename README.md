@@ -67,6 +67,10 @@ karaoke-decide candidates suggest --count 5 --format json
 # Loosen/tighten the cheap suitability pre-filter (default 45; LLM is the real gate)
 karaoke-decide candidates suggest --count 5 --min-score 40
 
+# Filter by genre/tag (see "Genre filter" below): skip all electronic, only rock
+karaoke-decide candidates suggest --count 5 -x electronic
+karaoke-decide candidates suggest --count 5 -g rock
+
 # Mark a song you've decided not to make (never suggested again)
 karaoke-decide candidates reject "Pendulum" "Slam" --reason "too repetitive live"
 karaoke-decide candidates review-rejects
@@ -95,14 +99,24 @@ Output columns: playcount · artist · title · brands · versions · watch (you
 link where available) · genres. Reports written to
 `candidates/output/singable.{csv,md,json}`.
 
-**Genre filter** (`-g/--genre` to include, `-x/--exclude-genre` to exclude, both
-repeatable): matches the artist's genre/tag descriptors — **MusicBrainz-first**
-(`mb_artists_normalized.mb_tags`, wider artist coverage) unioned with Spotify
-genres. Matching is case-insensitive **substring** (so `-g rock` catches "classic
-rock", `-g "drum and bass"` catches "liquid drum and bass"); **exclude wins over
-include**. Artists with no genre data are dropped when `-g` is used and kept when
-only `-x` is used. Genre data is loaded lazily (only when a filter is active) and
-cached per-artist (~30d), so the unfiltered path costs nothing extra.
+**Genre filter** (on both `suggest` and `singable`; `-g/--genre` to include,
+`-x/--exclude-genre` to exclude, both repeatable): matches the artist's genre/tag
+descriptors — **MusicBrainz-first** (`mb_artists_normalized.mb_tags`, wider artist
+coverage) unioned with Spotify genres. Matching is case-insensitive **substring**
+(so `-g rock` catches "classic rock", `-g "drum and bass"` catches "liquid drum and
+bass"); **exclude wins over include**. Artists with no genre data are dropped when
+`-g` is used and kept when only `-x` is used. Genre data is loaded lazily (only when
+a filter is active) and cached per-artist (~30d), so the unfiltered path costs
+nothing extra. On `suggest` the filter runs as a free eliminator *before* the
+expensive lyrics/LLM/flacfetch gates.
+
+*Group aliases:* a single umbrella name expands to a curated family of subgenres,
+so you don't have to enumerate them. Currently `electronic` → `electronic,
+electronica, edm, electro, house, techno, trance, dubstep, drum and bass, jungle,
+liquid funk, neurofunk, breakbeat, big beat, idm, ambient, downtempo, trip hop,
+synthwave, hardstyle, happy hardcore, uk garage, …`. So **`-x electronic` excludes
+all electronic music**. The map lives in `GENRE_GROUPS` (`candidates/generator.py`)
+— add `rock`/`metal`/etc. there as needed. Any non-alias term is used literally.
 
 Pipeline (cheap → expensive, so the slow/rate-limited steps only see survivors):
 Last.fm top tracks (playcount order = the ranking) → **free eliminators** [reject

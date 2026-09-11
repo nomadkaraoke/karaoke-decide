@@ -4,7 +4,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from karaoke_decide.candidates.generator import CandidateGenerator
+from karaoke_decide.candidates.generator import (
+    GENRE_GROUPS,
+    CandidateGenerator,
+    _genre_terms,
+)
 from karaoke_decide.candidates.matching import canonical_key
 from karaoke_decide.services.flacfetch import FlacfetchClient
 from karaoke_decide.services.llm_judge import Verdict
@@ -160,6 +164,29 @@ def generator(tmp_path):
     return gen
 
 
+class TestGenreTerms:
+    """CLI genre args -> normalized terms, with group-alias expansion."""
+
+    def test_lowercases_strips_and_dedups(self):
+        assert _genre_terms([" Rock ", "rock", "", None]) == ("rock",)
+
+    def test_passes_through_literal_terms(self):
+        assert _genre_terms(["drum and bass"]) == ("drum and bass",)
+
+    def test_electronic_alias_expands_to_umbrella(self):
+        terms = _genre_terms(["electronic"])
+        assert terms == GENRE_GROUPS["electronic"]
+        assert "drum and bass" in terms and "techno" in terms and "dubstep" in terms
+
+    def test_alias_merges_with_extra_terms_without_dupes(self):
+        terms = _genre_terms(["electronic", "house", "metal"])
+        assert terms.count("house") == 1  # already in the group, not duplicated
+        assert terms[-1] == "metal"  # extra literal appended after the group
+
+    def test_no_terms(self):
+        assert _genre_terms(None) == () and _genre_terms([]) == ()
+
+
 class TestSuggest:
     async def test_confirms_only_good_song(self, generator):
         result = await generator.suggest(count=5, min_plays=1, max_checks=50)
@@ -207,6 +234,34 @@ class TestSuggest:
         assert paths["csv"].read_text().startswith("artist,title,playcount,score")
         assert "GoodSong" in paths["json"].read_text()
         assert "UnsrcSong" in paths["misses"].read_text()
+
+
+class TestSuggestGenreFilter:
+    """--genre / --exclude-genre on suggest() (the only confirmable song,
+    GoodSong, has artist genres [drum and bass, electronic])."""
+
+    async def test_include_matching_keeps_candidate(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, include_genres=["electronic"])
+        assert [c.title for c in r.confirmed] == ["GoodSong"]
+
+    async def test_include_nonmatching_filters_everything(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, include_genres=["rock"])
+        assert r.confirmed == []
+        assert r.skipped["genre_filtered"] >= 1
+
+    async def test_exclude_drops_candidate(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, exclude_genres=["electronic"])
+        assert "GoodSong" not in [c.title for c in r.confirmed]
+        assert r.skipped["genre_filtered"] == 1
+
+    async def test_electronic_group_alias_excludes_drum_and_bass(self, generator):
+        # "electronic" expands to the umbrella; GoodSong is tagged "drum and bass".
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, exclude_genres=["electronic"])
+        assert "GoodSong" not in [c.title for c in r.confirmed]
+
+    async def test_no_filter_does_not_load_genres(self, generator):
+        await generator.suggest(count=5, min_plays=1, max_checks=50)
+        assert generator.catalog.genre_lookup_calls == 0
 
 
 class TestSingable:

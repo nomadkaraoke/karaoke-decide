@@ -86,6 +86,22 @@ def candidates() -> None:
 @click.option("--refresh-lastfm", is_flag=True, help="Re-pull Last.fm top tracks")
 @click.option("--refresh-catalog", is_flag=True, help="Re-pull KaraokeNerds dump")
 @click.option(
+    "--genre",
+    "-g",
+    "include_genres",
+    multiple=True,
+    help="Only include artists whose genre/tag matches (substring, case-insensitive; repeatable; "
+    "group aliases like 'electronic' expand)",
+)
+@click.option(
+    "--exclude-genre",
+    "-x",
+    "exclude_genres",
+    multiple=True,
+    help="Exclude artists whose genre/tag matches (substring, case-insensitive; repeatable; "
+    "group aliases like 'electronic' expand)",
+)
+@click.option(
     "--format",
     "output_format",
     type=click.Choice(["table", "json", "md"]),
@@ -98,9 +114,18 @@ def suggest(
     min_score: float,
     refresh_lastfm: bool,
     refresh_catalog: bool,
+    include_genres: tuple[str, ...],
+    exclude_genres: tuple[str, ...],
     output_format: str,
 ) -> None:
-    """Return N songs worth producing as karaoke jobs."""
+    """Return N songs worth producing as karaoke jobs.
+
+    Optionally filter by artist genre/tag (MusicBrainz-first, Spotify backup):
+    ``-g rock`` to include, ``-x electronic`` to exclude. Group aliases like
+    ``electronic`` expand to the whole umbrella of subgenres. Exclude wins over
+    include; artists with no genre data are dropped under ``-g`` and kept under
+    ``-x`` only.
+    """
     gen = _build_generator(min_score=min_score)
 
     def _tick(cand: object) -> None:
@@ -114,6 +139,8 @@ def suggest(
                 max_checks=max_checks,
                 refresh_lastfm=refresh_lastfm,
                 refresh_catalog=refresh_catalog,
+                include_genres=include_genres,
+                exclude_genres=exclude_genres,
                 progress=None if output_format != "table" else _tick,
             )
         )
