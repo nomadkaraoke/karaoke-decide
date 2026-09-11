@@ -714,20 +714,22 @@ class BigQueryCatalogService:
         if not artist_names:
             return {}
 
-        normalized_to_original: dict[str, str] = {}
+        # A normalized key can map to several distinct input names (e.g. "CHVRCHES"
+        # and "Chvrches"); track all of them so none is silently dropped.
+        normalized_to_originals: dict[str, list[str]] = {}
         for name in artist_names:
             if not name:
                 continue
             normalized = _normalize_for_matching(name)
             if normalized:
-                normalized_to_original[normalized] = name
+                normalized_to_originals.setdefault(normalized, []).append(name)
 
-        if not normalized_to_original:
+        if not normalized_to_originals:
             return {}
 
         chunk_size = 100
         results: dict[str, list[str]] = {}
-        normalized_list = list(normalized_to_original.keys())
+        normalized_list = list(normalized_to_originals.keys())
 
         for i in range(0, len(normalized_list), chunk_size):
             chunk = normalized_list[i : i + chunk_size]
@@ -768,8 +770,7 @@ class BigQueryCatalogService:
                     best[key] = (pop, descriptors)
 
             for key, (_, descriptors) in best.items():
-                original = normalized_to_original.get(key)
-                if original is not None:
+                for original in normalized_to_originals.get(key, ()):
                     results[original] = descriptors
 
         return results

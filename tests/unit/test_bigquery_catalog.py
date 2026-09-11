@@ -1291,3 +1291,16 @@ class TestBatchLookupArtistGenres:
         mock_client.query.side_effect = Exception("table not found")
         service = BigQueryCatalogService()
         assert service.batch_lookup_artist_genres(["Queen"]) == {}
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_distinct_names_sharing_normalized_key_both_resolved(self, mock_client_class: MagicMock) -> None:
+        mock_client = MagicMock()
+        mock_client_class.return_value = mock_client
+        # "CHVRCHES" and "Chvrches" both normalize to "chvrches" -> one MB row,
+        # but BOTH original input names must receive the descriptors.
+        mock_client.query.return_value.result.return_value = [
+            self._row("chvrches", 70, ["synthpop"], ["indie pop"]),
+        ]
+        service = BigQueryCatalogService()
+        result = service.batch_lookup_artist_genres(["CHVRCHES", "Chvrches"])
+        assert result == {"CHVRCHES": ["synthpop", "indie pop"], "Chvrches": ["synthpop", "indie pop"]}
