@@ -4,7 +4,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from karaoke_decide.candidates.generator import CandidateGenerator
+from karaoke_decide.candidates.generator import (
+    GENRE_GROUPS,
+    CandidateGenerator,
+    _genre_terms,
+)
 from karaoke_decide.candidates.matching import canonical_key
 from karaoke_decide.services.flacfetch import FlacfetchClient
 from karaoke_decide.services.llm_judge import Verdict
@@ -90,9 +94,15 @@ class FakeCatalog:
     PROJECT_ID = "test"
     DATASET_ID = "test"
 
-    def __init__(self, rows):
+    def __init__(self, rows, genres=None):
         self.client = MagicMock()
         self.client.query.return_value.result.return_value = [{"Artist": a, "Title": t} for a, t in rows]
+        self._genres = genres or {}
+        self.genre_lookup_calls = 0
+
+    def batch_lookup_artist_genres(self, artist_names):
+        self.genre_lookup_calls += 1
+        return {name: list(self._genres[name]) for name in artist_names if name in self._genres}
 
 
 class FakeGenJobs:
@@ -136,7 +146,14 @@ def generator(tmp_path):
         ),
         flacfetch=FakeFlac(sourceable={"GoodSong"}),
         gen_jobs=FakeGenJobs({canonical_key("Made", "MadeSong")}),
-        catalog=FakeCatalog([("Community", "CommSong")]),
+        catalog=FakeCatalog(
+            [("Community", "CommSong")],
+            genres={
+                "Good": ["drum and bass", "electronic"],
+                "Community": ["pop", "rock"],
+                # "Unsourced" deliberately absent -> no genre data
+            },
+        ),
         spotify=FakeSpotify(features),
         llm=FakeLlm(reject_titles={"LlmSong"}),
         username="tester",
@@ -145,6 +162,29 @@ def generator(tmp_path):
     )
     gen.rejects.add("Rejected", "RejSong", "not good", "2026-08-31")
     return gen
+
+
+class TestGenreTerms:
+    """CLI genre args -> normalized terms, with group-alias expansion."""
+
+    def test_lowercases_strips_and_dedups(self):
+        assert _genre_terms([" Rock ", "rock", "", None]) == ("rock",)
+
+    def test_passes_through_literal_terms(self):
+        assert _genre_terms(["drum and bass"]) == ("drum and bass",)
+
+    def test_electronic_alias_expands_to_umbrella(self):
+        terms = _genre_terms(["electronic"])
+        assert terms == GENRE_GROUPS["electronic"]
+        assert "drum and bass" in terms and "techno" in terms and "dubstep" in terms
+
+    def test_alias_merges_with_extra_terms_without_dupes(self):
+        terms = _genre_terms(["electronic", "house", "metal"])
+        assert terms.count("house") == 1  # already in the group, not duplicated
+        assert terms[-1] == "metal"  # extra literal appended after the group
+
+    def test_no_terms(self):
+        assert _genre_terms(None) == () and _genre_terms([]) == ()
 
 
 class TestSuggest:
@@ -194,6 +234,34 @@ class TestSuggest:
         assert paths["csv"].read_text().startswith("artist,title,playcount,score")
         assert "GoodSong" in paths["json"].read_text()
         assert "UnsrcSong" in paths["misses"].read_text()
+
+
+class TestSuggestGenreFilter:
+    """--genre / --exclude-genre on suggest() (the only confirmable song,
+    GoodSong, has artist genres [drum and bass, electronic])."""
+
+    async def test_include_matching_keeps_candidate(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, include_genres=["electronic"])
+        assert [c.title for c in r.confirmed] == ["GoodSong"]
+
+    async def test_include_nonmatching_filters_everything(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, include_genres=["rock"])
+        assert r.confirmed == []
+        assert r.skipped["genre_filtered"] >= 1
+
+    async def test_exclude_drops_candidate(self, generator):
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, exclude_genres=["electronic"])
+        assert "GoodSong" not in [c.title for c in r.confirmed]
+        assert r.skipped["genre_filtered"] == 1
+
+    async def test_electronic_group_alias_excludes_drum_and_bass(self, generator):
+        # "electronic" expands to the umbrella; GoodSong is tagged "drum and bass".
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50, exclude_genres=["electronic"])
+        assert "GoodSong" not in [c.title for c in r.confirmed]
+
+    async def test_no_filter_does_not_load_genres(self, generator):
+        await generator.suggest(count=5, min_plays=1, max_checks=50)
+        assert generator.catalog.genre_lookup_calls == 0
 
 
 class TestSingable:
@@ -278,6 +346,81 @@ class TestSingable:
         paths = generator.write_singable_reports(result)
         md = paths["md"].read_text()
         row = next(line for line in md.splitlines() if "Song" in line and line.startswith("|"))
-        # 6 columns => 7 pipes when none are stray; escaped pipes are "\|".
-        assert row.count("|") - row.count("\\|") == 7
+        # 7 columns => 8 pipes when none are stray; escaped pipes are "\|".
+        assert row.count("|") - row.count("\\|") == 8
         assert "Song \\| Remix" in md
+
+
+class TestSingableGenreFilter:
+    """--genre / --exclude-genre filtering on singable().
+
+    Fixture genres: Good=[drum and bass, electronic], Community=[pop, rock],
+    Unsourced has no genre data. Playcounts: Community=95 > Good=80 > Unsourced=60.
+    """
+
+    def _seed_all(self, generator):
+        generator.cache.set_blob(
+            "karaokenerds_community",
+            [
+                ["Community", "CommSong", "NOMAD", "https://youtu.be/c1"],
+                ["Good", "GoodSong", "WTF", "https://youtu.be/g2"],
+                ["Unsourced", "UnsrcSong", "KV", ""],
+            ],
+        )
+
+    async def test_no_filter_does_not_load_genres(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1)
+        assert generator.catalog.genre_lookup_calls == 0
+        assert [s.title for s in result.songs] == ["CommSong", "GoodSong", "UnsrcSong"]
+        assert result.community_matched == 3 and result.matched == 3
+
+    async def test_include_keeps_only_matching_genre(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1, include_genres=["rock"])
+        assert [s.title for s in result.songs] == ["CommSong"]
+        assert result.community_matched == 3 and result.matched == 1
+        assert result.songs[0].genres == ["pop", "rock"]
+
+    async def test_include_substring_matches_compound_genre(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1, include_genres=["drum and bass"])
+        assert [s.title for s in result.songs] == ["GoodSong"]
+
+    async def test_exclude_drops_matching_genre(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1, exclude_genres=["electronic"])
+        # Good excluded; Community and (no-genre) Unsourced kept.
+        assert [s.title for s in result.songs] == ["CommSong", "UnsrcSong"]
+        assert result.matched == 2
+
+    async def test_exclude_wins_over_include(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(
+            count=50, min_plays=1, include_genres=["rock", "electronic"], exclude_genres=["pop"]
+        )
+        # Community matches include(rock) but is excluded by "pop"; Good matches
+        # include(electronic) and has no "pop" -> only GoodSong survives.
+        assert [s.title for s in result.songs] == ["GoodSong"]
+
+    async def test_include_drops_artists_without_genre_data(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1, include_genres=["pop", "electronic"])
+        # Unsourced has no genre data -> dropped under an include filter.
+        assert [s.title for s in result.songs] == ["CommSong", "GoodSong"]
+
+    async def test_genre_results_cached_per_artist(self, generator):
+        self._seed_all(generator)
+        await generator.singable(count=50, min_plays=1, include_genres=["rock"])
+        await generator.singable(count=50, min_plays=1, exclude_genres=["electronic"])
+        # Second run reads genres from the per-artist cache; no second lookup.
+        assert generator.catalog.genre_lookup_calls == 1
+
+    async def test_genres_in_reports(self, generator):
+        self._seed_all(generator)
+        result = await generator.singable(count=50, min_plays=1, include_genres=["rock"])
+        paths = generator.write_singable_reports(result)
+        assert "genres" in paths["csv"].read_text().splitlines()[0]
+        assert "pop, rock" in paths["csv"].read_text()
+        assert "Genres" in paths["md"].read_text()
+        assert "pop, rock" in paths["json"].read_text()

@@ -98,6 +98,15 @@ class TestSuggestCommand:
             CliRunner().invoke(cli, ["candidates", "suggest", "--min-score", "60"])
         assert build.call_args.kwargs["min_score"] == 60.0
 
+    def test_suggest_passes_genre_filters(self):
+        gen = self._fake_gen()
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            res = CliRunner().invoke(cli, ["candidates", "suggest", "-g", "rock", "-x", "electronic"])
+        assert res.exit_code == 0, res.output
+        kwargs = gen.suggest.await_args.kwargs
+        assert kwargs["include_genres"] == ("rock",)
+        assert kwargs["exclude_genres"] == ("electronic",)
+
 
 class TestSingableCommand:
     def _fake_gen(self):
@@ -140,3 +149,24 @@ class TestSingableCommand:
             CliRunner().invoke(cli, ["candidates", "singable", "--count", "7", "--min-plays", "3"])
         kwargs = gen.singable.await_args.kwargs
         assert kwargs["count"] == 7 and kwargs["min_plays"] == 3
+
+    def test_singable_passes_genre_filters(self):
+        gen = self._fake_gen()
+        with patch("karaoke_decide.cli.candidates._build_generator", return_value=gen):
+            res = CliRunner().invoke(
+                cli,
+                [
+                    "candidates",
+                    "singable",
+                    "-g",
+                    "drum and bass",
+                    "-g",
+                    "rock",
+                    "-x",
+                    "classical",
+                ],
+            )
+        assert res.exit_code == 0, res.output
+        kwargs = gen.singable.await_args.kwargs
+        assert kwargs["include_genres"] == ("drum and bass", "rock")
+        assert kwargs["exclude_genres"] == ("classical",)

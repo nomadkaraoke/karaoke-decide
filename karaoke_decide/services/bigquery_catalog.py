@@ -695,6 +695,86 @@ class BigQueryCatalogService:
         logger.info(f"BigQuery: found metadata for {len(all_results)} artists (fast)")
         return all_results
 
+    def batch_lookup_artist_genres(
+        self,
+        artist_names: list[str],
+    ) -> dict[str, list[str]]:
+        """Batch map artist name -> merged genre/tag descriptors (lowercased).
+
+        MusicBrainz-first: uses ``mb_artists_normalized`` (wider artist coverage
+        than Spotify) and unions its ``mb_tags`` with ``spotify_genres`` so both
+        signals contribute to genre filtering. Descriptors are lowercased and
+        de-duplicated per artist.
+
+        Returns a dict keyed by the ORIGINAL input name (so callers don't have
+        to re-implement the matching normalization); artists with no row are
+        simply absent. Both source arrays are already capped at ~5 in the
+        pre-joined view, which is ample for substring genre filtering.
+        """
+        if not artist_names:
+            return {}
+
+        # A normalized key can map to several distinct input names (e.g. "CHVRCHES"
+        # and "Chvrches"); track all of them so none is silently dropped.
+        normalized_to_originals: dict[str, list[str]] = {}
+        for name in artist_names:
+            if not name:
+                continue
+            normalized = _normalize_for_matching(name)
+            if normalized:
+                normalized_to_originals.setdefault(normalized, []).append(name)
+
+        if not normalized_to_originals:
+            return {}
+
+        chunk_size = 100
+        results: dict[str, list[str]] = {}
+        normalized_list = list(normalized_to_originals.keys())
+
+        for i in range(0, len(normalized_list), chunk_size):
+            chunk = normalized_list[i : i + chunk_size]
+            sql = f"""
+                SELECT
+                    name_normalized,
+                    popularity,
+                    spotify_genres,
+                    mb_tags
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
+                WHERE name_normalized IN UNNEST(@names)
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter("names", "STRING", chunk),
+                ]
+            )
+            try:
+                rows = self.client.query(sql, job_config=job_config).result()
+            except Exception as e:  # pragma: no cover - defensive (tables missing)
+                logger.warning(f"Artist genre lookup failed (tables may not exist): {e}")
+                return results
+
+            # One artist name can map to several MB rows (disambiguations); keep
+            # the highest-popularity row's descriptors per normalized name.
+            best: dict[str, tuple[int, list[str]]] = {}
+            for row in rows:
+                key = row.name_normalized
+                pop = row.popularity or 0
+                descriptors: list[str] = []
+                seen: set[str] = set()
+                for value in list(row.mb_tags or []) + list(row.spotify_genres or []):
+                    tag = (value or "").strip().lower()
+                    if tag and tag not in seen:
+                        seen.add(tag)
+                        descriptors.append(tag)
+                if key not in best or pop > best[key][0]:
+                    best[key] = (pop, descriptors)
+
+            for key, (_, descriptors) in best.items():
+                for original in normalized_to_originals.get(key, ()):
+                    results[original] = descriptors
+
+        return results
+
     def get_artist_index(
         self,
         min_popularity: int = 30,
