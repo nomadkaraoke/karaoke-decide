@@ -1349,7 +1349,7 @@ return await firestore.query_documents(collection, filters=[], limit=MAX_USERS_F
 
 ### 2026-09-25: CI `gcloud run deploy` Flags Override Pulumi on Every Deploy
 
-**Context:** Pulumi was raised to `memory: 1Gi` in January, but `.github/workflows/ci.yml` still ran `gcloud run deploy --memory 512Mi`. Every merge silently reset the live service to 512Mi. With the ~300k-song catalog held in memory, p99 usage sat at 90–100% and the service OOM-killed about twice a week (12 times from 2026-09-03 to 2026-09-25) on ordinary quiz, my-data, and Last.fm sync requests.
+**Context:** Pulumi was raised to `memory: 1Gi` in January, but `.github/workflows/ci.yml` still ran `gcloud run deploy --memory 512Mi`. Every merge silently reset the live service to 512Mi. With the ~300k-song catalog held in memory, p99 usage sat at 90–100% and the service OOM-killed roughly four times a week (12 times from 2026-09-03 to 2026-09-25) on ordinary quiz, my-data, and Last.fm sync requests.
 
 **Recommendation:**
 - Resource flags in the CI deploy step win over Pulumi. Change both together, and check the live value with `gcloud run services describe karaoke-decide --format='value(spec.template.spec.containers[0].resources.limits)'`.
