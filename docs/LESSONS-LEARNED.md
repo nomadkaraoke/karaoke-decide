@@ -1346,3 +1346,11 @@ return await firestore.query_documents(collection, filters=[], limit=MAX_USERS_F
 ```
 
 **Memory calculation:** If each user has ~500 artists × 100 bytes = 50KB per user, then 10,000 users = 500MB just for artist arrays. Add overhead and you exceed 512Mi easily.
+
+### 2026-09-25: CI `gcloud run deploy` Flags Override Pulumi on Every Deploy
+
+**Context:** Pulumi was raised to `memory: 1Gi` in January, but `.github/workflows/ci.yml` still ran `gcloud run deploy --memory 512Mi`. Every merge silently reset the live service to 512Mi. With the ~300k-song catalog held in memory, p99 usage sat at 90–100% and the service OOM-killed about twice a week (12 times from 2026-09-03 to 2026-09-25) on ordinary quiz, my-data, and Last.fm sync requests.
+
+**Recommendation:**
+- Resource flags in the CI deploy step win over Pulumi. Change both together, and check the live value with `gcloud run services describe karaoke-decide --format='value(spec.template.spec.containers[0].resources.limits)'`.
+- Keep `httpx`/`httpcore` loggers at WARNING. At INFO they log full request URLs, including query-string API keys (Last.fm `api_key`).

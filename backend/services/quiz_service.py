@@ -80,7 +80,7 @@ class QuizService:
     MIN_SIMILAR_USERS = 5  # Minimum similar users needed to show "fans_also_like"
     MLHD_MIN_SHARED_USERS = 500  # Minimum shared users in MLHD data to suggest
 
-    # Query limits for collaborative filtering (tuned to avoid OOM on 512Mi Cloud Run)
+    # Query limits for collaborative filtering (tuned to avoid OOM; most of the 1Gi Cloud Run limit is the in-memory catalog)
     MAX_ORGANIC_USERS = 500  # Max organic users to query for collaborative filtering
     MAX_LASTFM_USERS = 200  # Max Last.fm users to query for collaborative filtering
 
@@ -829,7 +829,7 @@ class QuizService:
         async def query_organic() -> list[dict]:
             """Query organic users (our quiz users).
 
-            Limited to MAX_ORGANIC_USERS to avoid OOM on 512Mi Cloud Run.
+            Limited to MAX_ORGANIC_USERS to avoid OOM on memory-constrained Cloud Run (1Gi, most taken by the in-memory catalog).
             We only need a representative sample for collaborative filtering.
             """
             try:
@@ -850,7 +850,7 @@ class QuizService:
             Note: array_contains_any has a 30-value limit, so we use
             a subset of the user's artists for the initial filter.
 
-            Limited to MAX_LASTFM_USERS to avoid OOM on 512Mi Cloud Run.
+            Limited to MAX_LASTFM_USERS to avoid OOM on memory-constrained Cloud Run (1Gi, most taken by the in-memory catalog).
             """
             try:
                 # MBID-First: Use MBIDs if available for accurate matching

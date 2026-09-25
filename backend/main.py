@@ -19,6 +19,10 @@ logging.basicConfig(
     format="%(levelname)s:%(name)s:%(message)s",
     stream=sys.stdout,
 )
+# httpx/httpcore log every request URL at INFO, which leaks query-string API
+# keys (e.g. Last.fm api_key) into Cloud Logging.
+for _noisy_logger in ("httpx", "httpcore"):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 

@@ -136,3 +136,13 @@ def test_deep_health_check_degraded_on_failure(
     assert data["status"] == "degraded"
     assert data["checks"]["firestore"]["status"] == "unhealthy"
     assert "error" in data["checks"]["firestore"]
+
+
+def test_httpx_request_logging_silenced() -> None:
+    """httpx/httpcore INFO logs include request URLs with API keys; keep them at WARNING."""
+    import logging
+
+    import backend.main  # noqa: F401  # configures logging on import
+
+    for name in ("httpx", "httpcore"):
+        assert logging.getLogger(name).getEffectiveLevel() >= logging.WARNING
