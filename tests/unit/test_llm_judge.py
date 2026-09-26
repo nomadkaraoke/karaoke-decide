@@ -9,7 +9,7 @@ from karaoke_decide.services.llm_judge import LlmJudge
 
 
 def _judge_with_response(text: str) -> LlmJudge:
-    j = LlmJudge("proj", "global", "gemini-2.5-flash")
+    j = LlmJudge("proj", "global", "gemini-3.8-flash")
     fake_client = MagicMock()
     fake_client.models.generate_content.return_value = MagicMock(text=text)
     j._client = fake_client

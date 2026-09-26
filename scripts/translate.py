@@ -38,7 +38,7 @@ from google import genai
 from google.genai import types
 from translation_cache import TranslationCache
 
-MODEL = "gemini-3.1-pro-preview"
+MODEL = "gemini-3.8-flash"
 PROJECT = "nomadkaraoke"
 LOCATION = "global"
 

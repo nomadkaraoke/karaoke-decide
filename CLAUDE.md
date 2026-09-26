@@ -52,7 +52,7 @@ See [docs/TESTING.md](docs/TESTING.md) for full code quality standards.
 
 #### Translation Pipeline
 - `python scripts/translate.py --messages-dir ./frontend/messages --target all` — translate all locales
-- Uses Gemini 3.1 Pro via Vertex AI with two-pass (translate + review) and delta mode
+- Uses Gemini 3.8 Flash via Vertex AI with two-pass (translate + review) and delta mode
 - **GCS cache** (`nomadkaraoke-translation-cache` bucket) — caches by SHA-256 of English string per locale
   - `--no-cache` to disable, `--dry-run` to preview without calling Gemini
   - Cache shared across repos (karaoke-gen, karaoke-decide, public-website)

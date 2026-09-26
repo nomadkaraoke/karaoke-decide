@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # Vertex AI (LLM karaoke-suitability judge for the candidates tool)
     vertex_project: str = "nomadkaraoke"
     vertex_location: str = "global"
-    candidates_llm_model: str = "gemini-2.5-flash"
+    candidates_llm_model: str = "gemini-3.8-flash"
 
     # Postmark (transactional email)
     postmark_server_token: str = ""
