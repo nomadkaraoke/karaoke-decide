@@ -8,6 +8,11 @@ from dataclasses import dataclass
 
 from google.cloud import bigquery
 
+from karaoke_decide.services.bq_limits import (
+    MAX_BYTES_RECORDING_SEARCH,
+    make_client,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -150,7 +155,7 @@ class BigQueryCatalogService:
     CACHE_TTL = 300  # 5 minutes
 
     def __init__(self, client: bigquery.Client | None = None):
-        self.client = client or bigquery.Client(project=self.PROJECT_ID)
+        self.client = client or make_client(self.PROJECT_ID)
 
     @staticmethod
     def normalize_for_matching(text: str) -> str:
@@ -1431,36 +1436,28 @@ class BigQueryCatalogService:
                 logger.debug(f"Recording search cache hit for '{normalized}'")
                 return cached_results
 
-        # Build artist filter clause for runtime unicode normalization
-        artist_clause = ""
-        if normalized_artist:
-            # Runtime unicode normalization on artist_credit:
-            # NORMALIZE(text, NFD) decomposes accented chars, then strip combining marks
-            artist_clause = """
-              AND TRIM(REGEXP_REPLACE(REGEXP_REPLACE(
-                  LOWER(REGEXP_REPLACE(NORMALIZE(r.artist_credit, NFD), r'\\pM', '')),
-                  r'[^a-z0-9 ]', ' '), r' +', ' ')) LIKE @artist_prefix
-            """
+        # artist_normalized is precomputed in mb_recordings_enriched with the same
+        # unicode-aware normalization (NFD + strip combining marks) as _normalize_unicode.
+        artist_clause = "AND artist_normalized LIKE @artist_prefix" if normalized_artist else ""
 
-        # Query recordings with ISRC-based Spotify enrichment
+        # mb_recordings_enriched = mb_recordings LEFT JOIN mb_recording_isrc LEFT JOIN
+        # spotify_tracks, pre-joined and clustered on (name_normalized, artist_normalized)
+        # so prefix LIKE filters prune blocks: ~50 MiB billed per call instead of ~15 GiB
+        # for the live 3-way join. Built by scripts/create_cost_optimized_tables.py.
         sql = f"""
             SELECT
-                r.recording_mbid,
-                r.title,
-                r.artist_credit,
-                r.length_ms,
-                r.disambiguation,
-                st.spotify_id AS spotify_track_id,
-                st.popularity AS spotify_popularity
-            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings` r
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
-                ON r.recording_mbid = ri.recording_mbid
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
-                ON ri.isrc = st.isrc
-            WHERE r.name_normalized LIKE @query_prefix
-              AND (st.popularity >= @min_popularity OR st.popularity IS NULL)
+                recording_mbid,
+                title,
+                artist_credit,
+                length_ms,
+                disambiguation,
+                spotify_track_id,
+                spotify_popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings_enriched`
+            WHERE name_normalized LIKE @query_prefix
+              AND (spotify_popularity >= @min_popularity OR spotify_popularity IS NULL)
               {artist_clause}
-            ORDER BY COALESCE(st.popularity, 0) DESC
+            ORDER BY COALESCE(spotify_popularity, 0) DESC
             LIMIT @limit
         """
 
@@ -1472,7 +1469,10 @@ class BigQueryCatalogService:
         if normalized_artist:
             params.append(bigquery.ScalarQueryParameter("artist_prefix", "STRING", f"{normalized_artist}%"))
 
-        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=params,
+            maximum_bytes_billed=MAX_BYTES_RECORDING_SEARCH,
+        )
 
         try:
             results = self.client.query(sql, job_config=job_config).result()
@@ -1515,27 +1515,24 @@ class BigQueryCatalogService:
         """
         sql = f"""
             SELECT
-                r.recording_mbid,
-                r.title,
-                r.artist_credit,
-                r.length_ms,
-                r.disambiguation,
-                st.spotify_id AS spotify_track_id,
-                st.popularity AS spotify_popularity
-            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings` r
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_isrc` ri
-                ON r.recording_mbid = ri.recording_mbid
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` st
-                ON ri.isrc = st.isrc
-            WHERE r.recording_mbid = @mbid
-            ORDER BY st.popularity DESC NULLS LAST
+                recording_mbid,
+                title,
+                artist_credit,
+                length_ms,
+                disambiguation,
+                spotify_track_id,
+                spotify_popularity
+            FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings_enriched`
+            WHERE recording_mbid = @mbid
+            ORDER BY spotify_popularity DESC NULLS LAST
             LIMIT 1
         """
 
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("mbid", "STRING", mbid),
-            ]
+            ],
+            maximum_bytes_billed=MAX_BYTES_RECORDING_SEARCH,
         )
 
         try:

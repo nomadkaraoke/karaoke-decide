@@ -9,6 +9,7 @@ from backend.services.recommendation_service import (
     RecommendationService,
     UserContext,
 )
+from karaoke_decide.services.bq_limits import MAX_BYTES_RECOMMENDATION
 
 
 @pytest.fixture
@@ -515,6 +516,21 @@ class TestGetSongsByArtists:
         mock_bigquery.query.assert_called()
         assert len(result) > 0
 
+    def test_uses_popularity_table_pruned_by_artist_with_byte_cap(
+        self,
+        recommendation_service: RecommendationService,
+        mock_bigquery: MagicMock,
+    ) -> None:
+        """Joins the clustered popularity table (filtered by artist), not raw spotify_tracks."""
+        recommendation_service._get_songs_by_artists(["queen", "journey"], limit=10)
+
+        call_args = mock_bigquery.query.call_args
+        sql = call_args[0][0]
+        assert "spotify_popularity_by_artist_title" in sql
+        assert "spotify_tracks`" not in sql
+        assert "WHERE artist_lower IN (@artist_0, @artist_1)" in sql
+        assert call_args[1]["job_config"].maximum_bytes_billed == MAX_BYTES_RECOMMENDATION
+
 
 class TestGetPopularSongs:
     """Tests for _get_popular_songs method."""
@@ -529,6 +545,18 @@ class TestGetPopularSongs:
 
         mock_bigquery.query.assert_called()
         assert len(result) > 0
+
+    def test_uses_popularity_table_with_byte_cap(
+        self,
+        recommendation_service: RecommendationService,
+        mock_bigquery: MagicMock,
+    ) -> None:
+        recommendation_service._get_popular_songs(limit=10)
+
+        call_args = mock_bigquery.query.call_args
+        assert "spotify_popularity_by_artist_title" in call_args[0][0]
+        assert "spotify_tracks`" not in call_args[0][0]
+        assert call_args[1]["job_config"].maximum_bytes_billed == MAX_BYTES_RECOMMENDATION
 
     def test_returns_song_dicts(
         self,

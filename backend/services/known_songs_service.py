@@ -12,6 +12,7 @@ from google.cloud import bigquery
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
+from karaoke_decide.services.bq_limits import make_client
 
 
 @dataclass
@@ -101,7 +102,7 @@ class KnownSongsService:
     def bigquery(self) -> bigquery.Client:
         """Get or create BigQuery client."""
         if self._bigquery_client is None:
-            self._bigquery_client = bigquery.Client(project=self.PROJECT_ID)
+            self._bigquery_client = make_client(self.PROJECT_ID)
         return self._bigquery_client
 
     async def add_known_song(

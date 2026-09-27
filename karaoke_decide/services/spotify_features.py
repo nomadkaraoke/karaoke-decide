@@ -25,6 +25,7 @@ from karaoke_decide.candidates.matching import (
     strip_decorations,
     title_variants,
 )
+from karaoke_decide.services.bq_limits import MAX_BYTES_BATCH, make_client
 
 _ALNUM = re.compile(r"[^a-z0-9]+")
 
@@ -100,7 +101,7 @@ class SpotifyFeaturesService:
     @property
     def client(self) -> bigquery.Client:
         if self._client is None:
-            self._client = bigquery.Client(project=self.PROJECT_ID)
+            self._client = make_client(self.PROJECT_ID)
         return self._client
 
     def lookup(self, tracks: list[tuple[str, str]]) -> dict[tuple[str, str], SpotifyFeatures]:
@@ -155,10 +156,11 @@ class SpotifyFeaturesService:
         job = self.client.query(
             sql,
             job_config=bigquery.QueryJobConfig(
+                maximum_bytes_billed=MAX_BYTES_BATCH,
                 query_parameters=[
                     bigquery.ArrayQueryParameter("arts", "STRING", sorted(arts)),
                     bigquery.ArrayQueryParameter("tits", "STRING", sorted(tits)),
-                ]
+                ],
             ),
         )
         found: dict[tuple[str, str], SpotifyFeatures] = {}
