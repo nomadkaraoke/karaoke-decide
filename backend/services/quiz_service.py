@@ -17,6 +17,7 @@ from backend.services.firestore_service import FirestoreService
 from backend.services.listenbrainz_service import ListenBrainzService
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+from karaoke_decide.services.bq_limits import make_client
 
 
 @dataclass
@@ -109,7 +110,7 @@ class QuizService:
     def bigquery(self) -> bigquery.Client:
         """Get or create BigQuery client."""
         if self._bigquery_client is None:
-            self._bigquery_client = bigquery.Client(project=self.PROJECT_ID)
+            self._bigquery_client = make_client(self.PROJECT_ID)
         return self._bigquery_client
 
     @property

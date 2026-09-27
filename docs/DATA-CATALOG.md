@@ -52,6 +52,7 @@ This document describes all music data available in BigQuery for use in features
 | `mb_recording_isrc` | 5,480,292 | ISRC codes for recordings |
 | `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
 | `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
+| `mb_recordings_enriched` | 49,923,413 | Derived: recordings ⋈ ISRC ⋈ Spotify, clustered for search (see below) |
 | `karaoke_recording_links` | 162,314 | Karaoke songs → MB recordings |
 | `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
 
@@ -67,6 +68,7 @@ This document describes all music data available in BigQuery for use in features
 | `spotify_audio_analysis_tracks` | **33.5M** | Track-level audio analysis summary |
 | `spotify_artists` | 15M | Artist metadata |
 | `spotify_artist_genres` | 2.2M | Artist-to-genre mapping (768 unique genres) |
+| `spotify_popularity_by_artist_title` | 38.8M | Derived: MAX(popularity) per lowercased (artist, title), clustered (see below) |
 
 ### MLHD+ Tables (Recommendations)
 
@@ -196,6 +198,32 @@ FROM `nomadkaraoke.karaoke_decide.mb_recordings`
 WHERE name_normalized LIKE 'bohemian%'
 LIMIT 10
 ```
+
+### Cost-optimized derived tables
+
+BigQuery bills per byte scanned; request-path queries must NOT join the raw
+`mb_recordings` × `mb_recording_isrc` × `spotify_tracks` tables (~15 GiB/call)
+or `karaokenerds_raw` × `spotify_tracks` (~11 GiB/call). Use these instead. Both
+are static snapshots built by `scripts/create_cost_optimized_tables.py` —
+**re-run it after reloading MusicBrainz or Spotify data**.
+
+| Table | Clustered on | Replaces | Billed/call |
+|-------|--------------|----------|-------------|
+| `mb_recordings_enriched` | `name_normalized, artist_normalized` | 3-way LEFT JOIN in `search_recordings` / `get_recording_by_mbid` | ~15 GiB → ~50 MiB |
+| `spotify_popularity_by_artist_title` | `artist_lower, title_lower` | `spotify_tracks` join in recommendation KN queries | ~11 GiB → ~150 MiB (by artist) / ~1.7 GiB (popular) |
+
+`mb_recordings_enriched` columns: `recording_mbid, title, artist_credit, length_ms,
+disambiguation, name_normalized, artist_normalized` (NFD + strip combining marks,
+same as `_normalize_unicode`), `spotify_track_id, spotify_popularity` (NULL when no
+ISRC/Spotify match; one row per matching Spotify track, same fan-out as the join).
+
+`spotify_popularity_by_artist_title` keeps only `popularity > 0` rows — equivalent
+for consumers using `COALESCE(MAX(popularity), 0)`.
+
+All app BigQuery clients set `maximum_bytes_billed` (see
+`karaoke_decide/services/bq_limits.py`). The cap is checked against the
+*pre-pruning* dry-run estimate (~6.3 GiB for `mb_recordings_enriched`), not the
+bytes actually billed after clustering.
 
 ### mb_recording_isrc
 

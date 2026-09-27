@@ -13,6 +13,7 @@ from google.cloud import bigquery
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.models import Recommendation, UserSong
+from karaoke_decide.services.bq_limits import MAX_BYTES_RECOMMENDATION, make_client
 
 
 @dataclass
@@ -132,7 +133,7 @@ class RecommendationService:
     def bigquery(self) -> bigquery.Client:
         """Get or create BigQuery client."""
         if self._bigquery_client is None:
-            self._bigquery_client = bigquery.Client(project=self.PROJECT_ID)
+            self._bigquery_client = make_client(self.PROJECT_ID)
         return self._bigquery_client
 
     async def get_recommendations(
@@ -833,9 +834,17 @@ class RecommendationService:
                 ARRAY_LENGTH(SPLIT(k.Brands, ',')) as brand_count,
                 COALESCE(MAX(s.popularity), 0) as spotify_popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` s
-                ON LOWER(k.Artist) = LOWER(s.artist_name)
-                AND LOWER(k.Title) = LOWER(s.title)
+            LEFT JOIN (
+                -- Pre-aggregated MAX(popularity) per (artist, title), clustered on
+                -- artist_lower: the IN filter prunes to a few blocks (~150 MiB billed
+                -- vs ~11 GiB for the raw spotify_tracks join). Rows with popularity
+                -- 0/NULL are omitted, which COALESCE(..., 0) makes equivalent.
+                SELECT artist_lower, title_lower, popularity
+                FROM `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_popularity_by_artist_title`
+                WHERE artist_lower IN ({placeholders})
+            ) s
+                ON LOWER(k.Artist) = s.artist_lower
+                AND LOWER(k.Title) = s.title_lower
             WHERE LOWER(k.Artist) IN ({placeholders})
                 AND ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
             GROUP BY k.Id, k.Artist, k.Title, k.Brands
@@ -847,7 +856,10 @@ class RecommendationService:
         params.append(bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT))
         params.append(bigquery.ScalarQueryParameter("limit", "INT64", limit))
 
-        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=params,
+            maximum_bytes_billed=MAX_BYTES_RECOMMENDATION,
+        )
         results = self.bigquery.query(sql, job_config=job_config).result()
 
         return [
@@ -880,9 +892,9 @@ class RecommendationService:
                 ARRAY_LENGTH(SPLIT(k.Brands, ',')) as brand_count,
                 COALESCE(MAX(s.popularity), 0) as spotify_popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.karaokenerds_raw` k
-            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_tracks` s
-                ON LOWER(k.Artist) = LOWER(s.artist_name)
-                AND LOWER(k.Title) = LOWER(s.title)
+            LEFT JOIN `{self.PROJECT_ID}.{self.DATASET_ID}.spotify_popularity_by_artist_title` s
+                ON LOWER(k.Artist) = s.artist_lower
+                AND LOWER(k.Title) = s.title_lower
             WHERE ARRAY_LENGTH(SPLIT(k.Brands, ',')) >= @min_brands
             GROUP BY k.Id, k.Artist, k.Title, k.Brands
             ORDER BY
@@ -895,7 +907,8 @@ class RecommendationService:
             query_parameters=[
                 bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
                 bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ]
+            ],
+            maximum_bytes_billed=MAX_BYTES_RECOMMENDATION,
         )
 
         results = self.bigquery.query(sql, job_config=job_config).result()

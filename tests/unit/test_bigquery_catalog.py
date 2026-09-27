@@ -13,6 +13,7 @@ from karaoke_decide.services.bigquery_catalog import (
     _normalize_for_matching,
     _normalize_unicode,
 )
+from karaoke_decide.services.bq_limits import MAX_BYTES_DEFAULT, MAX_BYTES_RECORDING_SEARCH
 
 
 class TestSongResult:
@@ -54,7 +55,9 @@ class TestBigQueryCatalogService:
     def test_init_with_default_client(self, mock_client_class: MagicMock) -> None:
         """Test service initialization with default client."""
         service = BigQueryCatalogService()
-        mock_client_class.assert_called_once_with(project="nomadkaraoke")
+        mock_client_class.assert_called_once()
+        assert mock_client_class.call_args.kwargs["project"] == "nomadkaraoke"
+        assert mock_client_class.call_args.kwargs["default_query_job_config"].maximum_bytes_billed == MAX_BYTES_DEFAULT
         assert service.client == mock_client_class.return_value
 
     @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
@@ -1009,7 +1012,8 @@ class TestSearchRecordingsWithArtist:
         config = call_args[1]["job_config"]
         params = {p.name: p.value for p in config.query_parameters}
 
-        assert "NORMALIZE(r.artist_credit, NFD)" in sql
+        # Unicode normalization is precomputed in mb_recordings_enriched.artist_normalized
+        assert "artist_normalized LIKE @artist_prefix" in sql
         assert "artist_prefix" in params
         assert params["artist_prefix"] == "maximo park%"
 
@@ -1026,8 +1030,41 @@ class TestSearchRecordingsWithArtist:
         sql = call_args[0][0]
         params = {p.name: p.value for p in call_args[1]["job_config"].query_parameters}
 
-        assert "NORMALIZE" not in sql
+        assert "artist_normalized" not in sql
         assert "artist_prefix" not in params
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_search_recordings_uses_enriched_table_with_byte_cap(self, mock_client_class: MagicMock) -> None:
+        """Search must hit the pre-joined clustered table, never the raw 3-way join."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        service.search_recordings("enriched_table_check", artist="Queen")
+
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        config = call_args[1]["job_config"]
+
+        assert "mb_recordings_enriched" in sql
+        assert "mb_recording_isrc" not in sql
+        assert "spotify_tracks" not in sql
+        assert "name_normalized LIKE @query_prefix" in sql
+        assert config.maximum_bytes_billed == MAX_BYTES_RECORDING_SEARCH
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_recording_by_mbid_uses_enriched_table_with_byte_cap(self, mock_client_class: MagicMock) -> None:
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        service = BigQueryCatalogService()
+        assert service.get_recording_by_mbid("some-mbid") is None
+
+        call_args = mock_client.query.call_args
+        sql = call_args[0][0]
+        assert "mb_recordings_enriched" in sql
+        assert "mb_recording_isrc" not in sql
+        assert call_args[1]["job_config"].maximum_bytes_billed == MAX_BYTES_RECORDING_SEARCH
 
 
 class TestSearchTracksCombined:
