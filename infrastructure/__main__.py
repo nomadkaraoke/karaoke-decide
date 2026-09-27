@@ -77,6 +77,24 @@ data_bucket = gcp.storage.Bucket(
     uniform_bucket_level_access=True,
     public_access_prevention="inherited",
     hierarchical_namespace={"enabled": False},
+    # Cost cut 2026-09-26: this bucket only holds raw Spotify ETL staging files
+    # (~158 GiB) already loaded into BigQuery; nothing in decide/gen reads it at
+    # runtime (only the one-off scripts/spotify_*etl*.py), and there are no
+    # BigQuery external tables over it. Keep the raw data but move anything
+    # older than 30 days to ARCHIVE (~94% cheaper). ARCHIVE has a 365-day
+    # minimum storage duration — don't bulk-delete within a year of transition.
+    lifecycle_rules=[
+        gcp.storage.BucketLifecycleRuleArgs(
+            action=gcp.storage.BucketLifecycleRuleActionArgs(
+                type="SetStorageClass",
+                storage_class="ARCHIVE",
+            ),
+            condition=gcp.storage.BucketLifecycleRuleConditionArgs(
+                age=30,
+                matches_storage_classes=["STANDARD", "NEARLINE", "COLDLINE", "REGIONAL"],
+            ),
+        ),
+    ],
     opts=pulumi.ResourceOptions(protect=True),
 )
 
