@@ -494,6 +494,32 @@ class TestMBIDLookups:
         assert result.popularity == 80
 
     @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_artist_by_mbid_follows_merge_redirects(self, mock_client_class: MagicMock) -> None:
+        """A pre-merge MBID resolves through mb_artist_redirects in the same query."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        BigQueryCatalogService().get_artist_by_mbid("old-mbid")
+
+        sql = mock_client.query.call_args.args[0]
+        assert "mb_artist_redirects" in sql
+        assert "old_mbid = @mbid" in sql
+        params = mock_client.query.call_args.kwargs["job_config"].query_parameters
+        assert params[0].value == "old-mbid"
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    def test_get_recording_by_mbid_follows_merge_redirects(self, mock_client_class: MagicMock) -> None:
+        """A pre-merge recording MBID resolves through mb_recording_redirects."""
+        mock_client = mock_client_class.return_value
+        mock_client.query.return_value.result.return_value = []
+
+        BigQueryCatalogService().get_recording_by_mbid("old-mbid")
+
+        sql = mock_client.query.call_args.args[0]
+        assert "mb_recording_redirects" in sql
+        assert "old_mbid = @mbid" in sql
+
+    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
     def test_get_artist_by_mbid_not_found(self, mock_client_class: MagicMock) -> None:
         """Test getting artist by MBID when not found."""
         mock_client = mock_client_class.return_value

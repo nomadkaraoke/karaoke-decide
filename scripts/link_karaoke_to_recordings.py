@@ -2,6 +2,11 @@
 """
 Link Karaoke Catalog to MusicBrainz Recordings.
 
+SUPERSEDED: the weekly ``mb-refresh`` Cloud Run Job
+(``karaoke_decide/etl/musicbrainz_refresh.py``) now rebuilds these tables from
+the latest MusicBrainz dump. Kept for reference only; don't run it against prod
+(it would overwrite fresh tables with the January 2026 dump).
+
 This script creates the karaoke_recording_links table by matching karaoke songs
 to MusicBrainz recordings using multiple strategies:
 

@@ -1,7 +1,16 @@
 # MusicBrainz Auto-Refresh — Plan
 
 **Date:** 2026-09-27
-**Status:** Proposed (not started)
+**Status:** Implemented 2026-09-27 (decide v0.8.0). Decisions from Andrew: weekly cadence; refresh *only the data we already have* (no extra raw MB tables kept); Claude runs Pulumi.
+
+### As built (differences from the proposal below)
+- **Scope:** no persistent `musicbrainz_raw` dataset. Raw dump tables land in `musicbrainz_staging` only for the run and are deleted after publish. The only additions are what's needed to rebuild existing tables correctly: `url` + `l_artist_url` (for `mbid_spotify_mapping`) and the `*_gid_redirect` tables (new `mb_artist_redirects` / `mb_recording_redirects`, used as a fallback by `get_artist_by_mbid` / `get_recording_by_mbid`).
+- **Raw load:** each table loads as exactly N STRING columns (`c0..cN-1`, tab-delimited, no quoting, `\N` = NULL). BigQuery rejects the file if MusicBrainz changes a table's width, so this replaces the `SCHEMA_SEQUENCE` guard. It caught a mis-counted `area` width on the first run.
+- **karaoke_recording_links** is rebuilt weekly with the MB refresh (no separate daily run).
+- **Health endpoint freshness field:** not built. Freshness is visible via `mb_refresh_log` + the `mb_dump` table label, and failures log ERROR for gen's error monitor (`mb-refresh` added to `MONITORED_CLOUD_RUN_JOBS`); the job also logs ERROR if the last success is >14 days old.
+- **First run (dump 20260926-002121):** extract ~20 min (download + lbzip2 on 4 vCPU), load ~1 min, build ~3 min, ~50 GB billed per run. Artists 2.78M → 3.00M, recordings 37.5M → 40.3M, ISRCs 5.5M → 6.4M, Spotify mappings 376K → 455K, karaoke links 162K → 177K. Name churn vs Jan: 0.18% artists, 0.54% recordings; normalization parity exact.
+- **Bug found by validation:** BigQuery may evaluate a CTE twice; the ISRC link ranking needed a deterministic tie-break or songs could appear in both the ISRC and name passes (239 duplicate `karaoke_id`s). Fixed, and guarded by the `karaoke_links_unique` check.
+
 **Repo:** karaoke-decide (data consumed by decide backend; tables also backed up by gen's `backup_to_aws`)
 
 ## 1. Verification — is the MusicBrainz data stale?

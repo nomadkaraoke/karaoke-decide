@@ -534,10 +534,10 @@ CREATE TABLE karaoke_decide.karaoke_recording_links (
 - [ ] Remove backward-compat name-based queries
 
 **MusicBrainz Refresh Automation:**
-- [ ] Set up Cloud Scheduler job to run weekly
-- [ ] Download incremental dumps (not full dumps)
-- [ ] Update BigQuery tables with new/changed artists
-- [ ] Monitor for data quality issues
+- [x] Set up Cloud Scheduler job to run weekly (`mb-refresh`, 2026-09-27)
+- [x] ~~Download incremental dumps~~ Full dump weekly instead: replication packets need a live PostgreSQL mirror, and a BigQuery rebuild is cheaper than a MERGE (see docs/archive/2026-09-27-musicbrainz-auto-refresh-plan.md)
+- [x] Update BigQuery tables with new/changed artists (all mb_* tables + karaoke_recording_links rebuilt)
+- [x] Monitor for data quality issues (row-count bounds + canary checks gate every publish)
 
 **Incremental Update Strategy:**
 MusicBrainz provides daily "replication packets" (~10MB each) instead of re-downloading 6GB:
@@ -581,7 +581,7 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 - [x] Karaoke catalog linked to recordings (162K links, 58.9% coverage)
 
 **Phase 8 (TODO):**
-- [ ] MusicBrainz dump refresh automated (weekly)
+- [x] MusicBrainz dump refresh automated (weekly, 2026-09-27)
 - [ ] Remove deprecated Spotify-only code paths
 
 ## Coordination with MLHD+ Import
@@ -618,7 +618,7 @@ curl https://metabrainz.org/api/musicbrainz/replication-NNNNNN.tar.bz2
 **What's NOT DONE (Phase 8):**
 | Component | Status | Impact |
 |-----------|--------|--------|
-| Data refresh automation | ❌ Not started | Data will become stale |
+| Data refresh automation | ✅ Weekly `mb-refresh` job (2026-09-27) | — |
 | Deprecated code cleanup | ❌ Not started | Technical debt |
 
 **Current Data Flow (MBID-First):**

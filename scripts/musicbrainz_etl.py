@@ -2,6 +2,11 @@
 """
 MusicBrainz ETL Script - Extract and load MusicBrainz data to BigQuery.
 
+SUPERSEDED: the weekly ``mb-refresh`` Cloud Run Job
+(``karaoke_decide/etl/musicbrainz_refresh.py``) now rebuilds these tables from
+the latest MusicBrainz dump. Kept for reference only; don't run it against prod
+(it would overwrite fresh tables with the January 2026 dump).
+
 This script processes MusicBrainz PostgreSQL dump files and loads them to BigQuery.
 
 MusicBrainz dump format:
