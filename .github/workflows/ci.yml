@@ -357,6 +357,13 @@ jobs:
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}
 
+      - name: Update lb-refresh job image
+        # Same as mb-refresh: pin the ListenBrainz refresh job to the deployed image.
+        run: |
+          gcloud run jobs update lb-refresh \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
       - name: Verify deployment
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \

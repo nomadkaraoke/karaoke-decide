@@ -7,6 +7,7 @@ Resources managed:
 - Artifact Registry repository (container images)
 - Cloud Run service (backend API)
 - MusicBrainz weekly refresh (Cloud Run Job, Scheduler, staging dataset, bucket)
+- ListenBrainz refresh (Cloud Run Job, Scheduler, staging dataset)
 - IAM bindings (service account permissions)
 - Cloudflare Worker (API proxy)
 """
@@ -522,6 +523,116 @@ gcp.cloudscheduler.Job(
         },
     },
     opts=pulumi.ResourceOptions(depends_on=[mb_refresh_invoker]),
+)
+
+# =============================================================================
+# ListenBrainz refresh (Cloud Run Job + Cloud Scheduler)
+# =============================================================================
+# Loads the latest ListenBrainz statistics dump (artist/recording listen stats)
+# into lb_* popularity tables. Shares the MusicBrainz bucket for GCS staging
+# (staging/listenbrainz/, same 3-day lifecycle rule).
+# See karaoke_decide/etl/listenbrainz_refresh.py.
+
+LB_REFRESH_JOB_NAME = "lb-refresh"
+
+listenbrainz_staging_dataset = gcp.bigquery.Dataset(
+    "listenbrainz-staging-dataset",
+    dataset_id="listenbrainz_staging",
+    project=project,
+    location="US",
+    description="Scratch space for the ListenBrainz refresh (raw statistics + candidate builds)",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+lb_refresh_sa = gcp.serviceaccount.Account(
+    "lb-refresh-sa",
+    account_id="lb-refresh",
+    display_name="ListenBrainz Refresh Job",
+    description="Runs the lb-refresh Cloud Run Job",
+    project=project,
+)
+lb_refresh_member = lb_refresh_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+gcp.projects.IAMMember(
+    "lb-refresh-bq-job-user",
+    project=project,
+    role="roles/bigquery.jobUser",
+    member=lb_refresh_member,
+)
+for _name, _dataset in [("prod", bigquery_dataset), ("staging", listenbrainz_staging_dataset)]:
+    gcp.bigquery.DatasetIamMember(
+        f"lb-refresh-bq-editor-{_name}",
+        project=project,
+        dataset_id=_dataset.dataset_id,
+        role="roles/bigquery.dataEditor",
+        member=lb_refresh_member,
+    )
+gcp.storage.BucketIAMMember(
+    "lb-refresh-bucket-admin",
+    bucket=musicbrainz_bucket.name,
+    role="roles/storage.objectAdmin",
+    member=lb_refresh_member,
+)
+
+lb_refresh_job = gcp.cloudrunv2.Job(
+    "lb-refresh-job",
+    name=LB_REFRESH_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "karaoke_decide.etl.listenbrainz_refresh"],
+                    "args": ["run"],
+                    "resources": {"limits": {"cpu": "4", "memory": "4Gi"}},
+                }
+            ],
+            "service_account": lb_refresh_sa.email,
+            "timeout": "10800s",
+            # One retry covers a network blip during the ~22 GB stream; a failed
+            # attempt logs an ERROR (error monitor alerts) and leaves prod untouched.
+            "max_retries": 1,
+        },
+    },
+    opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),
+)
+
+lb_refresh_invoker = gcp.cloudrunv2.JobIamMember(
+    "lb-refresh-scheduler-invoker",
+    project=project,
+    location=region,
+    name=lb_refresh_job.name,
+    role="roles/run.invoker",
+    member=lb_refresh_member,
+)
+
+# Full exports are dated the 1st and 15th and finish uploading ~2 days later.
+# Checking twice a week keeps the lag under ~4 days; runs with no new export
+# exit after a directory listing.
+gcp.cloudscheduler.Job(
+    "lb-refresh-scheduler",
+    name="lb-refresh-twice-weekly",
+    description="ListenBrainz statistics dump -> BigQuery refresh (no-op unless a new export exists)",
+    project=project,
+    region=region,
+    schedule="0 11 * * 1,4",
+    time_zone="UTC",
+    attempt_deadline="60s",
+    http_target={
+        "uri": lb_refresh_job.name.apply(
+            lambda name: f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{name}:run"
+        ),
+        "http_method": "POST",
+        "oauth_token": {
+            "service_account_email": lb_refresh_sa.email,
+            "scope": "https://www.googleapis.com/auth/cloud-platform",
+        },
+    },
+    opts=pulumi.ResourceOptions(depends_on=[lb_refresh_invoker]),
 )
 
 # =============================================================================

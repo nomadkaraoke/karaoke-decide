@@ -26,18 +26,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
 import logging
-import os
 import shutil
-import subprocess
 import sys
-import tarfile
-import threading
 import traceback
 from collections.abc import Iterable
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import IO, Any
 
@@ -48,6 +41,15 @@ from google.cloud import (  # type: ignore[attr-defined]  # storage has no stubs
 )
 
 from karaoke_decide.etl import musicbrainz_sql as sql
+from karaoke_decide.etl import refresh_common as common
+from karaoke_decide.etl.refresh_common import (  # noqa: F401 - re-exported for callers/tests
+    CHUNK,
+    GIB,
+    PUBLISH_ATTEMPTS,
+    PartialPublishError,
+    RefreshError,
+    RunState,
+)
 
 logger = logging.getLogger("mb_refresh")
 
@@ -57,43 +59,10 @@ GCS_STAGING_PREFIX = "staging"
 LOG_TABLE = f"{sql.P}.mb_refresh_log"
 META_FILES = ("SCHEMA_SEQUENCE", "TIMESTAMP", "REPLICATION_SEQUENCE")
 STALE_AFTER_DAYS = 14
-CHUNK = 8 * 1024 * 1024
-GIB = 1024**3
 # Largest model (karaoke_recording_links) estimates ~35 GiB: spotify_tracks
 # name/isrc columns (~21.6 GiB) + karaokenerds_raw + mb_recordings.
 MAX_BYTES_MODEL = 80 * GIB
 MAX_BYTES_CHECK = 20 * GIB
-
-
-class RefreshError(RuntimeError):
-    """A refresh step failed before publishing; prod tables were not modified."""
-
-
-class PartialPublishError(RefreshError):
-    """Publishing stopped partway: some prod tables already hold the new dump.
-
-    Staging is kept, so ``publish --dump-id <id>`` can finish the job.
-    """
-
-    def __init__(self, published: list[str], failed: str, cause: Exception):
-        self.published = published
-        super().__init__(
-            f"Publish failed on {failed} after replacing {len(published)} prod table(s) "
-            f"{published}: {cause}. Staging kept; re-run `publish --dump-id` to finish."
-        )
-
-
-def _log_status(error: Exception) -> str:
-    return "partial_publish" if isinstance(error, PartialPublishError) else "failed"
-
-
-@dataclass
-class RunState:
-    dump_id: str
-    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    schema_sequence: str | None = None
-    row_counts: dict[str, int] = field(default_factory=dict)
-
 
 # --------------------------------------------------------------------------
 # Dump discovery + streaming extract
@@ -134,21 +103,6 @@ def member_table_name(member_name: str) -> str | None:
     return name if name and "/" not in name else None
 
 
-def _feed(chunks: Iterable[bytes], hasher: Any, dst: IO[bytes], errors: list[BaseException]) -> None:
-    """Hash the compressed stream while piping it into the decompressor."""
-    try:
-        for chunk in chunks:
-            hasher.update(chunk)
-            dst.write(chunk)
-    except BaseException as e:  # noqa: BLE001 - re-raised by the main thread
-        errors.append(e)
-    finally:
-        try:
-            dst.close()
-        except OSError:
-            pass
-
-
 def extract_members(
     compressed_chunks: Iterable[bytes],
     wanted: set[str],
@@ -161,64 +115,15 @@ def extract_members(
     Returns the small metadata files (SCHEMA_SEQUENCE etc.) found in the
     archive. Raises RefreshError on a checksum mismatch or missing members.
     """
-    cmd = decompress_cmd or ["lbzip2", "-dc"]
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    assert proc.stdin is not None and proc.stdout is not None
-    hasher = hashlib.sha256()
-    errors: list[BaseException] = []
-    feeder = threading.Thread(target=_feed, args=(compressed_chunks, hasher, proc.stdin, errors), daemon=True)
-    feeder.start()
-
-    meta: dict[str, str] = {}
-    found: set[str] = set()
-    read_error: Exception | None = None
-    try:
-        with tarfile.open(fileobj=proc.stdout, mode="r|") as tar:
-            for member in tar:
-                if not member.isfile():
-                    continue
-                if member.name in META_FILES:
-                    f = tar.extractfile(member)
-                    if f is not None:
-                        meta[member.name] = f.read().decode().strip()
-                    continue
-                table = member_table_name(member.name)
-                if table in wanted:
-                    f = tar.extractfile(member)
-                    if f is None:
-                        raise RefreshError(f"Could not read {member.name}")
-                    logger.info(f"Extracting {member.name} ({member.size / GIB:.2f} GiB)")
-                    on_member(table, f)
-                    found.add(table)
-        # Drain trailing padding so the decompressor and feeder can finish.
-        while proc.stdout.read(CHUNK):
-            pass
-    except Exception as e:  # noqa: BLE001 - classified below
-        read_error = e
-        # Stop the decompressor so the feeder can't block writing into a full pipe.
-        proc.kill()
-    finally:
-        feeder.join()
-        rc = proc.wait()
-
-    # A truncated download surfaces as a tar read error; report the root cause.
-    # A BrokenPipe in the feeder is just a consequence of killing lbzip2.
-    download_error = errors[0] if errors and not isinstance(errors[0], BrokenPipeError) else None
-    if download_error is not None:
-        raise RefreshError(f"Download failed: {download_error!r}") from download_error
-    if read_error is not None:
-        if isinstance(read_error, RefreshError):
-            raise read_error
-        raise RefreshError(f"Reading archive failed: {read_error!r}") from read_error
-    if rc != 0:
-        raise RefreshError(f"{cmd[0]} exited with {rc}")
-    actual = hasher.hexdigest()
-    if actual != expected_sha256.lower():
-        raise RefreshError(f"SHA256 mismatch: expected {expected_sha256}, got {actual}")
-    missing = wanted - found
-    if missing:
-        raise RefreshError(f"Archive is missing tables: {sorted(missing)}")
-    return meta
+    return common.extract_members(
+        compressed_chunks,
+        wanted,
+        on_member,
+        expected_sha256,
+        decompress_cmd=decompress_cmd or ["lbzip2", "-dc"],
+        table_of=member_table_name,
+        meta_files=META_FILES,
+    )
 
 
 def gcs_uri(dump_id: str, table: str) -> str:
@@ -305,83 +210,27 @@ def build_models(bq: bigquery.Client) -> None:
         )
 
 
-def _num_rows(bq: bigquery.Client, table_id: str) -> int | None:
-    try:
-        rows = bq.get_table(table_id).num_rows
-    except Exception:  # noqa: BLE001 - NotFound or transient; treated as "no baseline"
-        return None
-    return int(rows) if rows is not None else None
-
-
 def check_row_counts(staging: dict[str, int | None], prod: dict[str, int | None]) -> list[str]:
     """Compare staging row counts with prod using ROW_COUNT_BOUNDS."""
-    failures = []
-    for name, bounds in sql.ROW_COUNT_BOUNDS.items():
-        new = staging.get(name)
-        if not new:
-            failures.append(f"{name}: staging table empty or missing")
-            continue
-        old = prod.get(name)
-        if bounds is None or not old:
-            continue
-        lo, hi = bounds
-        ratio = new / old
-        if not lo <= ratio <= hi:
-            failures.append(f"{name}: {new:,} rows vs prod {old:,} (ratio {ratio:.3f} outside [{lo}, {hi}])")
-    return failures
+    return common.check_row_counts(sql.ROW_COUNT_BOUNDS, staging, prod)
 
 
 def validate(bq: bigquery.Client, state: RunState) -> None:
-    staging = {name: _num_rows(bq, f"{sql.S}.{name}") for name in sql.MODEL_ORDER}
-    prod = {name: _num_rows(bq, f"{sql.P}.{name}") for name in sql.MODEL_ORDER}
+    staging = {name: common.num_rows(bq, f"{sql.S}.{name}") for name in sql.MODEL_ORDER}
+    prod = {name: common.num_rows(bq, f"{sql.P}.{name}") for name in sql.MODEL_ORDER}
     state.row_counts = {k: v for k, v in staging.items() if v is not None}
     for name in sql.MODEL_ORDER:
         logger.info(f"Rows {name}: staging={staging[name]} prod={prod[name]}")
 
     failures = check_row_counts(staging, prod)
-    cfg = bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES_CHECK)
-    for name, query in sql.CANARY_CHECKS.items():
-        row = next(iter(bq.query(query, job_config=cfg).result()))
-        detail = row.get("detail")
-        if row["ok"]:
-            logger.info(f"Check {name}: ok ({detail})")
-        else:
-            failures.append(f"{name}: {detail}")
-
+    failures += common.run_canaries(bq, sql.CANARY_CHECKS, MAX_BYTES_CHECK)
     if failures:
         raise RefreshError("Validation failed, prod untouched: " + "; ".join(failures))
 
 
-PUBLISH_ATTEMPTS = 3
-
-
 def publish(bq: bigquery.Client, state: RunState) -> None:
-    """Copy every staging table over prod, in MODEL_ORDER.
-
-    Each copy is atomic per table and idempotent, so it's retried; if one still
-    fails, the tables already replaced are reported via PartialPublishError.
-    """
-    cfg = bigquery.CopyJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
-    published: list[str] = []
-    for name in sql.MODEL_ORDER:
-        dest = f"{sql.P}.{name}"
-        for attempt in range(1, PUBLISH_ATTEMPTS + 1):
-            try:
-                bq.copy_table(f"{sql.S}.{name}", dest, job_config=cfg).result()
-                break
-            except Exception as e:  # noqa: BLE001 - retried, then reported
-                if attempt == PUBLISH_ATTEMPTS:
-                    raise PartialPublishError(published, name, e) from e
-                logger.warning(f"Copy to {dest} failed (attempt {attempt}/{PUBLISH_ATTEMPTS}): {e}")
-        published.append(name)
-        # Labels are informational only; never fail a publish over them.
-        try:
-            table = bq.get_table(dest)
-            table.labels = {**(table.labels or {}), "mb_dump": state.dump_id.lower()}
-            bq.update_table(table, ["labels"])
-            logger.info(f"Published {dest} ({table.num_rows:,} rows)")
-        except Exception as e:  # noqa: BLE001
-            logger.warning(f"Published {dest} but failed to set mb_dump label: {e}")
+    """Copy every staging table over prod, in MODEL_ORDER (see common.publish_tables)."""
+    common.publish_tables(bq, sql.MODEL_ORDER, sql.S, sql.P, "mb_dump", state.dump_id)
 
 
 # --------------------------------------------------------------------------
@@ -389,69 +238,8 @@ def publish(bq: bigquery.Client, state: RunState) -> None:
 # --------------------------------------------------------------------------
 
 
-def ensure_log_table(bq: bigquery.Client) -> None:
-    bq.query(
-        f"""
-        CREATE TABLE IF NOT EXISTS `{LOG_TABLE}` (
-            dump_id STRING NOT NULL,
-            status STRING NOT NULL,
-            schema_sequence STRING,
-            started_at TIMESTAMP NOT NULL,
-            finished_at TIMESTAMP NOT NULL,
-            row_counts JSON,
-            error STRING
-        )
-        """
-    ).result()
-
-
-def write_log(bq: bigquery.Client, state: RunState, status: str, error: str | None = None) -> None:
-    params = [
-        bigquery.ScalarQueryParameter("dump_id", "STRING", state.dump_id),
-        bigquery.ScalarQueryParameter("status", "STRING", status),
-        bigquery.ScalarQueryParameter("schema_sequence", "STRING", state.schema_sequence),
-        bigquery.ScalarQueryParameter("started_at", "TIMESTAMP", state.started_at),
-        bigquery.ScalarQueryParameter("row_counts", "STRING", json.dumps(state.row_counts)),
-        bigquery.ScalarQueryParameter("error", "STRING", (error or "")[:10000] or None),
-    ]
-    bq.query(
-        f"""
-        INSERT INTO `{LOG_TABLE}` (dump_id, status, schema_sequence, started_at, finished_at, row_counts, error)
-        VALUES (@dump_id, @status, @schema_sequence, @started_at, CURRENT_TIMESTAMP(),
-                PARSE_JSON(@row_counts), @error)
-        """,
-        job_config=bigquery.QueryJobConfig(query_parameters=params),
-    ).result()
-
-
-def last_success(bq: bigquery.Client) -> tuple[str, datetime] | None:
-    rows = list(
-        bq.query(
-            f"SELECT dump_id, finished_at FROM `{LOG_TABLE}` WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1"
-        ).result()
-    )
-    return (rows[0]["dump_id"], rows[0]["finished_at"]) if rows else None
-
-
-def already_published(bq: bigquery.Client, dump_id: str) -> bool:
-    cfg = bigquery.QueryJobConfig(query_parameters=[bigquery.ScalarQueryParameter("d", "STRING", dump_id)])
-    rows = list(
-        bq.query(
-            f"SELECT 1 FROM `{LOG_TABLE}` WHERE status = 'success' AND dump_id = @d LIMIT 1", job_config=cfg
-        ).result()
-    )
-    return bool(rows)
-
-
-def warn_if_stale(bq: bigquery.Client) -> None:
-    """Log an ERROR (picked up by the error monitor) if data is getting old."""
-    last = last_success(bq)
-    if last is None:
-        return
-    dump_id, finished_at = last
-    age_days = (datetime.now(UTC) - finished_at).days
-    if age_days > STALE_AFTER_DAYS:
-        logger.error(f"MusicBrainz data is stale: last successful refresh {dump_id} was {age_days} days ago")
+def _log(bq: bigquery.Client) -> common.RunLog:
+    return common.RunLog(bq, LOG_TABLE)
 
 
 def cleanup_staging(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> None:
@@ -481,12 +269,13 @@ def run(
     skip_extract: bool = False,
     reuse_gcs: bool = False,
 ) -> int:
-    ensure_log_table(bq)
-    warn_if_stale(bq)
+    log = _log(bq)
+    log.ensure()
+    log.warn_if_stale("MusicBrainz", STALE_AFTER_DAYS)
     state = RunState(dump_id=dump_id or fetch_latest_dump_id(http))
     logger.info(f"MusicBrainz dump {state.dump_id}")
 
-    if do_publish and not force and already_published(bq, state.dump_id):
+    if do_publish and not force and log.already_published(state.dump_id):
         logger.info(f"Dump {state.dump_id} already published; nothing to do")
         return 0
 
@@ -502,9 +291,9 @@ def run(
             return 0
         publish(bq, state)
     except Exception as e:
-        write_log(bq, state, _log_status(e), f"{e}\n{traceback.format_exc()}")
+        log.write(state, common.log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
-    write_log(bq, state, "success")
+    log.write(state, "success")
     cleanup_staging(bq, gcs, state.dump_id)
     logger.info(f"MusicBrainz refresh complete: {state.dump_id}")
     return 0
@@ -512,43 +301,25 @@ def run(
 
 def publish_existing(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> int:
     """Validate and publish staging tables built by an earlier --no-publish run."""
-    ensure_log_table(bq)
+    log = _log(bq)
+    log.ensure()
     state = RunState(dump_id=dump_id)
     try:
         validate(bq, state)
         publish(bq, state)
     except Exception as e:
-        write_log(bq, state, _log_status(e), f"{e}\n{traceback.format_exc()}")
+        log.write(state, common.log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
-    write_log(bq, state, "success")
+    log.write(state, "success")
     cleanup_staging(bq, gcs, dump_id)
     return 0
 
 
 def status(bq: bigquery.Client) -> int:
-    ensure_log_table(bq)
-    for row in bq.query(f"SELECT * FROM `{LOG_TABLE}` ORDER BY finished_at DESC LIMIT 10").result():
-        print(f"{row['finished_at']:%Y-%m-%d %H:%M} {row['status']:8} {row['dump_id']} {(row['error'] or '')[:120]}")
+    log = _log(bq)
+    log.ensure()
+    log.print_recent()
     return 0
-
-
-class _CloudLoggingFormatter(logging.Formatter):
-    """One JSON object per line so Cloud Logging picks up severity."""
-
-    def format(self, record: logging.LogRecord) -> str:
-        entry = {"severity": record.levelname, "message": record.getMessage(), "logger": record.name}
-        if record.exc_info:
-            entry["message"] += "\n" + self.formatException(record.exc_info)
-        return json.dumps(entry)
-
-
-def _configure_logging() -> None:
-    handler = logging.StreamHandler(sys.stdout)
-    if os.environ.get("CLOUD_RUN_JOB"):
-        handler.setFormatter(_CloudLoggingFormatter())
-    else:
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
-    logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -567,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status", help="Show recent runs")
     args = parser.parse_args(argv)
 
-    _configure_logging()
+    common.configure_logging()
     bq = bigquery.Client(project=sql.PROJECT_ID)
     try:
         if args.command == "status":
