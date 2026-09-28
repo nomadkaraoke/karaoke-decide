@@ -282,6 +282,49 @@ class TestRun:
         bq.copy_table.assert_not_called()
         assert self._statuses(bq) == ["failed"]
 
+    def test_partial_publish_is_recorded_and_staging_kept(self, monkeypatch):
+        bq = _mock_bq()
+        calls = {"n": 0}
+
+        def copy_table(src, dest, job_config=None):
+            calls["n"] += 1
+            job = MagicMock()
+            # First two tables copy fine; the third fails every attempt.
+            if dest.endswith(sql.MODEL_ORDER[2]):
+                job.result.side_effect = RuntimeError("quota")
+            return job
+
+        bq.copy_table.side_effect = copy_table
+        with pytest.raises(mr.PartialPublishError) as exc:
+            self._run(bq, monkeypatch)
+        assert exc.value.published == sql.MODEL_ORDER[:2]
+        assert calls["n"] == 2 + mr.PUBLISH_ATTEMPTS
+        assert self._statuses(bq) == ["partial_publish"]
+        bq.delete_table.assert_not_called()
+
+    def test_copy_retried_then_succeeds(self, monkeypatch):
+        bq = _mock_bq()
+        attempts = {"n": 0}
+
+        def copy_table(src, dest, job_config=None):
+            job = MagicMock()
+            if dest.endswith(sql.MODEL_ORDER[0]) and attempts["n"] == 0:
+                attempts["n"] += 1
+                job.result.side_effect = RuntimeError("transient")
+            return job
+
+        bq.copy_table.side_effect = copy_table
+        rc, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        assert self._statuses(bq) == ["success"]
+
+    def test_label_failure_does_not_fail_publish(self, monkeypatch):
+        bq = _mock_bq()
+        bq.update_table.side_effect = RuntimeError("labels")
+        rc, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        assert self._statuses(bq) == ["success"]
+
     def test_no_publish_leaves_staging(self, monkeypatch):
         bq = _mock_bq()
         rc, _ = self._run(bq, monkeypatch, do_publish=False)

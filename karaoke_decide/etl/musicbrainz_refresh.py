@@ -66,7 +66,25 @@ MAX_BYTES_CHECK = 20 * GIB
 
 
 class RefreshError(RuntimeError):
-    """A refresh step failed; prod tables were not modified by this step."""
+    """A refresh step failed before publishing; prod tables were not modified."""
+
+
+class PartialPublishError(RefreshError):
+    """Publishing stopped partway: some prod tables already hold the new dump.
+
+    Staging is kept, so ``publish --dump-id <id>`` can finish the job.
+    """
+
+    def __init__(self, published: list[str], failed: str, cause: Exception):
+        self.published = published
+        super().__init__(
+            f"Publish failed on {failed} after replacing {len(published)} prod table(s) "
+            f"{published}: {cause}. Staging kept; re-run `publish --dump-id` to finish."
+        )
+
+
+def _log_status(error: Exception) -> str:
+    return "partial_publish" if isinstance(error, PartialPublishError) else "failed"
 
 
 @dataclass
@@ -334,15 +352,36 @@ def validate(bq: bigquery.Client, state: RunState) -> None:
         raise RefreshError("Validation failed, prod untouched: " + "; ".join(failures))
 
 
+PUBLISH_ATTEMPTS = 3
+
+
 def publish(bq: bigquery.Client, state: RunState) -> None:
+    """Copy every staging table over prod, in MODEL_ORDER.
+
+    Each copy is atomic per table and idempotent, so it's retried; if one still
+    fails, the tables already replaced are reported via PartialPublishError.
+    """
     cfg = bigquery.CopyJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
+    published: list[str] = []
     for name in sql.MODEL_ORDER:
         dest = f"{sql.P}.{name}"
-        bq.copy_table(f"{sql.S}.{name}", dest, job_config=cfg).result()
-        table = bq.get_table(dest)
-        table.labels = {**(table.labels or {}), "mb_dump": state.dump_id.lower()}
-        bq.update_table(table, ["labels"])
-        logger.info(f"Published {dest} ({table.num_rows:,} rows)")
+        for attempt in range(1, PUBLISH_ATTEMPTS + 1):
+            try:
+                bq.copy_table(f"{sql.S}.{name}", dest, job_config=cfg).result()
+                break
+            except Exception as e:  # noqa: BLE001 - retried, then reported
+                if attempt == PUBLISH_ATTEMPTS:
+                    raise PartialPublishError(published, name, e) from e
+                logger.warning(f"Copy to {dest} failed (attempt {attempt}/{PUBLISH_ATTEMPTS}): {e}")
+        published.append(name)
+        # Labels are informational only; never fail a publish over them.
+        try:
+            table = bq.get_table(dest)
+            table.labels = {**(table.labels or {}), "mb_dump": state.dump_id.lower()}
+            bq.update_table(table, ["labels"])
+            logger.info(f"Published {dest} ({table.num_rows:,} rows)")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Published {dest} but failed to set mb_dump label: {e}")
 
 
 # --------------------------------------------------------------------------
@@ -463,7 +502,7 @@ def run(
             return 0
         publish(bq, state)
     except Exception as e:
-        write_log(bq, state, "failed", f"{e}\n{traceback.format_exc()}")
+        write_log(bq, state, _log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
     write_log(bq, state, "success")
     cleanup_staging(bq, gcs, state.dump_id)
@@ -479,7 +518,7 @@ def publish_existing(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> 
         validate(bq, state)
         publish(bq, state)
     except Exception as e:
-        write_log(bq, state, "failed", f"{e}\n{traceback.format_exc()}")
+        write_log(bq, state, _log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
     write_log(bq, state, "success")
     cleanup_staging(bq, gcs, dump_id)
