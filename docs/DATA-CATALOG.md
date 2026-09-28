@@ -82,11 +82,13 @@ Row counts as of dump `20260926-002121`; all rebuilt weekly by `mb-refresh`.
 
 ### ListenBrainz Tables (Popularity)
 
+Row counts as of export `2663-20260915-000002` (84,850 users with all-time stats; 64,267 this year).
+
 | Table | Row Count | Description |
 |-------|-----------|-------------|
-| `lb_recording_popularity` | TBD | Listens + listeners per recording MBID, per stats range |
-| `lb_artist_popularity` | TBD | Listens + listeners per artist MBID, per stats range |
-| `lb_user_artist_listens` | TBD | Per-user all-time top artists (collaborative filtering input) |
+| `lb_recording_popularity` | 25,716,524 | Listens + listeners per recording MBID, per stats range |
+| `lb_artist_popularity` | 3,610,639 | Listens + listeners per artist MBID, per stats range |
+| `lb_user_artist_listens` | 29,599,461 | Per-user all-time top artists (collaborative filtering input) |
 | `lb_stats_ranges` | 18 | Users + period covered per (entity, stats range) |
 | `lb_refresh_log` | — | One row per refresh run (export, status, row counts, error) |
 
@@ -669,7 +671,9 @@ Built from the ListenBrainz statistics dump by `lb-refresh`. Every table has a
 | `year` / `half_yearly` / `quarter` / `month` / `week` | Last *completed* period (2025; Jan–Jun 2026; Apr–Jun 2026; Aug 2026; Sep 7–14) |
 | `this_year` / `this_month` / `this_week` | Current period so far |
 
-Exact bounds and user counts per range are in `lb_stats_ranges`. MBIDs MusicBrainz has since
+Exact bounds and user counts per range are in `lb_stats_ranges`. ListenBrainz recomputes
+`all_time` less often than the other ranges (in the 2026-09-15 export it ran to 2026-07-27), so
+use `this_year` / `half_yearly` for "popular now". MBIDs MusicBrainz has since
 merged are already resolved to the current MBID (via `mb_*_redirects`). Listens that
 ListenBrainz couldn't map to an MBID (~15-20%) are not included.
 
