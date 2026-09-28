@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl lbzip2 \
+    curl lbzip2 zstd \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
