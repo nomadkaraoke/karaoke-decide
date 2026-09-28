@@ -1360,5 +1360,5 @@ return await firestore.query_documents(collection, filters=[], limit=MAX_USERS_F
 **Context:** `poetry.lock` was gitignored. The Docker build re-resolved every dependency to the newest version in range on each deploy. CI keyed its venv cache on `hashFiles('**/poetry.lock')`, which is always empty, so it reused one old cached venv indefinitely. Decide's ranges (`google-cloud-storage <3`, `httpx <0.28`, `fastapi <0.116`) also conflicted with karaoke-gen's pins. Both repos share the workspace `nomadkaraoke` conda env, so each `poetry install` broke the other repo.
 
 **Recommendation:**
-- Commit `poetry.lock`, and lock every package shared with karaoke-gen to gen's exact version (see [DEVELOPMENT.md](DEVELOPMENT.md#shared-dependency-versions-keep-in-lockstep-with-karaoke-gen)). Check alignment with `python scripts/check-shared-deps.py` from the workspace root.
+- Commit `poetry.lock`, and lock every package shared with karaoke-gen to gen's exact version (see [DEVELOPMENT.md](DEVELOPMENT.md#shared-dependency-versions-keep-in-lockstep-with-karaoke-gen)). Check alignment with `python scripts/check-shared-deps.py`.
 - Poetry 2 `poetry lock` keeps existing locked versions. Only `--regenerate` or `poetry update` floats them.

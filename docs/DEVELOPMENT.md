@@ -34,8 +34,9 @@ versions of a package they share, every `poetry install` in one repo breaks the 
   `google-cloud-storage==3.10.1`, `google-auth==2.49.1`, `google-cloud-firestore==2.26.0`).
 - Don't run `poetry lock --regenerate` or a blanket `poetry update`. They float shared packages to
   their newest versions. Bump shared packages in gen first, then mirror the change here.
-- Check alignment from the workspace root: `python scripts/check-shared-deps.py`. It exits 1 and
-  lists each package whose versions differ.
+- Check alignment with `python scripts/check-shared-deps.py [GEN_LOCK]`. GEN_LOCK defaults to the
+  sibling `karaoke-gen/poetry.lock` in the workspace. It exits 1 and lists each package whose
+  versions differ.
 
 To re-align after gen bumps its deps, pin the differing packages with a temporary Poetry group
 (`"<pkg>" = "==<gen version>"`), run `poetry lock`, then delete the group and run `poetry lock`
