@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.11–3.13
 - Poetry
 - Docker (for emulators)
 - Google Cloud SDK (optional, for deployment)
@@ -21,6 +21,26 @@ poetry install
 cp .env.example .env
 # Edit .env with your credentials
 ```
+
+## Shared dependency versions (keep in lockstep with karaoke-gen)
+
+In the Nomad Karaoke workspace, karaoke-decide and karaoke-gen are installed into the **same**
+`nomadkaraoke` conda env (activated by the workspace `.envrc`). If the two lock files pin different
+versions of a package they share, every `poetry install` in one repo breaks the other. So:
+
+- **`poetry.lock` is committed**, and every package decide shares with gen is locked to **exactly
+  gen's version**. The Docker image and CI install from this lock (Poetry 2.2.1).
+- Direct-dependency ranges in `pyproject.toml` must include gen's pins (e.g. gen pins
+  `google-cloud-storage==3.10.1`, `google-auth==2.49.1`, `google-cloud-firestore==2.26.0`).
+- Don't run `poetry lock --regenerate` or a blanket `poetry update`. They float shared packages to
+  their newest versions. Bump shared packages in gen first, then mirror the change here.
+- Check alignment with `python scripts/check-shared-deps.py [GEN_LOCK]`. GEN_LOCK defaults to the
+  sibling `karaoke-gen/poetry.lock` in the workspace. It exits 1 and lists each package whose
+  versions differ.
+
+To re-align after gen bumps its deps, pin the differing packages with a temporary Poetry group
+(`"<pkg>" = "==<gen version>"`), run `poetry lock`, then delete the group and run `poetry lock`
+again. Poetry 2 keeps the already-locked versions.
 
 ## Running Locally
 

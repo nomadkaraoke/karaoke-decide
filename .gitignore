@@ -31,8 +31,8 @@ ENV/
 env.bak/
 venv.bak/
 
-# Poetry
-poetry.lock
+# Poetry — poetry.lock IS committed: shared packages are pinned to karaoke-gen's versions
+# (see docs/DEVELOPMENT.md "Shared dependency versions")
 
 # IDE
 .idea/
