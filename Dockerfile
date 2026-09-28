@@ -9,14 +9,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
-RUN pip install poetry==1.7.1
+RUN pip install poetry==2.2.1
 
-# Copy dependency files
-COPY pyproject.toml ./
+# Copy dependency files (poetry.lock pins shared packages to karaoke-gen's versions)
+COPY pyproject.toml poetry.lock ./
 
 # Install dependencies (no dev deps in production)
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --only main
+    && poetry install --no-interaction --no-ansi --only main --no-root
 
 # Copy application code
 COPY karaoke_decide/ ./karaoke_decide/

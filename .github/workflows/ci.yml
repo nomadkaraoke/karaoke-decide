@@ -36,7 +36,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "1.8.2"
+          version: "2.2.1"
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -78,7 +78,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "1.8.2"
+          version: "2.2.1"
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -126,7 +126,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "1.8.2"
+          version: "2.2.1"
           virtualenvs-create: true
           virtualenvs-in-project: true
 
@@ -291,7 +291,7 @@ jobs:
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "1.8.2"
+          version: "2.2.1"
 
       - name: Extract version
         id: version
