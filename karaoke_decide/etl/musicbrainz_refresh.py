@@ -42,7 +42,10 @@ from datetime import UTC, datetime
 from typing import IO, Any
 
 import httpx
-from google.cloud import bigquery, storage
+from google.cloud import (  # type: ignore[attr-defined]  # storage has no stubs
+    bigquery,
+    storage,
+)
 
 from karaoke_decide.etl import musicbrainz_sql as sql
 
@@ -286,9 +289,10 @@ def build_models(bq: bigquery.Client) -> None:
 
 def _num_rows(bq: bigquery.Client, table_id: str) -> int | None:
     try:
-        return bq.get_table(table_id).num_rows
+        rows = bq.get_table(table_id).num_rows
     except Exception:  # noqa: BLE001 - NotFound or transient; treated as "no baseline"
         return None
+    return int(rows) if rows is not None else None
 
 
 def check_row_counts(staging: dict[str, int | None], prod: dict[str, int | None]) -> list[str]:
