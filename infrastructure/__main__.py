@@ -593,8 +593,9 @@ lb_refresh_job = gcp.cloudrunv2.Job(
             ],
             "service_account": lb_refresh_sa.email,
             "timeout": "10800s",
-            # A failed run logs an ERROR (error monitor alerts); the next run retries.
-            "max_retries": 0,
+            # One retry covers a network blip during the ~22 GB stream; a failed
+            # attempt logs an ERROR (error monitor alerts) and leaves prod untouched.
+            "max_retries": 1,
         },
     },
     opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),

@@ -7,6 +7,7 @@ import re
 import sys
 import tarfile
 import zlib
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import httpx
@@ -149,6 +150,7 @@ class TestDiscovery:
             (f"{ROOT}/COPYING", None),
             (f"{ROOT}/lbdump/statistics", None),
             (f"{ROOT}/lbdump/other/artists_all_time.jsonl", None),
+            (f"{ROOT}/lbdump/statistics/sub/artists_all_time.jsonl", None),
         ],
     )
     def test_member_table_name(self, member, expected):
@@ -271,7 +273,7 @@ class TestModels:
 # --------------------------------------------------------------------------
 
 
-def _mock_bq(num_rows=1000, published=False, canary_ok=True):
+def _mock_bq(num_rows=1000, published=False, canary_ok=True, last_success=None):
     bq = MagicMock()
     bq.get_table.return_value = MagicMock(num_rows=num_rows, labels={})
 
@@ -280,7 +282,9 @@ def _mock_bq(num_rows=1000, published=False, canary_ok=True):
         if "status = 'success' AND dump_id" in q:
             job.result.return_value = [{"x": 1}] if published else []
         elif "ORDER BY finished_at DESC LIMIT 1" in q:
-            job.result.return_value = []
+            job.result.return_value = (
+                [{"dump_id": last_success, "finished_at": datetime.now(UTC)}] if last_success else []
+            )
         elif " AS ok" in q:
             job.result.return_value = [{"ok": canary_ok, "detail": "d"}]
         else:
@@ -315,6 +319,24 @@ class TestRun:
         assert rc == 0
         extract.assert_not_called()
         bq.copy_table.assert_not_called()
+
+    def test_skips_export_older_than_last_published(self, monkeypatch):
+        bq = _mock_bq(last_success="2700-20261015-000002")
+        rc, extract, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        extract.assert_not_called()
+        bq.copy_table.assert_not_called()
+
+    def test_force_publishes_older_export(self, monkeypatch):
+        bq = _mock_bq(last_success="2700-20261015-000002")
+        rc, extract, _ = self._run(bq, monkeypatch, force=True)
+        assert rc == 0
+        extract.assert_called_once()
+
+    def test_newer_export_than_last_published_runs(self, monkeypatch):
+        bq = _mock_bq(last_success="2647-20260901-000002")
+        _, extract, _ = self._run(bq, monkeypatch)
+        extract.assert_called_once()
 
     def test_full_run_publishes_every_model_with_label(self, monkeypatch):
         bq = _mock_bq()

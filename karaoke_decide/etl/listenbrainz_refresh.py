@@ -133,8 +133,19 @@ def member_table_name(member_name: str) -> str | None:
     """``<root>/lbdump/statistics/artists_all_time.jsonl`` -> ``artists_all_time``."""
     if STATS_MEMBER_DIR not in member_name or not member_name.endswith(".jsonl"):
         return None
-    name = member_name.rsplit("/", 1)[-1][: -len(".jsonl")]
-    return name or None
+    name = member_name.split(STATS_MEMBER_DIR, 1)[1][: -len(".jsonl")]
+    return name if name and "/" not in name else None
+
+
+def export_number(dump_id: str) -> int:
+    """``2663-20260915-000002`` -> 2663 (ListenBrainz's increasing dump number)."""
+    return int(dump_id.split("-", 1)[0])
+
+
+def is_older_than_published(log: common.RunLog, dump_id: str) -> bool:
+    """True if a newer export than ``dump_id`` was already published."""
+    last = log.last_success()
+    return last is not None and export_number(dump_id) < export_number(last[0])
 
 
 def gcs_blob_name(dump_id: str, table: str) -> str:
@@ -288,6 +299,11 @@ def run(
 
     if do_publish and not force and log.already_published(state.dump_id):
         logger.info(f"Export {state.dump_id} already published; nothing to do")
+        return 0
+    if do_publish and not force and is_older_than_published(log, state.dump_id):
+        # e.g. the newest export vanished from the mirror and we fell back to an
+        # older one: never replace fresher prod data with staler stats.
+        logger.warning(f"Export {state.dump_id} is older than the last published export; skipping (use --force)")
         return 0
 
     try:
