@@ -2,7 +2,7 @@
 
 This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-09-27 (MusicBrainz tables now refreshed weekly by the `mb-refresh` job)
+> **Last Updated:** 2026-09-28 (ListenBrainz listening popularity added, refreshed by the `lb-refresh` job)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
@@ -47,6 +47,18 @@ This document describes all music data available in BigQuery for use in features
    - ✅ Automated daily via Cloud Function `divebar-mirror` in `nomadkaraoke` project
    - Cross-referenced with KN catalog: 85,826 matches (17,124 KN songs ↔ 22,863 Divebar files)
 
+6. **ListenBrainz Listening Statistics** (Popularity - refreshed every ~2 weeks):
+   - Real, current listen counts per artist and recording, keyed by MusicBrainz MBIDs
+     (joins straight onto `mb_artists` / `mb_recordings`). The fresh popularity signal;
+     `spotify_tracks.popularity` is a static July 2025 snapshot.
+   - Source: the statistics dump in each [ListenBrainz full export](https://data.metabrainz.org/pub/musicbrainz/listenbrainz/fullexport/)
+     (1st + 15th of each month, CC0). Per-user top-1,000 lists, summed across users, so the
+     long tail is slightly undercounted; fine for ranking.
+   - ✅ Automated via Cloud Run Job `lb-refresh` (Mon + Thu 11:00 UTC; no-op unless a new export exists)
+     (`karaoke_decide/etl/listenbrainz_refresh.py`). Same staging → validate → publish pattern as `mb-refresh`.
+   - Check freshness: `SELECT * FROM karaoke_decide.lb_refresh_log ORDER BY finished_at DESC LIMIT 5`,
+     or the `lb_dump` label on any `lb_*` table
+
 ## Table Summary
 
 ### MusicBrainz Tables (Primary)
@@ -67,6 +79,16 @@ Row counts as of dump `20260926-002121`; all rebuilt weekly by `mb-refresh`.
 | `karaoke_recording_links` | 177,420 | Karaoke songs → MB recordings |
 | `mb_refresh_log` | — | One row per refresh run (dump, status, row counts, error) |
 | `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
+
+### ListenBrainz Tables (Popularity)
+
+| Table | Row Count | Description |
+|-------|-----------|-------------|
+| `lb_recording_popularity` | TBD | Listens + listeners per recording MBID, per stats range |
+| `lb_artist_popularity` | TBD | Listens + listeners per artist MBID, per stats range |
+| `lb_user_artist_listens` | TBD | Per-user all-time top artists (collaborative filtering input) |
+| `lb_stats_ranges` | 18 | Users + period covered per (entity, stats range) |
+| `lb_refresh_log` | — | One row per refresh run (export, status, row counts, error) |
 
 ### Spotify Tables (Enrichment)
 
@@ -636,6 +658,69 @@ LIMIT 20
 
 ---
 
+## ListenBrainz Tables
+
+Built from the ListenBrainz statistics dump by `lb-refresh`. Every table has a
+`stats_range` (or is all-time only). ListenBrainz ranges are **calendar periods**:
+
+| `stats_range` | Period (example, export of 2026-09-15) |
+|---------------|----------------------------------------|
+| `all_time` | Everything |
+| `year` / `half_yearly` / `quarter` / `month` / `week` | Last *completed* period (2025; Jan–Jun 2026; Apr–Jun 2026; Aug 2026; Sep 7–14) |
+| `this_year` / `this_month` / `this_week` | Current period so far |
+
+Exact bounds and user counts per range are in `lb_stats_ranges`. MBIDs MusicBrainz has since
+merged are already resolved to the current MBID (via `mb_*_redirects`). Listens that
+ListenBrainz couldn't map to an MBID (~15-20%) are not included.
+
+### lb_recording_popularity / lb_artist_popularity
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `stats_range` | STRING | See table above |
+| `recording_mbid` / `artist_mbid` | STRING | MusicBrainz UUID |
+| `total_listens` | INT64 | Sum of listens across users (from each user's top 1,000) |
+| `listeners` | INT64 | Users with it in their top 1,000 for the range (better ranking signal than listens: one heavy listener can't dominate) |
+
+Clustered by `(stats_range, <mbid>)`, so always filter on `stats_range`.
+
+**Example Query - Most popular karaoke songs this year:**
+```sql
+SELECT k.Artist, k.Title, p.listeners, p.total_listens
+FROM `nomadkaraoke.karaoke_decide.lb_recording_popularity` p
+JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` l USING (recording_mbid)
+JOIN `nomadkaraoke.karaoke_decide.karaokenerds_raw` k ON k.Id = l.karaoke_id
+WHERE p.stats_range = 'this_year'
+ORDER BY p.listeners DESC
+LIMIT 20
+```
+
+A song has many recording MBIDs (single, album, live, remaster); aggregate by
+`mb_recordings.name_normalized` + artist when you need song-level popularity.
+
+### lb_user_artist_listens
+
+Each ListenBrainz user's all-time top artists (up to 1,000). `user_id` is ListenBrainz's
+numeric id; no user names are stored. Input for "listeners of X also like Y": a fresher,
+MBID-native complement to `mlhd_artist_similarity`.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `user_id` | INT64 | ListenBrainz user id |
+| `artist_mbid` | STRING | MusicBrainz UUID |
+| `listen_count` | INT64 | That user's all-time listens of the artist |
+
+### lb_stats_ranges
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `entity` | STRING | `artists` or `recordings` |
+| `stats_range` | STRING | Range name |
+| `users` | INT64 | Users with stats for this range (denominator for listener share) |
+| `from_ts` / `to_ts` | TIMESTAMP | Period covered |
+
+---
+
 ## MLHD+ Similarity Data
 
 ### mlhd_artist_similarity
@@ -823,6 +908,13 @@ Daily automated data pipelines running as Cloud Functions in the `nomadkaraoke` 
 **API Key:** KaraokeNerds API key stored in Secret Manager as `karaokenerds-api-key`
 
 **Infrastructure:** All pipelines are Pulumi-managed in `karaoke-gen/infrastructure/`
+
+**Dump refresh jobs** (Cloud Run Jobs, Pulumi-managed in this repo's `infrastructure/`; failures log an ERROR the gen error monitor picks up):
+
+| Job | Schedule | Data Flow |
+|-----|----------|-----------|
+| `mb-refresh` | Sun 10:00 UTC | MusicBrainz full dump → `musicbrainz_staging` → `mb_*`, `karaoke_recording_links` |
+| `lb-refresh` | Mon + Thu 11:00 UTC (runs only for a new export) | ListenBrainz statistics dump → `listenbrainz_staging` → `lb_*` |
 
 ---
 
