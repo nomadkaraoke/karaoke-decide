@@ -2,18 +2,25 @@
 
 This document describes all music data available in BigQuery for use in features and recommendations.
 
-> **Last Updated:** 2026-03-21 (Divebar catalog, KN community tracks, automated ETL pipelines)
+> **Last Updated:** 2026-09-27 (MusicBrainz tables now refreshed weekly by the `mb-refresh` job)
 >
 > **Location:** `nomadkaraoke.karaoke_decide.*`
 
 ## Data Sources
 
-1. **MusicBrainz Database Dumps** (Primary - refreshable):
-   - Full artist catalog from MusicBrainz (~2.78M artists)
-   - Recording catalog (~37.5M recordings)
-   - Community-curated tags/genres (~693K)
-   - MBID↔Spotify ID mappings (~376K)
-   - ⚠️ **TODO:** Automate monthly refresh via Cloud Scheduler + ETL pipeline
+1. **MusicBrainz Database Dumps** (Primary - refreshed weekly):
+   - Full artist catalog from MusicBrainz (~3.0M artists)
+   - Recording catalog (~40.3M recordings)
+   - Community-curated tags/genres (~766K)
+   - MBID↔Spotify ID mappings (~455K, from MusicBrainz artist→Spotify URL relationships)
+   - Merge redirects (old MBID → current MBID) for artists and recordings
+   - ✅ Automated weekly (Sun 10:00 UTC) via Cloud Run Job `mb-refresh`
+     (`karaoke_decide/etl/musicbrainz_refresh.py`, infra in `infrastructure/__main__.py`).
+     Loads the latest [full export](https://data.metabrainz.org/pub/musicbrainz/data/fullexport/),
+     rebuilds every table below in `musicbrainz_staging`, validates (row-count bounds + canaries),
+     then copies to prod. A failed run leaves prod untouched and logs an ERROR.
+   - Check freshness: `SELECT * FROM karaoke_decide.mb_refresh_log ORDER BY finished_at DESC LIMIT 5`,
+     or the `mb_dump` label on any `mb_*` table (`bq show karaoke_decide.mb_artists`)
 
 2. **Spotify July 2025 Dataset** (Enrichment - static snapshot):
    - From [Anna's Archive Spotify dataset](https://annas-archive.org/datasets/spotify_2025_07)
@@ -44,16 +51,21 @@ This document describes all music data available in BigQuery for use in features
 
 ### MusicBrainz Tables (Primary)
 
+Row counts as of dump `20260926-002121`; all rebuilt weekly by `mb-refresh`.
+
 | Table | Row Count | Description |
 |-------|-----------|-------------|
-| `mb_artists` | 2,780,016 | Full MusicBrainz artist catalog |
-| `mb_recordings` | 37,530,321 | MusicBrainz recording catalog |
-| `mb_artist_tags` | 693,045 | Community-sourced tags/genres |
-| `mb_recording_isrc` | 5,480,292 | ISRC codes for recordings |
-| `mbid_spotify_mapping` | 376,231 | MBID to Spotify ID mappings |
-| `mb_artists_normalized` | 2,780,016 | Pre-joined for fast search |
-| `mb_recordings_enriched` | 49,923,413 | Derived: recordings ⋈ ISRC ⋈ Spotify, clustered for search (see below) |
-| `karaoke_recording_links` | 162,314 | Karaoke songs → MB recordings |
+| `mb_artists` | 2,995,592 | Full MusicBrainz artist catalog |
+| `mb_recordings` | 40,341,425 | MusicBrainz recording catalog |
+| `mb_artist_tags` | 765,754 | Community-sourced tags/genres |
+| `mb_recording_isrc` | 6,412,906 | ISRC codes for recordings |
+| `mbid_spotify_mapping` | 455,248 | MBID to Spotify ID mappings (one per artist) |
+| `mb_artist_redirects` | 90,159 | Merged artists: `old_mbid` → `artist_mbid` |
+| `mb_recording_redirects` | 5,071,377 | Merged recordings: `old_mbid` → `recording_mbid` |
+| `mb_artists_normalized` | 2,995,592 | Pre-joined for fast search |
+| `mb_recordings_enriched` | 53,679,830 | Derived: recordings ⋈ ISRC ⋈ Spotify, clustered for search (see below) |
+| `karaoke_recording_links` | 177,420 | Karaoke songs → MB recordings |
+| `mb_refresh_log` | — | One row per refresh run (dump, status, row counts, error) |
 | `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
 
 ### Spotify Tables (Enrichment)
@@ -204,8 +216,8 @@ LIMIT 10
 BigQuery bills per byte scanned; request-path queries must NOT join the raw
 `mb_recordings` × `mb_recording_isrc` × `spotify_tracks` tables (~15 GiB/call)
 or `karaokenerds_raw` × `spotify_tracks` (~11 GiB/call). Use these instead. Both
-are static snapshots built by `scripts/create_cost_optimized_tables.py` —
-**re-run it after reloading MusicBrainz or Spotify data**.
+are built by `scripts/create_cost_optimized_tables.py`; `mb_recordings_enriched`
+is also rebuilt weekly by `mb-refresh`. **Re-run the script after reloading Spotify data**.
 
 | Table | Clustered on | Replaces | Billed/call |
 |-------|--------------|----------|-------------|

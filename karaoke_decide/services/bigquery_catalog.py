@@ -1272,6 +1272,13 @@ class BigQueryCatalogService:
                 mb_tags AS tags
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artists_normalized`
             WHERE artist_mbid = @mbid
+                -- MBIDs stored before a MusicBrainz merge resolve to the surviving artist
+                OR artist_mbid IN (
+                    SELECT artist_mbid
+                    FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_artist_redirects`
+                    WHERE old_mbid = @mbid
+                )
+            LIMIT 1
         """
 
         job_config = bigquery.QueryJobConfig(
@@ -1524,6 +1531,12 @@ class BigQueryCatalogService:
                 spotify_popularity
             FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recordings_enriched`
             WHERE recording_mbid = @mbid
+                -- MBIDs stored before a MusicBrainz merge resolve to the surviving recording
+                OR recording_mbid IN (
+                    SELECT recording_mbid
+                    FROM `{self.PROJECT_ID}.{self.DATASET_ID}.mb_recording_redirects`
+                    WHERE old_mbid = @mbid
+                )
             ORDER BY spotify_popularity DESC NULLS LAST
             LIMIT 1
         """

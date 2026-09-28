@@ -20,8 +20,9 @@ used to join them in full on every call:
    Clustered on ``artist_lower`` so ``IN (...)`` artist filters prune.
    Was ~11 GiB billed per call.
 
-The source data (MusicBrainz + Spotify dumps) is static between manual ETL
-runs. Re-run this script after re-running ``scripts/musicbrainz_etl.py`` or
+``mb_recordings_enriched`` is rebuilt weekly by the ``mb-refresh`` Cloud Run Job
+(``karaoke_decide/etl/musicbrainz_refresh.py``) whenever a new MusicBrainz dump
+is loaded. The Spotify data is a static snapshot: re-run this script after
 reloading ``spotify_tracks``.
 
 Usage:
@@ -36,6 +37,8 @@ from datetime import datetime
 
 from google.cloud import bigquery
 
+from karaoke_decide.etl.musicbrainz_sql import mb_recordings_enriched_sql
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -43,36 +46,10 @@ PROJECT_ID = "nomadkaraoke"
 DATASET_ID = "karaoke_decide"
 DS = f"{PROJECT_ID}.{DATASET_ID}"
 
-# Must stay byte-identical to the runtime artist normalization previously used in
-# search_recordings (NFD decompose, strip combining marks, lowercase,
-# non-alphanumerics -> space, collapse spaces, trim).
-ARTIST_NORMALIZE_SQL = (
-    "TRIM(REGEXP_REPLACE(REGEXP_REPLACE("
-    "LOWER(REGEXP_REPLACE(NORMALIZE(r.artist_credit, NFD), r'\\pM', '')), "
-    "r'[^a-z0-9 ]', ' '), r' +', ' '))"
-)
-
 TABLES: dict[str, str] = {
-    "mb_recordings_enriched": f"""
-    CREATE OR REPLACE TABLE `{DS}.mb_recordings_enriched`
-    CLUSTER BY name_normalized, artist_normalized
-    AS
-    SELECT
-        r.recording_mbid,
-        r.title,
-        r.artist_credit,
-        r.length_ms,
-        r.disambiguation,
-        r.name_normalized,
-        {ARTIST_NORMALIZE_SQL} AS artist_normalized,
-        st.spotify_id AS spotify_track_id,
-        st.popularity AS spotify_popularity
-    FROM `{DS}.mb_recordings` r
-    LEFT JOIN `{DS}.mb_recording_isrc` ri
-        ON r.recording_mbid = ri.recording_mbid
-    LEFT JOIN `{DS}.spotify_tracks` st
-        ON ri.isrc = st.isrc
-    """,
+    # Also rebuilt weekly by the mb-refresh job (karaoke_decide.etl.musicbrainz_refresh)
+    # from the latest MusicBrainz dump; this entry is for manual rebuilds only.
+    "mb_recordings_enriched": mb_recordings_enriched_sql(DS, DS),
     "spotify_popularity_by_artist_title": f"""
     CREATE OR REPLACE TABLE `{DS}.spotify_popularity_by_artist_title`
     CLUSTER BY artist_lower, title_lower

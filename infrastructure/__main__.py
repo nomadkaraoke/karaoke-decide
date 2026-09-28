@@ -6,6 +6,7 @@ Resources managed:
 - GCS bucket (data staging)
 - Artifact Registry repository (container images)
 - Cloud Run service (backend API)
+- MusicBrainz weekly refresh (Cloud Run Job, Scheduler, staging dataset, bucket)
 - IAM bindings (service account permissions)
 - Cloudflare Worker (API proxy)
 """
@@ -77,6 +78,16 @@ data_bucket = gcp.storage.Bucket(
     uniform_bucket_level_access=True,
     public_access_prevention="inherited",
     hierarchical_namespace={"enabled": False},
+    # Leftover ETL staging data; archive anything not touched in 30 days.
+    lifecycle_rules=[
+        {
+            "action": {"type": "SetStorageClass", "storage_class": "ARCHIVE"},
+            "condition": {
+                "age": 30,
+                "matches_storage_classes": ["STANDARD", "NEARLINE", "COLDLINE", "REGIONAL"],
+            },
+        }
+    ],
     opts=pulumi.ResourceOptions(protect=True),
 )
 
@@ -386,6 +397,132 @@ for secret_name in REQUIRED_SECRETS:
         role="roles/secretmanager.secretAccessor",
         member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
     )
+
+# =============================================================================
+# MusicBrainz weekly refresh (Cloud Run Job + Cloud Scheduler)
+# =============================================================================
+# Loads the latest MusicBrainz full dump into BigQuery and rebuilds the mb_*
+# tables + karaoke_recording_links. See karaoke_decide/etl/musicbrainz_refresh.py.
+
+MB_REFRESH_JOB_NAME = "mb-refresh"
+
+# Bucket was created by hand for the original one-off ETL; adopted here.
+musicbrainz_bucket = gcp.storage.Bucket(
+    "musicbrainz-data-bucket",
+    name="nomadkaraoke-musicbrainz-data",
+    project=project,
+    location="US-CENTRAL1",
+    uniform_bucket_level_access=True,
+    public_access_prevention="inherited",
+    # Staging TSVs are deleted after every successful run; this catches failed runs.
+    lifecycle_rules=[
+        {
+            "action": {"type": "Delete"},
+            "condition": {"age": 3, "matches_prefixes": ["staging/"]},
+        }
+    ],
+    # Everything here is re-derivable from the public dump; don't pay 7 days of
+    # soft-delete retention on ~7 GB of staging data every week.
+    soft_delete_policy={"retention_duration_seconds": 0},
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+musicbrainz_staging_dataset = gcp.bigquery.Dataset(
+    "musicbrainz-staging-dataset",
+    dataset_id="musicbrainz_staging",
+    project=project,
+    location="US",
+    description="Scratch space for the weekly MusicBrainz refresh (raw dump tables + candidate builds)",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
+mb_refresh_sa = gcp.serviceaccount.Account(
+    "mb-refresh-sa",
+    account_id="mb-refresh",
+    display_name="MusicBrainz Refresh Job",
+    description="Runs the weekly mb-refresh Cloud Run Job",
+    project=project,
+)
+mb_refresh_member = mb_refresh_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+gcp.projects.IAMMember(
+    "mb-refresh-bq-job-user",
+    project=project,
+    role="roles/bigquery.jobUser",
+    member=mb_refresh_member,
+)
+for _name, _dataset in [("prod", bigquery_dataset), ("staging", musicbrainz_staging_dataset)]:
+    gcp.bigquery.DatasetIamMember(
+        f"mb-refresh-bq-editor-{_name}",
+        project=project,
+        dataset_id=_dataset.dataset_id,
+        role="roles/bigquery.dataEditor",
+        member=mb_refresh_member,
+    )
+gcp.storage.BucketIAMMember(
+    "mb-refresh-bucket-admin",
+    bucket=musicbrainz_bucket.name,
+    role="roles/storage.objectAdmin",
+    member=mb_refresh_member,
+)
+
+mb_refresh_job = gcp.cloudrunv2.Job(
+    "mb-refresh-job",
+    name=MB_REFRESH_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "karaoke_decide.etl.musicbrainz_refresh"],
+                    "args": ["run"],
+                    "resources": {"limits": {"cpu": "4", "memory": "4Gi"}},
+                }
+            ],
+            "service_account": mb_refresh_sa.email,
+            "timeout": "10800s",
+            # A failed run logs an ERROR (error monitor alerts); next week's run retries.
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),
+)
+
+mb_refresh_invoker = gcp.cloudrunv2.JobIamMember(
+    "mb-refresh-scheduler-invoker",
+    project=project,
+    location=region,
+    name=mb_refresh_job.name,
+    role="roles/run.invoker",
+    member=mb_refresh_member,
+)
+
+# MusicBrainz publishes full dumps Wed + Sat (~00:20 UTC, files complete by ~05:00).
+gcp.cloudscheduler.Job(
+    "mb-refresh-scheduler",
+    name="mb-refresh-weekly",
+    description="Weekly MusicBrainz dump -> BigQuery refresh",
+    project=project,
+    region=region,
+    schedule="0 10 * * 0",
+    time_zone="UTC",
+    attempt_deadline="60s",
+    http_target={
+        "uri": mb_refresh_job.name.apply(
+            lambda name: f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{name}:run"
+        ),
+        "http_method": "POST",
+        "oauth_token": {
+            "service_account_email": mb_refresh_sa.email,
+            "scope": "https://www.googleapis.com/auth/cloud-platform",
+        },
+    },
+    opts=pulumi.ResourceOptions(depends_on=[mb_refresh_invoker]),
+)
 
 # =============================================================================
 # Cloudflare Worker (API Proxy)
