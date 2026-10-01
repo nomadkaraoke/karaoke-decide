@@ -36,8 +36,7 @@ def quota_exhausted_message() -> str:
     """QUOTA_EXHAUSTED_MESSAGE plus a hint when the key came from the environment."""
     if os.environ.get("GEMINI_API_KEY", "").strip():
         return (
-            QUOTA_EXHAUSTED_MESSAGE
-            + " Note: the key came from the GEMINI_API_KEY environment variable — "
+            QUOTA_EXHAUSTED_MESSAGE + " Note: the key came from the GEMINI_API_KEY environment variable — "
             "unset it to use the Secret Manager key instead."
         )
     return QUOTA_EXHAUSTED_MESSAGE
@@ -59,8 +58,13 @@ def get_api_key() -> str:
     if _cached_key:
         return _cached_key
     cmd = [
-        "gcloud", "secrets", "versions", "access", "latest",
-        f"--secret={SECRET_NAME}", f"--project={SECRET_PROJECT}",
+        "gcloud",
+        "secrets",
+        "versions",
+        "access",
+        "latest",
+        f"--secret={SECRET_NAME}",
+        f"--project={SECRET_PROJECT}",
     ]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, check=False)
