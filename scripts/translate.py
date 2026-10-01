@@ -36,14 +36,14 @@ import sys
 import time
 from pathlib import Path
 
-from google import genai
-from google.genai import types
 from gemini_client import (
-    quota_exhausted_message,
     GeminiKeyUnavailableError,
     get_genai_client,
     is_quota_or_billing_error,
+    quota_exhausted_message,
 )
+from google import genai
+from google.genai import types
 from translation_cache import TranslationCache
 
 MODEL = "gemini-3.8-flash"
@@ -614,7 +614,7 @@ async def async_main(args):
 
     # Only save snapshot if all translations succeeded (never on a dry run)
     if args.dry_run:
-        print(f"\nSnapshot NOT saved (dry run)")
+        print("\nSnapshot NOT saved (dry run)")
     elif failed == 0:
         with open(snapshot_path, "w", encoding="utf-8") as f:
             json.dump(english_data, f, ensure_ascii=False, indent=2)
