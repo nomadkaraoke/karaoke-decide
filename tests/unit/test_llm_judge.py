@@ -1,15 +1,15 @@
-"""Tests for the Vertex AI LLM karaoke-suitability judge."""
+"""Tests for the Gemini (Developer API) LLM karaoke-suitability judge."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from karaoke_decide.core.exceptions import ExternalServiceError
-from karaoke_decide.services.llm_judge import LlmJudge
+from karaoke_decide.services.llm_judge import LlmJudge, LlmQuotaExhaustedError
 
 
 def _judge_with_response(text: str) -> LlmJudge:
-    j = LlmJudge("proj", "global", "gemini-3.8-flash")
+    j = LlmJudge("gemini-3.8-flash")
     fake_client = MagicMock()
     fake_client.models.generate_content.return_value = MagicMock(text=text)
     j._client = fake_client
@@ -52,9 +52,38 @@ class TestJudge:
             j.judge("A", "B", "x", {})
 
     def test_sdk_error_wrapped(self):
-        j = LlmJudge("proj", "global", "m")
+        j = LlmJudge("m")
         fake = MagicMock()
-        fake.models.generate_content.side_effect = RuntimeError("vertex down")
+        fake.models.generate_content.side_effect = RuntimeError("gemini down")
         j._client = fake
         with pytest.raises(ExternalServiceError):
             j.judge("A", "B", "x", {})
+
+    def test_sdk_error_is_not_quota(self):
+        j = LlmJudge("m")
+        fake = MagicMock()
+        fake.models.generate_content.side_effect = RuntimeError("503 UNAVAILABLE overloaded")
+        j._client = fake
+        with pytest.raises(ExternalServiceError) as ei:
+            j.judge("A", "B", "x", {})
+        assert not isinstance(ei.value, LlmQuotaExhaustedError)
+
+    def test_quota_error_raises_quota_exhausted(self):
+        class FakeAPIError(Exception):
+            code = 429
+            status = "RESOURCE_EXHAUSTED"
+
+        j = LlmJudge("m")
+        fake = MagicMock()
+        fake.models.generate_content.side_effect = FakeAPIError("quota")
+        j._client = fake
+        with pytest.raises(LlmQuotaExhaustedError):
+            j.judge("A", "B", "x", {})
+
+    def test_client_uses_api_key_not_vertex(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+        with patch("google.genai.Client") as client_cls:
+            LlmJudge("m")._get_client()
+        kwargs = client_cls.call_args.kwargs
+        assert kwargs["api_key"] == "test-key"
+        assert "vertexai" not in kwargs and "project" not in kwargs

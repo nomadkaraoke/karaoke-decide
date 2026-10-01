@@ -26,6 +26,7 @@ import asyncio
 import csv
 import hashlib
 import json
+import logging
 import time
 from collections import Counter
 from dataclasses import dataclass, field
@@ -37,7 +38,7 @@ from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 from karaoke_decide.services.flacfetch import FlacfetchClient
 from karaoke_decide.services.gen_jobs import GenJobsService
 from karaoke_decide.services.lastfm import LastFmClient
-from karaoke_decide.services.llm_judge import LlmJudge
+from karaoke_decide.services.llm_judge import LlmJudge, LlmQuotaExhaustedError
 from karaoke_decide.services.lrclib import LrclibClient
 from karaoke_decide.services.spotify_features import SpotifyFeatures, SpotifyFeaturesService
 
@@ -64,6 +65,15 @@ GENRES_TTL = _MONTH  # artist genres/tags shift slowly -> refresh monthly
 LRCLIB_TTL: float | None = None  # lyrics never change -> cache forever
 SPOTIFY_TTL: float | None = None  # audio features never change -> forever
 LLM_TTL: float | None = None  # keyed by lyrics hash -> forever
+
+logger = logging.getLogger(__name__)
+
+# Used (never cached) when the Gemini key's quota/prepaid credit is exhausted.
+LLM_UNAVAILABLE_VERDICT: dict[str, Any] = {
+    "keep": True,
+    "confidence": 0.0,
+    "reason": "LLM judge unavailable (Gemini quota/credit exhausted) — review manually",
+}
 
 # Stable CSV header for candidates.csv (also written when there are 0 rows).
 _CSV_FIELDS = [
@@ -304,6 +314,7 @@ class CandidateGenerator:
         self.catalog = catalog
         self.spotify = spotify
         self.llm = llm
+        self._llm_unavailable = False  # set after a quota/credit error
         self.username = username
         self.weights = weights or ScoreWeights()
         self.min_score = min_score
@@ -558,11 +569,23 @@ class CandidateGenerator:
                 "unique_words": stats.unique_words,
                 "suitability_score": round(score, 1),
             }
-            try:
-                verdict = self._judge(artist, title, text, metadata)
-            except ExternalServiceError:
-                result.skipped["llm_error"] += 1
-                continue
+            if self._llm_unavailable:
+                verdict = dict(LLM_UNAVAILABLE_VERDICT)
+            else:
+                try:
+                    verdict = self._judge(artist, title, text, metadata)
+                except LlmQuotaExhaustedError as exc:
+                    # Gemini credit/quota/key exhausted: stop calling it and keep
+                    # candidates un-judged (flagged for manual review) rather than
+                    # silently dropping every remaining song.
+                    logger.warning("LLM judge disabled for this run: %s", exc)
+                    self._llm_unavailable = True
+                    verdict = dict(LLM_UNAVAILABLE_VERDICT)
+                except ExternalServiceError:
+                    result.skipped["llm_error"] += 1
+                    continue
+            if self._llm_unavailable:
+                result.skipped["llm_unavailable_kept"] += 1
             if not verdict.get("keep", True):
                 result.skipped["llm_reject"] += 1
                 result.misses.append(Miss(artist, title, plays, f"llm: {verdict.get('reason', '')}", stats))

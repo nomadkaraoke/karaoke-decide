@@ -2,7 +2,7 @@
 """
 LLM Translation Pipeline for Nomad Karaoke i18n.
 
-Two-pass translation using Gemini via Vertex AI:
+Two-pass translation using Gemini (Developer API):
   1. Translate English JSON to target language
   2. Review and polish translations for fluency
 
@@ -24,7 +24,9 @@ Usage:
 
 Requires:
   - google-genai SDK (pip install google-genai)
-  - GCP Application Default Credentials (gcloud auth application-default login)
+  - Gemini Developer API key: GEMINI_API_KEY env var, else read from Secret
+    Manager (gemini-api-key) via your gcloud login — see gemini_client.py
+  - GCP Application Default Credentials for the GCS translation cache
 """
 
 import argparse
@@ -36,11 +38,15 @@ from pathlib import Path
 
 from google import genai
 from google.genai import types
+from gemini_client import (
+    quota_exhausted_message,
+    GeminiKeyUnavailableError,
+    get_genai_client,
+    is_quota_or_billing_error,
+)
 from translation_cache import TranslationCache
 
 MODEL = "gemini-3.8-flash"
-PROJECT = "nomadkaraoke"
-LOCATION = "global"
 
 MAX_CONCURRENT = 5
 MAX_RETRIES = 3
@@ -327,7 +333,8 @@ async def _call_with_retry(client: genai.Client, prompt: str) -> str:
             )
             return response.text
         except Exception as e:
-            if attempt == MAX_RETRIES - 1:
+            # Quota/credit/key errors won't fix themselves — fail fast.
+            if attempt == MAX_RETRIES - 1 or is_quota_or_billing_error(e):
                 raise
             wait = 2 ** (attempt + 1)
             print(f"  Retry {attempt + 1}/{MAX_RETRIES} after error: {e}")
@@ -557,15 +564,17 @@ async def async_main(args):
         enabled=not args.no_cache,
     )
 
-    # Initialize Vertex AI client
-    client = genai.Client(
-        vertexai=True,
-        project=PROJECT,
-        location=LOCATION,
-    )
+    # Gemini Developer API client (API key; not needed for --dry-run)
+    client = None
+    if not args.dry_run:
+        try:
+            client = get_genai_client()
+        except GeminiKeyUnavailableError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(2)
 
     print(f"Using model: {MODEL}")
-    print(f"Project: {PROJECT}, Location: {LOCATION}")
+    print("Backend: Gemini Developer API (gemini-api-key)")
     print(f"Locales: {', '.join(locales)} ({len(locales)} total)")
     print(f"Mode: {'full' if args.full or snapshot_data is None else 'incremental (delta)'}")
     print(f"Review: {'skip' if args.skip_review else 'enabled'}")
@@ -603,8 +612,10 @@ async def async_main(args):
     succeeded = sum(1 for r in results if r is True)
     failed = sum(1 for r in results if r is not True)
 
-    # Only save snapshot if all translations succeeded
-    if failed == 0:
+    # Only save snapshot if all translations succeeded (never on a dry run)
+    if args.dry_run:
+        print(f"\nSnapshot NOT saved (dry run)")
+    elif failed == 0:
         with open(snapshot_path, "w", encoding="utf-8") as f:
             json.dump(english_data, f, ensure_ascii=False, indent=2)
             f.write("\n")
@@ -623,9 +634,13 @@ async def async_main(args):
     else:
         print()
 
+    if any(isinstance(r, BaseException) and is_quota_or_billing_error(r) for r in results):
+        print(f"\nError: {quota_exhausted_message()}", file=sys.stderr)
+        sys.exit(2)
+
 
 def main():
-    parser = argparse.ArgumentParser(description="Translate i18n message files using Gemini via Vertex AI")
+    parser = argparse.ArgumentParser(description="Translate i18n message files using the Gemini Developer API")
     parser.add_argument(
         "--messages-dir",
         type=Path,
