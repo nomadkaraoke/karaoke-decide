@@ -40,6 +40,14 @@ def _is_edge_block(response: httpx.Response) -> bool:
     return False
 
 
+def _close_smtp(smtp: smtplib.SMTP) -> None:
+    """QUIT the session; a failed QUIT after an accepted send must not fail the send."""
+    try:
+        smtp.quit()
+    except (smtplib.SMTPException, OSError):
+        smtp.close()
+
+
 class EmailService:
     """Service for sending emails via Postmark's REST API."""
 
@@ -119,10 +127,13 @@ class EmailService:
             msg["X-PM-Message-Stream"] = "outbound"
             msg.set_content(html_content, subtype="html")
 
-            with smtplib.SMTP(POSTMARK_SMTP_HOST, POSTMARK_SMTP_PORT, timeout=POSTMARK_SMTP_TIMEOUT) as smtp:
+            smtp = smtplib.SMTP(POSTMARK_SMTP_HOST, POSTMARK_SMTP_PORT, timeout=POSTMARK_SMTP_TIMEOUT)
+            try:
                 smtp.starttls(context=ssl.create_default_context())
                 smtp.login(token, token)
                 smtp.send_message(msg, to_addrs=[to_email])
+            finally:
+                _close_smtp(smtp)
         except (smtplib.SMTPException, OSError, ValueError):
             # ValueError: EmailMessage rejects CR/LF in header values.
             logger.exception(f"Failed to send email to {to_email} via Postmark SMTP fallback")

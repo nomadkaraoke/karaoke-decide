@@ -1,7 +1,7 @@
 """Tests for EmailService's Postmark send path and SMTP fallback."""
 
 import smtplib
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -42,8 +42,7 @@ def mock_post():
 @pytest.fixture
 def mock_smtp():
     with patch("backend.services.email_service.smtplib.SMTP") as smtp_cls:
-        smtp = MagicMock()
-        smtp_cls.return_value.__enter__.return_value = smtp
+        smtp = smtp_cls.return_value
         yield smtp_cls, smtp
 
 
@@ -112,3 +111,12 @@ async def test_smtp_header_injection_returns_false(service, mock_post, mock_smtp
 
     assert await service._send("user@example.com", "Subj\nBcc: evil@example.com", "<p>x</p>") is False
     mock_smtp[1].send_message.assert_not_called()
+
+
+async def test_quit_failure_after_send_still_reports_success(service, mock_post, mock_smtp):
+    """Postmark already accepted the message; a failed QUIT must not trigger a resend."""
+    mock_post.return_value = _response(403)
+    mock_smtp[1].quit.side_effect = smtplib.SMTPServerDisconnected("gone")
+
+    assert await service._send("user@example.com", "Subj", "<p>x</p>") is True
+    mock_smtp[1].close.assert_called_once()
