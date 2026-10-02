@@ -123,14 +123,16 @@ Last.fm top tracks (playcount order = the ranking) → **free eliminators** [rej
 list · "already ours" (fresh Firestore `jobs`) · KaraokeNerds community versions]
 → **Spotify audio-features match** (mandatory; batched BigQuery + cache) → **LRCLIB
 lyrics** → **karaoke-suitability score** (instrumentalness/duration/richness; cheap
-pre-filter) → **LLM judge** (Gemini via Vertex; reads the lyrics + metadata — the
+pre-filter) → **LLM judge** (Gemini Developer API; reads the lyrics + metadata — the
 real quality gate, catches mostly-instrumental / wrong-lyrics / over-repetitive) →
 **flacfetch high-quality-FLAC** hard gate. Rejections/misses logged to
 `candidates/output/rejected_misses.csv`.
 
 Requires (workspace `.envrc` / direnv): `ANDREW_LASTFM_APIKEY` (or `LASTFM_API_KEY`),
-`FLACFETCH_API_KEY`, and GCP ADC with read access to BigQuery + Firestore and
-`generate_content` on Vertex AI (the LLM judge uses ADC — no API key). Data +
+`FLACFETCH_API_KEY`, and GCP ADC with read access to BigQuery + Firestore. The LLM
+judge uses the Gemini Developer API key (`GEMINI_API_KEY`, else Secret Manager
+`gemini-api-key` via gcloud); if its quota/credit is exhausted, candidates are
+kept and flagged "review manually" instead of being dropped. Data +
 caches live in `candidates/` (reject list committed; caches/reports gitignored).
 Design + calibration notes:
 `docs/archive/2026-08-30-karaoke-candidate-tool-v2-kickoff.md`.

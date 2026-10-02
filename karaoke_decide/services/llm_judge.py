@@ -1,11 +1,12 @@
-"""LLM karaoke-suitability judge (Gemini via Vertex AI).
+"""LLM karaoke-suitability judge (Gemini Developer API).
 
 Metadata alone can't tell "the vocals only cover a third of the song" or "these
 lyrics are the wrong song" — the failure modes that dominate on electronic/DnB
 libraries. This judge reads the actual lyrics plus the metadata and returns a
 keep/reject verdict with a reason.
 
-Uses the same Vertex AI path as the translation pipeline (ADC auth, no API key).
+Uses the Gemini Developer API key (``GEMINI_API_KEY`` env var, else Secret
+Manager ``gemini-api-key`` via gcloud) — see ``services/gemini_client.py``.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from karaoke_decide.core.exceptions import ExternalServiceError
+from karaoke_decide.services.gemini_client import get_genai_client, is_quota_or_billing_error
 
 
 def _as_float(value: Any) -> float:
@@ -61,28 +63,22 @@ class Verdict:
         return {"keep": self.keep, "confidence": self.confidence, "reason": self.reason}
 
 
-class LlmJudge:
-    """Karaoke-suitability judge backed by Vertex AI Gemini."""
+class LlmQuotaExhaustedError(ExternalServiceError):
+    """Gemini quota / prepaid credit / API key problem — retrying won't help."""
 
-    def __init__(self, project: str, location: str, model: str, timeout_ms: int = 60000):
-        self.project = project
-        self.location = location
+
+class LlmJudge:
+    """Karaoke-suitability judge backed by Gemini (Developer API)."""
+
+    def __init__(self, model: str, timeout_ms: int = 60000):
         self.model = model
         self.timeout_ms = timeout_ms
         self._client: Any = None
 
     def _get_client(self) -> Any:
         if self._client is None:
-            from google import genai  # imported lazily; heavy optional dep
-            from google.genai import types
-
-            self._client = genai.Client(
-                vertexai=True,
-                project=self.project,
-                location=self.location,
-                # Bound each request so a stalled call can't hang the run.
-                http_options=types.HttpOptions(timeout=self.timeout_ms),
-            )
+            # Bound each request so a stalled call can't hang the run.
+            self._client = get_genai_client(timeout_ms=self.timeout_ms)
         return self._client
 
     def _build_prompt(self, artist: str, title: str, lyrics: str, metadata: dict[str, Any]) -> str:
@@ -96,7 +92,11 @@ class LlmJudge:
         )
 
     def judge(self, artist: str, title: str, lyrics: str, metadata: dict[str, Any]) -> Verdict:
-        """Return a keep/reject Verdict. Raises ExternalServiceError on failure."""
+        """Return a keep/reject Verdict.
+
+        Raises LlmQuotaExhaustedError on quota/credit/key errors, ExternalServiceError
+        on any other failure.
+        """
         from google.genai import types
 
         prompt = self._build_prompt(artist, title, lyrics, metadata)
@@ -111,7 +111,9 @@ class LlmJudge:
             )
             text = (resp.text or "").strip()
         except Exception as exc:  # noqa: BLE001 - normalize SDK errors
-            raise ExternalServiceError("VertexAI", str(exc)) from exc
+            if is_quota_or_billing_error(exc):
+                raise LlmQuotaExhaustedError("Gemini", str(exc)) from exc
+            raise ExternalServiceError("Gemini", str(exc)) from exc
 
         data = self._parse(text)
         verdict = str(data.get("verdict", "")).lower()
@@ -124,7 +126,7 @@ class LlmJudge:
     @staticmethod
     def _parse(text: str) -> dict[str, Any]:
         if not text:
-            raise ExternalServiceError("VertexAI", "empty response")
+            raise ExternalServiceError("Gemini", "empty response")
         # Be tolerant of accidental code fences.
         if text.startswith("```"):
             text = text.strip("`")
@@ -132,7 +134,7 @@ class LlmJudge:
         try:
             obj = json.loads(text)
         except json.JSONDecodeError as exc:
-            raise ExternalServiceError("VertexAI", f"bad JSON: {text[:120]}") from exc
+            raise ExternalServiceError("Gemini", f"bad JSON: {text[:120]}") from exc
         if not isinstance(obj, dict):
-            raise ExternalServiceError("VertexAI", "response was not an object")
+            raise ExternalServiceError("Gemini", "response was not an object")
         return obj

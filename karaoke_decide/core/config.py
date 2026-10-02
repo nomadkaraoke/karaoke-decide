@@ -61,9 +61,8 @@ class Settings(BaseSettings):
     # LRCLIB (lyrics text source for richness heuristics)
     lrclib_user_agent: str = "karaoke-decide-candidates/2.0 (https://nomadkaraoke.com)"
 
-    # Vertex AI (LLM karaoke-suitability judge for the candidates tool)
-    vertex_project: str = "nomadkaraoke"
-    vertex_location: str = "global"
+    # Gemini Developer API (LLM karaoke-suitability judge for the candidates tool).
+    # Key: GEMINI_API_KEY env var, else Secret Manager `gemini-api-key` via gcloud.
     candidates_llm_model: str = "gemini-3.8-flash"
 
     # Postmark (transactional email)

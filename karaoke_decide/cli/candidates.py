@@ -63,11 +63,7 @@ def _build_generator(min_score: float = 45.0) -> CandidateGenerator:
         gen_jobs=GenJobsService(),
         catalog=BigQueryCatalogService(),
         spotify=SpotifyFeaturesService(),
-        llm=LlmJudge(
-            settings.vertex_project,
-            settings.vertex_location,
-            settings.candidates_llm_model,
-        ),
+        llm=LlmJudge(settings.candidates_llm_model),
         username=settings.lastfm_username,
         min_score=min_score,
     )

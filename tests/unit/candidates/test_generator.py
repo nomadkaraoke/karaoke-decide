@@ -220,6 +220,44 @@ class TestSuggest:
         assert "LlmSong" in reasons and reasons["LlmSong"].startswith("llm:")
         assert reasons.get("UnsrcSong") == "unsourceable"
 
+    async def test_llm_quota_exhausted_keeps_candidates_for_manual_review(self, generator):
+        from karaoke_decide.services.llm_judge import LlmQuotaExhaustedError
+
+        class QuotaLlm:
+            calls = 0
+
+            def judge(self, *a, **k):
+                QuotaLlm.calls += 1
+                raise LlmQuotaExhaustedError("Gemini", "429 RESOURCE_EXHAUSTED")
+
+        generator.llm = QuotaLlm()
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        # Judge called once, then disabled for the rest of the run.
+        assert QuotaLlm.calls == 1
+        # Nothing is LLM-rejected — songs are kept (flagged) instead of dropped.
+        assert "GoodSong" in [c.title for c in r.confirmed]
+        assert r.skipped["llm_reject"] == 0
+        assert not any(m.reason.startswith("llm:") for m in r.misses)
+        assert r.skipped["llm_error"] == 0
+        assert r.skipped["llm_unavailable_kept"] == 3  # GoodSong, LlmSong, UnsrcSong
+        assert all("review manually" in c.llm["reason"] for c in r.confirmed)
+
+    async def test_llm_quota_exhausted_still_uses_cached_verdicts(self, generator):
+        from karaoke_decide.services.llm_judge import LlmQuotaExhaustedError
+
+        await generator.suggest(count=5, min_plays=1, max_checks=50)  # caches verdicts
+
+        class QuotaLlm:
+            def judge(self, *a, **k):
+                raise LlmQuotaExhaustedError("Gemini", "quota")
+
+        generator.llm = QuotaLlm()
+        generator._llm_unavailable = True
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        # The cached reject still rejects; nothing falls back to "review manually".
+        assert r.skipped["llm_reject"] == 1
+        assert r.skipped["llm_unavailable_kept"] == 0
+
     async def test_caching_skips_repeat_llm(self, generator):
         await generator.suggest(count=5, min_plays=1, max_checks=50)
         first_calls = generator.llm.calls
