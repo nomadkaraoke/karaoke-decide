@@ -1,6 +1,10 @@
 """Email service for sending transactional emails via Postmark."""
 
+import asyncio
 import logging
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 import httpx
 
@@ -11,6 +15,29 @@ logger = logging.getLogger(__name__)
 
 
 POSTMARK_API_URL = "https://api.postmarkapp.com/email"
+
+# SMTP fallback for when Postmark's API edge blocks us. Since 2026-09-30 the edge
+# has answered us-central1 Cloud Run egress IPs with a bare nginx HTML 403 for
+# hours at a time; SMTP is separate infrastructure. Auth = server token as both
+# username and password. Mirrors karaoke-gen's PostmarkEmailProvider fallback.
+POSTMARK_SMTP_HOST = "smtp.postmarkapp.com"
+POSTMARK_SMTP_PORT = 587
+POSTMARK_SMTP_TIMEOUT = 15
+
+
+def _is_edge_block(response: httpx.Response) -> bool:
+    """True for a 403 without a JSON body: an IP-level block at Postmark's edge.
+
+    Postmark's own API errors come back as JSON; a bare HTML 403 never reached
+    the API, so the message wasn't accepted and resending over SMTP is safe.
+    """
+    if response.status_code != 403:
+        return False
+    try:
+        response.json()
+    except ValueError:
+        return True
+    return False
 
 
 class EmailService:
@@ -52,9 +79,17 @@ class EmailService:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(POSTMARK_API_URL, json=payload, headers=headers)
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            # Never reached Postmark, so the message wasn't accepted: safe to resend.
+            logger.warning(f"Postmark API unreachable for {to_email}; falling back to SMTP")
+            return await self._send_via_smtp(to_email, subject, html_content)
         except httpx.HTTPError:
             logger.exception(f"Failed to send email to {to_email} via Postmark")
             return False
+
+        if _is_edge_block(response):
+            logger.warning(f"Postmark API edge returned HTML 403 for {to_email}; falling back to SMTP")
+            return await self._send_via_smtp(to_email, subject, html_content)
 
         if 200 <= response.status_code < 300:
             logger.info(f"Email sent to {to_email} via Postmark")
@@ -69,6 +104,32 @@ class EmailService:
         except ValueError:
             logger.error(f"Postmark returned status {response.status_code}: {response.text[:200]}")
         return False
+
+    async def _send_via_smtp(self, to_email: str, subject: str, html_content: str) -> bool:
+        """Send through Postmark's SMTP endpoint (used when the API is blocked)."""
+        return await asyncio.to_thread(self._send_via_smtp_sync, to_email, subject, html_content)
+
+    def _send_via_smtp_sync(self, to_email: str, subject: str, html_content: str) -> bool:
+        token = self.settings.postmark_server_token
+        try:
+            msg = EmailMessage()
+            msg["From"] = self.settings.postmark_from_email
+            msg["To"] = to_email
+            msg["Subject"] = subject
+            msg["X-PM-Message-Stream"] = "outbound"
+            msg.set_content(html_content, subtype="html")
+
+            with smtplib.SMTP(POSTMARK_SMTP_HOST, POSTMARK_SMTP_PORT, timeout=POSTMARK_SMTP_TIMEOUT) as smtp:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.login(token, token)
+                smtp.send_message(msg, to_addrs=[to_email])
+        except (smtplib.SMTPException, OSError, ValueError):
+            # ValueError: EmailMessage rejects CR/LF in header values.
+            logger.exception(f"Failed to send email to {to_email} via Postmark SMTP fallback")
+            return False
+
+        logger.info(f"Email sent to {to_email} via Postmark SMTP fallback")
+        return True
 
     async def send_magic_link(self, email: str, token: str, locale: str = "en") -> bool:
         """Send a magic link email to the user.
