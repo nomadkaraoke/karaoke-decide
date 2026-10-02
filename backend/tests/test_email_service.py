@@ -1,7 +1,9 @@
 """Tests for EmailService's Postmark send path and SMTP fallback."""
 
 import smtplib
-from unittest.mock import AsyncMock, patch
+from collections.abc import Iterator
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -22,7 +24,7 @@ def service() -> EmailService:
     )
 
 
-def _response(status_code: int, json_body: dict | None = None) -> httpx.Response:
+def _response(status_code: int, json_body: dict[str, Any] | None = None) -> httpx.Response:
     request = httpx.Request("POST", "https://api.postmarkapp.com/email")
     if json_body is not None:
         return httpx.Response(status_code, json=json_body, request=request)
@@ -30,7 +32,7 @@ def _response(status_code: int, json_body: dict | None = None) -> httpx.Response
 
 
 @pytest.fixture
-def mock_post():
+def mock_post() -> Iterator[AsyncMock]:
     with patch("backend.services.email_service.httpx.AsyncClient") as client_cls:
         post = AsyncMock()
         client_cls.return_value.__aenter__.return_value.post = post
@@ -38,20 +40,24 @@ def mock_post():
 
 
 @pytest.fixture
-def mock_smtp():
+def mock_smtp() -> Iterator[tuple[MagicMock, MagicMock]]:
     with patch("backend.services.email_service.smtplib.SMTP") as smtp_cls:
         smtp = smtp_cls.return_value
         yield smtp_cls, smtp
 
 
-async def test_api_success_does_not_use_smtp(service, mock_post, mock_smtp):
+async def test_api_success_does_not_use_smtp(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     mock_post.return_value = _response(200, {"MessageID": "abc"})
 
     assert await service._send("user@example.com", "Subj", "<p>x</p>") is True
     mock_smtp[0].assert_not_called()
 
 
-async def test_html_403_falls_back_to_smtp(service, mock_post, mock_smtp):
+async def test_html_403_falls_back_to_smtp(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     """The prod failure mode: nginx HTML 403 from Postmark's edge."""
     smtp_cls, smtp = mock_smtp
     mock_post.return_value = _response(403)
@@ -75,21 +81,31 @@ async def test_html_403_falls_back_to_smtp(service, mock_post, mock_smtp):
         (422, {"ErrorCode": 406, "Message": "Inactive recipient"}),
     ],
 )
-async def test_json_postmark_errors_do_not_fall_back(service, mock_post, mock_smtp, status, body):
+async def test_json_postmark_errors_do_not_fall_back(
+    service: EmailService,
+    mock_post: AsyncMock,
+    mock_smtp: tuple[MagicMock, MagicMock],
+    status: int,
+    body: dict[str, Any],
+) -> None:
     mock_post.return_value = _response(status, body)
 
     assert await service._send("user@example.com", "Subj", "<p>x</p>") is False
     mock_smtp[0].assert_not_called()
 
 
-async def test_connect_error_falls_back_to_smtp(service, mock_post, mock_smtp):
+async def test_connect_error_falls_back_to_smtp(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     mock_post.side_effect = httpx.ConnectError("unreachable")
 
     assert await service._send("user@example.com", "Subj", "<p>x</p>") is True
     mock_smtp[1].send_message.assert_called_once()
 
 
-async def test_read_timeout_does_not_fall_back(service, mock_post, mock_smtp):
+async def test_read_timeout_does_not_fall_back(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     """Postmark may already have accepted it; resending could duplicate."""
     mock_post.side_effect = httpx.ReadTimeout("no response")
 
@@ -97,21 +113,27 @@ async def test_read_timeout_does_not_fall_back(service, mock_post, mock_smtp):
     mock_smtp[0].assert_not_called()
 
 
-async def test_smtp_failure_returns_false(service, mock_post, mock_smtp):
+async def test_smtp_failure_returns_false(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     mock_post.return_value = _response(403)
     mock_smtp[1].login.side_effect = smtplib.SMTPAuthenticationError(535, b"bad")
 
     assert await service._send("user@example.com", "Subj", "<p>x</p>") is False
 
 
-async def test_smtp_header_injection_returns_false(service, mock_post, mock_smtp):
+async def test_smtp_header_injection_returns_false(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     mock_post.return_value = _response(403)
 
     assert await service._send("user@example.com", "Subj\nBcc: evil@example.com", "<p>x</p>") is False
     mock_smtp[1].send_message.assert_not_called()
 
 
-async def test_quit_failure_after_send_still_reports_success(service, mock_post, mock_smtp):
+async def test_quit_failure_after_send_still_reports_success(
+    service: EmailService, mock_post: AsyncMock, mock_smtp: tuple[MagicMock, MagicMock]
+) -> None:
     """Postmark already accepted the message; a failed QUIT must not trigger a resend."""
     mock_post.return_value = _response(403)
     mock_smtp[1].quit.side_effect = smtplib.SMTPServerDisconnected("gone")
