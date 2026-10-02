@@ -242,6 +242,22 @@ class TestSuggest:
         assert r.skipped["llm_unavailable_kept"] == 3  # GoodSong, LlmSong, UnsrcSong
         assert all("review manually" in c.llm["reason"] for c in r.confirmed)
 
+    async def test_llm_quota_exhausted_still_uses_cached_verdicts(self, generator):
+        from karaoke_decide.services.llm_judge import LlmQuotaExhaustedError
+
+        await generator.suggest(count=5, min_plays=1, max_checks=50)  # caches verdicts
+
+        class QuotaLlm:
+            def judge(self, *a, **k):
+                raise LlmQuotaExhaustedError("Gemini", "quota")
+
+        generator.llm = QuotaLlm()
+        generator._llm_unavailable = True
+        r = await generator.suggest(count=5, min_plays=1, max_checks=50)
+        # The cached reject still rejects; nothing falls back to "review manually".
+        assert r.skipped["llm_reject"] == 1
+        assert r.skipped["llm_unavailable_kept"] == 0
+
     async def test_caching_skips_repeat_llm(self, generator):
         await generator.suggest(count=5, min_plays=1, max_checks=50)
         first_calls = generator.llm.calls

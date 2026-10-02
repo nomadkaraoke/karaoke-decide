@@ -418,9 +418,13 @@ class CandidateGenerator:
         self.cache.set_item("lrclib", cache_key, result or {})
         return result
 
-    def _judge(self, artist: str, title: str, lyrics_text: str, metadata: dict[str, Any]) -> dict[str, Any]:
+    @staticmethod
+    def _judge_cache_key(artist: str, title: str, lyrics_text: str) -> str:
         lyrics_hash = hashlib.sha1(lyrics_text.encode("utf-8")).hexdigest()[:12]
-        cache_key = f"{artist}::{title}::{lyrics_hash}"
+        return f"{artist}::{title}::{lyrics_hash}"
+
+    def _judge(self, artist: str, title: str, lyrics_text: str, metadata: dict[str, Any]) -> dict[str, Any]:
+        cache_key = self._judge_cache_key(artist, title, lyrics_text)
         cached = self.cache.get_item("llm", cache_key, LLM_TTL)
         if cached is not None:
             return dict(cached)
@@ -569,8 +573,16 @@ class CandidateGenerator:
                 "unique_words": stats.unique_words,
                 "suitability_score": round(score, 1),
             }
-            if self._llm_unavailable:
+            cached_verdict = (
+                self.cache.get_item("llm", self._judge_cache_key(artist, title, text), LLM_TTL)
+                if self._llm_unavailable
+                else None
+            )
+            if cached_verdict is not None:
+                verdict = dict(cached_verdict)  # earlier verdicts still apply
+            elif self._llm_unavailable:
                 verdict = dict(LLM_UNAVAILABLE_VERDICT)
+                result.skipped["llm_unavailable_kept"] += 1
             else:
                 try:
                     verdict = self._judge(artist, title, text, metadata)
@@ -581,11 +593,10 @@ class CandidateGenerator:
                     logger.warning("LLM judge disabled for this run: %s", exc)
                     self._llm_unavailable = True
                     verdict = dict(LLM_UNAVAILABLE_VERDICT)
+                    result.skipped["llm_unavailable_kept"] += 1
                 except ExternalServiceError:
                     result.skipped["llm_error"] += 1
                     continue
-            if self._llm_unavailable:
-                result.skipped["llm_unavailable_kept"] += 1
             if not verdict.get("keep", True):
                 result.skipped["llm_reject"] += 1
                 result.misses.append(Miss(artist, title, plays, f"llm: {verdict.get('reason', '')}", stats))
