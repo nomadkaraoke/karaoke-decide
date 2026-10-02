@@ -86,4 +86,4 @@ class TestJudge:
             LlmJudge("m")._get_client()
         kwargs = client_cls.call_args.kwargs
         assert kwargs["api_key"] == "test-key"
-        assert "vertexai" not in kwargs and "project" not in kwargs
+        assert kwargs["vertexai"] is False and "project" not in kwargs
