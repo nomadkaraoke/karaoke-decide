@@ -26,9 +26,7 @@ def _response(status_code: int, json_body: dict | None = None) -> httpx.Response
     request = httpx.Request("POST", "https://api.postmarkapp.com/email")
     if json_body is not None:
         return httpx.Response(status_code, json=json_body, request=request)
-    return httpx.Response(
-        status_code, text="<html><center><h1>403 Forbidden</h1></center></html>", request=request
-    )
+    return httpx.Response(status_code, text="<html><center><h1>403 Forbidden</h1></center></html>", request=request)
 
 
 @pytest.fixture
