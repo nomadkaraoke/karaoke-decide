@@ -15,6 +15,21 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-10-02: Postmark blocks some Cloud Run egress IPs (HTML 403); SMTP fallback
+
+**Context:** Guest account upgrades (`POST /api/auth/upgrade`) returned 500 five times in a row on 2026-10-02, because the verification email failed. Postmark's API edge answered our us-central1 Cloud Run egress IP with a bare nginx HTML `403 Forbidden` instead of its usual JSON error. karaoke-gen hit the same thing, and its magic links and order emails were lost for hours.
+
+**Lesson:**
+- An HTML (non-JSON) 403 from `api.postmarkapp.com` is an **IP-reputation block** on a shared Google egress IP. Postmark confirmed this on ticket #11562402 and won't lift it.
+- Retrying the API is useless, because the instance keeps the same IP for hours.
+- Postmark **SMTP** (`smtp.postmarkapp.com:587`) is not affected.
+
+**Recommendation:**
+- v0.9.3 (`backend/services/email_service.py`) falls back to SMTP on an HTML 403 or a connect error. Keep it, and keep SMTP enabled on the Postmark server.
+- Log lines: `falling back to SMTP` (block hit), `via Postmark SMTP fallback` (sent), `Failed to send email to … via Postmark SMTP fallback` (lost).
+- A Cloud Monitoring alert ("Email - Postmark SMTP fallback failing", defined in karaoke-gen `infrastructure/modules/monitoring.py`) covers this service as well, matching on `textPayload`.
+- If that alert fires, add a static egress IP. Options, measured costs and steps are in karaoke-gen `docs/archive/2026-10-02-postmark-ip-block-options.md`.
+
 ### 2026-01-13: Infinite Scroll UX for Selection Interfaces
 
 **Context:** Quiz step 5 "Artists You Know" had a "Show More Artists" button that would reload/shuffle the list. Users complained that artists they'd already seen and planned to select would suddenly disappear.
