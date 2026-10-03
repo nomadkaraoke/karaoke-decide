@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 
 interface BadgeProps {
-  variant?: "default" | "spotify" | "lastfm" | "quiz" | "success" | "warning" | "error" | "danger" | "primary" | "secondary";
+  variant?: "default" | "spotify" | "lastfm" | "youtube" | "quiz" | "success" | "warning" | "error" | "danger" | "primary" | "secondary";
   size?: "sm" | "md";
   children: ReactNode;
   className?: string;
@@ -19,6 +19,7 @@ export function Badge({
     default: "bg-[var(--secondary)] text-[var(--text-muted)] border-[var(--card-border)]",
     spotify: "bg-[#1DB954]/20 text-[#1DB954] border-[#1DB954]/30",
     lastfm: "bg-[#D51007]/20 text-[#ff4444] border-[#D51007]/30",
+    youtube: "bg-[#FF0000]/20 text-[#ff4444] border-[#FF0000]/30",
     quiz: "bg-[var(--brand-purple)]/20 text-[var(--brand-purple)] border-[var(--brand-purple)]/30",
     success: "bg-green-500/20 text-green-400 border-green-500/30",
     warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -48,9 +49,15 @@ export function Badge({
 }
 
 // Convenience component for source badges
+const SOURCE_BADGES: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
+  spotify: { variant: "spotify", label: "Spotify" },
+  lastfm: { variant: "lastfm", label: "Last.fm" },
+  listenbrainz: { variant: "default", label: "ListenBrainz" },
+  youtube_music: { variant: "youtube", label: "YouTube Music" },
+};
+
 export function SourceBadge({ source }: { source: string }) {
-  const variant = source === "spotify" ? "spotify" : source === "lastfm" ? "lastfm" : "quiz";
-  const label = source === "spotify" ? "Spotify" : source === "lastfm" ? "Last.fm" : "Quiz";
+  const { variant, label } = SOURCE_BADGES[source] ?? { variant: "quiz", label: "Quiz" };
 
   return <Badge variant={variant}>{label}</Badge>;
 }

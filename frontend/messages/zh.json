@@ -898,9 +898,12 @@
     "howToStep4": "打开新建的歌单，点击“分享”→“复制链接”，然后粘贴在上方即可。",
     "howToTitle": "如何分享我的“顶过的音乐”？",
     "import": "导入",
-    "importedResult": "已从“{title}”导入 {fetched} 首歌（其中 {matched} 首有卡拉OK伴奏版本）。",
+    "importedResult": "已从“{title}”导入 {fetched, plural, one {# 首歌曲} other {# 首歌曲}}（其中 {matched} 首匹配到卡拉OK版本）。",
     "importing": "正在导入...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — 粘贴歌单链接"
+    "title": "YouTube Music — 粘贴歌单链接",
+    "emptyPlaylist": "“{title}”中没有我们可以读取的歌曲。请尝试其他播放列表。",
+    "errorTooManyImports": "您导入播放列表的操作过于频繁。请稍等一分钟后再试。",
+    "inputLabel": "YouTube Music 播放列表链接"
   }
 }

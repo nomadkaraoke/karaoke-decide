@@ -24,6 +24,10 @@ from karaoke_decide.services.youtube_music import YouTubeMusicClient, parse_play
 logger = logging.getLogger(__name__)
 
 
+class ImportRateLimitedError(Exception):
+    """User is importing playlists too often."""
+
+
 @dataclass
 class SyncResult:
     """Result of a sync operation for a single service."""
@@ -61,6 +65,10 @@ class SyncService:
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
     YOUTUBE_MUSIC_PLAYLIST_LIMIT = 1000  # Tracks read from a shared playlist
+    YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT = 500  # Lower cap for unverified guests
+    YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS = 30
+    YOUTUBE_MUSIC_IMPORTS_PER_DAY = 20
+    YOUTUBE_MUSIC_IMPORTS_COLLECTION = "youtube_music_imports"
     # Full scrobble history - now incremental with progress tracking
     LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
     LASTFM_BATCH_SIZE = 1000  # Save progress every N scrobbles
@@ -1204,25 +1212,41 @@ class SyncService:
         self,
         user_id: str,
         playlist_url: str,
+        is_guest: bool = False,
         client: YouTubeMusicClient | None = None,
     ) -> dict[str, Any]:
         """Import songs from a public/unlisted YouTube Music playlist.
 
+        Rate limited per user (cooldown + daily cap) since guests can call it
+        and each import costs YouTube requests plus ~2 Firestore ops per track.
+
         Args:
             user_id: User ID.
             playlist_url: Playlist link or ID shared by the user.
+            is_guest: Guests get a lower track limit.
             client: Optional YouTube Music client override (for tests).
 
         Returns:
             Dict with playlist_title, tracks_fetched, tracks_matched, created, updated.
 
         Raises:
+            ImportRateLimitedError: Too many recent imports.
             InvalidPlaylistUrlError, PrivatePlaylistError, PlaylistNotFoundError,
             PlaylistFetchError: See karaoke_decide.services.youtube_music.
         """
         playlist_id = parse_playlist_id(playlist_url)
-        playlist = await (client or YouTubeMusicClient()).get_playlist(
-            playlist_id, limit=self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
+        imports_today = await self._check_youtube_music_import_limits(user_id)
+        limit = self.YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT if is_guest else self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
+        playlist = await (client or YouTubeMusicClient()).get_playlist(playlist_id, limit=limit)
+        # Only successful fetches count, so a user can fix a private playlist and retry at once
+        await self.firestore.set_document(
+            self.YOUTUBE_MUSIC_IMPORTS_COLLECTION,
+            user_id,
+            {
+                "last_import_at": datetime.now(UTC).isoformat(),
+                "day": datetime.now(UTC).date().isoformat(),
+                "count": imports_today + 1,
+            },
         )
 
         matched = await self.track_matcher.batch_match_tracks(playlist.tracks)
@@ -1241,6 +1265,29 @@ class SyncService:
             "created": created,
             "updated": updated,
         }
+
+    async def _check_youtube_music_import_limits(self, user_id: str) -> int:
+        """Enforce the per-user import cooldown and daily cap.
+
+        Returns:
+            Number of imports the user has already done today.
+
+        Raises:
+            ImportRateLimitedError: If the user is over either limit.
+        """
+        now = datetime.now(UTC)
+        doc = await self.firestore.get_document(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id) or {}
+
+        last_import_at = doc.get("last_import_at")
+        if last_import_at:
+            elapsed = (now - datetime.fromisoformat(last_import_at)).total_seconds()
+            if elapsed < self.YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS:
+                raise ImportRateLimitedError("cooldown")
+
+        imports_today = doc.get("count", 0) if doc.get("day") == now.date().isoformat() else 0
+        if imports_today >= self.YOUTUBE_MUSIC_IMPORTS_PER_DAY:
+            raise ImportRateLimitedError("daily limit")
+        return imports_today
 
     # -------------------------------------------------------------------------
     # ListenBrainz Sync

@@ -898,9 +898,12 @@
     "howToStep4": "เปิดเพลย์ลิสต์ใหม่ แตะ แชร์ → คัดลอกลิงก์ แล้วนำมาวางที่ด้านบน",
     "howToTitle": "จะแชร์ \"เพลงที่ชอบ\" ได้อย่างไร?",
     "import": "นำเข้า",
-    "importedResult": "นำเข้าเพลงจาก \"{title}\" แล้ว {fetched} เพลง (มีเวอร์ชันคาราโอเกะ {matched} เพลง)",
+    "importedResult": "นำเข้า {fetched, plural, one {# เพลง} other {# เพลง}} จาก \"{title}\" เรียบร้อยแล้ว (พบเวอร์ชันคาราโอเกะ {matched} เพลง)",
     "importing": "กำลังนำเข้า...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — วางลิงก์เพลย์ลิสต์"
+    "title": "YouTube Music — วางลิงก์เพลย์ลิสต์",
+    "emptyPlaylist": "ไม่พบเพลงที่ระบบสามารถอ่านได้ใน \"{title}\" ลองใช้เพลย์ลิสต์อื่นดูนะ",
+    "errorTooManyImports": "คุณนำเข้าเพลย์ลิสต์ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง",
+    "inputLabel": "ลิงก์เพลย์ลิสต์ YouTube Music"
   }
 }

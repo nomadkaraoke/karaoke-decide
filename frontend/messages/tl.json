@@ -898,9 +898,12 @@
     "howToStep4": "Buksan ang bagong playlist, i-tap ang Share → Copy link, at i-paste ito sa itaas.",
     "howToTitle": "Paano ko maibabahagi ang aking Liked Music?",
     "import": "I-import",
-    "importedResult": "Na-import ang {fetched} (na) kanta mula sa \"{title}\" ({matched} ang may karaoke version).",
+    "importedResult": "Na-import ang {fetched, plural, one {# kanta} other {# kanta}} mula sa \"{title}\" ({matched} ang may karaoke version).",
     "importing": "Nag-i-import...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — mag-paste ng link ng playlist"
+    "title": "YouTube Music — mag-paste ng link ng playlist",
+    "emptyPlaylist": "Walang makitang kanta sa \"{title}\". Sumubok ng ibang playlist.",
+    "errorTooManyImports": "Masyadong mabilis ang pag-import mo ng mga playlist. Maghintay muna ng isang minuto bago subukan ulit.",
+    "inputLabel": "Link ng YouTube Music playlist"
   }
 }

@@ -898,9 +898,12 @@
     "howToStep4": "Apri la nuova playlist, seleziona Condividi → Copia link e incollalo qui sopra.",
     "howToTitle": "Come faccio a condividere i miei \"Brani che ti piacciono\"?",
     "import": "Importa",
-    "importedResult": "Importati {fetched} brani da \"{title}\" ({matched} hanno versioni karaoke).",
+    "importedResult": "{fetched, plural, one {È stato importato # brano} other {Sono stati importati # brani}} da \"{title}\" ({matched} con versioni karaoke).",
     "importing": "Importazione in corso...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — incolla il link di una playlist"
+    "title": "YouTube Music — incolla il link di una playlist",
+    "emptyPlaylist": "\"{title}\" non contiene brani leggibili. Prova con un'altra playlist.",
+    "errorTooManyImports": "Stai importando playlist troppo velocemente. Attendi un minuto e riprova.",
+    "inputLabel": "Link della playlist di YouTube Music"
   }
 }

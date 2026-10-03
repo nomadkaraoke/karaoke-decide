@@ -891,7 +891,7 @@
     "placeholder": "https://music.youtube.com/playlist?list=...",
     "import": "Import",
     "importing": "Importing...",
-    "importedResult": "Imported {fetched} songs from \"{title}\" ({matched} have karaoke versions).",
+    "importedResult": "Imported {fetched, plural, one {# song} other {# songs}} from \"{title}\" ({matched} with karaoke versions).",
     "errorInvalidLink": "That doesn't look like a YouTube Music playlist link.",
     "errorNotFound": "We couldn't open that playlist. Make sure it's set to Public or Unlisted.",
     "errorLikedMusicPrivate": "Your Liked Music playlist is always private. Copy its songs into a new Public or Unlisted playlist and share that instead (see how below).",
@@ -901,6 +901,9 @@
     "howToStep2": "Select the songs (click one, then Shift+click to select a range).",
     "howToStep3": "Choose \"Add to playlist\" → New playlist, and set visibility to Unlisted or Public.",
     "howToStep4": "Open the new playlist, tap Share → Copy link, and paste it above.",
-    "howToAnyPlaylist": "Any public or unlisted playlist of songs you love works too, e.g. your party or workout mix."
+    "howToAnyPlaylist": "Any public or unlisted playlist of songs you love works too, e.g. your party or workout mix.",
+    "emptyPlaylist": "\"{title}\" has no songs we could read. Try another playlist.",
+    "errorTooManyImports": "You're importing playlists too quickly. Please wait a minute and try again.",
+    "inputLabel": "YouTube Music playlist link"
   }
 }

@@ -898,9 +898,12 @@
     "howToStep4": "नई प्लेलिस्ट खोलो, Share → Copy link पर टैप करो, और उसे ऊपर पेस्ट करो।",
     "howToTitle": "मैं अपनी Liked Music प्लेलिस्ट कैसे शेयर करूँ?",
     "import": "इंपोर्ट करो",
-    "importedResult": "\"{title}\" से {fetched} गाने इंपोर्ट किए गए ({matched} के कराओके वर्शन उपलब्ध हैं)।",
+    "importedResult": "\"{title}\" से {fetched, plural, one {# गाना} other {# गाने}} इंपोर्ट किए गए ({matched} के कराओके वर्ज़न मौजूद हैं)।",
     "importing": "इंपोर्ट हो रहा है...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — प्लेलिस्ट लिंक पेस्ट करो"
+    "title": "YouTube Music — प्लेलिस्ट लिंक पेस्ट करो",
+    "emptyPlaylist": "\"{title}\" में ऐसा कोई गाना नहीं है जिसे हम पढ़ सकें। कोई दूसरी प्लेलिस्ट आज़माओ।",
+    "errorTooManyImports": "तुम बहुत तेज़ी से प्लेलिस्ट इंपोर्ट कर रहे हो। कृपया एक मिनट इंतज़ार करो और फिर से कोशिश करो।",
+    "inputLabel": "YouTube Music प्लेलिस्ट लिंक"
   }
 }

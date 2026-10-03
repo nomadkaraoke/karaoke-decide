@@ -898,9 +898,12 @@
     "howToStep4": "Mở danh sách phát mới, nhấn Chia sẻ → Sao chép đường liên kết, rồi dán vào ô bên trên.",
     "howToTitle": "Làm thế nào để chia sẻ danh sách Bài hát đã thích của tôi?",
     "import": "Nhập",
-    "importedResult": "Đã nhập {fetched} bài hát từ \"{title}\" ({matched} bài có phiên bản karaoke).",
+    "importedResult": "Đã nhập {fetched, plural, one {# bài hát} other {# bài hát}} từ \"{title}\" ({matched} bài có phiên bản karaoke).",
     "importing": "Đang nhập...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — dán liên kết danh sách phát"
+    "title": "YouTube Music — dán liên kết danh sách phát",
+    "emptyPlaylist": "\"{title}\" không có bài hát nào đọc được. Bạn hãy thử một danh sách phát khác nhé.",
+    "errorTooManyImports": "Bạn đang nhập danh sách phát quá nhanh. Vui lòng đợi một phút rồi thử lại nhé.",
+    "inputLabel": "Liên kết danh sách phát YouTube Music"
   }
 }

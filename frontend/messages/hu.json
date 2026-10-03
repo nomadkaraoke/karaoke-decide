@@ -898,9 +898,12 @@
     "howToStep4": "Nyisd meg az új lejátszási listát, kattints a Megosztás → Link másolása opcióra, és illeszd be fentebb.",
     "howToTitle": "Hogyan oszthatom meg a Kedvelt zenéimet?",
     "import": "Importálás",
-    "importedResult": "Sikeresen importálva {fetched} dal a(z) „{title}” listából ({matched} dalhoz érhető el karaoke változat).",
+    "importedResult": "Sikeresen importálva {fetched, plural, one {# dal} other {# dal}} a(z) „{title}” listából ({matched} karaokeverzióval párosítva).",
     "importing": "Importálás folyamatban...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — illessz be egy lejátszásilista-linket"
+    "title": "YouTube Music — illessz be egy lejátszásilista-linket",
+    "emptyPlaylist": "A(z) „{title}” lejátszási listában nem találtunk beolvasható dalt. Próbálkozz egy másik lejátszási listával.",
+    "errorTooManyImports": "Túl gyorsan importálsz lejátszási listákat. Kérlek, várj egy percet, és próbáld újra.",
+    "inputLabel": "YouTube Music lejátszási lista linkje"
   }
 }

@@ -898,9 +898,12 @@
     "howToStep4": "Открой новый плейлист, нажми «Поделиться» → «Копировать ссылку» и вставь её выше.",
     "howToTitle": "Как поделиться плейлистом «Понравившиеся»?",
     "import": "Импортировать",
-    "importedResult": "Импортировано треков: {fetched} из «{title}» (для {matched} есть караоке-версии).",
+    "importedResult": "Импортировано: {fetched, plural, one {# песня} few {# песни} many {# песен} other {# песен}} из «{title}» (из них {matched} с караоке-версиями).",
     "importing": "Импортируем...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — вставь ссылку на плейлист"
+    "title": "YouTube Music — вставь ссылку на плейлист",
+    "emptyPlaylist": "В плейлисте «{title}» нет песен, которые удалось бы прочитать. Попробуй другой плейлист.",
+    "errorTooManyImports": "Ты импортируешь плейлисты слишком быстро. Пожалуйста, подожди минуту и попробуй снова.",
+    "inputLabel": "Ссылка на плейлист YouTube Music"
   }
 }

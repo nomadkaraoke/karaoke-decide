@@ -898,9 +898,12 @@
     "howToStep4": "Otvori novu playlistu, dodirni Dijeli → Kopiraj poveznicu i zalijepi je gore.",
     "howToTitle": "Kako podijeliti svoja Sviđanja?",
     "import": "Uvezi",
-    "importedResult": "Uvezeno {fetched} pjesama s „{title}” ({matched} ima karaoke verziju).",
+    "importedResult": "Uvezeno: {fetched, plural, one {# pjesma} few {# pjesme} other {# pjesama}} s playliste \"{title}\" ({matched} s karaoke verzijama).",
     "importing": "Uvoz...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — zalijepi poveznicu na playlistu"
+    "title": "YouTube Music — zalijepi poveznicu na playlistu",
+    "emptyPlaylist": "\"{title}\" nema pjesama koje bismo mogli učitati. Isprobaj drugu playlistu.",
+    "errorTooManyImports": "Prebrzo uvoziš playliste. Pričekaj minutu pa pokušaj ponovno.",
+    "inputLabel": "Poveznica na YouTube Music playlistu"
   }
 }

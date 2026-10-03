@@ -17,6 +17,7 @@ const ERROR_KEYS: Record<number, string> = {
   400: "errorInvalidLink",
   404: "errorNotFound",
   422: "errorLikedMusicPrivate",
+  429: "errorTooManyImports",
 };
 
 /**
@@ -34,6 +35,7 @@ export function YouTubeMusicImport() {
     if (!playlistUrl.trim() || isImporting) return;
     setIsImporting(true);
     setError(null);
+    setResult(null);
     try {
       const response = await api.services.importYouTubeMusicPlaylist(playlistUrl.trim());
       setResult(response);
@@ -54,12 +56,18 @@ export function YouTubeMusicImport() {
       </div>
 
       {result && (
-        <p data-testid="youtube-music-import-result" className="text-sm text-[var(--brand-pink)] mb-2">
-          {t("importedResult", {
-            fetched: result.tracks_fetched,
-            matched: result.tracks_matched,
-            title: result.playlist_title,
-          })}
+        <p
+          data-testid="youtube-music-import-result"
+          role="status"
+          className="text-sm text-[var(--brand-pink)] mb-2"
+        >
+          {result.tracks_fetched === 0
+            ? t("emptyPlaylist", { title: result.playlist_title })
+            : t("importedResult", {
+                fetched: result.tracks_fetched,
+                matched: result.tracks_matched,
+                title: result.playlist_title,
+              })}
         </p>
       )}
 
@@ -70,13 +78,15 @@ export function YouTubeMusicImport() {
           handleImport();
         }}
       >
+        {/* type="text": also accept bare playlist IDs and links without https:// */}
         <input
-          type="url"
+          type="text"
           inputMode="url"
+          autoComplete="off"
           value={playlistUrl}
           onChange={(e) => setPlaylistUrl(e.target.value)}
           placeholder={t("placeholder")}
-          aria-label={t("placeholder")}
+          aria-label={t("inputLabel")}
           className="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm bg-[var(--bg)] border border-[var(--card-border)] text-[var(--text)] placeholder-[var(--text-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-pink)]/50"
         />
         <Button
@@ -91,7 +101,7 @@ export function YouTubeMusicImport() {
       </form>
 
       {error && (
-        <p data-testid="youtube-music-import-error" className="text-sm text-red-400 mt-2">
+        <p data-testid="youtube-music-import-error" role="alert" className="text-sm text-red-400 mt-2">
           {error}
         </p>
       )}

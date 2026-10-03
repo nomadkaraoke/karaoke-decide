@@ -898,9 +898,12 @@
     "howToStep4": "Yeni çalma listesini aç, Paylaş → Bağlantıyı kopyala'ya tıkla ve yukarıya yapıştır.",
     "howToTitle": "Beğenilen Müzikler listemi nasıl paylaşırım?",
     "import": "İçe aktar",
-    "importedResult": "\"{title}\" listesinden {fetched} şarkı içe aktarıldı ({matched} tanesinin karaoke versiyonu mevcut).",
+    "importedResult": "\"{title}\" listesinden {fetched, plural, one {# şarkı} other {# şarkı}} içe aktarıldı ({matched} tanesinin karaoke versiyonu bulundu).",
     "importing": "İçe aktarılıyor...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — bir çalma listesi bağlantısı yapıştır"
+    "title": "YouTube Music — bir çalma listesi bağlantısı yapıştır",
+    "emptyPlaylist": "\"{title}\" içinde okuyabileceğimiz şarkı bulunamadı. Başka bir çalma listesi dene.",
+    "errorTooManyImports": "Çalma listelerini çok hızlı içe aktarıyorsun. Lütfen bir dakika bekle ve tekrar dene.",
+    "inputLabel": "YouTube Music çalma listesi bağlantısı"
   }
 }

@@ -898,9 +898,12 @@
     "howToStep4": "Otevři nový playlist, klepni na Sdílet → Zkopírovat odkaz a vlož ho výše.",
     "howToTitle": "Jak nasdílet Oblíbenou hudbu?",
     "import": "Importovat",
-    "importedResult": "Importováno {fetched} skladeb z „{title}“ ({matched} má karaoke verzi).",
+    "importedResult": "Z playlistu \"{title}\" bylo importováno {fetched, plural, one {# skladba} few {# skladby} other {# skladeb}} (z toho {matched} s karaoke verzí).",
     "importing": "Importování...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — vlož odkaz na playlist"
+    "title": "YouTube Music — vlož odkaz na playlist",
+    "emptyPlaylist": "\"{title}\" neobsahuje žádné skladby, které bychom dokázali načíst. Zkus jiný playlist.",
+    "errorTooManyImports": "Importuješ playlisty příliš rychle. Počkej prosím minutu a zkus to znovu.",
+    "inputLabel": "Odkaz na playlist ze služby YouTube Music"
   }
 }

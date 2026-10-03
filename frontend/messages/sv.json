@@ -898,9 +898,12 @@
     "howToStep4": "Öppna den nya spellistan, klicka på Dela → Kopiera länk och klistra in den ovan.",
     "howToTitle": "Hur delar jag min gillade musik?",
     "import": "Importera",
-    "importedResult": "Importerade {fetched} låtar från \"{title}\" ({matched} har karaokeversioner).",
+    "importedResult": "Importerade {fetched, plural, one {# låt} other {# låtar}} från \"{title}\" ({matched} med karaokeversioner).",
     "importing": "Importerar...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music – klistra in en länk till en spellista"
+    "title": "YouTube Music – klistra in en länk till en spellista",
+    "emptyPlaylist": "\"{title}\" har inga låtar som vi kunde läsa in. Testa en annan spellista.",
+    "errorTooManyImports": "Du importerar spellistor för snabbt. Vänta en minut och försök igen.",
+    "inputLabel": "Länk till YouTube Music-spellista"
   }
 }

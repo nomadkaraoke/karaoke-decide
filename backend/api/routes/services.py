@@ -24,6 +24,7 @@ from backend.api.deps import (
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
+from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 from karaoke_decide.services.youtube_music import (
     InvalidPlaylistUrlError,
@@ -373,10 +374,15 @@ async def import_youtube_music_playlist(
     - 400: not a YouTube playlist link
     - 422: the always-private Liked Music / Liked videos playlist was shared
     - 404: playlist doesn't exist or is private
+    - 429: too many imports (per-user cooldown / daily cap)
     - 502: YouTube couldn't be reached
     """
     try:
-        result = await sync_service.import_youtube_music_playlist(user.id, request_body.playlist_url)
+        result = await sync_service.import_youtube_music_playlist(
+            user.id, request_body.playlist_url, is_guest=user.is_guest
+        )
+    except ImportRateLimitedError:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many playlist imports")
     except InvalidPlaylistUrlError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a YouTube playlist link")
     except PrivatePlaylistError:

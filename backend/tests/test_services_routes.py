@@ -520,7 +520,9 @@ class TestYouTubeMusicImport:
 
         assert response.status_code == 200
         assert response.json() == {"playlist_title": "My Likes", "tracks_fetched": 120, "tracks_matched": 45}
-        mock_sync_service.import_youtube_music_playlist.assert_awaited_once_with(sample_user.id, "PLabc123")
+        mock_sync_service.import_youtube_music_playlist.assert_awaited_once_with(
+            sample_user.id, "PLabc123", is_guest=sample_user.is_guest
+        )
 
     @pytest.mark.parametrize(
         ("error", "expected_status"),
@@ -529,14 +531,17 @@ class TestYouTubeMusicImport:
             ("PrivatePlaylistError", 422),
             ("PlaylistNotFoundError", 404),
             ("PlaylistFetchError", 502),
+            ("ImportRateLimitedError", 429),
         ],
     )
     def test_maps_errors_to_status_codes(
         self, auth_client: TestClient, mock_sync_service: MagicMock, error: str, expected_status: int
     ) -> None:
+        from backend.services import sync_service
         from karaoke_decide.services import youtube_music
 
-        mock_sync_service.import_youtube_music_playlist = AsyncMock(side_effect=getattr(youtube_music, error)("x"))
+        error_cls = getattr(youtube_music, error, None) or getattr(sync_service, error)
+        mock_sync_service.import_youtube_music_playlist = AsyncMock(side_effect=error_cls("x"))
 
         response = auth_client.post(self.URL, json={"playlist_url": "anything"}, headers=self.AUTH)
 

@@ -898,9 +898,12 @@
     "howToStep4": "Deschide noul playlist, apasă pe Distribuie → Copiază linkul și inserează-l mai sus.",
     "howToTitle": "Cum pot partaja playlistul „Muzică apreciată”?",
     "import": "Importă",
-    "importedResult": "S-au importat {fetched} melodii din „{title}” ({matched} au versiuni karaoke).",
+    "importedResult": "S-au importat {fetched, plural, one {# melodie} few {# melodii} other {# de melodii}} din \"{title}\" ({matched} cu versiuni karaoke).",
     "importing": "Se importă...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — lipește linkul unui playlist"
+    "title": "YouTube Music — lipește linkul unui playlist",
+    "emptyPlaylist": "\"{title}\" nu conține nicio melodie care să poată fi citită. Încearcă o altă listă de redare.",
+    "errorTooManyImports": "Imporți liste de redare prea rapid. Te rugăm să aștepți un minut și să încerci din nou.",
+    "inputLabel": "Link către lista de redare YouTube Music"
   }
 }

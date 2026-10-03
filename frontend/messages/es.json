@@ -898,9 +898,12 @@
     "howToStep4": "Abre la nueva lista de reproducción, pulsa Compartir → Copiar enlace y pégalo arriba.",
     "howToTitle": "¿Cómo comparto mi lista de Canciones que te gustan?",
     "import": "Importar",
-    "importedResult": "Se importaron {fetched} canciones de \"{title}\" ({matched} tienen versiones de karaoke).",
+    "importedResult": "Se {fetched, plural, one {importó # canción} other {importaron # canciones}} de \"{title}\" ({matched} con versiones de karaoke).",
     "importing": "Importando...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — pega el enlace a una lista de reproducción"
+    "title": "YouTube Music — pega el enlace a una lista de reproducción",
+    "emptyPlaylist": "\"{title}\" no tiene canciones que hayamos podido leer. Prueba con otra lista de reproducción.",
+    "errorTooManyImports": "Estás importando listas de reproducción demasiado rápido. Espera un minuto y vuelve a intentarlo.",
+    "inputLabel": "Enlace a la lista de reproducción de YouTube Music"
   }
 }

@@ -898,9 +898,12 @@
     "howToStep4": "新しいプレイリストを開き、「共有」→「リンクをコピー」を選択して、上の入力欄に貼り付けます。",
     "howToTitle": "「高く評価した音楽」を共有するには？",
     "import": "インポート",
-    "importedResult": "「{title}」から {fetched} 曲をインポートしました（{matched} 曲にカラオケバージョンがあります）。",
+    "importedResult": "「{title}」から{fetched, plural, one {#曲} other {#曲}}をインポートしました（カラオケバージョンあり: {matched}曲）。",
     "importing": "インポート中...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — プレイリストのリンクを貼り付け"
+    "title": "YouTube Music — プレイリストのリンクを貼り付け",
+    "emptyPlaylist": "「{title}」から読み込める曲が見つかりませんでした。別のプレイリストをお試しください。",
+    "errorTooManyImports": "プレイリストのインポートの間隔が短すぎます。少し時間をおいてからもう一度お試しください。",
+    "inputLabel": "YouTube Musicプレイリストのリンク"
   }
 }

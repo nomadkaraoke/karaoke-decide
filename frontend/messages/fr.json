@@ -898,9 +898,12 @@
     "howToStep4": "Ouvre la nouvelle playlist, clique sur Partager → Copier le lien, et colle-le ci-dessus.",
     "howToTitle": "Comment partager mes Titres likés ?",
     "import": "Importer",
-    "importedResult": "{fetched} morceaux importés depuis « {title} » ({matched} ont une version karaoké).",
+    "importedResult": "{fetched, plural, one {# morceau importé} other {# morceaux importés}} depuis \"{title}\" ({matched} avec une version karaoké).",
     "importing": "Importation en cours...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — colle un lien de playlist"
+    "title": "YouTube Music — colle un lien de playlist",
+    "emptyPlaylist": "\"{title}\" ne contient aucun morceau que nous avons pu lire. Essaie une autre playlist.",
+    "errorTooManyImports": "Tu importes des playlists trop rapidement. Attends une minute et réessaie.",
+    "inputLabel": "Lien de la playlist YouTube Music"
   }
 }

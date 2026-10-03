@@ -898,9 +898,12 @@
     "howToStep4": "Otvor nový zoznam skladieb, klikni na Zdieľať → Kopírovať odkaz a vlož ho vyššie.",
     "howToTitle": "Ako môžem zdieľať svoje skladby z Páči sa mi?",
     "import": "Importovať",
-    "importedResult": "Importovaných bolo {fetched} skladieb z „{title}“ ({matched} má karaoke verziu).",
+    "importedResult": "{fetched, plural, one {Bol importovaný # song} few {Boli importované # songy} other {Bolo importovaných # songov}} z \"{title}\" ({matched} s karaoke verziami).",
     "importing": "Importuje sa...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — vlož odkaz na zoznam skladieb"
+    "title": "YouTube Music — vlož odkaz na zoznam skladieb",
+    "emptyPlaylist": "\"{title}\" neobsahuje žiadne skladby, ktoré by sme vedeli načítať. Skús iný playlist.",
+    "errorTooManyImports": "Importuješ playlisty príliš rýchlo. Počkaj chvíľu a skús to znova.",
+    "inputLabel": "Odkaz na playlist v YouTube Music"
   }
 }

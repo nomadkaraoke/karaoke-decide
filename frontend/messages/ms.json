@@ -898,9 +898,12 @@
     "howToStep4": "Buka senarai main baharu tersebut, ketik Kongsi → Salin pautan, dan tampalkannya di atas.",
     "howToTitle": "Bagaimanakah cara untuk berkongsi Lagu yang Disukai (Liked Music) saya?",
     "import": "Import",
-    "importedResult": "Berjaya mengimport {fetched} lagu daripada \"{title}\" ({matched} mempunyai versi karaoke).",
+    "importedResult": "Berjaya mengimport {fetched, plural, one {# lagu} other {# lagu}} daripada \"{title}\" ({matched} dengan versi karaoke).",
     "importing": "Mengimport...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — tampal pautan senarai main"
+    "title": "YouTube Music — tampal pautan senarai main",
+    "emptyPlaylist": "\"{title}\" tidak mempunyai lagu yang boleh kami baca. Cuba senarai main lain.",
+    "errorTooManyImports": "Anda mengimport senarai main terlalu pantas. Sila tunggu seminit dan cuba lagi.",
+    "inputLabel": "Pautan senarai main YouTube Music"
   }
 }

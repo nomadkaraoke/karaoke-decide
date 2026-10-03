@@ -898,9 +898,12 @@
     "howToStep4": "Åbn den nye playliste, tryk på Del → Kopiér link, og indsæt det ovenfor.",
     "howToTitle": "Hvordan deler jeg mine Likede sange?",
     "import": "Importér",
-    "importedResult": "Importerede {fetched} sange fra \"{title}\" ({matched} findes som karaokeversioner).",
+    "importedResult": "Importerede {fetched, plural, one {# sang} other {# sange}} fra \"{title}\" ({matched} med karaokeversioner).",
     "importing": "Importerer...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music – indsæt et link til en playliste"
+    "title": "YouTube Music – indsæt et link til en playliste",
+    "emptyPlaylist": "\"{title}\" indeholder ingen sange, vi kunne indlæse. Prøv en anden spilleliste.",
+    "errorTooManyImports": "Du importerer spillelister for hurtigt. Vent venligst et minut, og prøv igen.",
+    "inputLabel": "Link til YouTube Music-spilleliste"
   }
 }

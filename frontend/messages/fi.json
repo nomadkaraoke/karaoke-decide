@@ -898,9 +898,12 @@
     "howToStep4": "Avaa uusi soittolista, napauta Jaa → Kopioi linkki ja liitä se ylle.",
     "howToTitle": "Miten jaan tykätyt kappaleeni?",
     "import": "Tuo",
-    "importedResult": "Tuotu {fetched} kappaletta soittolistalta \"{title}\" ({matched} sisältää karaokeversion).",
+    "importedResult": "Tuotiin {fetched, plural, one {# kappale} other {# kappaletta}} soittolistalta \"{title}\" ({matched} löytyi karaokeversiona).",
     "importing": "Tuodaan...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — liitä soittolistan linkki"
+    "title": "YouTube Music — liitä soittolistan linkki",
+    "emptyPlaylist": "Soittolistalla \"{title}\" ei ole kappaleita, joita voisimme lukea. Kokeile toista soittolistaa.",
+    "errorTooManyImports": "Tuot soittolistoja liian nopeasti. Odota hetki ja yritä uudelleen.",
+    "inputLabel": "YouTube Music -soittolistan linkki"
   }
 }

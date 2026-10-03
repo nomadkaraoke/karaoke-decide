@@ -898,9 +898,12 @@
     "howToStep4": "Abra a nova playlist, clique em Compartilhar → Copiar link e cole-o acima.",
     "howToTitle": "Como compartilho minhas Músicas Curtidas?",
     "import": "Importar",
-    "importedResult": "{fetched} músicas importadas de \"{title}\" ({matched} têm versões em karaokê).",
+    "importedResult": "{fetched, plural, one {# música importada} other {# músicas importadas}} de \"{title}\" ({matched} com versões de karaokê).",
     "importing": "Importando...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — cole o link de uma playlist"
+    "title": "YouTube Music — cole o link de uma playlist",
+    "emptyPlaylist": "\"{title}\" não tem músicas que pudemos ler. Tente outra playlist.",
+    "errorTooManyImports": "Você está importando playlists rápido demais. Por favor, espere um minuto e tente novamente.",
+    "inputLabel": "Link da playlist do YouTube Music"
   }
 }

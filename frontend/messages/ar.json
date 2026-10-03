@@ -898,9 +898,12 @@
     "howToStep4": "افتح قائمة التشغيل الجديدة، واضغط على مشاركة ← نسخ الرابط، ثم الصقه في الأعلى.",
     "howToTitle": "كيف يمكنني مشاركة الموسيقى التي أعجبتني؟",
     "import": "استيراد",
-    "importedResult": "تم استيراد {fetched} أغنية من \"{title}\" (تتوفر نسخ كاريوكي لـ {matched} منها).",
+    "importedResult": "تم استيراد {fetched, plural, zero {أي أغنية} one {أغنية واحدة} two {أغنيتين} few {# أغانٍ} many {# أغنية} other {# أغنية}} من \"{title}\" ({matched} تتوفر لها نسخ كاراوكي).",
     "importing": "جارٍ الاستيراد...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — الصق رابط قائمة تشغيل"
+    "title": "YouTube Music — الصق رابط قائمة تشغيل",
+    "emptyPlaylist": "لا تحتوي \"{title}\" على أي أغانٍ يمكننا قراءتها. يُرجى تجربة قائمة تشغيل أخرى.",
+    "errorTooManyImports": "أنت تستورد قوائم التشغيل بسرعة كبيرة. يُرجى الانتظار لمدة دقيقة والمحاولة مرة أخرى.",
+    "inputLabel": "رابط قائمة تشغيل YouTube Music"
   }
 }

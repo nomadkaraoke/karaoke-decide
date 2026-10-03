@@ -898,9 +898,12 @@
     "howToStep4": "Otwórz nową playlistę, kliknij Udostępnij → Skopiuj link i wklej go powyżej.",
     "howToTitle": "Jak udostępnić Polubione utwory?",
     "import": "Importuj",
-    "importedResult": "Zaimportowano {fetched} utworów z „{title}” ({matched} ma wersję karaoke).",
+    "importedResult": "Zaimportowano {fetched, plural, one {# utwór} few {# utwory} many {# utworów} other {# utworów}} z \"{title}\" ({matched} z wersjami karaoke).",
     "importing": "Importowanie...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — wklej link do playlisty"
+    "title": "YouTube Music — wklej link do playlisty",
+    "emptyPlaylist": "\"{title}\" nie zawiera utworów, które moglibyśmy odczytać. Wypróbuj inną playlistę.",
+    "errorTooManyImports": "Zbyt szybko importujesz playlisty. Poczekaj chwilę i spróbuj ponownie.",
+    "inputLabel": "Link do playlisty YouTube Music"
   }
 }

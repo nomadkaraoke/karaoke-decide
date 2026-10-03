@@ -26,15 +26,21 @@ PRIVATE_PLAYLIST_IDS = {"LM", "LL", "WL"}
 # Valid playlist ID characters (PL..., OLAK5uy_..., RDCLAK..., etc.)
 _PLAYLIST_ID_RE = re.compile(r"^[A-Za-z0-9_-]{2,64}$")
 
-# Video-title noise that YouTube music videos carry but catalog titles don't
-_TITLE_NOISE_PATTERN = re.compile(
-    r"\s*[\(\[][^\)\]]*\b(official|lyrics?|lyric video|audio|music video|video|visualizer|hd|hq|4k|remastered)\b"
-    r"[^\)\]]*[\)\]]",
-    re.IGNORECASE,
-)
-# Trailing " Video" suffix - only stripped for music videos, since real song
-# titles can end in "Video" (e.g. "Home Video")
+# Video-title noise that YouTube music videos carry but catalog titles don't,
+# e.g. "(Official Video)", "[Lyrics]", "- Official Video", "| Official Audio"
+_TITLE_NOISE_PATTERNS = [
+    re.compile(
+        r"\s*[\(\[][^\)\]]*\b(official|lyrics?|lyric video|audio|music video|video|visualizer|hd|hq|4k|remastered)\b"
+        r"[^\)\]]*[\)\]]",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\s*[-|:\u2013\u2014]\s*official\s+(music\s+)?(video|audio|lyric video|visualizer)\s*$", re.IGNORECASE),
+]
+# Trailing bare " Video" suffix (e.g. "Some Song Video"), common on YouTube
+# Music's official-video titles. Only stripped for videos, never song tracks.
+# Trade-off: a music video for a song literally titled "... Video" loses the word.
 _TRAILING_VIDEO_PATTERN = re.compile(r"\s+(official\s+)?(music\s+)?video$", re.IGNORECASE)
+_TRAILING_SEPARATORS = " -|:\u2013\u2014"
 
 # Song tracks ("Art Tracks") carry clean titles; everything else is a video
 SONG_VIDEO_TYPE = "MUSIC_VIDEO_TYPE_ATV"
@@ -85,7 +91,9 @@ def parse_playlist_id(value: str) -> str:
 
     playlist_id: str | None = None
 
-    if "://" in value or value.startswith(("music.youtube.com", "www.youtube.com", "youtube.com", "m.youtube.com")):
+    if "://" in value or value.startswith(
+        ("music.youtube.com", "www.youtube.com", "youtube.com", "m.youtube.com", "youtu.be")
+    ):
         parsed = urlparse(value if "://" in value else f"https://{value}")
         host = (parsed.hostname or "").lower()
         if not (host == "youtu.be" or host == "youtube.com" or host.endswith(".youtube.com")):
@@ -99,7 +107,7 @@ def parse_playlist_id(value: str) -> str:
             if match:
                 playlist_id = match.group(1)
     else:
-        playlist_id = value[2:] if value.startswith("VL") and len(value) > 4 else value
+        playlist_id = value[2:] if value.startswith("VL") and len(value) > 2 else value
 
     if not playlist_id or not _PLAYLIST_ID_RE.match(playlist_id):
         raise InvalidPlaylistUrlError(f"No playlist ID found in: {value}")
@@ -112,10 +120,12 @@ def parse_playlist_id(value: str) -> str:
 
 def clean_video_title(title: str, video_type: str | None = None) -> str:
     """Strip music-video noise like "(Official Video)" from a track title."""
-    result = _TITLE_NOISE_PATTERN.sub("", title or "")
+    result = title or ""
+    for pattern in _TITLE_NOISE_PATTERNS:
+        result = pattern.sub("", result)
     if video_type != SONG_VIDEO_TYPE:
         result = _TRAILING_VIDEO_PATTERN.sub("", result)
-    return result.strip() or (title or "").strip()
+    return result.strip(_TRAILING_SEPARATORS) or (title or "").strip()
 
 
 class YouTubeMusicClient:
@@ -147,6 +157,8 @@ class YouTubeMusicClient:
         except (KeyError, IndexError) as e:
             # ytmusicapi raises KeyError when the page has no playlist contents,
             # which is what YouTube returns for missing and private playlists.
+            # Logged because an upstream page-format change looks identical.
+            logger.warning(f"YouTube Music playlist {playlist_id} not readable: {e!s:.200}")
             raise PlaylistNotFoundError(playlist_id) from e
         except requests.RequestException as e:
             raise PlaylistFetchError(str(e)) from e

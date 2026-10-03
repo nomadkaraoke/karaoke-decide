@@ -898,9 +898,12 @@
     "howToStep4": "Open de nieuwe afspeellijst, klik op Delen → Link kopiëren en plak deze hierboven.",
     "howToTitle": "Hoe deel ik mijn 'Gelikete muziek'?",
     "import": "Importeren",
-    "importedResult": "{fetched} nummers geïmporteerd uit \"{title}\" ({matched} hebben een karaokeversie).",
+    "importedResult": "{fetched, plural, one {# nummer} other {# nummers}} geïmporteerd uit \"{title}\" ({matched} met karaokeversies).",
     "importing": "Bezig met importeren...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — plak een afspeellijstlink"
+    "title": "YouTube Music — plak een afspeellijstlink",
+    "emptyPlaylist": "\"{title}\" bevat geen nummers die we konden lezen. Probeer een andere afspeellijst.",
+    "errorTooManyImports": "Je importeert afspeellijsten te snel. Wacht een minuutje en probeer het opnieuw.",
+    "inputLabel": "Link naar YouTube Music-afspeellijst"
   }
 }

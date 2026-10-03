@@ -898,9 +898,12 @@
     "howToStep4": "פתחו את הפלייליסט החדש, לחצו על שיתוף ← העתקת הקישור, והדביקו אותו למעלה.",
     "howToTitle": "איך לשתף את השירים שאהבתי?",
     "import": "ייבוא",
-    "importedResult": "יובאו {fetched} שירים מתוך \"{title}\" (ל-{matched} מתוכם יש גרסאות קריוקי).",
+    "importedResult": "יובאו {fetched, plural, one {שיר אחד} other {# שירים}} מתוך \"{title}\" ({matched} מתוכם עם גרסאות קריוקי).",
     "importing": "מייבא...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — הדבקת קישור לפלייליסט"
+    "title": "YouTube Music — הדבקת קישור לפלייליסט",
+    "emptyPlaylist": "ב-\"{title}\" אין שירים שהצלחנו לקרוא. כדאי לנסות פלייליסט אחר.",
+    "errorTooManyImports": "ייבוא הפלייליסטים מתבצע מהר מדי. נא להמתין דקה ולנסות שוב.",
+    "inputLabel": "קישור לפלייליסט ב-YouTube Music"
   }
 }

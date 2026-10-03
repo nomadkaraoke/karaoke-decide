@@ -898,9 +898,12 @@
     "howToStep4": "Åpne den nye spillelisten, trykk på Del → Kopier lenke, og lim den inn ovenfor.",
     "howToTitle": "Hvordan deler jeg mine likte sanger?",
     "import": "Importer",
-    "importedResult": "Importerte {fetched} sanger fra «{title}» ({matched} har karaokeversjoner).",
+    "importedResult": "Importerte {fetched, plural, one {# sang} other {# sanger}} fra \"{title}\" ({matched} med karaokeversjoner).",
     "importing": "Importerer...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music – lim inn en spillelistelenke"
+    "title": "YouTube Music – lim inn en spillelistelenke",
+    "emptyPlaylist": "\"{title}\" har ingen sanger vi kunne lese. Prøv en annen spilleliste.",
+    "errorTooManyImports": "Du importerer spillelister for raskt. Vent et minutt og prøv igjen.",
+    "inputLabel": "Lenke til YouTube Music-spilleliste"
   }
 }

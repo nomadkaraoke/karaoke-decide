@@ -898,9 +898,12 @@
     "howToStep4": "Obre la nova llista de reproducció, toca Comparteix → Copia l'enllaç, i enganxa'l a dalt.",
     "howToTitle": "Com puc compartir la meva llista de cançons que m'agraden?",
     "import": "Importa",
-    "importedResult": "S'han importat {fetched} cançons de «{title}» ({matched} tenen versió de karaoke).",
+    "importedResult": "{fetched, plural, one {S'ha importat # cançó} other {S'han importat # cançons}} de \"{title}\" ({matched} amb versions de karaoke).",
     "importing": "S'està important...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music — enganxa l'enllaç d'una llista de reproducció"
+    "title": "YouTube Music — enganxa l'enllaç d'una llista de reproducció",
+    "emptyPlaylist": "\"{title}\" no té cap cançó que puguem llegir. Prova amb una altra llista de reproducció.",
+    "errorTooManyImports": "Estàs important llistes de reproducció massa ràpidament. Espera un minut i torna-ho a provar.",
+    "inputLabel": "Enllaç a la llista de reproducció de YouTube Music"
   }
 }

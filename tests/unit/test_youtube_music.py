@@ -32,6 +32,7 @@ class TestParsePlaylistId:
             f"https://music.youtube.com/browse/VL{PID}",
             f"  {PID}  ",
             f"VL{PID}",
+            f"youtu.be/vid123?list={PID}",
         ],
     )
     def test_extracts_id(self, value: str) -> None:
@@ -57,6 +58,11 @@ class TestParsePlaylistId:
         with pytest.raises(PrivatePlaylistError):
             parse_playlist_id(f"https://music.youtube.com/playlist?list={pid}")
 
+    @pytest.mark.parametrize("value", ["LM", "VLLM", "https://music.youtube.com/browse/VLLM"])
+    def test_rejects_private_auto_playlist_ids(self, value: str) -> None:
+        with pytest.raises(PrivatePlaylistError):
+            parse_playlist_id(value)
+
 
 class TestCleanVideoTitle:
     @pytest.mark.parametrize(
@@ -69,6 +75,10 @@ class TestCleanVideoTitle:
             ("Sample Tune (Lyrics)", "Sample Tune"),
             ("Sample Tune (HD)", "Sample Tune"),
             ("Sample Tune Video", "Sample Tune"),
+            ("Sample Tune - Official Video", "Sample Tune"),
+            ("Sample Tune | Official Audio", "Sample Tune"),
+            ("Sample Tune (Live Version) | Official Video", "Sample Tune (Live Version)"),
+            ("Sample Tune - Remix", "Sample Tune - Remix"),
             ("Sample Tune (Part Two)", "Sample Tune (Part Two)"),
         ],
     )
@@ -122,11 +132,12 @@ class TestGetPlaylist:
         assert len(playlist.tracks) == 3
 
     @pytest.mark.asyncio
-    async def test_missing_playlist_raises_not_found(self) -> None:
+    async def test_missing_playlist_raises_not_found(self, caplog: pytest.LogCaptureFixture) -> None:
         ytmusic = MagicMock()
         ytmusic.get_playlist.side_effect = KeyError("contents")
         with pytest.raises(PlaylistNotFoundError):
             await YouTubeMusicClient(ytmusic).get_playlist(PID, limit=10)
+        assert "not readable" in caplog.text
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("error", [requests.ConnectionError("down"), Exception("Server returned HTTP 429")])

@@ -898,9 +898,12 @@
     "howToStep4": "Öffne die neue Playlist, klicke auf Teilen → Link kopieren und füge ihn oben ein.",
     "howToTitle": "Wie teile ich meine Lieblingsmusik?",
     "import": "Importieren",
-    "importedResult": "{fetched} Songs aus „{title}“ importiert ({matched} haben Karaoke-Versionen).",
+    "importedResult": "{fetched, plural, one {# Song} other {# Songs}} aus \"{title}\" importiert ({matched} mit Karaoke-Versionen).",
     "importing": "Wird importiert...",
     "placeholder": "https://music.youtube.com/playlist?list=...",
-    "title": "YouTube Music – Playlist-Link einfügen"
+    "title": "YouTube Music – Playlist-Link einfügen",
+    "emptyPlaylist": "\"{title}\" enthält keine Songs, die wir lesen konnten. Versuche es mit einer anderen Playlist.",
+    "errorTooManyImports": "Du importierst Playlists zu schnell. Bitte warte eine Minute und versuche es erneut.",
+    "inputLabel": "Link zur YouTube Music-Playlist"
   }
 }
