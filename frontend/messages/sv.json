@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Ju fler artister du lägger till, desto bättre blir dina rekommendationer.",
     "searchForArtists": "Sök efter artister du kan...",
     "artistsAdded": "{count} {count, plural, one {artist tillagd} other {artister tillagda}}",
-    "haveListeningHistory": "Har du lyssningshistorik i Last.fm eller Spotify?",
     "importForBetterRecs": "Importera den för ännu bättre rekommendationer!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direktimport",
@@ -238,7 +237,8 @@
       "2000s": "2000-tal",
       "2010s": "2010-tal",
       "2020s": "2020-tal"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Har du lyssningshistorik på Last.fm, Spotify eller YouTube Music?"
   },
   "recommendations": {
     "title": "Rekommendationer",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Något gick fel när spellistan skulle importeras. Försök igen.",
+    "errorInvalidLink": "Det där ser inte ut som en länk till en YouTube Music-spellista.",
+    "errorLikedMusicPrivate": "Din spellista med gillad musik är alltid privat. Kopiera låtarna till en ny offentlig eller olistad spellista och dela den istället (se hur du gör nedan).",
+    "errorNotFound": "Vi kunde inte öppna den spellistan. Kontrollera att den är inställd som offentlig eller olistad.",
+    "howToAnyPlaylist": "Det fungerar också med vilken offentlig eller olistad spellista som helst med låtar du älskar, t.ex. din fest- eller träningsmix.",
+    "howToStep1": "Gå till music.youtube.com och öppna Bibliotek → Gillad musik.",
+    "howToStep2": "Markera låtarna (klicka på en och Shift-klicka sedan för att markera ett intervall).",
+    "howToStep3": "Välj \"Lägg till i spellista\" → Ny spellista och sätt synligheten till Olistad eller Offentlig.",
+    "howToStep4": "Öppna den nya spellistan, klicka på Dela → Kopiera länk och klistra in den ovan.",
+    "howToTitle": "Hur delar jag min gillade musik?",
+    "import": "Importera",
+    "importedResult": "Importerade {fetched} låtar från \"{title}\" ({matched} har karaokeversioner).",
+    "importing": "Importerar...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music – klistra in en länk till en spellista"
   }
 }

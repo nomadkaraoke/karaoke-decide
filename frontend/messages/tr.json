@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Ne kadar çok sanatçı eklersen, önerilerin o kadar iyi olur.",
     "searchForArtists": "Bildiğin sanatçıları ara...",
     "artistsAdded": "{count} sanatçı eklendi",
-    "haveListeningHistory": "Last.fm veya Spotify'da dinleme geçmişin var mı?",
     "importForBetterRecs": "Daha da iyi öneriler için içe aktar!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "doğrudan içe aktarım",
@@ -238,7 +237,8 @@
       "2000s": "2000'ler",
       "2010s": "2010'lar",
       "2020s": "2020'ler"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Last.fm, Spotify veya YouTube Music'te dinleme geçmişin veya çalma listen var mı?"
   },
   "recommendations": {
     "title": "Öneriler",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Bu çalma listesi içe aktarılırken bir sorun oluştu. Lütfen tekrar dene.",
+    "errorInvalidLink": "Bu, bir YouTube Music çalma listesi bağlantısı gibi görünmüyor.",
+    "errorLikedMusicPrivate": "Beğenilen Müzikler listen her zaman gizlidir. Şarkıları Herkese Açık veya Liste Dışı yeni bir çalma listesine kopyalayıp onun yerine o listeyi paylaşabilirsin (nasıl yapıldığını aşağıda görebilirsin).",
+    "errorNotFound": "Bu çalma listesini açamadık. Listenin Herkese Açık veya Liste Dışı olarak ayarlandığından emin ol.",
+    "howToAnyPlaylist": "Sevdiğin şarkılardan oluşan herkese açık veya liste dışı herhangi bir çalma listesi de olur (örneğin parti veya antrenman listen).",
+    "howToStep1": "music.youtube.com adresinde Kitaplık → Beğenilen müzikler bölümünü aç.",
+    "howToStep2": "Şarkıları seç (birine tıkla, ardından bir aralığı seçmek için Shift tuşuna basılı tutarak tıkla).",
+    "howToStep3": "\"Çalma listesine ekle\" → Yeni çalma listesi seçeneğini belirle ve görünürlüğü Liste Dışı veya Herkese Açık olarak ayarla.",
+    "howToStep4": "Yeni çalma listesini aç, Paylaş → Bağlantıyı kopyala'ya tıkla ve yukarıya yapıştır.",
+    "howToTitle": "Beğenilen Müzikler listemi nasıl paylaşırım?",
+    "import": "İçe aktar",
+    "importedResult": "\"{title}\" listesinden {fetched} şarkı içe aktarıldı ({matched} tanesinin karaoke versiyonu mevcut).",
+    "importing": "İçe aktarılıyor...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — bir çalma listesi bağlantısı yapıştır"
   }
 }

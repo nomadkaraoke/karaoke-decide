@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Čím viac interpretov pridáš, tým lepšie budú tvoje odporúčania.",
     "searchForArtists": "Hľadaj interpretov, ktorých poznáš...",
     "artistsAdded": "Pridaní interpreti: {count}",
-    "haveListeningHistory": "Máš históriu počúvania na Last.fm alebo Spotify?",
     "importForBetterRecs": "Importuj ju pre ešte lepšie odporúčania!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "priamy import",
@@ -238,7 +237,8 @@
       "2000s": "Nulté roky",
       "2010s": "2010-te roky",
       "2020s": "2020-te roky"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Máš históriu počúvania na Last.fm, Spotify alebo YouTube Music?"
   },
   "recommendations": {
     "title": "Odporúčania",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Pri importovaní tohto zoznamu skladieb sa niečo pokazilo. Skús to znova, prosím.",
+    "errorInvalidLink": "Toto nevyzerá ako odkaz na zoznam skladieb v YouTube Music.",
+    "errorLikedMusicPrivate": "Tvoj zoznam skladieb Páči sa mi je vždy súkromný. Skopíruj jeho skladby do nového verejného alebo nezaradeného zoznamu a zdieľaj radšej ten (postup nájdeš nižšie).",
+    "errorNotFound": "Tento zoznam skladieb sa nám nepodarilo otvoriť. Uisti sa, že je nastavený ako Verejný alebo Nezaradený.",
+    "howToAnyPlaylist": "Funguje aj akýkoľvek verejný alebo nezaradený zoznam obľúbených skladieb, napr. tvoj párty alebo tréningový mix.",
+    "howToStep1": "Na stránke music.youtube.com otvor Knižnica → Páči sa mi.",
+    "howToStep2": "Vyber skladby (klikni na jednu a potom pomocou Shift+kliknutia vyber rozsah).",
+    "howToStep3": "Zvoľ „Pridať do zoznamu skladieb“ → Nový zoznam skladieb a nastav viditeľnosť na Nezaradený alebo Verejný.",
+    "howToStep4": "Otvor nový zoznam skladieb, klikni na Zdieľať → Kopírovať odkaz a vlož ho vyššie.",
+    "howToTitle": "Ako môžem zdieľať svoje skladby z Páči sa mi?",
+    "import": "Importovať",
+    "importedResult": "Importovaných bolo {fetched} skladieb z „{title}“ ({matched} má karaoke verziu).",
+    "importing": "Importuje sa...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — vlož odkaz na zoznam skladieb"
   }
 }

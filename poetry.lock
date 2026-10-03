@@ -3368,7 +3368,22 @@ idna = ">=2.0"
 multidict = ">=4.0"
 propcache = ">=0.2.1"
 
+[[package]]
+name = "ytmusicapi"
+version = "1.12.3"
+description = "Unofficial API for YouTube Music"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "ytmusicapi-1.12.3-py3-none-any.whl", hash = "sha256:f65db840907a43ca23b29bd563951a1e390fbe2089d7aa4ddbe2043824b2acd9"},
+    {file = "ytmusicapi-1.12.3.tar.gz", hash = "sha256:be81511af7494eec8e5970c56a10e51aada6253246649e4ea6714fd6aeb654ee"},
+]
+
+[package.dependencies]
+requests = ">=2.22"
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "4dc24686faa80d79b1924b2ac3bb6b4346b28c1c439000c139ff6bdc5bdaf3ca"
+content-hash = "201669445085981b5421a96291a5252c7a8e43ec5e03ea36a105c44141a85ea1"

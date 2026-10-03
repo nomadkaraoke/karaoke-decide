@@ -497,3 +497,55 @@ class TestSyncStatus:
         for service in data["services"]:
             assert "sync_status" in service
             assert "tracks_synced" in service
+
+
+class TestYouTubeMusicImport:
+    """Tests for POST /api/services/youtube-music/import."""
+
+    URL = "/api/services/youtube-music/import"
+    AUTH = {"Authorization": "Bearer test-token"}
+
+    def test_imports_playlist(self, auth_client: TestClient, mock_sync_service: MagicMock, sample_user: User) -> None:
+        mock_sync_service.import_youtube_music_playlist = AsyncMock(
+            return_value={
+                "playlist_title": "My Likes",
+                "tracks_fetched": 120,
+                "tracks_matched": 45,
+                "created": 120,
+                "updated": 0,
+            }
+        )
+
+        response = auth_client.post(self.URL, json={"playlist_url": "PLabc123"}, headers=self.AUTH)
+
+        assert response.status_code == 200
+        assert response.json() == {"playlist_title": "My Likes", "tracks_fetched": 120, "tracks_matched": 45}
+        mock_sync_service.import_youtube_music_playlist.assert_awaited_once_with(sample_user.id, "PLabc123")
+
+    @pytest.mark.parametrize(
+        ("error", "expected_status"),
+        [
+            ("InvalidPlaylistUrlError", 400),
+            ("PrivatePlaylistError", 422),
+            ("PlaylistNotFoundError", 404),
+            ("PlaylistFetchError", 502),
+        ],
+    )
+    def test_maps_errors_to_status_codes(
+        self, auth_client: TestClient, mock_sync_service: MagicMock, error: str, expected_status: int
+    ) -> None:
+        from karaoke_decide.services import youtube_music
+
+        mock_sync_service.import_youtube_music_playlist = AsyncMock(side_effect=getattr(youtube_music, error)("x"))
+
+        response = auth_client.post(self.URL, json={"playlist_url": "anything"}, headers=self.AUTH)
+
+        assert response.status_code == expected_status
+
+    def test_requires_auth(self, auth_client: TestClient) -> None:
+        response = auth_client.post(self.URL, json={"playlist_url": "PLabc123"})
+        assert response.status_code == 401
+
+    def test_rejects_empty_url(self, auth_client: TestClient) -> None:
+        response = auth_client.post(self.URL, json={"playlist_url": ""}, headers=self.AUTH)
+        assert response.status_code == 422

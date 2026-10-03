@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Quanto mais artistas você adicionar, melhores serão suas recomendações.",
     "searchForArtists": "Pesquise por artistas que você conhece...",
     "artistsAdded": "{count} artista{count, plural, one {} other {s}} adicionado(s)",
-    "haveListeningHistory": "Tem histórico de reprodução no Last.fm ou Spotify?",
     "importForBetterRecs": "Importe para recomendações ainda melhores!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "importação direta",
@@ -238,7 +237,8 @@
       "2000s": "Anos 2000",
       "2010s": "Anos 2010",
       "2020s": "Anos 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Tem histórico de reprodução no Last.fm, Spotify ou YouTube Music?"
   },
   "recommendations": {
     "title": "Recomendações",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Algo deu errado ao importar essa playlist. Tente novamente.",
+    "errorInvalidLink": "Esse link não parece ser de uma playlist do YouTube Music.",
+    "errorLikedMusicPrivate": "Sua playlist de Músicas Curtidas é sempre privada. Copie as músicas dela para uma nova playlist Pública ou Não listada e compartilhe o link dela (veja como fazer abaixo).",
+    "errorNotFound": "Não conseguimos abrir essa playlist. Verifique se ela está definida como Pública ou Não listada.",
+    "howToAnyPlaylist": "Qualquer playlist pública ou não listada com músicas que você adora também funciona, como sua playlist de festa ou de treino.",
+    "howToStep1": "Em music.youtube.com, abra Biblioteca → Músicas curtidas.",
+    "howToStep2": "Selecione as músicas (clique em uma e use Shift+clique para selecionar um intervalo).",
+    "howToStep3": "Escolha \"Adicionar à playlist\" → Nova playlist e defina a visibilidade como Não listada ou Pública.",
+    "howToStep4": "Abra a nova playlist, clique em Compartilhar → Copiar link e cole-o acima.",
+    "howToTitle": "Como compartilho minhas Músicas Curtidas?",
+    "import": "Importar",
+    "importedResult": "{fetched} músicas importadas de \"{title}\" ({matched} têm versões em karaokê).",
+    "importing": "Importando...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — cole o link de uma playlist"
   }
 }

@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Im więcej artystów dodasz, tym lepsze będą twoje rekomendacje.",
     "searchForArtists": "Szukaj artystów, których znasz...",
     "artistsAdded": "Dodano {count} {count, plural, one {artystę} few {artystów} many {artystów} other {artystów}}",
-    "haveListeningHistory": "Masz historię słuchania w Last.fm lub Spotify?",
     "importForBetterRecs": "Zaimportuj ją, aby uzyskać jeszcze lepsze rekomendacje!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "bezpośredni import",
@@ -238,7 +237,8 @@
       "2000s": "Lata 2000.",
       "2010s": "Lata 2010.",
       "2020s": "Lata 2020."
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Masz historię odtwarzania w Last.fm, Spotify lub YouTube Music?"
   },
   "recommendations": {
     "title": "Rekomendacje",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Coś poszło nie tak podczas importowania tej playlisty. Spróbuj ponownie.",
+    "errorInvalidLink": "To nie wygląda na link do playlisty YouTube Music.",
+    "errorLikedMusicPrivate": "Playlista „Polubione utwory” jest zawsze prywatna. Skopiuj jej utwory do nowej playlisty publicznej lub niepublicznej i udostępnij ją zamiast tego (zobacz instrukcję poniżej).",
+    "errorNotFound": "Nie udało się otworzyć tej playlisty. Upewnij się, że jest ustawiona jako publiczna lub niepubliczna.",
+    "howToAnyPlaylist": "Każda publiczna lub niepubliczna playlista z Twoimi ulubionymi utworami również zadziała — np. Twoja składanka na imprezę lub trening.",
+    "howToStep1": "Na music.youtube.com otwórz Biblioteka → Polubione utwory.",
+    "howToStep2": "Zaznacz utwory (kliknij jeden, a następnie kliknij z wciśniętym klawiszem Shift, aby zaznaczyć zakres).",
+    "howToStep3": "Wybierz „Dodaj do playlisty” → Nowa playlista i ustaw widoczność na Niepubliczna lub Publiczna.",
+    "howToStep4": "Otwórz nową playlistę, kliknij Udostępnij → Skopiuj link i wklej go powyżej.",
+    "howToTitle": "Jak udostępnić Polubione utwory?",
+    "import": "Importuj",
+    "importedResult": "Zaimportowano {fetched} utworów z „{title}” ({matched} ma wersję karaoke).",
+    "importing": "Importowanie...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — wklej link do playlisty"
   }
 }

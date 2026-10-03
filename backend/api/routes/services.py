@@ -10,19 +10,27 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.requests import Request
 
 from backend.api.deps import (
+    CurrentUser,
     FirestoreServiceDep,
     MusicServiceServiceDep,
     Settings,
+    SyncServiceDep,
     VerifiedUser,
 )
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
+from karaoke_decide.services.youtube_music import (
+    InvalidPlaylistUrlError,
+    PlaylistFetchError,
+    PlaylistNotFoundError,
+    PrivatePlaylistError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -328,6 +336,65 @@ async def connect_listenbrainz(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e),
         )
+
+
+# -----------------------------------------------------------------------------
+# YouTube Music Playlist Import
+# -----------------------------------------------------------------------------
+
+
+class YouTubeMusicImportRequest(BaseModel):
+    """Request to import a shared YouTube Music playlist."""
+
+    playlist_url: str = Field(..., min_length=1, max_length=500, description="Playlist link or ID")
+
+
+class YouTubeMusicImportResponse(BaseModel):
+    """Result of a YouTube Music playlist import."""
+
+    playlist_title: str
+    tracks_fetched: int
+    tracks_matched: int  # Tracks with a karaoke version in the catalog
+
+
+@router.post("/youtube-music/import", response_model=YouTubeMusicImportResponse)
+async def import_youtube_music_playlist(
+    request_body: YouTubeMusicImportRequest,
+    user: CurrentUser,
+    sync_service: SyncServiceDep,
+) -> YouTubeMusicImportResponse:
+    """Import songs from a public or unlisted YouTube Music playlist.
+
+    No YouTube login needed - the user shares a playlist link (e.g. a copy of
+    their Liked Music). Guests may import during the quiz; their songs move to
+    their account on email verification. Error status codes are stable so the
+    frontend can show localized guidance:
+
+    - 400: not a YouTube playlist link
+    - 422: the always-private Liked Music / Liked videos playlist was shared
+    - 404: playlist doesn't exist or is private
+    - 502: YouTube couldn't be reached
+    """
+    try:
+        result = await sync_service.import_youtube_music_playlist(user.id, request_body.playlist_url)
+    except InvalidPlaylistUrlError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a YouTube playlist link")
+    except PrivatePlaylistError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Liked Music is always private - copy it into a public or unlisted playlist",
+        )
+    except PlaylistNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found or private")
+    except PlaylistFetchError as e:
+        logger.warning(f"YouTube Music playlist fetch failed: {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube Music")
+
+    return YouTubeMusicImportResponse(
+        playlist_title=result["playlist_title"],
+        tracks_fetched=result["tracks_fetched"],
+        tracks_matched=result["tracks_matched"],
+    )
 
 
 # -----------------------------------------------------------------------------

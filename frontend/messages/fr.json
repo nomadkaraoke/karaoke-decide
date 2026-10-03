@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Plus tu ajoutes d'artistes, meilleures seront tes recommandations.",
     "searchForArtists": "Recherche des artistes que tu connais...",
     "artistsAdded": "{count} artiste{count, plural, one {} other {s}} ajouté{count, plural, one {} other {s}}",
-    "haveListeningHistory": "Tu as un historique d'écoute sur Last.fm ou Spotify ?",
     "importForBetterRecs": "Importe-le pour des recommandations encore meilleures !",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "importation directe",
@@ -238,7 +237,8 @@
       "2000s": "Années 2000",
       "2010s": "Années 2010",
       "2020s": "Années 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Tu as un historique d'écoute sur Last.fm, Spotify ou YouTube Music ?"
   },
   "recommendations": {
     "title": "Recommandations",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Un problème est survenu lors de l'importation de cette playlist. Merci de réessayer.",
+    "errorInvalidLink": "Ce lien ne semble pas être un lien de playlist YouTube Music valide.",
+    "errorLikedMusicPrivate": "Ta playlist « Titres likés » est toujours privée. Copie ses morceaux dans une nouvelle playlist publique ou non répertoriée et partage plutôt celle-ci (voir la méthode ci-dessous).",
+    "errorNotFound": "Impossible d'ouvrir cette playlist. Assure-toi qu'elle est bien définie sur Publique ou Non répertoriée.",
+    "howToAnyPlaylist": "Toute playlist publique ou non répertoriée de morceaux que tu adores fonctionne aussi, comme ton mix de soirée ou d'entraînement.",
+    "howToStep1": "Sur music.youtube.com, ouvre Bibliothèque → Titres likés.",
+    "howToStep2": "Sélectionne les morceaux (clique sur un morceau, puis Maj+clic pour en sélectionner plusieurs).",
+    "howToStep3": "Choisis « Ajouter à une playlist » → Nouvelle playlist, et règle la visibilité sur Non répertoriée ou Publique.",
+    "howToStep4": "Ouvre la nouvelle playlist, clique sur Partager → Copier le lien, et colle-le ci-dessus.",
+    "howToTitle": "Comment partager mes Titres likés ?",
+    "import": "Importer",
+    "importedResult": "{fetched} morceaux importés depuis « {title} » ({matched} ont une version karaoké).",
+    "importing": "Importation en cours...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — colle un lien de playlist"
   }
 }

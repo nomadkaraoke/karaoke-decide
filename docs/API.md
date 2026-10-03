@@ -496,6 +496,35 @@ Connect Last.fm account by username.
 }
 ```
 
+### POST /api/services/youtube-music/import
+
+Import songs from a public or unlisted YouTube Music / YouTube playlist (no YouTube login).
+Used on the quiz "Artists You Know" step so YouTube Music users can share e.g. a copy of their
+Liked Music. Tracks (up to 1000) are matched to the catalog and stored as `user_songs` with
+`source: "youtube_music"`; unmatched tracks are kept for "Create Your Own Karaoke".
+
+**Requires:** Bearer token (guests allowed — songs migrate on email verification)
+
+**Request:**
+```json
+{
+  "playlist_url": "https://music.youtube.com/playlist?list=PL..."
+}
+```
+
+**Response:**
+```json
+{
+  "playlist_title": "My Likes",
+  "tracks_fetched": 214,
+  "tracks_matched": 87
+}
+```
+
+**Errors:** `400` not a YouTube playlist link · `422` the always-private Liked Music (`LM`) /
+Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `502` YouTube
+unreachable.
+
 ### DELETE /api/services/{service_type}
 
 Disconnect a music service.

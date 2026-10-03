@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Semakin banyak artis yang Anda tambahkan, semakin baik rekomendasi Anda.",
     "searchForArtists": "Cari artis yang Anda kenal...",
     "artistsAdded": "{count} artis{count, plural, one {} other {s}} ditambahkan",
-    "haveListeningHistory": "Punya riwayat mendengarkan di Last.fm atau Spotify?",
     "importForBetterRecs": "Impor untuk rekomendasi yang lebih baik!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "impor langsung",
@@ -238,7 +237,8 @@
       "2000s": "2000-an",
       "2010s": "2010-an",
       "2020s": "2020-an"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Punya riwayat mendengarkan di Last.fm, Spotify, atau YouTube Music?"
   },
   "recommendations": {
     "title": "Rekomendasi",
@@ -885,5 +885,22 @@
     "korean": "Korea",
     "portuguese": "Portugis",
     "chinese": "Mandarin"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Terjadi kesalahan saat mengimpor playlist tersebut. Silakan coba lagi.",
+    "errorInvalidLink": "Tautan tersebut sepertinya bukan tautan playlist YouTube Music.",
+    "errorLikedMusicPrivate": "Playlist Musik yang Disukai selalu bersifat pribadi. Salin lagu-lagunya ke playlist Publik atau Tidak Publik yang baru dan bagikan playlist tersebut (lihat caranya di bawah).",
+    "errorNotFound": "Kami tidak dapat membuka playlist tersebut. Pastikan setelannya adalah Publik atau Tidak Publik.",
+    "howToAnyPlaylist": "Playlist publik atau tidak publik apa pun yang berisi lagu favoritmu juga bisa, misalnya mix pesta atau olahraga.",
+    "howToStep1": "Di music.youtube.com, buka Koleksi → Musik yang disukai.",
+    "howToStep2": "Pilih lagu-lagunya (klik salah satu, lalu Shift+klik untuk memilih beberapa lagu sekaligus).",
+    "howToStep3": "Pilih \"Tambahkan ke playlist\" → Playlist baru, lalu atur visibilitasnya ke Tidak Publik atau Publik.",
+    "howToStep4": "Buka playlist baru tersebut, ketuk Bagikan → Salin link, lalu tempelkan di atas.",
+    "howToTitle": "Bagaimana cara membagikan Musik yang Disukai?",
+    "import": "Impor",
+    "importedResult": "Berhasil mengimpor {fetched} lagu dari \"{title}\" ({matched} memiliki versi karaoke).",
+    "importing": "Mengimpor...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — tempel tautan playlist"
   }
 }

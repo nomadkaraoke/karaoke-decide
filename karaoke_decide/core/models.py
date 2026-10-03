@@ -111,7 +111,9 @@ class UserSong(BaseModel):
     song_id: str
 
     # Source tracking
-    source: Literal["spotify", "lastfm", "quiz", "known_songs", "enjoy_singing"] = "spotify"
+    source: Literal["spotify", "lastfm", "listenbrainz", "youtube_music", "quiz", "known_songs", "enjoy_singing"] = (
+        "spotify"
+    )
 
     # From listening history
     play_count: int = 0  # Legacy: sync count (times seen during sync)

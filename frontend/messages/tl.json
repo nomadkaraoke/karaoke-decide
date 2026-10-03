@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Mas maraming artist na idinagdag, mas maganda ang iyong mga rekomendasyon.",
     "searchForArtists": "Maghanap ng mga artist na alam mo...",
     "artistsAdded": "{count} artist ang naidagdag",
-    "haveListeningHistory": "May listening history sa Last.fm o Spotify?",
     "importForBetterRecs": "I-import ito para sa mas magandang rekomendasyon!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direktang import",
@@ -238,7 +237,8 @@
       "2000s": "2000s",
       "2010s": "2010s",
       "2020s": "2020s"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "May listening history sa Last.fm, Spotify, o YouTube Music?"
   },
   "recommendations": {
     "title": "Mga Rekomendasyon",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Nagkaproblema sa pag-import ng playlist na iyon. Pakisubukan muli.",
+    "errorInvalidLink": "Mukhang hindi iyon link ng playlist sa YouTube Music.",
+    "errorLikedMusicPrivate": "Palaging pribado ang iyong Liked Music playlist. Kopyahin ang mga kanta nito sa isang bagong Public o Unlisted na playlist at iyon ang ibahagi (tingnan sa ibaba kung paano).",
+    "errorNotFound": "Hindi namin mabuksan ang playlist na iyon. Siguraduhing nakatakda ito sa Public o Unlisted.",
+    "howToAnyPlaylist": "Puwede rin ang kahit anong pampubliko o unlisted na playlist ng mga paborito mong kanta, tulad ng mix mo para sa party o workout.",
+    "howToStep1": "Sa music.youtube.com, buksan ang Library → Liked Music.",
+    "howToStep2": "Piliin ang mga kanta (mag-click ng isa, pagkatapos ay Shift+click para pumili ng maramihan).",
+    "howToStep3": "Piliin ang \"Add to playlist\" → New playlist, at itakda ang visibility sa Unlisted o Public.",
+    "howToStep4": "Buksan ang bagong playlist, i-tap ang Share → Copy link, at i-paste ito sa itaas.",
+    "howToTitle": "Paano ko maibabahagi ang aking Liked Music?",
+    "import": "I-import",
+    "importedResult": "Na-import ang {fetched} (na) kanta mula sa \"{title}\" ({matched} ang may karaoke version).",
+    "importing": "Nag-i-import...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — mag-paste ng link ng playlist"
   }
 }

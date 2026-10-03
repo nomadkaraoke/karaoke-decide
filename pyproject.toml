@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.9.3"
+version = "0.10.0"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"
@@ -39,6 +39,7 @@ python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 # Utilities
 python-slugify = "^8.0.1"
 python-dotenv = "^1.0.0"
+ytmusicapi = ">=1.11"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

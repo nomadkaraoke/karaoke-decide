@@ -1,6 +1,8 @@
 """Tests for core data models."""
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+import pytest
 
 from karaoke_decide.core.models import (
     KaraokeSong,
@@ -96,3 +98,13 @@ class TestPlaylist:
         )
         assert playlist.description is None
         assert playlist.song_ids == []
+
+
+@pytest.mark.parametrize("source", ["listenbrainz", "youtube_music"])
+def test_user_song_accepts_import_sources(source: str) -> None:
+    """Sync writes these sources to user_songs, so the model must accept them."""
+    now = datetime.now(UTC)
+    song = UserSong(
+        id="u:1", user_id="u", song_id="1", source=source, artist="Band", title="Tune", created_at=now, updated_at=now
+    )
+    assert song.source == source

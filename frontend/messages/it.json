@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Più artisti aggiungi, migliori saranno i tuoi suggerimenti.",
     "searchForArtists": "Cerca artisti che conosci...",
     "artistsAdded": "{count} artist{count, plural, one {a aggiunto} other {i aggiunti}}",
-    "haveListeningHistory": "Hai una cronologia di ascolto su Last.fm o Spotify?",
     "importForBetterRecs": "Importala per suggerimenti ancora migliori!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "importazione diretta",
@@ -238,7 +237,8 @@
       "2000s": "Anni 2000",
       "2010s": "Anni 2010",
       "2020s": "Anni 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Hai una cronologia di ascolto o playlist su Last.fm, Spotify o YouTube Music?"
   },
   "recommendations": {
     "title": "Suggerimenti",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Si è verificato un errore durante l'importazione della playlist. Riprova.",
+    "errorInvalidLink": "Non sembra un link valido a una playlist di YouTube Music.",
+    "errorLikedMusicPrivate": "La tua playlist \"Brani che ti piacciono\" è sempre privata. Copia i brani in una nuova playlist pubblica o non in elenco e condividi quella (scopri come fare qui sotto).",
+    "errorNotFound": "Non siamo riusciti ad aprire questa playlist. Assicurati che sia impostata su Pubblica o Non in elenco.",
+    "howToAnyPlaylist": "Va bene anche qualsiasi playlist pubblica o non in elenco con i brani che ami, ad esempio il tuo mix per le feste o per l'allenamento.",
+    "howToStep1": "Su music.youtube.com, apri Raccolta → Brani che ti piacciono.",
+    "howToStep2": "Seleziona i brani (fai clic su uno, poi premi Maiusc+clic per selezionare un intervallo).",
+    "howToStep3": "Scegli \"Aggiungi a playlist\" → Nuova playlist e imposta la visibilità su Non in elenco o Pubblica.",
+    "howToStep4": "Apri la nuova playlist, seleziona Condividi → Copia link e incollalo qui sopra.",
+    "howToTitle": "Come faccio a condividere i miei \"Brani che ti piacciono\"?",
+    "import": "Importa",
+    "importedResult": "Importati {fetched} brani da \"{title}\" ({matched} hanno versioni karaoke).",
+    "importing": "Importazione in corso...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — incolla il link di una playlist"
   }
 }

@@ -739,6 +739,13 @@ export const api = {
     connectSpotify: () =>
       api.post<{ auth_url: string }>("/api/services/spotify/connect"),
 
+    importYouTubeMusicPlaylist: (playlistUrl: string) =>
+      api.post<{
+        playlist_title: string;
+        tracks_fetched: number;
+        tracks_matched: number;
+      }>("/api/services/youtube-music/import", { playlist_url: playlistUrl }),
+
     connectLastfm: (username: string) =>
       api.post<{
         service_type: string;

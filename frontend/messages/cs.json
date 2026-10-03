@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Čím více interpretů přidáš, tím lepší budou tvá doporučení.",
     "searchForArtists": "Hledej interprety, které znáš...",
     "artistsAdded": "{count} interpret{count, plural, one {} few {i} other {ů}} přidán{count, plural, one {} few {i} other {o}}",
-    "haveListeningHistory": "Máš historii poslechu na Last.fm nebo Spotify?",
     "importForBetterRecs": "Importuj ji pro ještě lepší doporučení!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "přímý import",
@@ -238,7 +237,8 @@
       "2000s": "Nultá léta",
       "2010s": "10. léta",
       "2020s": "20. léta"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Máš historii poslechu na Last.fm, Spotify nebo YouTube Music?"
   },
   "recommendations": {
     "title": "Doporučení",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Při importu tohoto playlistu se něco pokazilo. Zkus to prosím znovu.",
+    "errorInvalidLink": "Tohle nevypadá jako odkaz na playlist z YouTube Music.",
+    "errorLikedMusicPrivate": "Tvůj playlist Oblíbená hudba je vždy soukromý. Zkopíruj z něj skladby do nového veřejného nebo neveřejného playlistu a nasdílej ten (návod najdeš níže).",
+    "errorNotFound": "Tento playlist se nám nepodařilo otevřít. Ujisti se, že je nastavený jako veřejný nebo neveřejný.",
+    "howToAnyPlaylist": "Funguje i jakýkoli jiný veřejný nebo neveřejný playlist s tvou oblíbenou hudbou, např. mix na párty nebo na cvičení.",
+    "howToStep1": "Na music.youtube.com otevři Knihovna → Oblíbená hudba.",
+    "howToStep2": "Vyber skladby (klikni na jednu a pak pomocí Shift+kliknutí vyber rozsah).",
+    "howToStep3": "Zvol „Přidat do playlistu“ → Nový playlist a nastav viditelnost na Neveřejný nebo Veřejný.",
+    "howToStep4": "Otevři nový playlist, klepni na Sdílet → Zkopírovat odkaz a vlož ho výše.",
+    "howToTitle": "Jak nasdílet Oblíbenou hudbu?",
+    "import": "Importovat",
+    "importedResult": "Importováno {fetched} skladeb z „{title}“ ({matched} má karaoke verzi).",
+    "importing": "Importování...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — vlož odkaz na playlist"
   }
 }

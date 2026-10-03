@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Je mehr Künstler du hinzufügst, desto besser werden deine Empfehlungen.",
     "searchForArtists": "Suche nach Künstlern, die du kennst...",
     "artistsAdded": "{count} Künstler{count, plural, one {} other {}} hinzugefügt",
-    "haveListeningHistory": "Hast du einen Hörverlauf bei Last.fm oder Spotify?",
     "importForBetterRecs": "Importiere ihn für noch bessere Empfehlungen!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direkter Import",
@@ -238,7 +237,8 @@
       "2000s": "2000er",
       "2010s": "2010er",
       "2020s": "2020er"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Hast du einen Hörverlauf bei Last.fm, Spotify oder YouTube Music?"
   },
   "recommendations": {
     "title": "Empfehlungen",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Beim Importieren dieser Playlist ist etwas schiefgelaufen. Bitte versuche es erneut.",
+    "errorInvalidLink": "Das sieht nicht nach einem Link zu einer YouTube Music-Playlist aus.",
+    "errorLikedMusicPrivate": "Deine Playlist „Lieblingsmusik“ ist immer privat. Kopiere ihre Songs in eine neue öffentliche oder nicht gelistete Playlist und teile stattdessen diese (siehe Anleitung unten).",
+    "errorNotFound": "Wir konnten diese Playlist nicht öffnen. Stelle sicher, dass sie auf „Öffentlich“ oder „Nicht gelistet“ gestellt ist.",
+    "howToAnyPlaylist": "Jede öffentliche oder nicht gelistete Playlist mit deinen Lieblingssongs funktioniert genauso – z. B. dein Party- oder Workout-Mix.",
+    "howToStep1": "Öffne auf music.youtube.com Mediathek → Lieblingsmusik.",
+    "howToStep2": "Wähle die Songs aus (klicke auf einen Song und wähle dann mit Umschalt+Klick einen Bereich aus).",
+    "howToStep3": "Wähle „Zur Playlist hinzufügen“ → Neue Playlist und stelle die Sichtbarkeit auf „Nicht gelistet“ oder „Öffentlich“.",
+    "howToStep4": "Öffne die neue Playlist, klicke auf Teilen → Link kopieren und füge ihn oben ein.",
+    "howToTitle": "Wie teile ich meine Lieblingsmusik?",
+    "import": "Importieren",
+    "importedResult": "{fetched} Songs aus „{title}“ importiert ({matched} haben Karaoke-Versionen).",
+    "importing": "Wird importiert...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music – Playlist-Link einfügen"
   }
 }

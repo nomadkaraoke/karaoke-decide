@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Jo flere artister du legger til, jo bedre blir anbefalingene dine.",
     "searchForArtists": "Søk etter artister du kjenner...",
     "artistsAdded": "{count} artist{count, plural, one {} other {er}} lagt til",
-    "haveListeningHistory": "Har du lyttehistorikk i Last.fm eller Spotify?",
     "importForBetterRecs": "Importer den for enda bedre anbefalinger!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direkte import",
@@ -238,7 +237,8 @@
       "2000s": "2000s",
       "2010s": "2010s",
       "2020s": "2020s"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Har du lyttehistorikk på Last.fm, Spotify eller YouTube Music?"
   },
   "recommendations": {
     "title": "Anbefalinger",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Noe gikk galt under importen av spillelisten. Prøv igjen.",
+    "errorInvalidLink": "Det ser ikke ut som en gyldig spillelistelenke fra YouTube Music.",
+    "errorLikedMusicPrivate": "Spillelisten over likte sanger er alltid privat. Kopier sangene til en ny offentlig eller uoppført spilleliste og del den i stedet (se fremgangsmåte nedenfor).",
+    "errorNotFound": "Vi kunne ikke åpne den spillelisten. Sørg for at den er satt til Offentlig eller Uoppført.",
+    "howToAnyPlaylist": "En hvilken som helst offentlig eller uoppført spilleliste med sanger du liker fungerer også, f.eks. fest- eller treningslisten din.",
+    "howToStep1": "Gå til music.youtube.com, og åpne Bibliotek → Likte sanger.",
+    "howToStep2": "Marker sangene (klikk på én, og Shift+klikk for å markere flere).",
+    "howToStep3": "Velg «Legg til i spilleliste» → Ny spilleliste, og sett synlighet til Uoppført eller Offentlig.",
+    "howToStep4": "Åpne den nye spillelisten, trykk på Del → Kopier lenke, og lim den inn ovenfor.",
+    "howToTitle": "Hvordan deler jeg mine likte sanger?",
+    "import": "Importer",
+    "importedResult": "Importerte {fetched} sanger fra «{title}» ({matched} har karaokeversjoner).",
+    "importing": "Importerer...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music – lim inn en spillelistelenke"
   }
 }

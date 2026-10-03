@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "तुम जितने ज़्यादा कलाकार जोड़ोगे, तुम्हारे सुझाव उतने ही बेहतर होंगे।",
     "searchForArtists": "उन कलाकारों को खोजो जिन्हें तुम जानते हो...",
     "artistsAdded": "{count} कलाकार{count, plural, one {} other {}} जोड़े गए",
-    "haveListeningHistory": "क्या Last.fm या Spotify में सुनने की हिस्ट्री है?",
     "importForBetterRecs": "और भी बेहतर सुझावों के लिए इसे इम्पोर्ट करो!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "डायरेक्ट इम्पोर्ट",
@@ -238,7 +237,8 @@
       "2000s": "2000s",
       "2010s": "2010s",
       "2020s": "2020s"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "क्या Last.fm, Spotify या YouTube Music में सुनने की हिस्ट्री या कोई प्लेलिस्ट है?"
   },
   "recommendations": {
     "title": "सुझाव",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "उस प्लेलिस्ट को इंपोर्ट करने में कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करो।",
+    "errorInvalidLink": "यह YouTube Music प्लेलिस्ट का लिंक नहीं लग रहा है।",
+    "errorLikedMusicPrivate": "तुम्हारी Liked Music प्लेलिस्ट हमेशा प्राइवेट होती है। इसके गानों को एक नई Public या Unlisted प्लेलिस्ट में कॉपी करो और उसे यहाँ शेयर करो (नीचे तरीका देखो)।",
+    "errorNotFound": "हम वह प्लेलिस्ट खोल नहीं पाए। पक्का करो कि यह Public या Unlisted पर सेट है।",
+    "howToAnyPlaylist": "तुम्हारे पसंदीदा गानों की कोई भी Public या Unlisted प्लेलिस्ट भी चलेगी, जैसे कि तुम्हारा पार्टी या वर्कआउट मिक्स।",
+    "howToStep1": "music.youtube.com पर, Library → Liked Music खोलो।",
+    "howToStep2": "गाने चुनो (एक पर क्लिक करो, फिर रेंज चुनने के लिए Shift+क्लिक करो)।",
+    "howToStep3": "\"Add to playlist\" → New playlist चुनो, और विजिबिलिटी को Unlisted या Public पर सेट करो।",
+    "howToStep4": "नई प्लेलिस्ट खोलो, Share → Copy link पर टैप करो, और उसे ऊपर पेस्ट करो।",
+    "howToTitle": "मैं अपनी Liked Music प्लेलिस्ट कैसे शेयर करूँ?",
+    "import": "इंपोर्ट करो",
+    "importedResult": "\"{title}\" से {fetched} गाने इंपोर्ट किए गए ({matched} के कराओके वर्शन उपलब्ध हैं)।",
+    "importing": "इंपोर्ट हो रहा है...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — प्लेलिस्ट लिंक पेस्ट करो"
   }
 }

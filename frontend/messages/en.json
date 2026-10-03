@@ -142,7 +142,7 @@
     "moreArtistsBetterRecs": "The more artists you add, the better your recommendations.",
     "searchForArtists": "Search for artists you know...",
     "artistsAdded": "{count} artist{count, plural, one {} other {s}} added",
-    "haveListeningHistory": "Have listening history in Last.fm or Spotify?",
+    "haveListeningHistoryOrPlaylist": "Have listening history in Last.fm, Spotify or YouTube Music?",
     "importForBetterRecs": "Import it for even better recommendations!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direct import",
@@ -885,5 +885,22 @@
     "korean": "\ud55c\uad6d\uc5b4",
     "portuguese": "Portugu\u00eas",
     "chinese": "\u4e2d\u6587"
+  },
+  "youtubeMusicImport": {
+    "title": "YouTube Music \u2014 paste a playlist link",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "import": "Import",
+    "importing": "Importing...",
+    "importedResult": "Imported {fetched} songs from \"{title}\" ({matched} have karaoke versions).",
+    "errorInvalidLink": "That doesn't look like a YouTube Music playlist link.",
+    "errorNotFound": "We couldn't open that playlist. Make sure it's set to Public or Unlisted.",
+    "errorLikedMusicPrivate": "Your Liked Music playlist is always private. Copy its songs into a new Public or Unlisted playlist and share that instead (see how below).",
+    "errorGeneric": "Something went wrong importing that playlist. Please try again.",
+    "howToTitle": "How do I share my Liked Music?",
+    "howToStep1": "On music.youtube.com, open Library \u2192 Liked Music.",
+    "howToStep2": "Select the songs (click one, then Shift+click to select a range).",
+    "howToStep3": "Choose \"Add to playlist\" \u2192 New playlist, and set visibility to Unlisted or Public.",
+    "howToStep4": "Open the new playlist, tap Share \u2192 Copy link, and paste it above.",
+    "howToAnyPlaylist": "Any public or unlisted playlist of songs you love works too, e.g. your party or workout mix."
   }
 }

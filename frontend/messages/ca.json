@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Com més artistes afegeixis, millors seran les teves recomanacions.",
     "searchForArtists": "Cerca artistes que coneguis...",
     "artistsAdded": "{count} artista{count, plural, one {} other {s}} afegit{count, plural, one {} other {s}}",
-    "haveListeningHistory": "Tens historial d'escolta a Last.fm o Spotify?",
     "importForBetterRecs": "Importa'l per obtenir recomanacions encara millors!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "importació directa",
@@ -238,7 +237,8 @@
       "2000s": "2000s",
       "2010s": "2010s",
       "2020s": "2020s"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Tens historial de reproducció a Last.fm, Spotify o YouTube Music?"
   },
   "recommendations": {
     "title": "Recomanacions",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Hi ha hagut un error en importar aquesta llista de reproducció. Torna-ho a provar.",
+    "errorInvalidLink": "Això no sembla un enllaç a una llista de reproducció de YouTube Music.",
+    "errorLikedMusicPrivate": "La teva llista «Cançons que t'agraden» sempre és privada. Copia les cançons en una llista de reproducció nova Pública o No llistada i comparteix aquesta nova llista (mira com fer-ho més avall).",
+    "errorNotFound": "No hem pogut obrir aquesta llista de reproducció. Assegura't que estigui configurada com a Pública o No llistada.",
+    "howToAnyPlaylist": "Qualsevol llista de reproducció pública o no llistada amb cançons que t'encantin també serveix; per exemple, la teva llista de festa o d'entrenament.",
+    "howToStep1": "A music.youtube.com, ves a Biblioteca → Cançons que t'agraden.",
+    "howToStep2": "Selecciona les cançons (fes clic a una i, després, prem Maj+clic per seleccionar-ne un interval).",
+    "howToStep3": "Tria «Afegeix a la llista de reproducció» → Nova llista de reproducció, i defineix la visibilitat com a No llistada o Pública.",
+    "howToStep4": "Obre la nova llista de reproducció, toca Comparteix → Copia l'enllaç, i enganxa'l a dalt.",
+    "howToTitle": "Com puc compartir la meva llista de cançons que m'agraden?",
+    "import": "Importa",
+    "importedResult": "S'han importat {fetched} cançons de «{title}» ({matched} tenen versió de karaoke).",
+    "importing": "S'està important...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — enganxa l'enllaç d'una llista de reproducció"
   }
 }

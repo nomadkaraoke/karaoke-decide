@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "你添加的歌手越多，推荐就越准确。",
     "searchForArtists": "搜索你认识的歌手...",
     "artistsAdded": "已添加 {count} 位歌手{count, plural, one {} other {}}",
-    "haveListeningHistory": "在 Last.fm 或 Spotify 上有听歌记录吗？",
     "importForBetterRecs": "导入记录以获得更好的推荐！",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "直接导入",
@@ -238,7 +237,8 @@
       "2000s": "2000年代",
       "2010s": "2010年代",
       "2020s": "2020年代"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "在 Last.fm、Spotify 或 YouTube Music 中有听歌记录？"
   },
   "recommendations": {
     "title": "推荐",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "导入该歌单时出错，请重试。",
+    "errorInvalidLink": "这看起来不像是 YouTube Music 歌单链接。",
+    "errorLikedMusicPrivate": "你的“顶过的音乐”歌单始终是私密的。请将其中的歌曲复制到一个新的“公开”或“不公开列出”歌单中并分享（具体操作见下方）。",
+    "errorNotFound": "无法打开该歌单。请确保其已设置为“公开”或“不公开列出”。",
+    "howToAnyPlaylist": "只要是包含你喜欢的歌曲的公开或不公开列出歌单都可以，例如你的派对或健身歌单。",
+    "howToStep1": "在 music.youtube.com 上，打开“媒体库”→“顶过的音乐”。",
+    "howToStep2": "选择歌曲（点击一首，然后按住 Shift 点击以多选范围）。",
+    "howToStep3": "选择“添加到歌单”→“新建歌单”，并将可见度设置为“不公开列出”或“公开”。",
+    "howToStep4": "打开新建的歌单，点击“分享”→“复制链接”，然后粘贴在上方即可。",
+    "howToTitle": "如何分享我的“顶过的音乐”？",
+    "import": "导入",
+    "importedResult": "已从“{title}”导入 {fetched} 首歌（其中 {matched} 首有卡拉OK伴奏版本）。",
+    "importing": "正在导入...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — 粘贴歌单链接"
   }
 }

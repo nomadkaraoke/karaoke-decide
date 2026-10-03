@@ -19,6 +19,7 @@ from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
+from karaoke_decide.services.youtube_music import YouTubeMusicClient, parse_playlist_id
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class SyncService:
     LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
+    YOUTUBE_MUSIC_PLAYLIST_LIMIT = 1000  # Tracks read from a shared playlist
     # Full scrobble history - now incremental with progress tracking
     LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
     LASTFM_BATCH_SIZE = 1000  # Save progress every N scrobbles
@@ -1193,6 +1195,52 @@ class SyncService:
                 created += 1
 
         return created, updated
+
+    # -------------------------------------------------------------------------
+    # YouTube Music Playlist Import
+    # -------------------------------------------------------------------------
+
+    async def import_youtube_music_playlist(
+        self,
+        user_id: str,
+        playlist_url: str,
+        client: YouTubeMusicClient | None = None,
+    ) -> dict[str, Any]:
+        """Import songs from a public/unlisted YouTube Music playlist.
+
+        Args:
+            user_id: User ID.
+            playlist_url: Playlist link or ID shared by the user.
+            client: Optional YouTube Music client override (for tests).
+
+        Returns:
+            Dict with playlist_title, tracks_fetched, tracks_matched, created, updated.
+
+        Raises:
+            InvalidPlaylistUrlError, PrivatePlaylistError, PlaylistNotFoundError,
+            PlaylistFetchError: See karaoke_decide.services.youtube_music.
+        """
+        playlist_id = parse_playlist_id(playlist_url)
+        playlist = await (client or YouTubeMusicClient()).get_playlist(
+            playlist_id, limit=self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
+        )
+
+        matched = await self.track_matcher.batch_match_tracks(playlist.tracks)
+        created, updated = await self._upsert_user_songs(user_id, matched, "youtube_music")
+        tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
+
+        logger.info(
+            f"YouTube Music import for {user_id}: playlist {playlist_id} "
+            f"{len(playlist.tracks)} fetched, {tracks_matched} matched"
+        )
+
+        return {
+            "playlist_title": playlist.title,
+            "tracks_fetched": len(playlist.tracks),
+            "tracks_matched": tracks_matched,
+            "created": created,
+            "updated": updated,
+        }
 
     # -------------------------------------------------------------------------
     # ListenBrainz Sync

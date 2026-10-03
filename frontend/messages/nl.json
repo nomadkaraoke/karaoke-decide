@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Hoe meer artiesten je toevoegt, hoe beter je aanbevelingen.",
     "searchForArtists": "Zoek naar artiesten die je kent...",
     "artistsAdded": "{count} {count, plural, one {artiest} other {artiesten}} toegevoegd",
-    "haveListeningHistory": "Heb je een luistergeschiedenis in Last.fm of Spotify?",
     "importForBetterRecs": "Importeer het voor nog betere aanbevelingen!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "directe import",
@@ -238,7 +237,8 @@
       "2000s": "Jaren 00",
       "2010s": "Jaren 10",
       "2020s": "Jaren 20"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Heb je een luistergeschiedenis op Last.fm, Spotify of YouTube Music?"
   },
   "recommendations": {
     "title": "Aanbevelingen",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Er is iets misgegaan bij het importeren van die afspeellijst. Probeer het opnieuw.",
+    "errorInvalidLink": "Dat lijkt geen link naar een YouTube Music-afspeellijst te zijn.",
+    "errorLikedMusicPrivate": "Je afspeellijst 'Gelikete muziek' is altijd privé. Kopieer de nummers naar een nieuwe openbare of verborgen afspeellijst en deel die in plaats daarvan (hieronder zie je hoe).",
+    "errorNotFound": "We konden die afspeellijst niet openen. Controleer of deze is ingesteld op Openbaar of Verborgen.",
+    "howToAnyPlaylist": "Elke openbare of verborgen afspeellijst met nummers die je geweldig vindt werkt ook, zoals je feest- of workoutmix.",
+    "howToStep1": "Ga op music.youtube.com naar Bibliotheek → Gelikete muziek.",
+    "howToStep2": "Selecteer de nummers (klik op eentje en gebruik Shift+klik om een reeks te selecteren).",
+    "howToStep3": "Kies \"Aan afspeellijst toevoegen\" → Nieuwe afspeellijst en stel de zichtbaarheid in op Verborgen of Openbaar.",
+    "howToStep4": "Open de nieuwe afspeellijst, klik op Delen → Link kopiëren en plak deze hierboven.",
+    "howToTitle": "Hoe deel ik mijn 'Gelikete muziek'?",
+    "import": "Importeren",
+    "importedResult": "{fetched} nummers geïmporteerd uit \"{title}\" ({matched} hebben een karaokeversie).",
+    "importing": "Bezig met importeren...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — plak een afspeellijstlink"
   }
 }

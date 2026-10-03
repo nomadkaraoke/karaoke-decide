@@ -717,3 +717,53 @@ class TestUpsertUserSongs:
         assert doc_data["has_karaoke_version"] is False
         assert doc_data["artist"] == "Unknown Artist"
         assert doc_data["title"] == "Unknown Song"
+
+
+class TestImportYouTubeMusicPlaylist:
+    """Tests for importing a shared YouTube Music playlist."""
+
+    @pytest.mark.asyncio
+    async def test_imports_and_stores_tracks(
+        self, sync_service: SyncService, mock_track_matcher: MagicMock, mock_firestore: MagicMock
+    ) -> None:
+        from karaoke_decide.services.youtube_music import YouTubeMusicPlaylist
+
+        tracks = [{"artist": "Band One", "title": "First Tune"}, {"artist": "Band Two", "title": "Second Tune"}]
+        client = MagicMock()
+        client.get_playlist = AsyncMock(
+            return_value=YouTubeMusicPlaylist(playlist_id="PLabc123", title="My Likes", tracks=tracks)
+        )
+        catalog_song = MagicMock(id=42, artist="Band One", title="First Tune")
+        mock_track_matcher.batch_match_tracks = AsyncMock(
+            return_value=[
+                MatchedTrack("Band One", "First Tune", "band one", "first tune", catalog_song, 1.0),
+                MatchedTrack("Band Two", "Second Tune", "band two", "second tune", None, 0.0),
+            ]
+        )
+
+        result = await sync_service.import_youtube_music_playlist(
+            "guest_1", "https://music.youtube.com/playlist?list=PLabc123&si=x", client=client
+        )
+
+        client.get_playlist.assert_awaited_once_with("PLabc123", limit=SyncService.YOUTUBE_MUSIC_PLAYLIST_LIMIT)
+        mock_track_matcher.batch_match_tracks.assert_awaited_once_with(tracks)
+        assert result == {
+            "playlist_title": "My Likes",
+            "tracks_fetched": 2,
+            "tracks_matched": 1,
+            "created": 2,
+            "updated": 0,
+        }
+        stored = [c[0][2] for c in mock_firestore.set_document.call_args_list]
+        assert {d["source"] for d in stored} == {"youtube_music"}
+        assert {d["song_id"] for d in stored} == {"42", "youtube_music:band two:second tune"}
+
+    @pytest.mark.asyncio
+    async def test_invalid_url_raises_before_fetch(self, sync_service: SyncService) -> None:
+        from karaoke_decide.services.youtube_music import InvalidPlaylistUrlError
+
+        client = MagicMock()
+        client.get_playlist = AsyncMock()
+        with pytest.raises(InvalidPlaylistUrlError):
+            await sync_service.import_youtube_music_playlist("guest_1", "https://example.com/x", client=client)
+        client.get_playlist.assert_not_awaited()

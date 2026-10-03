@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "アーティストを追加するほど、おすすめの精度が上がります。",
     "searchForArtists": "知っているアーティストを検索...",
     "artistsAdded": "{count}組のアーティストを追加しました",
-    "haveListeningHistory": "Last.fmやSpotifyの再生履歴はありますか？",
     "importForBetterRecs": "インポートして、さらに精度のおすすめをゲットしましょう！",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "直接インポート",
@@ -238,7 +237,8 @@
       "2000s": "2000年代",
       "2010s": "2010年代",
       "2020s": "2020年代"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Last.fm、Spotify、またはYouTube Musicに再生履歴やプレイリストはありますか？"
   },
   "recommendations": {
     "title": "おすすめ",
@@ -885,5 +885,22 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "プレイリストのインポート中に問題が発生しました。もう一度お試しください。",
+    "errorInvalidLink": "YouTube Musicのプレイリストのリンクではないようです。",
+    "errorLikedMusicPrivate": "「高く評価した音楽」プレイリストは常に非公開になっています。曲を新しい「公開」または「限定公開」のプレイリストにコピーして、そちらを共有してください（手順は下記をご覧ください）。",
+    "errorNotFound": "プレイリストを開けませんでした。「公開」または「限定公開」に設定されているかご確認ください。",
+    "howToAnyPlaylist": "お気に入りの曲を集めた公開または限定公開のプレイリスト（パーティー用やワークアウト用など）でもインポートできます。",
+    "howToStep1": "music.youtube.com で、「ライブラリ」→「高く評価した音楽」を開きます。",
+    "howToStep2": "曲を選択します（1曲クリックした後、Shiftキーを押しながらクリックすると範囲選択できます）。",
+    "howToStep3": "「プレイリストに追加」→「新しいプレイリスト」を選択し、公開設定を「限定公開」または「公開」にします。",
+    "howToStep4": "新しいプレイリストを開き、「共有」→「リンクをコピー」を選択して、上の入力欄に貼り付けます。",
+    "howToTitle": "「高く評価した音楽」を共有するには？",
+    "import": "インポート",
+    "importedResult": "「{title}」から {fetched} 曲をインポートしました（{matched} 曲にカラオケバージョンがあります）。",
+    "importing": "インポート中...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — プレイリストのリンクを貼り付け"
   }
 }
