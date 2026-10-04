@@ -6,6 +6,7 @@ karaoke catalog, and creates UserSong records.
 
 import logging
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -1235,19 +1236,14 @@ class SyncService:
             PlaylistFetchError: See karaoke_decide.services.youtube_music.
         """
         playlist_id = parse_playlist_id(playlist_url)
-        imports_today = await self._check_youtube_music_import_limits(user_id)
+        token = await self._reserve_youtube_music_import(user_id)
         limit = self.YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT if is_guest else self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
-        playlist = await (client or YouTubeMusicClient()).get_playlist(playlist_id, limit=limit)
-        # Only successful fetches count, so a user can fix a private playlist and retry at once
-        await self.firestore.set_document(
-            self.YOUTUBE_MUSIC_IMPORTS_COLLECTION,
-            user_id,
-            {
-                "last_import_at": datetime.now(UTC).isoformat(),
-                "day": datetime.now(UTC).date().isoformat(),
-                "count": imports_today + 1,
-            },
-        )
+        try:
+            playlist = await (client or YouTubeMusicClient()).get_playlist(playlist_id, limit=limit)
+        except Exception:
+            # Only successful fetches count, so a user can fix a private playlist and retry at once
+            await self._release_youtube_music_import(user_id, token)
+            raise
 
         matched = await self.track_matcher.batch_match_tracks(playlist.tracks)
         created, updated = await self._upsert_user_songs(user_id, matched, "youtube_music")
@@ -1266,28 +1262,56 @@ class SyncService:
             "updated": updated,
         }
 
-    async def _check_youtube_music_import_limits(self, user_id: str) -> int:
-        """Enforce the per-user import cooldown and daily cap.
+    async def _reserve_youtube_music_import(self, user_id: str) -> str:
+        """Atomically enforce the import cooldown + daily cap and reserve a slot.
+
+        The check and the write happen in one Firestore transaction, so parallel
+        requests can't all pass the check before any of them records an import.
 
         Returns:
-            Number of imports the user has already done today.
+            Reservation token, needed to release the slot if the fetch fails.
 
         Raises:
             ImportRateLimitedError: If the user is over either limit.
         """
         now = datetime.now(UTC)
-        doc = await self.firestore.get_document(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id) or {}
+        today = now.date().isoformat()
+        token = uuid.uuid4().hex
 
-        last_import_at = doc.get("last_import_at")
-        if last_import_at:
-            elapsed = (now - datetime.fromisoformat(last_import_at)).total_seconds()
-            if elapsed < self.YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS:
-                raise ImportRateLimitedError("cooldown")
+        def reserve(current: dict[str, Any] | None) -> dict[str, Any]:
+            current = current or {}
+            last_import_at = current.get("last_import_at")
+            if last_import_at:
+                elapsed = (now - datetime.fromisoformat(last_import_at)).total_seconds()
+                if elapsed < self.YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS:
+                    raise ImportRateLimitedError("cooldown")
 
-        imports_today = doc.get("count", 0) if doc.get("day") == now.date().isoformat() else 0
-        if imports_today >= self.YOUTUBE_MUSIC_IMPORTS_PER_DAY:
-            raise ImportRateLimitedError("daily limit")
-        return imports_today
+            imports_today = current.get("count", 0) if current.get("day") == today else 0
+            if imports_today >= self.YOUTUBE_MUSIC_IMPORTS_PER_DAY:
+                raise ImportRateLimitedError("daily limit")
+
+            # Keep the previous record (minus its own history) so a failed fetch can restore it
+            previous = {k: v for k, v in current.items() if k not in ("id", "previous")} or None
+            return {
+                "last_import_at": now.isoformat(),
+                "day": today,
+                "count": imports_today + 1,
+                "token": token,
+                "previous": previous,
+            }
+
+        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, reserve)
+        return token
+
+    async def _release_youtube_music_import(self, user_id: str, token: str) -> None:
+        """Undo a reservation after a failed fetch, if it's still this request's."""
+
+        def release(current: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not current or current.get("token") != token:
+                return current  # A later import has taken over; leave it alone
+            return current.get("previous")
+
+        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, release)
 
     # -------------------------------------------------------------------------
     # ListenBrainz Sync

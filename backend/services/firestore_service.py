@@ -1,5 +1,6 @@
 """Firestore database service."""
 
+from collections.abc import Callable
 from typing import Any
 
 from google.cloud import firestore
@@ -151,4 +152,39 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await delete_in_transaction(transaction)
+        return result
+
+    async def transform_document_atomically(
+        self,
+        collection: str,
+        doc_id: str,
+        transform: Callable[[dict[str, Any] | None], dict[str, Any] | None],
+    ) -> dict[str, Any] | None:
+        """Atomically read a document, compute its new contents, and write them.
+
+        ``transform`` gets the current data (None if missing) and returns the new
+        data to store, or None to delete the document. It may raise to abort
+        without writing. It must be side-effect free: Firestore retries the
+        transaction (and so calls ``transform`` again) on contention.
+
+        Returns:
+            The data returned by ``transform``.
+        """
+
+        @firestore.async_transactional
+        async def transform_in_transaction(
+            transaction: firestore.AsyncTransaction,
+        ) -> dict[str, Any] | None:
+            doc_ref = self.collection(collection).document(doc_id)
+            doc = await doc_ref.get(transaction=transaction)
+            new_data = transform((doc.to_dict() or {}) if doc.exists else None)
+            if new_data is None:
+                if doc.exists:
+                    transaction.delete(doc_ref)
+            else:
+                transaction.set(doc_ref, new_data)
+            return new_data
+
+        transaction = self.client.transaction()
+        result: dict[str, Any] | None = await transform_in_transaction(transaction)
         return result

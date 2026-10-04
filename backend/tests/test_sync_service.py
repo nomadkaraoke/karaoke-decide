@@ -741,6 +741,8 @@ class TestImportYouTubeMusicPlaylist:
             ]
         )
 
+        mock_firestore.transform_document_atomically = AsyncMock(return_value={})
+
         result = await sync_service.import_youtube_music_playlist(
             "guest_1", "https://music.youtube.com/playlist?list=PLabc123&si=x", client=client
         )
@@ -770,86 +772,116 @@ class TestImportYouTubeMusicPlaylist:
 
 
 class TestYouTubeMusicImportLimits:
-    """Rate limiting for YouTube Music playlist imports."""
+    """Rate limiting for YouTube Music playlist imports (atomic reserve/release)."""
 
     @staticmethod
-    def _client(tracks: int = 0) -> MagicMock:
+    def _client(error: Exception | None = None) -> MagicMock:
         from karaoke_decide.services.youtube_music import YouTubeMusicPlaylist
 
         client = MagicMock()
         client.get_playlist = AsyncMock(
-            return_value=YouTubeMusicPlaylist(
-                playlist_id="PLabc123",
-                title="Mix",
-                tracks=[{"artist": "Band", "title": f"Tune {i}"} for i in range(tracks)],
-            )
+            side_effect=error,
+            return_value=YouTubeMusicPlaylist(playlist_id="PLabc123", title="Mix", tracks=[]),
         )
         return client
 
-    @pytest.fixture(autouse=True)
-    def _no_matches(self, mock_track_matcher: MagicMock) -> None:
+    @pytest.fixture
+    def store(self, mock_firestore: MagicMock, mock_track_matcher: MagicMock) -> dict[str, Any]:
+        """In-memory stand-in for the youtube_music_imports collection."""
         mock_track_matcher.batch_match_tracks = AsyncMock(return_value=[])
+        docs: dict[str, Any] = {}
+
+        async def transform(collection: str, doc_id: str, fn: Any) -> Any:
+            assert collection == "youtube_music_imports"
+            new = fn(docs.get(doc_id))
+            if new is None:
+                docs.pop(doc_id, None)
+            else:
+                docs[doc_id] = new
+            return new
+
+        mock_firestore.transform_document_atomically = AsyncMock(side_effect=transform)
+        return docs
 
     @pytest.mark.asyncio
-    async def test_records_import_after_successful_fetch(
-        self, sync_service: SyncService, mock_firestore: MagicMock
-    ) -> None:
+    async def test_records_successful_import(self, sync_service: SyncService, store: dict[str, Any]) -> None:
         await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=self._client())
 
-        record = next(c for c in mock_firestore.set_document.call_args_list if c[0][0] == "youtube_music_imports")
-        assert record[0][1] == "guest_1"
-        assert record[0][2]["count"] == 1
-        assert record[0][2]["day"] == datetime.now(UTC).date().isoformat()
+        assert store["guest_1"]["count"] == 1
+        assert store["guest_1"]["day"] == datetime.now(UTC).date().isoformat()
 
     @pytest.mark.asyncio
-    async def test_cooldown_blocks_rapid_repeat(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
+    async def test_cooldown_blocks_rapid_repeat(self, sync_service: SyncService, store: dict[str, Any]) -> None:
         from backend.services.sync_service import ImportRateLimitedError
 
-        mock_firestore.get_document = AsyncMock(
-            return_value={"last_import_at": datetime.now(UTC).isoformat(), "day": "x", "count": 1}
-        )
+        await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=self._client())
         client = self._client()
         with pytest.raises(ImportRateLimitedError):
             await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=client)
         client.get_playlist.assert_not_awaited()
+        assert store["guest_1"]["count"] == 1
 
     @pytest.mark.asyncio
-    async def test_daily_cap(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
+    async def test_daily_cap(self, sync_service: SyncService, store: dict[str, Any]) -> None:
         from backend.services.sync_service import ImportRateLimitedError
 
         now = datetime.now(UTC)
-        mock_firestore.get_document = AsyncMock(
-            return_value={
-                "last_import_at": (now - timedelta(hours=1)).isoformat(),
-                "day": now.date().isoformat(),
-                "count": SyncService.YOUTUBE_MUSIC_IMPORTS_PER_DAY,
-            }
-        )
+        store["guest_1"] = {
+            "last_import_at": (now - timedelta(hours=1)).isoformat(),
+            "day": now.date().isoformat(),
+            "count": SyncService.YOUTUBE_MUSIC_IMPORTS_PER_DAY,
+        }
         with pytest.raises(ImportRateLimitedError):
             await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=self._client())
 
     @pytest.mark.asyncio
-    async def test_daily_count_resets_on_new_day(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
-        mock_firestore.get_document = AsyncMock(
-            return_value={
-                "last_import_at": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
-                "day": "2000-01-01",
-                "count": SyncService.YOUTUBE_MUSIC_IMPORTS_PER_DAY,
-            }
-        )
+    async def test_daily_count_resets_on_new_day(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        store["guest_1"] = {
+            "last_import_at": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            "day": "2000-01-01",
+            "count": SyncService.YOUTUBE_MUSIC_IMPORTS_PER_DAY,
+        }
         await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=self._client())
-        record = next(c for c in mock_firestore.set_document.call_args_list if c[0][0] == "youtube_music_imports")
-        assert record[0][2]["count"] == 1
+        assert store["guest_1"]["count"] == 1
 
     @pytest.mark.asyncio
-    async def test_failed_fetch_is_not_recorded(self, sync_service: SyncService, mock_firestore: MagicMock) -> None:
+    async def test_failed_fetch_restores_previous_record(
+        self, sync_service: SyncService, store: dict[str, Any]
+    ) -> None:
         from karaoke_decide.services.youtube_music import PlaylistNotFoundError
 
-        client = MagicMock()
-        client.get_playlist = AsyncMock(side_effect=PlaylistNotFoundError("PLabc123"))
+        earlier = {
+            "last_import_at": (datetime.now(UTC) - timedelta(hours=2)).isoformat(),
+            "day": datetime.now(UTC).date().isoformat(),
+            "count": 3,
+        }
+        store["guest_1"] = dict(earlier)
         with pytest.raises(PlaylistNotFoundError):
-            await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=client)
-        mock_firestore.set_document.assert_not_awaited()
+            await sync_service.import_youtube_music_playlist(
+                "guest_1", "PLabc123", client=self._client(PlaylistNotFoundError("PLabc123"))
+            )
+        assert store["guest_1"] == earlier
+
+        # ...so the user can fix the playlist and retry immediately
+        await sync_service.import_youtube_music_playlist("guest_1", "PLabc123", client=self._client())
+        assert store["guest_1"]["count"] == 4
+
+    @pytest.mark.asyncio
+    async def test_failed_first_fetch_leaves_no_record(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        from karaoke_decide.services.youtube_music import PlaylistFetchError
+
+        with pytest.raises(PlaylistFetchError):
+            await sync_service.import_youtube_music_playlist(
+                "guest_1", "PLabc123", client=self._client(PlaylistFetchError("down"))
+            )
+        assert "guest_1" not in store
+
+    @pytest.mark.asyncio
+    async def test_release_keeps_newer_reservation(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        token = await sync_service._reserve_youtube_music_import("guest_1")
+        store["guest_1"]["token"] = "someone-else"
+        await sync_service._release_youtube_music_import("guest_1", token)
+        assert store["guest_1"]["token"] == "someone-else"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -859,7 +891,9 @@ class TestYouTubeMusicImportLimits:
             (False, SyncService.YOUTUBE_MUSIC_PLAYLIST_LIMIT),
         ],
     )
-    async def test_guest_track_limit(self, sync_service: SyncService, is_guest: bool, expected_limit: int) -> None:
+    async def test_guest_track_limit(
+        self, sync_service: SyncService, store: dict[str, Any], is_guest: bool, expected_limit: int
+    ) -> None:
         client = self._client()
         await sync_service.import_youtube_music_playlist("u", "PLabc123", is_guest=is_guest, client=client)
         client.get_playlist.assert_awaited_once_with("PLabc123", limit=expected_limit)

@@ -422,7 +422,7 @@ Get catalog statistics.
 
 ## Services ✅ Implemented
 
-**Note:** All services endpoints require a verified (non-guest) user. Guest users receive a `403 Forbidden` response with message: "Email verification required. Please verify your email to use this feature."
+**Note:** All services endpoints except `POST /api/services/youtube-music/import` require a verified (non-guest) user. Guest users receive a `403 Forbidden` response with message: "Email verification required. Please verify your email to use this feature."
 
 ### GET /api/services
 
@@ -523,7 +523,7 @@ Liked Music. Tracks (up to 1000; 500 for guests) are matched to the catalog and 
 
 **Errors:** `400` not a YouTube playlist link · `422` the always-private Liked Music (`LM`) /
 Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `429` rate limited
-(one successful import per 30s, 20/day per user) · `502` YouTube unreachable.
+(one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `502` YouTube unreachable.
 
 ### DELETE /api/services/{service_type}
 
