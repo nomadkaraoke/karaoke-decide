@@ -141,8 +141,32 @@ class TestGetPlaylist:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("error", [requests.ConnectionError("down"), Exception("Server returned HTTP 429")])
-    async def test_upstream_failure_raises_fetch_error(self, error: Exception) -> None:
+    async def test_upstream_failure_raises_fetch_error_after_retry(
+        self, error: Exception, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(YouTubeMusicClient, "RETRY_DELAY_SECONDS", 0)
         ytmusic = MagicMock()
         ytmusic.get_playlist.side_effect = error
         with pytest.raises(PlaylistFetchError):
             await YouTubeMusicClient(ytmusic).get_playlist(PID, limit=10)
+        assert ytmusic.get_playlist.call_count == YouTubeMusicClient.FETCH_ATTEMPTS
+
+    @pytest.mark.asyncio
+    async def test_transient_failure_then_success(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(YouTubeMusicClient, "RETRY_DELAY_SECONDS", 0)
+        ytmusic = MagicMock()
+        ytmusic.get_playlist.side_effect = [
+            ValueError("Expecting value: line 1 column 1 (char 0)"),
+            {"title": "Mix", "tracks": [{"title": "Tune", "artists": [{"name": "Band"}]}]},
+        ]
+        playlist = await YouTubeMusicClient(ytmusic).get_playlist(PID, limit=10)
+        assert playlist.title == "Mix"
+        assert len(playlist.tracks) == 1
+
+    @pytest.mark.asyncio
+    async def test_not_found_is_not_retried(self) -> None:
+        ytmusic = MagicMock()
+        ytmusic.get_playlist.side_effect = KeyError("contents")
+        with pytest.raises(PlaylistNotFoundError):
+            await YouTubeMusicClient(ytmusic).get_playlist(PID, limit=10)
+        assert ytmusic.get_playlist.call_count == 1

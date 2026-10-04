@@ -523,7 +523,7 @@ Liked Music. Tracks (up to 1000; 500 for guests) are matched to the catalog and 
 
 **Errors:** `400` not a YouTube playlist link · `422` the always-private Liked Music (`LM`) /
 Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `429` rate limited
-(one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `502` YouTube unreachable.
+(one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `503` YouTube unreachable (after one automatic retry).
 
 ### DELETE /api/services/{service_type}
 
