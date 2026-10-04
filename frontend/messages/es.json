@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Cuantos más artistas agregues, mejores serán tus recomendaciones.",
     "searchForArtists": "Busca artistas que conoces...",
     "artistsAdded": "{count} {count, plural, one {artista agregado} other {artistas agregados}}",
-    "haveListeningHistory": "¿Tienes historial de escucha en Last.fm o Spotify?",
     "importForBetterRecs": "¡Impórtalo para obtener recomendaciones aún mejores!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "importación directa",
@@ -238,7 +237,8 @@
       "2000s": "2000s",
       "2010s": "2010s",
       "2020s": "2020s"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "¿Tienes historial de reproducción en Last.fm, Spotify o YouTube Music?"
   },
   "recommendations": {
     "title": "Recomendaciones",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Algo salió mal al importar esa lista de reproducción. Por favor, inténtalo de nuevo.",
+    "errorInvalidLink": "Ese enlace no parece ser de una lista de reproducción de YouTube Music.",
+    "errorLikedMusicPrivate": "Tu lista de Canciones que te gustan siempre es privada. Copia sus canciones en una nueva lista pública u oculta y comparte esa en su lugar (mira cómo abajo).",
+    "errorNotFound": "No pudimos abrir esa lista de reproducción. Asegúrate de que esté configurada como pública u oculta.",
+    "howToAnyPlaylist": "Cualquier lista de reproducción pública u oculta con canciones que te encanten también sirve; por ejemplo, tu mezcla para fiestas o entrenar.",
+    "howToStep1": "En music.youtube.com, abre Biblioteca → Canciones que te gustan.",
+    "howToStep2": "Selecciona las canciones (haz clic en una y luego Mayús+clic para seleccionar un rango).",
+    "howToStep3": "Elige \"Añadir a lista de reproducción\" → Nueva lista de reproducción y configura la visibilidad en Oculta o Pública.",
+    "howToStep4": "Abre la nueva lista de reproducción, pulsa Compartir → Copiar enlace y pégalo arriba.",
+    "howToTitle": "¿Cómo comparto mi lista de Canciones que te gustan?",
+    "import": "Importar",
+    "importedResult": "Se {fetched, plural, one {importó # canción} other {importaron # canciones}} de \"{title}\" ({matched} con versiones de karaoke).",
+    "importing": "Importando...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — pega el enlace a una lista de reproducción",
+    "emptyPlaylist": "\"{title}\" no tiene canciones que hayamos podido leer. Prueba con otra lista de reproducción.",
+    "errorTooManyImports": "Estás importando listas de reproducción demasiado rápido. Espera un minuto y vuelve a intentarlo.",
+    "inputLabel": "Enlace a la lista de reproducción de YouTube Music"
   }
 }

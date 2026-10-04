@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Cu cât adaugi mai mulți artiști, cu atât recomandările tale vor fi mai bune.",
     "searchForArtists": "Caută artiști pe care îi cunoști...",
     "artistsAdded": "{count} artist{count, plural, one {} other {i}} adăugat{count, plural, one {} other {i}}",
-    "haveListeningHistory": "Ai un istoric de ascultare în Last.fm sau Spotify?",
     "importForBetterRecs": "Importă-l pentru recomandări și mai bune!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "import direct",
@@ -238,7 +237,8 @@
       "2000s": "Anii 2000",
       "2010s": "Anii 2010",
       "2020s": "Anii 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Ai un istoric de ascultare pe Last.fm, Spotify sau YouTube Music?"
   },
   "recommendations": {
     "title": "Recomandări",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "A apărut o problemă la importarea acelui playlist. Te rugăm să încerci din nou.",
+    "errorInvalidLink": "Acesta nu pare a fi un link valid către un playlist YouTube Music.",
+    "errorLikedMusicPrivate": "Playlistul tău „Muzică apreciată” (Liked Music) este întotdeauna privat. Copiază melodiile într-un playlist nou, Public sau Neafișat, și partajează-l pe acela (vezi pașii mai jos).",
+    "errorNotFound": "Nu am putut deschide acel playlist. Asigură-te că este setat ca Public sau Neafișat.",
+    "howToAnyPlaylist": "Funcționează la fel de bine orice playlist public sau neafișat cu melodii care îți plac, cum ar fi mixul tău pentru petreceri sau antrenamente.",
+    "howToStep1": "Pe music.youtube.com, deschide Bibliotecă → Muzică apreciată.",
+    "howToStep2": "Selectează melodiile (fă clic pe una, apoi ține apăsat Shift și fă clic pentru a selecta mai multe).",
+    "howToStep3": "Alege „Adaugă la playlist” → Playlist nou și setează vizibilitatea la Neafișat sau Public.",
+    "howToStep4": "Deschide noul playlist, apasă pe Distribuie → Copiază linkul și inserează-l mai sus.",
+    "howToTitle": "Cum pot partaja playlistul „Muzică apreciată”?",
+    "import": "Importă",
+    "importedResult": "S-au importat {fetched, plural, one {# melodie} few {# melodii} other {# de melodii}} din \"{title}\" ({matched} cu versiuni karaoke).",
+    "importing": "Se importă...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — lipește linkul unui playlist",
+    "emptyPlaylist": "\"{title}\" nu conține nicio melodie care să poată fi citită. Încearcă o altă listă de redare.",
+    "errorTooManyImports": "Imporți liste de redare prea rapid. Te rugăm să aștepți un minut și să încerci din nou.",
+    "inputLabel": "Link către lista de redare YouTube Music"
   }
 }

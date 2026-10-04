@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "ככל שתוסיף יותר אמנים, כך ההמלצות שלך יהיו טובות יותר.",
     "searchForArtists": "חפש אמנים שאתה מכיר...",
     "artistsAdded": "{count} {count, plural, one {אמן נוסף} other {אמנים נוספו}}",
-    "haveListeningHistory": "יש לך היסטוריית האזנה ב-Last.fm או Spotify?",
     "importForBetterRecs": "ייבא אותה לקבלת המלצות טובות עוד יותר!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "ייבוא ישיר",
@@ -238,7 +237,8 @@
       "2000s": "שנות ה-2000",
       "2010s": "שנות ה-2010",
       "2020s": "שנות ה-2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "יש לך היסטוריית האזנה ב-Last.fm, ב-Spotify או ב-YouTube Music?"
   },
   "recommendations": {
     "title": "המלצות",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "משהו השתבש בייבוא הפלייליסט. כדאי לנסות שוב.",
+    "errorInvalidLink": "הקישור הזה לא נראה כמו קישור לפלייליסט ב-YouTube Music.",
+    "errorLikedMusicPrivate": "פלייליסט השירים שאהבת הוא תמיד פרטי. אפשר להעתיק את השירים שבו לפלייליסט חדש שמוגדר כציבורי או כלא רשום (Unlisted) ולשתף אותו במקום (הסבר למטה).",
+    "errorNotFound": "לא הצלחנו לפתוח את הפלייליסט הזה. יש לוודא שהוא מוגדר כציבורי או כלא רשום (Unlisted).",
+    "howToAnyPlaylist": "כל פלייליסט ציבורי או לא רשום (Unlisted) של שירים שאתם אוהבים יעבוד מעולה, למשל המיקס שלכם למסיבה או לאימון.",
+    "howToStep1": "באתר music.youtube.com, פתחו את הספרייה (Library) ← שירים שאהבתי (Liked Music).",
+    "howToStep2": "בחרו את השירים (קליק על שיר אחד, ואז Shift+קליק כדי לבחור טווח).",
+    "howToStep3": "בחרו \"הוספה לפלייליסט\" ← פלייליסט חדש, והגדירו את הניראות כלא רשום (Unlisted) או ציבורי.",
+    "howToStep4": "פתחו את הפלייליסט החדש, לחצו על שיתוף ← העתקת הקישור, והדביקו אותו למעלה.",
+    "howToTitle": "איך לשתף את השירים שאהבתי?",
+    "import": "ייבוא",
+    "importedResult": "יובאו {fetched, plural, one {שיר אחד} other {# שירים}} מתוך \"{title}\" ({matched} מתוכם עם גרסאות קריוקי).",
+    "importing": "מייבא...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — הדבקת קישור לפלייליסט",
+    "emptyPlaylist": "ב-\"{title}\" אין שירים שהצלחנו לקרוא. כדאי לנסות פלייליסט אחר.",
+    "errorTooManyImports": "ייבוא הפלייליסטים מתבצע מהר מדי. נא להמתין דקה ולנסות שוב.",
+    "inputLabel": "קישור לפלייליסט ב-YouTube Music"
   }
 }

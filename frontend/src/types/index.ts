@@ -80,7 +80,7 @@ export interface UserSong {
   song_id: string;
   artist: string;
   title: string;
-  source: "spotify" | "lastfm" | "quiz" | "known_songs" | "enjoy_singing";
+  source: "spotify" | "lastfm" | "listenbrainz" | "youtube_music" | "quiz" | "known_songs" | "enjoy_singing";
   play_count: number;
   is_saved: boolean;
   times_sung: number;

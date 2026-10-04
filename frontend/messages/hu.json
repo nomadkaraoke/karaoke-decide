@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Minél több előadót adsz hozzá, annál jobbak lesznek az ajánlásaid.",
     "searchForArtists": "Keress előadókat, akiket ismersz...",
     "artistsAdded": "{count} előadó{count, plural, one {} other {}} hozzáadva",
-    "haveListeningHistory": "Van hallgatási előzményed a Last.fm-en vagy a Spotify-on?",
     "importForBetterRecs": "Importáld a még jobb ajánlásokért!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "közvetlen importálás",
@@ -238,7 +237,8 @@
       "2000s": "2000-es évek",
       "2010s": "2010-es évek",
       "2020s": "2020-as évek"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Van lejátszási előzményed Last.fm-en, Spotify-on vagy YouTube Music-on?"
   },
   "recommendations": {
     "title": "Ajánlások",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Hiba történt a lejátszási lista importálása során. Kérlek, próbáld újra.",
+    "errorInvalidLink": "Ez nem tűnik érvényes YouTube Music lejátszásilista-linknek.",
+    "errorLikedMusicPrivate": "A Kedvelt zenék lejátszási listád mindig privát. Másold a dalait egy új Nyilvános vagy Nem listázott lejátszási listába, és oszd meg azt helyette (lásd lentebb a lépéseket).",
+    "errorNotFound": "Nem sikerült megnyitni a lejátszási listát. Ellenőrizd, hogy Nyilvánosra vagy Nem listázottra van-e állítva.",
+    "howToAnyPlaylist": "Bármilyen nyilvános vagy nem listázott lejátszási lista megfelel a kedvenc számaiddal, például egy buli- vagy edzésmix.",
+    "howToStep1": "A music.youtube.com oldalon nyisd meg a Könyvtár → Kedvelt zenék menüpontot.",
+    "howToStep2": "Jelöld ki a dalokat (kattints az egyikre, majd a Shift billentyűt nyomva tartva kattintva jelölj ki egy tartományt).",
+    "howToStep3": "Válaszd a „Hozzáadás lejátszási listához” → „Új lejátszási lista” lehetőséget, és állítsd a láthatóságot Nem listázott vagy Nyilvános értékre.",
+    "howToStep4": "Nyisd meg az új lejátszási listát, kattints a Megosztás → Link másolása opcióra, és illeszd be fentebb.",
+    "howToTitle": "Hogyan oszthatom meg a Kedvelt zenéimet?",
+    "import": "Importálás",
+    "importedResult": "Sikeresen importálva {fetched, plural, one {# dal} other {# dal}} a(z) „{title}” listából ({matched} karaokeverzióval párosítva).",
+    "importing": "Importálás folyamatban...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — illessz be egy lejátszásilista-linket",
+    "emptyPlaylist": "A(z) „{title}” lejátszási listában nem találtunk beolvasható dalt. Próbálkozz egy másik lejátszási listával.",
+    "errorTooManyImports": "Túl gyorsan importálsz lejátszási listákat. Kérlek, várj egy percet, és próbáld újra.",
+    "inputLabel": "YouTube Music lejátszási lista linkje"
   }
 }

@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Mitä enemmän artisteja lisäät, sitä paremmat suositukset saat.",
     "searchForArtists": "Etsi tuntemiasi artisteja...",
     "artistsAdded": "{count} artisti{count, plural, one {} other {a}} lisätty",
-    "haveListeningHistory": "Onko sinulla kuunteluhistoriaa Last.fm:ssä tai Spotifyssa?",
     "importForBetterRecs": "Tuo se saadaksesi vielä parempia suosituksia!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "suora tuonti",
@@ -238,7 +237,8 @@
       "2000s": "2000-luku",
       "2010s": "2010-luku",
       "2020s": "2020-luku"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Onko sinulla kuunteluhistoriaa Last.fm:ssä, Spotifyssa tai YouTube Musicissa?"
   },
   "recommendations": {
     "title": "Suositukset",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Soittolistan tuonnissa tapahtui virhe. Yritä uudelleen.",
+    "errorInvalidLink": "Linkki ei näytä YouTube Music -soittolistan linkiltä.",
+    "errorLikedMusicPrivate": "Tykkäämäsi musiikki -soittolistasi on aina yksityinen. Kopioi sen kappaleet uuteen julkiseen tai piilotettuun soittolistaan ja jaa se sen sijaan (katso ohjeet alta).",
+    "errorNotFound": "Soittolistan avaaminen ei onnistunut. Varmista, että sen näkyvyydeksi on asetettu Julkinen tai Piilotettu.",
+    "howToAnyPlaylist": "Mikä tahansa julkinen tai piilotettu lempikappaleidesi soittolista käy myös, kuten bile- tai treenimixisi.",
+    "howToStep1": "Avaa osoitteessa music.youtube.com Kirjasto → Tykätyt kappaleet.",
+    "howToStep2": "Valitse kappaleet (klikkaa yhtä ja valitse useampia painamalla Shift-näppäintä ja klikkaamalla toista).",
+    "howToStep3": "Valitse \"Lisää soittolistaan\" → Uusi soittolista ja aseta näkyvyydeksi Piilotettu tai Julkinen.",
+    "howToStep4": "Avaa uusi soittolista, napauta Jaa → Kopioi linkki ja liitä se ylle.",
+    "howToTitle": "Miten jaan tykätyt kappaleeni?",
+    "import": "Tuo",
+    "importedResult": "Tuotiin {fetched, plural, one {# kappale} other {# kappaletta}} soittolistalta \"{title}\" ({matched} löytyi karaokeversiona).",
+    "importing": "Tuodaan...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — liitä soittolistan linkki",
+    "emptyPlaylist": "Soittolistalla \"{title}\" ei ole kappaleita, joita voisimme lukea. Kokeile toista soittolistaa.",
+    "errorTooManyImports": "Tuot soittolistoja liian nopeasti. Odota hetki ja yritä uudelleen.",
+    "inputLabel": "YouTube Music -soittolistan linkki"
   }
 }

@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "كلما أضفت فنانين أكثر، كانت توصياتك أفضل.",
     "searchForArtists": "ابحث عن فنانين تعرفهم...",
     "artistsAdded": "تمت إضافة {count} {count, plural, one {فنان} other {فنانين}}",
-    "haveListeningHistory": "هل لديك سجل استماع في Last.fm أو Spotify؟",
     "importForBetterRecs": "قم باستيراده للحصول على توصيات أفضل!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "استيراد مباشر",
@@ -238,7 +237,8 @@
       "2000s": "الألفينات",
       "2010s": "العقد الأول من 2010",
       "2020s": "العقد الثاني من 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "هل لديك سجل استماع في Last.fm أو Spotify أو YouTube Music؟"
   },
   "recommendations": {
     "title": "التوصيات",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "حدث خطأ أثناء استيراد قائمة التشغيل هذه. يُرجى المحاولة مرة أخرى.",
+    "errorInvalidLink": "لا يبدو هذا كرابط لقائمة تشغيل YouTube Music.",
+    "errorLikedMusicPrivate": "تكون قائمة \"الموسيقى التي أعجبتك\" خاصة دائمًا. انسخ أغانيها إلى قائمة تشغيل جديدة \"عامة\" أو \"غير مدرجة\" وشاركها بدلاً من ذلك (تعرّف على الطريقة أدناه).",
+    "errorNotFound": "تعذّر علينا فتح قائمة التشغيل تلك. تأكد من ضبطها على \"عامة\" أو \"غير مدرجة\".",
+    "howToAnyPlaylist": "يمكنك أيضاً استخدام أي قائمة تشغيل عامة أو غير مدرجة للأغاني المفضلة لديك، مثل ميكس الحفلات أو التمارين الرياضية.",
+    "howToStep1": "على music.youtube.com، افتح المكتبة ← الموسيقى التي أعجبتك.",
+    "howToStep2": "حدّد الأغاني (انقر على إحداها، ثم انقر مع الضغط على Shift لتحديد مجموعة).",
+    "howToStep3": "اختر \"إضافة إلى قائمة تشغيل\" ← قائمة تشغيل جديدة، واضبط مستوى الخصوصية على \"غير مدرجة\" أو \"عامة\".",
+    "howToStep4": "افتح قائمة التشغيل الجديدة، واضغط على مشاركة ← نسخ الرابط، ثم الصقه في الأعلى.",
+    "howToTitle": "كيف يمكنني مشاركة الموسيقى التي أعجبتني؟",
+    "import": "استيراد",
+    "importedResult": "تم استيراد {fetched, plural, zero {أي أغنية} one {أغنية واحدة} two {أغنيتين} few {# أغانٍ} many {# أغنية} other {# أغنية}} من \"{title}\" ({matched} تتوفر لها نسخ كاراوكي).",
+    "importing": "جارٍ الاستيراد...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — الصق رابط قائمة تشغيل",
+    "emptyPlaylist": "لا تحتوي \"{title}\" على أي أغانٍ يمكننا قراءتها. يُرجى تجربة قائمة تشغيل أخرى.",
+    "errorTooManyImports": "أنت تستورد قوائم التشغيل بسرعة كبيرة. يُرجى الانتظار لمدة دقيقة والمحاولة مرة أخرى.",
+    "inputLabel": "رابط قائمة تشغيل YouTube Music"
   }
 }

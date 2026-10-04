@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Lebih banyak artis yang anda tambah, lebih baik cadangan anda.",
     "searchForArtists": "Cari artis yang anda kenali...",
     "artistsAdded": "{count} artis ditambah",
-    "haveListeningHistory": "Mempunyai sejarah pendengaran di Last.fm atau Spotify?",
     "importForBetterRecs": "Import untuk cadangan yang lebih baik!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "import terus",
@@ -238,7 +237,8 @@
       "2000s": "2000-an",
       "2010s": "2010-an",
       "2020s": "2020-an"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Ada sejarah mendengar di Last.fm, Spotify atau YouTube Music?"
   },
   "recommendations": {
     "title": "Cadangan",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Terdapat masalah semasa mengimport senarai main tersebut. Sila cuba lagi.",
+    "errorInvalidLink": "Pautan itu tidak kelihatan seperti pautan senarai main YouTube Music.",
+    "errorLikedMusicPrivate": "Senarai main Lagu yang Disukai (Liked Music) anda sentiasa bersifat peribadi. Salin lagunya ke dalam senarai main Awam atau Tidak Disenaraikan yang baharu dan kongsikannya (lihat caranya di bawah).",
+    "errorNotFound": "Kami tidak dapat membuka senarai main tersebut. Pastikan ia ditetapkan kepada Awam atau Tidak Disenaraikan.",
+    "howToAnyPlaylist": "Mana-mana senarai main awam atau tidak disenaraikan yang mengandungi lagu kegemaran anda juga boleh digunakan, cth. campuran parti atau senaman anda.",
+    "howToStep1": "Di music.youtube.com, buka Pustaka → Lagu yang Disukai (Liked Music).",
+    "howToStep2": "Pilih lagu (klik satu lagu, kemudian Shift+klik untuk memilih julat lagu).",
+    "howToStep3": "Pilih \"Tambah ke senarai main\" → Senarai main baharu, dan tetapkan keterlihatan kepada Tidak Disenaraikan atau Awam.",
+    "howToStep4": "Buka senarai main baharu tersebut, ketik Kongsi → Salin pautan, dan tampalkannya di atas.",
+    "howToTitle": "Bagaimanakah cara untuk berkongsi Lagu yang Disukai (Liked Music) saya?",
+    "import": "Import",
+    "importedResult": "Berjaya mengimport {fetched, plural, one {# lagu} other {# lagu}} daripada \"{title}\" ({matched} dengan versi karaoke).",
+    "importing": "Mengimport...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — tampal pautan senarai main",
+    "emptyPlaylist": "\"{title}\" tidak mempunyai lagu yang boleh kami baca. Cuba senarai main lain.",
+    "errorTooManyImports": "Anda mengimport senarai main terlalu pantas. Sila tunggu seminit dan cuba lagi.",
+    "inputLabel": "Pautan senarai main YouTube Music"
   }
 }

@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Bạn càng thêm nhiều nghệ sĩ, đề xuất của bạn càng tốt.",
     "searchForArtists": "Tìm kiếm nghệ sĩ bạn biết...",
     "artistsAdded": "Đã thêm {count} nghệ sĩ",
-    "haveListeningHistory": "Bạn có lịch sử nghe nhạc trên Last.fm hoặc Spotify không?",
     "importForBetterRecs": "Nhập dữ liệu để có đề xuất chuẩn hơn nữa!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "nhập trực tiếp",
@@ -238,7 +237,8 @@
       "2000s": "Những năm 2000",
       "2010s": "Những năm 2010",
       "2020s": "Những năm 2020"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Bạn có lịch sử nghe nhạc trên Last.fm, Spotify hoặc YouTube Music không?"
   },
   "recommendations": {
     "title": "Đề xuất",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Đã xảy ra lỗi khi nhập danh sách phát đó. Vui lòng thử lại.",
+    "errorInvalidLink": "Liên kết này có vẻ không phải là liên kết danh sách phát YouTube Music.",
+    "errorLikedMusicPrivate": "Danh sách phát \"Bài hát đã thích\" của bạn luôn ở chế độ riêng tư. Hãy sao chép các bài hát đó vào một danh sách phát mới ở chế độ Công khai hoặc Không công khai và chia sẻ liên kết đó (xem hướng dẫn bên dưới).",
+    "errorNotFound": "Chúng tôi không thể mở danh sách phát đó. Hãy đảm bảo danh sách phát được đặt ở chế độ Công khai hoặc Không công khai.",
+    "howToAnyPlaylist": "Bất kỳ danh sách phát công khai hoặc không công khai nào chứa các bài hát bạn yêu thích đều dùng được, ví dụ: danh sách nhạc quẩy tiệc tùng hoặc nhạc tập luyện của bạn.",
+    "howToStep1": "Trên music.youtube.com, mở Thư viện → Bài hát đã thích.",
+    "howToStep2": "Chọn các bài hát (nhấp vào một bài, sau đó giữ Shift + nhấp để chọn một loạt bài).",
+    "howToStep3": "Chọn \"Thêm vào danh sách phát\" → Danh sách phát mới, và đặt chế độ hiển thị thành Không công khai hoặc Công khai.",
+    "howToStep4": "Mở danh sách phát mới, nhấn Chia sẻ → Sao chép đường liên kết, rồi dán vào ô bên trên.",
+    "howToTitle": "Làm thế nào để chia sẻ danh sách Bài hát đã thích của tôi?",
+    "import": "Nhập",
+    "importedResult": "Đã nhập {fetched, plural, one {# bài hát} other {# bài hát}} từ \"{title}\" ({matched} bài có phiên bản karaoke).",
+    "importing": "Đang nhập...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — dán liên kết danh sách phát",
+    "emptyPlaylist": "\"{title}\" không có bài hát nào đọc được. Bạn hãy thử một danh sách phát khác nhé.",
+    "errorTooManyImports": "Bạn đang nhập danh sách phát quá nhanh. Vui lòng đợi một phút rồi thử lại nhé.",
+    "inputLabel": "Liên kết danh sách phát YouTube Music"
   }
 }

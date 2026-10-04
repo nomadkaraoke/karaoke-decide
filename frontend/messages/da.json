@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Jo flere kunstnere du tilføjer, jo bedre bliver dine anbefalinger.",
     "searchForArtists": "Søg efter kunstnere du kender...",
     "artistsAdded": "{count} kunstner{count, plural, one {} other {e}} tilføjet",
-    "haveListeningHistory": "Har du lyttehistorik i Last.fm eller Spotify?",
     "importForBetterRecs": "Importer den for endnu bedre anbefalinger!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "direkte import",
@@ -238,7 +237,8 @@
       "2000s": "2000'erne",
       "2010s": "2010'erne",
       "2020s": "2020'erne"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Har du lyttehistorik på Last.fm, Spotify eller YouTube Music?"
   },
   "recommendations": {
     "title": "Anbefalinger",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Der gik noget galt under importen af playlisten. Prøv venligst igen.",
+    "errorInvalidLink": "Det ligner ikke et link til en YouTube Music-playliste.",
+    "errorLikedMusicPrivate": "Din playliste med Likede sange er altid privat. Kopiér sangene over i en ny offentlig eller skjult playliste, og del den i stedet (se hvordan nedenfor).",
+    "errorNotFound": "Vi kunne ikke åbne playlisten. Sørg for, at den er indstillet til Offentlig eller Skjult.",
+    "howToAnyPlaylist": "Enhver offentlig eller skjult playliste med sange, du elsker, kan også bruges – f.eks. dit fest- eller træningsmix.",
+    "howToStep1": "Gå til music.youtube.com, og åbn Samling → Likede sange.",
+    "howToStep2": "Vælg sangene (klik på én, og hold derefter Shift nede og klik for at vælge et interval).",
+    "howToStep3": "Vælg \"Føj til playliste\" → Ny playliste, og sæt synligheden til Skjult eller Offentlig.",
+    "howToStep4": "Åbn den nye playliste, tryk på Del → Kopiér link, og indsæt det ovenfor.",
+    "howToTitle": "Hvordan deler jeg mine Likede sange?",
+    "import": "Importér",
+    "importedResult": "Importerede {fetched, plural, one {# sang} other {# sange}} fra \"{title}\" ({matched} med karaokeversioner).",
+    "importing": "Importerer...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music – indsæt et link til en playliste",
+    "emptyPlaylist": "\"{title}\" indeholder ingen sange, vi kunne indlæse. Prøv en anden spilleliste.",
+    "errorTooManyImports": "Du importerer spillelister for hurtigt. Vent venligst et minut, og prøv igen.",
+    "inputLabel": "Link til YouTube Music-spilleliste"
   }
 }

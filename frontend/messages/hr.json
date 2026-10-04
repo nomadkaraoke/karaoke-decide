@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "Što više izvođača dodaš, to će tvoje preporuke biti bolje.",
     "searchForArtists": "Traži izvođače koje znaš...",
     "artistsAdded": "{count} dodan{count, plural, one {i izvođač} few {a izvođača} other {ih izvođača}}",
-    "haveListeningHistory": "Imaš povijest slušanja na Last.fm-u ili Spotifyju?",
     "importForBetterRecs": "Uvezi je za još bolje preporuke!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "izravan uvoz",
@@ -238,7 +237,8 @@
       "2000s": "2000-e",
       "2010s": "2010-e",
       "2020s": "2020-e"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Imaš povijest slušanja na Last.fm-u, Spotifyu ili YouTube Musicu?"
   },
   "recommendations": {
     "title": "Preporuke",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "Nešto je pošlo po zlu prilikom uvoza te playliste. Pokušaj ponovno.",
+    "errorInvalidLink": "Ovo ne izgleda kao poveznica na YouTube Music playlistu.",
+    "errorLikedMusicPrivate": "Tvoja playlista „Sviđanja” uvijek je privatna. Kopiraj njezine pjesme u novu javnu ili nenavedenu playlistu i podijeli nju (pogledaj upute u nastavku).",
+    "errorNotFound": "Nismo uspjeli otvoriti tu playlistu. Provjeri je li postavljena na Javno ili Nenavedeno.",
+    "howToAnyPlaylist": "Bilo koja javna ili nenavedena playlista s tvojim omiljenim pjesmama također funkcionira, npr. miks za tulum ili trening.",
+    "howToStep1": "Na music.youtube.com otvori Zbirka → Sviđanja.",
+    "howToStep2": "Odaberi pjesme (klikni na jednu, zatim Shift+klik za odabir više njih).",
+    "howToStep3": "Odaberi „Dodaj na playlistu” → Nova playlista i postavi vidljivost na Nenavedeno ili Javno.",
+    "howToStep4": "Otvori novu playlistu, dodirni Dijeli → Kopiraj poveznicu i zalijepi je gore.",
+    "howToTitle": "Kako podijeliti svoja Sviđanja?",
+    "import": "Uvezi",
+    "importedResult": "Uvezeno: {fetched, plural, one {# pjesma} few {# pjesme} other {# pjesama}} s playliste \"{title}\" ({matched} s karaoke verzijama).",
+    "importing": "Uvoz...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — zalijepi poveznicu na playlistu",
+    "emptyPlaylist": "\"{title}\" nema pjesama koje bismo mogli učitati. Isprobaj drugu playlistu.",
+    "errorTooManyImports": "Prebrzo uvoziš playliste. Pričekaj minutu pa pokušaj ponovno.",
+    "inputLabel": "Poveznica na YouTube Music playlistu"
   }
 }

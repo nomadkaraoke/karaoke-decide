@@ -11,6 +11,7 @@ import { SongSearchAutocomplete, SelectedSong } from "@/components/SongSearchAut
 import { ArtistSearchAutocomplete, SelectedArtist } from "@/components/ArtistSearchAutocomplete";
 import { useQuizDraft } from "@/hooks/useQuizDraft";
 import { EnjoySingingModal, EnjoySingingMetadataResult } from "@/components/EnjoySingingModal";
+import { YouTubeMusicImport } from "@/components/YouTubeMusicImport";
 import { CheckIcon, ChevronRightIcon, MicrophoneIcon, XIcon, LoaderIcon, LastfmIcon, SpotifyIcon } from "@/components/icons";
 import { Button, LoadingPulse, LoadingOverlay } from "@/components/ui";
 import type { SingingTag, SingingEnergy, VocalComfort } from "@/types";
@@ -874,7 +875,7 @@ export default function QuizPage() {
                 <span className="text-2xl flex-shrink-0">📥</span>
                 <div>
                   <h2 className="font-semibold text-[var(--text)] mb-1">
-                    {t("haveListeningHistory")}
+                    {t("haveListeningHistoryOrPlaylist")}
                   </h2>
                   <p className="text-[var(--text)]/60 text-sm mb-3">
                     {t("importForBetterRecs")}
@@ -892,6 +893,9 @@ export default function QuizPage() {
                   <p className="text-[var(--text)]/40 text-xs mt-3">
                     {t("afterQuizSyncHint")}
                   </p>
+                  <div className="mt-4 pt-4 border-t border-[var(--card-border)]">
+                    <YouTubeMusicImport />
+                  </div>
                 </div>
               </div>
             </div>

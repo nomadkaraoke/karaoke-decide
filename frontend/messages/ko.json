@@ -142,7 +142,6 @@
     "moreArtistsBetterRecs": "아티스트를 많이 추가할수록 추천이 더 정확해져요.",
     "searchForArtists": "아는 아티스트 검색...",
     "artistsAdded": "{count}명의 아티스트 추가됨",
-    "haveListeningHistory": "Last.fm이나 Spotify에 청취 기록이 있나요?",
     "importForBetterRecs": "데이터를 가져와서 더 나은 추천을 받아보세요!",
     "lastfmDirectImport": "Last.fm",
     "lastfmDirectImportDesc": "직접 가져오기",
@@ -238,7 +237,8 @@
       "2000s": "2000년대",
       "2010s": "2010년대",
       "2020s": "2020년대"
-    }
+    },
+    "haveListeningHistoryOrPlaylist": "Last.fm, Spotify 또는 YouTube Music 청취 기록이나 재생목록이 있으신가요?"
   },
   "recommendations": {
     "title": "추천",
@@ -885,5 +885,25 @@
     "korean": "한국어",
     "portuguese": "Português",
     "chinese": "中文"
+  },
+  "youtubeMusicImport": {
+    "errorGeneric": "재생목록을 가져오는 중 문제가 발생했습니다. 다시 시도해 주세요.",
+    "errorInvalidLink": "YouTube Music 재생목록 링크가 아닌 것 같습니다.",
+    "errorLikedMusicPrivate": "'좋아요 표시한 음악' 재생목록은 항상 비공개로 설정되어 있습니다. 해당 곡들을 새로운 '공개' 또는 '일부 공개' 재생목록에 복사한 후 공유해 주세요 (방법은 아래 참조).",
+    "errorNotFound": "해당 재생목록을 열 수 없습니다. '공개' 또는 '일부 공개'로 설정되어 있는지 확인해 주세요.",
+    "howToAnyPlaylist": "파티나 운동용 믹스처럼 좋아하는 곡이 담긴 공개 또는 일부 공개 재생목록이라면 모두 사용 가능합니다.",
+    "howToStep1": "music.youtube.com에서 보관함 → 좋아요 표시한 음악으로 이동합니다.",
+    "howToStep2": "곡들을 선택합니다 (한 곡을 클릭한 뒤 Shift를 누른 채 클릭하면 여러 곡을 한 번에 선택할 수 있습니다).",
+    "howToStep3": "\"재생목록에 추가\" → 새 재생목록을 선택하고, 공개 상태를 '일부 공개' 또는 '공개'로 설정합니다.",
+    "howToStep4": "새 재생목록을 열고 공유 → 링크 복사를 클릭한 뒤, 위의 입력창에 붙여넣습니다.",
+    "howToTitle": "'좋아요 표시한 음악'은 어떻게 공유하나요?",
+    "import": "가져오기",
+    "importedResult": "\"{title}\"에서 {fetched, plural, other {#곡}}을 가져왔습니다(노래방 버전 {matched}곡 확인).",
+    "importing": "가져오는 중...",
+    "placeholder": "https://music.youtube.com/playlist?list=...",
+    "title": "YouTube Music — 재생목록 링크 붙여넣기",
+    "emptyPlaylist": "\"{title}\"에서 불러올 수 있는 곡이 없습니다. 다른 재생목록으로 시도해 보세요.",
+    "errorTooManyImports": "재생목록을 너무 빠르게 가져오고 있어요. 잠시 후 다시 시도해 주세요.",
+    "inputLabel": "YouTube Music 재생목록 링크"
   }
 }

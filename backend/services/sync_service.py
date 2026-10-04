@@ -6,6 +6,7 @@ karaoke catalog, and creates UserSong records.
 
 import logging
 import re
+import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,8 +20,13 @@ from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
+from karaoke_decide.services.youtube_music import YouTubeMusicClient, parse_playlist_id
 
 logger = logging.getLogger(__name__)
+
+
+class ImportRateLimitedError(Exception):
+    """User is importing playlists too often."""
 
 
 @dataclass
@@ -59,6 +65,11 @@ class SyncService:
     LASTFM_TOP_TRACKS_LIMIT = 1000  # Top 1000 tracks with play counts
     LASTFM_TOP_ARTISTS_LIMIT = 1000  # Top 1000 artists with play counts
     LASTFM_LOVED_TRACKS_LIMIT = 500  # Loved tracks (additional to top)
+    YOUTUBE_MUSIC_PLAYLIST_LIMIT = 1000  # Tracks read from a shared playlist
+    YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT = 500  # Lower cap for unverified guests
+    YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS = 30
+    YOUTUBE_MUSIC_IMPORTS_PER_DAY = 20
+    YOUTUBE_MUSIC_IMPORTS_COLLECTION = "youtube_music_imports"
     # Full scrobble history - now incremental with progress tracking
     LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
     LASTFM_BATCH_SIZE = 1000  # Save progress every N scrobbles
@@ -1193,6 +1204,114 @@ class SyncService:
                 created += 1
 
         return created, updated
+
+    # -------------------------------------------------------------------------
+    # YouTube Music Playlist Import
+    # -------------------------------------------------------------------------
+
+    async def import_youtube_music_playlist(
+        self,
+        user_id: str,
+        playlist_url: str,
+        is_guest: bool = False,
+        client: YouTubeMusicClient | None = None,
+    ) -> dict[str, Any]:
+        """Import songs from a public/unlisted YouTube Music playlist.
+
+        Rate limited per user (cooldown + daily cap) since guests can call it
+        and each import costs YouTube requests plus ~2 Firestore ops per track.
+
+        Args:
+            user_id: User ID.
+            playlist_url: Playlist link or ID shared by the user.
+            is_guest: Guests get a lower track limit.
+            client: Optional YouTube Music client override (for tests).
+
+        Returns:
+            Dict with playlist_title, tracks_fetched, tracks_matched, created, updated.
+
+        Raises:
+            ImportRateLimitedError: Too many recent imports.
+            InvalidPlaylistUrlError, PrivatePlaylistError, PlaylistNotFoundError,
+            PlaylistFetchError: See karaoke_decide.services.youtube_music.
+        """
+        playlist_id = parse_playlist_id(playlist_url)
+        token = await self._reserve_youtube_music_import(user_id)
+        limit = self.YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT if is_guest else self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
+        try:
+            playlist = await (client or YouTubeMusicClient()).get_playlist(playlist_id, limit=limit)
+        except Exception:
+            # Only successful fetches count, so a user can fix a private playlist and retry at once
+            await self._release_youtube_music_import(user_id, token)
+            raise
+
+        matched = await self.track_matcher.batch_match_tracks(playlist.tracks)
+        created, updated = await self._upsert_user_songs(user_id, matched, "youtube_music")
+        tracks_matched = sum(1 for m in matched if m.catalog_song is not None)
+
+        logger.info(
+            f"YouTube Music import for {user_id}: playlist {playlist_id} "
+            f"{len(playlist.tracks)} fetched, {tracks_matched} matched"
+        )
+
+        return {
+            "playlist_title": playlist.title,
+            "tracks_fetched": len(playlist.tracks),
+            "tracks_matched": tracks_matched,
+            "created": created,
+            "updated": updated,
+        }
+
+    async def _reserve_youtube_music_import(self, user_id: str) -> str:
+        """Atomically enforce the import cooldown + daily cap and reserve a slot.
+
+        The check and the write happen in one Firestore transaction, so parallel
+        requests can't all pass the check before any of them records an import.
+
+        Returns:
+            Reservation token, needed to release the slot if the fetch fails.
+
+        Raises:
+            ImportRateLimitedError: If the user is over either limit.
+        """
+        now = datetime.now(UTC)
+        today = now.date().isoformat()
+        token = uuid.uuid4().hex
+
+        def reserve(current: dict[str, Any] | None) -> dict[str, Any]:
+            current = current or {}
+            last_import_at = current.get("last_import_at")
+            if last_import_at:
+                elapsed = (now - datetime.fromisoformat(last_import_at)).total_seconds()
+                if elapsed < self.YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS:
+                    raise ImportRateLimitedError("cooldown")
+
+            imports_today = current.get("count", 0) if current.get("day") == today else 0
+            if imports_today >= self.YOUTUBE_MUSIC_IMPORTS_PER_DAY:
+                raise ImportRateLimitedError("daily limit")
+
+            # Keep the previous record (minus its own history) so a failed fetch can restore it
+            previous = {k: v for k, v in current.items() if k not in ("id", "previous")} or None
+            return {
+                "last_import_at": now.isoformat(),
+                "day": today,
+                "count": imports_today + 1,
+                "token": token,
+                "previous": previous,
+            }
+
+        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, reserve)
+        return token
+
+    async def _release_youtube_music_import(self, user_id: str, token: str) -> None:
+        """Undo a reservation after a failed fetch, if it's still this request's."""
+
+        def release(current: dict[str, Any] | None) -> dict[str, Any] | None:
+            if not current or current.get("token") != token:
+                return current  # A later import has taken over; leave it alone
+            return current.get("previous")
+
+        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, release)
 
     # -------------------------------------------------------------------------
     # ListenBrainz Sync
