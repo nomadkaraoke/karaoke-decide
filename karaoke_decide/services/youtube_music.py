@@ -15,7 +15,6 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-import requests
 from ytmusicapi import YTMusic
 
 logger = logging.getLogger(__name__)
@@ -160,9 +159,7 @@ class YouTubeMusicClient:
             # Logged because an upstream page-format change looks identical.
             logger.warning(f"YouTube Music playlist {playlist_id} not readable: {e!s:.200}")
             raise PlaylistNotFoundError(playlist_id) from e
-        except requests.RequestException as e:
-            raise PlaylistFetchError(str(e)) from e
-        except Exception as e:  # ytmusicapi raises bare Exception on HTTP errors
+        except Exception as e:  # network errors (requests) and ytmusicapi's bare Exception on HTTP errors
             raise PlaylistFetchError(str(e)) from e
 
         tracks: list[dict[str, Any]] = []
