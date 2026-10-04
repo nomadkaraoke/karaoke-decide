@@ -530,7 +530,7 @@ class TestYouTubeMusicImport:
             ("InvalidPlaylistUrlError", 400),
             ("PrivatePlaylistError", 422),
             ("PlaylistNotFoundError", 404),
-            ("PlaylistFetchError", 502),
+            ("PlaylistFetchError", 503),
             ("ImportRateLimitedError", 429),
         ],
     )

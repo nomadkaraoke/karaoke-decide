@@ -130,6 +130,9 @@ def clean_video_title(title: str, video_type: str | None = None) -> str:
 class YouTubeMusicClient:
     """Unauthenticated reader for public/unlisted YouTube Music playlists."""
 
+    FETCH_ATTEMPTS = 2
+    RETRY_DELAY_SECONDS = 1.0
+
     def __init__(self, ytmusic: YTMusic | None = None):
         self._ytmusic = ytmusic
 
@@ -138,6 +141,32 @@ class YouTubeMusicClient:
         if self._ytmusic is None:
             self._ytmusic = YTMusic()
         return self._ytmusic
+
+    async def _fetch_raw_playlist(self, playlist_id: str, limit: int) -> dict[str, Any]:
+        """Call ytmusicapi, retrying transient upstream failures.
+
+        YouTube occasionally returns an empty / non-JSON body (seen in prod as
+        "Expecting value: line 1 column 1"); a single retry usually succeeds.
+        """
+        loop = asyncio.get_running_loop()
+        for attempt in range(1, self.FETCH_ATTEMPTS + 1):
+            try:
+                raw: dict[str, Any] = await loop.run_in_executor(
+                    None, lambda: self.ytmusic.get_playlist(playlist_id, limit=limit)
+                )
+                return raw
+            except (KeyError, IndexError) as e:
+                # ytmusicapi raises KeyError when the page has no playlist contents,
+                # which is what YouTube returns for missing and private playlists.
+                # Logged because an upstream page-format change looks identical.
+                logger.warning(f"YouTube Music playlist {playlist_id} not readable: {e!s:.200}")
+                raise PlaylistNotFoundError(playlist_id) from e
+            except Exception as e:  # network errors (requests) and ytmusicapi's bare Exception on HTTP errors
+                if attempt == self.FETCH_ATTEMPTS:
+                    raise PlaylistFetchError(str(e)) from e
+                logger.warning(f"YouTube Music fetch attempt {attempt} for {playlist_id} failed, retrying: {e!s:.200}")
+                await asyncio.sleep(self.RETRY_DELAY_SECONDS)
+        raise AssertionError("unreachable")
 
     async def get_playlist(self, playlist_id: str, limit: int) -> YouTubeMusicPlaylist:
         """Fetch a playlist's tracks.
@@ -150,17 +179,7 @@ class YouTubeMusicClient:
             PlaylistNotFoundError: Playlist doesn't exist or isn't public/unlisted.
             PlaylistFetchError: Network or unexpected upstream failure.
         """
-        loop = asyncio.get_running_loop()
-        try:
-            raw = await loop.run_in_executor(None, lambda: self.ytmusic.get_playlist(playlist_id, limit=limit))
-        except (KeyError, IndexError) as e:
-            # ytmusicapi raises KeyError when the page has no playlist contents,
-            # which is what YouTube returns for missing and private playlists.
-            # Logged because an upstream page-format change looks identical.
-            logger.warning(f"YouTube Music playlist {playlist_id} not readable: {e!s:.200}")
-            raise PlaylistNotFoundError(playlist_id) from e
-        except Exception as e:  # network errors (requests) and ytmusicapi's bare Exception on HTTP errors
-            raise PlaylistFetchError(str(e)) from e
+        raw = await self._fetch_raw_playlist(playlist_id, limit)
 
         tracks: list[dict[str, Any]] = []
         for item in (raw.get("tracks") or [])[:limit]:

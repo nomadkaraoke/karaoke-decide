@@ -375,7 +375,7 @@ async def import_youtube_music_playlist(
     - 422: the always-private Liked Music / Liked videos playlist was shared
     - 404: playlist doesn't exist or is private
     - 429: too many imports (per-user cooldown / daily cap)
-    - 502: YouTube couldn't be reached
+    - 503: YouTube couldn't be reached (503, not 502: Cloudflare replaces origin 502 bodies)
     """
     try:
         result = await sync_service.import_youtube_music_playlist(
@@ -394,7 +394,7 @@ async def import_youtube_music_playlist(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found or private")
     except PlaylistFetchError as e:
         logger.warning(f"YouTube Music playlist fetch failed: {e}")
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Could not reach YouTube Music")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not reach YouTube Music")
 
     return YouTubeMusicImportResponse(
         playlist_title=result["playlist_title"],
