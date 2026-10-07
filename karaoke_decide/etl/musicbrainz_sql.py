@@ -36,10 +36,31 @@ RAW_TABLES: dict[str, dict[str, int]] = {
         "l_artist_url": 9,
         "artist_gid_redirect": 3,
         "recording_gid_redirect": 3,
+        # Releases (albums/singles/EPs), their editions, and tracklists.
+        "artist_credit_name": 5,
+        "release_group": 8,
+        "release_group_primary_type": 6,
+        "release_group_secondary_type": 6,
+        "release_group_secondary_type_join": 3,
+        "release": 14,
+        "release_status": 6,
+        "release_packaging": 6,
+        "language": 7,
+        "release_country": 5,
+        "release_unknown_country": 4,
+        "iso_3166_1": 2,
+        "release_label": 5,
+        "label": 16,
+        "medium": 9,
+        "medium_format": 8,
+        "track": 12,
     },
     "mbdump-derived.tar.bz2": {
         "tag": 3,
         "artist_tag": 4,
+        # MusicBrainz's own first-release-date / release count / rating per release group.
+        "release_group_meta": 7,
+        "release_group_tag": 4,
     },
 }
 
@@ -62,6 +83,29 @@ CREATE TEMP FUNCTION pg(s STRING) AS (
 NORM_FN = r"""
 CREATE TEMP FUNCTION norm(s STRING) AS (
   TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(s), r'[^a-z0-9 ]', ' '), r' +', ' '))
+);
+"""
+
+# norm() after stripping accents (NFD + drop combining marks), so "Maxïmo Park"
+# matches "maximo park". Used by the release tables; same result as
+# ARTIST_NORMALIZE_SQL below.
+FOLD_FN = r"""
+CREATE TEMP FUNCTION fold(s STRING) AS (
+  norm(REGEXP_REPLACE(NORMALIZE(s, NFD), r'\pM', ''))
+);
+"""
+
+# MusicBrainz partial date -> 'YYYY', 'YYYY-MM' or 'YYYY-MM-DD' (NULL without a
+# year), the same format the MusicBrainz API uses for first-release-date.
+MB_DATE_FN = r"""
+CREATE TEMP FUNCTION mb_date(y STRING, m STRING, d STRING) AS (
+  CASE
+    WHEN SAFE_CAST(y AS INT64) IS NULL THEN NULL
+    WHEN SAFE_CAST(m AS INT64) IS NULL THEN FORMAT('%04d', SAFE_CAST(y AS INT64))
+    WHEN SAFE_CAST(d AS INT64) IS NULL
+      THEN FORMAT('%04d-%02d', SAFE_CAST(y AS INT64), SAFE_CAST(m AS INT64))
+    ELSE FORMAT('%04d-%02d-%02d', SAFE_CAST(y AS INT64), SAFE_CAST(m AS INT64), SAFE_CAST(d AS INT64))
+  END
 );
 """
 
@@ -301,6 +345,172 @@ MODELS: dict[str, str] = {
     FROM name_matches
     WHERE rn = 1
     """,
+    # Which artists make up each artist credit ("Jay-Z & Linkin Park" -> 2 rows),
+    # so release groups / releases / recordings can be found by artist MBID.
+    "mb_artist_credit_artists": f"""
+    CREATE OR REPLACE TABLE `{S}.mb_artist_credit_artists`
+    CLUSTER BY artist_mbid
+    AS
+    SELECT
+        SAFE_CAST(acn.c0 AS INT64) AS artist_credit_id,
+        SAFE_CAST(acn.c1 AS INT64) AS position,
+        a.c1 AS artist_mbid,
+        pg(acn.c3) AS credited_name,
+        pg(acn.c4) AS join_phrase
+    FROM `{S}.raw_artist_credit_name` acn
+    JOIN `{S}.raw_artist` a ON a.c0 = acn.c2
+    """,
+    # Release groups = "albums" in the everyday sense (all editions of OK
+    # Computer are one release group). first_release_date comes straight from
+    # MusicBrainz's release_group_meta, so it matches the MB API/website.
+    "mb_release_groups": f"""
+    CREATE OR REPLACE TABLE `{S}.mb_release_groups`
+    CLUSTER BY artist_normalized, name_normalized
+    AS
+    WITH secondary AS (
+        SELECT j.c0 AS rg_id, ARRAY_AGG(pg(st.c1) ORDER BY pg(st.c1)) AS secondary_types
+        FROM `{S}.raw_release_group_secondary_type_join` j
+        JOIN `{S}.raw_release_group_secondary_type` st ON st.c0 = j.c1
+        GROUP BY j.c0
+    ),
+    tags AS (
+        SELECT rgt.c0 AS rg_id,
+               ARRAY_AGG(pg(t.c1) ORDER BY SAFE_CAST(rgt.c2 AS INT64) DESC, pg(t.c1) LIMIT 5) AS tags
+        FROM `{S}.raw_release_group_tag` rgt
+        JOIN `{S}.raw_tag` t ON t.c0 = rgt.c1
+        WHERE SAFE_CAST(rgt.c2 AS INT64) > 0
+        GROUP BY rgt.c0
+    )
+    SELECT
+        rg.c1 AS release_group_mbid,
+        pg(rg.c2) AS title,
+        pg(ac.c1) AS artist_credit,
+        SAFE_CAST(rg.c3 AS INT64) AS artist_credit_id,
+        pg(pt.c1) AS primary_type,
+        COALESCE(sec.secondary_types, []) AS secondary_types,
+        mb_date(m.c2, m.c3, m.c4) AS first_release_date,
+        SAFE_CAST(m.c2 AS INT64) AS first_release_year,
+        SAFE_CAST(m.c1 AS INT64) AS release_count,
+        SAFE_CAST(m.c5 AS INT64) AS rating,
+        SAFE_CAST(m.c6 AS INT64) AS rating_count,
+        COALESCE(tg.tags, []) AS tags,
+        pg(rg.c5) AS disambiguation,
+        fold(pg(rg.c2)) AS name_normalized,
+        fold(pg(ac.c1)) AS artist_normalized
+    FROM `{S}.raw_release_group` rg
+    LEFT JOIN `{S}.raw_artist_credit` ac ON ac.c0 = rg.c3
+    LEFT JOIN `{S}.raw_release_group_primary_type` pt ON pt.c0 = rg.c4
+    LEFT JOIN `{S}.raw_release_group_meta` m ON m.c0 = rg.c0
+    LEFT JOIN secondary sec ON sec.rg_id = rg.c0
+    LEFT JOIN tags tg ON tg.rg_id = rg.c0
+    WHERE rg.c1 IS NOT NULL AND pg(rg.c2) IS NOT NULL
+    """,
+    # Individual releases (editions/pressings) of a release group, with their
+    # earliest release event, countries, labels and formats.
+    "mb_releases": f"""
+    CREATE OR REPLACE TABLE `{S}.mb_releases`
+    CLUSTER BY release_group_mbid
+    AS
+    WITH events AS (
+        SELECT rc.c0 AS release_id, iso.c1 AS country, rc.c2 AS y, rc.c3 AS m, rc.c4 AS d
+        FROM `{S}.raw_release_country` rc
+        LEFT JOIN `{S}.raw_iso_3166_1` iso ON iso.c0 = rc.c1
+        UNION ALL
+        SELECT ruc.c0, CAST(NULL AS STRING), ruc.c1, ruc.c2, ruc.c3
+        FROM `{S}.raw_release_unknown_country` ruc
+    ),
+    event_agg AS (
+        SELECT
+            release_id,
+            -- Earliest dated event; partial dates sort after full ones of the same
+            -- year/month (NULLS LAST, as in MusicBrainz's first-release-date logic;
+            -- BigQuery rejects NULLS LAST in aggregate ORDER BY, hence the 99s).
+            ARRAY_AGG(
+                IF(SAFE_CAST(y AS INT64) IS NULL, NULL, STRUCT(mb_date(y, m, d) AS date, SAFE_CAST(y AS INT64) AS year))
+                IGNORE NULLS
+                ORDER BY SAFE_CAST(y AS INT64), IFNULL(SAFE_CAST(m AS INT64), 99), IFNULL(SAFE_CAST(d AS INT64), 99)
+                LIMIT 1
+            )[SAFE_OFFSET(0)] AS first_event,
+            ARRAY_AGG(DISTINCT country IGNORE NULLS ORDER BY country) AS countries
+        FROM events
+        GROUP BY release_id
+    ),
+    label_agg AS (
+        SELECT
+            rl.c1 AS release_id,
+            ARRAY_AGG(
+                STRUCT(pg(l.c2) AS name, pg(rl.c3) AS catalog_number)
+                ORDER BY pg(l.c2), pg(rl.c3)
+            ) AS labels
+        FROM `{S}.raw_release_label` rl
+        LEFT JOIN `{S}.raw_label` l ON l.c0 = rl.c2
+        GROUP BY rl.c1
+    ),
+    medium_agg AS (
+        SELECT
+            md.c1 AS release_id,
+            COUNT(*) AS medium_count,
+            SUM(SAFE_CAST(md.c7 AS INT64)) AS track_count,
+            ARRAY_AGG(DISTINCT pg(mf.c1) IGNORE NULLS ORDER BY pg(mf.c1)) AS formats
+        FROM `{S}.raw_medium` md
+        LEFT JOIN `{S}.raw_medium_format` mf ON mf.c0 = md.c3
+        GROUP BY md.c1
+    )
+    SELECT
+        rel.c1 AS release_mbid,
+        rg.c1 AS release_group_mbid,
+        pg(rel.c2) AS title,
+        pg(ac.c1) AS artist_credit,
+        SAFE_CAST(rel.c3 AS INT64) AS artist_credit_id,
+        pg(rs.c1) AS status,
+        pg(rp.c1) AS packaging,
+        pg(lang.c4) AS language,
+        ev.first_event.date AS release_date,
+        ev.first_event.year AS release_year,
+        COALESCE(ev.countries, []) AS countries,
+        COALESCE(la.labels, []) AS labels,
+        COALESCE(ma.formats, []) AS formats,
+        COALESCE(ma.medium_count, 0) AS medium_count,
+        COALESCE(ma.track_count, 0) AS track_count,
+        pg(rel.c9) AS barcode,
+        pg(rel.c10) AS disambiguation
+    FROM `{S}.raw_release` rel
+    JOIN `{S}.raw_release_group` rg ON rg.c0 = rel.c4
+    LEFT JOIN `{S}.raw_artist_credit` ac ON ac.c0 = rel.c3
+    LEFT JOIN `{S}.raw_release_status` rs ON rs.c0 = rel.c5
+    LEFT JOIN `{S}.raw_release_packaging` rp ON rp.c0 = rel.c6
+    LEFT JOIN `{S}.raw_language` lang ON lang.c0 = rel.c7
+    LEFT JOIN event_agg ev ON ev.release_id = rel.c0
+    LEFT JOIN label_agg la ON la.release_id = rel.c0
+    LEFT JOIN medium_agg ma ON ma.release_id = rel.c0
+    WHERE rel.c1 IS NOT NULL AND pg(rel.c2) IS NOT NULL
+    """,
+    # Every track on every release: tracklists, and "which releases/albums is
+    # this recording on". Clustered by recording for the latter.
+    "mb_tracks": f"""
+    CREATE OR REPLACE TABLE `{S}.mb_tracks`
+    CLUSTER BY recording_mbid, release_mbid
+    AS
+    SELECT
+        tr.c1 AS track_mbid,
+        rec.c1 AS recording_mbid,
+        rel.c1 AS release_mbid,
+        rg.c1 AS release_group_mbid,
+        SAFE_CAST(md.c2 AS INT64) AS medium_position,
+        pg(mf.c1) AS medium_format,
+        SAFE_CAST(tr.c4 AS INT64) AS track_position,
+        pg(tr.c5) AS track_number,
+        pg(tr.c6) AS title,
+        pg(ac.c1) AS artist_credit,
+        SAFE_CAST(tr.c8 AS INT64) AS length_ms
+    FROM `{S}.raw_track` tr
+    JOIN `{S}.raw_medium` md ON md.c0 = tr.c3
+    JOIN `{S}.raw_release` rel ON rel.c0 = md.c1
+    JOIN `{S}.raw_release_group` rg ON rg.c0 = rel.c4
+    JOIN `{S}.raw_recording` rec ON rec.c0 = tr.c2
+    LEFT JOIN `{S}.raw_medium_format` mf ON mf.c0 = md.c3
+    LEFT JOIN `{S}.raw_artist_credit` ac ON ac.c0 = tr.c7
+    """,
 }
 
 MODEL_ORDER: list[str] = list(MODELS)
@@ -308,7 +518,7 @@ MODEL_ORDER: list[str] = list(MODELS)
 
 def model_script(name: str) -> str:
     """Full multi-statement script (temp functions + CTAS) for one model."""
-    return PG_DECODE_FN + NORM_FN + MODELS[name]
+    return PG_DECODE_FN + NORM_FN + FOLD_FN + MB_DATE_FN + MODELS[name]
 
 
 # Row-count bounds relative to the current prod table: (min_ratio, max_ratio).
@@ -327,6 +537,10 @@ ROW_COUNT_BOUNDS: dict[str, tuple[float, float] | None] = {
     "mb_artists_normalized": (0.98, 1.25),
     "mb_recordings_enriched": (0.98, 1.25),
     "karaoke_recording_links": (0.97, 1.40),
+    "mb_artist_credit_artists": (0.98, 1.25),
+    "mb_release_groups": (0.98, 1.25),
+    "mb_releases": (0.98, 1.25),
+    "mb_tracks": (0.98, 1.25),
 }
 
 # Sanity checks against staging. Each query returns one BOOL column ``ok`` and
@@ -396,5 +610,51 @@ CANARY_CHECKS: dict[str, str] = {
         SELECT COUNTIF(s.title != p.title) / COUNT(*) < 0.03 AS ok,
                FORMAT('%.4f', COUNTIF(s.title != p.title) / COUNT(*)) AS detail
         FROM `{S}.mb_recordings` s JOIN `{P}.mb_recordings` p USING (recording_mbid)
+    """,
+    "ok_computer_release_group": f"""
+        SELECT COUNT(*) = 1 AS ok,
+               TO_JSON_STRING(ARRAY_AGG(STRUCT(title, primary_type, first_release_date, release_count))) AS detail
+        FROM `{S}.mb_release_groups`
+        WHERE release_group_mbid = 'b1392450-e666-3926-a536-22c65f834433'
+          AND title = 'OK Computer' AND artist_credit = 'Radiohead'
+          AND primary_type = 'Album' AND first_release_date = '1997-05-21'
+          AND release_count > 10
+    """,
+    "radiohead_albums_by_artist_mbid": f"""
+        SELECT COUNTIF(rg.title = 'OK Computer') >= 1 AND COUNTIF(rg.title = 'Kid A') >= 1 AS ok,
+               CAST(COUNT(*) AS STRING) AS detail
+        FROM `{S}.mb_artist_credit_artists` aca
+        JOIN `{S}.mb_release_groups` rg USING (artist_credit_id)
+        WHERE aca.artist_mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711' AND rg.primary_type = 'Album'
+    """,
+    "ok_computer_releases": f"""
+        SELECT COUNT(*) > 10 AND MIN(release_date) = '1997-05-21'
+               AND COUNTIF(ARRAY_LENGTH(labels) > 0) > 0 AND COUNTIF('CD' IN UNNEST(formats)) > 0 AS ok,
+               FORMAT('rows=%d min_date=%s', COUNT(*), IFNULL(MIN(release_date), 'NULL')) AS detail
+        FROM `{S}.mb_releases`
+        WHERE release_group_mbid = 'b1392450-e666-3926-a536-22c65f834433'
+    """,
+    "creep_on_pablo_honey": f"""
+        SELECT COUNTIF(rg.title = 'Pablo Honey') > 0 AND COUNT(DISTINCT t.release_mbid) > 10 AS ok,
+               FORMAT('releases=%d', COUNT(DISTINCT t.release_mbid)) AS detail
+        FROM `{S}.mb_tracks` t
+        JOIN `{S}.mb_release_groups` rg USING (release_group_mbid)
+        WHERE t.recording_mbid = '70595637-9310-45f2-a266-58f8de4874a7'
+    """,
+    "release_groups_unique": f"""
+        SELECT COUNT(*) = COUNT(DISTINCT release_group_mbid) AS ok,
+               FORMAT('rows=%d distinct=%d', COUNT(*), COUNT(DISTINCT release_group_mbid)) AS detail
+        FROM `{S}.mb_release_groups`
+    """,
+    "releases_unique": f"""
+        SELECT COUNT(*) = COUNT(DISTINCT release_mbid) AS ok,
+               FORMAT('rows=%d distinct=%d', COUNT(*), COUNT(DISTINCT release_mbid)) AS detail
+        FROM `{S}.mb_releases`
+    """,
+    # release_group_meta is in the derived archive; if it stops joining, dates vanish.
+    "release_group_dates_present": f"""
+        SELECT COUNTIF(first_release_date IS NOT NULL) / COUNT(*) > 0.7 AS ok,
+               FORMAT('%.3f', COUNTIF(first_release_date IS NOT NULL) / COUNT(*)) AS detail
+        FROM `{S}.mb_release_groups`
     """,
 }

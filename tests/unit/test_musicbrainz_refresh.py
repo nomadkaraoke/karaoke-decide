@@ -218,6 +218,27 @@ class TestModels:
         assert "CREATE TEMP FUNCTION pg" in script
         assert "CREATE TEMP FUNCTION norm" in script
 
+    def test_model_script_includes_release_helpers(self):
+        script = sql.model_script("mb_releases")
+        assert "CREATE TEMP FUNCTION fold" in script
+        assert "CREATE TEMP FUNCTION mb_date" in script
+        # fold() calls norm(), so norm must be defined first.
+        assert script.index("FUNCTION norm") < script.index("FUNCTION fold")
+
+    def test_release_tables_loaded_from_correct_archives(self):
+        core = sql.RAW_TABLES["mbdump.tar.bz2"]
+        derived = sql.RAW_TABLES["mbdump-derived.tar.bz2"]
+        for table in ("release_group", "release", "medium", "track", "artist_credit_name", "release_country"):
+            assert table in core
+        # Computed by MusicBrainz and only shipped in the derived archive.
+        assert {"release_group_meta", "release_group_tag"} <= set(derived)
+
+    @pytest.mark.parametrize("model", ["mb_artist_credit_artists", "mb_release_groups", "mb_releases", "mb_tracks"])
+    def test_release_models_registered_with_bounds_and_canaries(self, model):
+        assert model in sql.MODEL_ORDER
+        assert sql.ROW_COUNT_BOUNDS[model] is not None
+        assert any(f"{sql.S}.{model}`" in q for q in sql.CANARY_CHECKS.values())
+
     def test_enriched_sql_shared_with_script(self):
         assert "CLUSTER BY name_normalized, artist_normalized" in sql.mb_recordings_enriched_sql("a.b", "a.c")
 
