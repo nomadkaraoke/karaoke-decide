@@ -3,8 +3,11 @@
 Runs as the ``mb-refresh`` Cloud Run Job (Cloud Scheduler, weekly). Steps:
 
 1. CHECK     Read fullexport/LATEST; exit if that dump is already published.
-2. EXTRACT   Stream each dump archive over HTTPS, verify its SHA256, decompress
-             with lbzip2 and copy only the needed ``mbdump/<table>`` members to
+2. DOWNLOAD  Copy each dump archive once into our bucket
+             (``staging/archives/<dump_id>/``), resuming after stalls and
+             verifying its SHA256; reruns reuse that copy (refresh_common).
+   EXTRACT   Stream each archive back from GCS, decompress with lbzip2 and
+             copy the ``mbdump/<table>`` members to
              ``gs://nomadkaraoke-musicbrainz-data/staging/<dump_id>/``.
              Nothing is written to local disk (Cloud Run disk is RAM).
 3. LOAD      BigQuery load jobs (free) into ``musicbrainz_staging.raw_<table>``.
@@ -149,6 +152,11 @@ def required_tables() -> set[str]:
     return {t for tables in sql.RAW_TABLES.values() for t in tables}
 
 
+def archive_blob_name(dump_id: str, archive: str) -> str:
+    """Cached copy of a dump archive; outside staging/<dump_id>/ so cleanup keeps it for reruns."""
+    return f"{GCS_STAGING_PREFIX}/archives/{dump_id}/{archive}"
+
+
 def gcs_uri(dump_id: str, table: str) -> str:
     return f"gs://{GCS_BUCKET}/{GCS_STAGING_PREFIX}/{dump_id}/{table}.tsv"
 
@@ -163,17 +171,30 @@ def extract_dump_to_gcs(http: httpx.Client, gcs: storage.Client, state: RunState
             shutil.copyfileobj(fileobj, out, CHUNK)
 
     for archive in ARCHIVES:
-        tables = archive_tables(archive)
         if archive not in sums:
             raise RefreshError(f"{archive} not listed in SHA256SUMS for {state.dump_id}")
-        url = f"{DUMP_BASE_URL}/{state.dump_id}/{archive}"
-        logger.info(f"Streaming {url}")
-        timeout = httpx.Timeout(60.0, read=600.0)
-        with http.stream("GET", url, timeout=timeout, follow_redirects=True) as resp:
-            resp.raise_for_status()
-            meta = extract_members(
-                resp.iter_bytes(CHUNK), set(tables), upload, sums[archive], required=set(sql.RAW_TABLES[archive])
-            )
+    # Download everything first: the origin connection is only held while
+    # downloading, and an extract failure never costs a second download.
+    blobs = {
+        archive: common.cache_archive(
+            http,
+            bucket,
+            f"{DUMP_BASE_URL}/{state.dump_id}/{archive}",
+            archive_blob_name(state.dump_id, archive),
+            sums[archive],
+        )
+        for archive in ARCHIVES
+    }
+    for archive in ARCHIVES:
+        tables = archive_tables(archive)
+        logger.info(f"Extracting {archive} from gs://{GCS_BUCKET}/{archive_blob_name(state.dump_id, archive)}")
+        meta = extract_members(
+            common.gcs_chunks(blobs[archive]),
+            set(tables),
+            upload,
+            sums[archive],
+            required=set(sql.RAW_TABLES[archive]),
+        )
         if "SCHEMA_SEQUENCE" in meta:
             state.schema_sequence = meta["SCHEMA_SEQUENCE"]
         logger.info(f"{archive}: extracted {len(tables)} tables (meta={meta})")

@@ -5,7 +5,8 @@ new full export appears on the 1st and 15th). Steps:
 
 1. CHECK     Find the newest full export whose statistics dump + .sha256 are
              both uploaded; exit if that dump is already published.
-2. EXTRACT   Stream the ~22 GB ``.tar.zst`` over HTTPS, verify its SHA256,
+2. EXTRACT   Download the ~22 GB ``.tar.zst`` once into GCS (resumable, SHA256-verified,
+             reused by reruns; refresh_common.cache_archive), then stream it back,
              decompress with zstd and copy only the ``artists_*`` and
              ``recordings_*`` JSONL members to
              ``gs://nomadkaraoke-musicbrainz-data/staging/listenbrainz/<dump_id>/``.
@@ -156,6 +157,11 @@ def gcs_uri(dump_id: str, table: str) -> str:
     return f"gs://{GCS_BUCKET}/{gcs_blob_name(dump_id, table)}"
 
 
+def archive_blob_name(dump: StatsDump) -> str:
+    """Cached copy of the dump archive; outside <prefix>/<dump_id>/ so cleanup keeps it for reruns."""
+    return f"{GCS_STAGING_PREFIX}/archives/{dump.dump_id}/{dump.url.rsplit('/', 1)[-1]}"
+
+
 def extract_dump_to_gcs(
     http: httpx.Client,
     gcs: storage.Client,
@@ -170,19 +176,17 @@ def extract_dump_to_gcs(
         with blob.open("wb", chunk_size=64 * 1024 * 1024, content_type="application/x-ndjson") as out:
             shutil.copyfileobj(fileobj, out, CHUNK)
 
-    logger.info(f"Streaming {dump.url}")
-    timeout = httpx.Timeout(60.0, read=600.0)
-    with http.stream("GET", dump.url, timeout=timeout, follow_redirects=True) as resp:
-        resp.raise_for_status()
-        meta = common.extract_members(
-            resp.iter_bytes(CHUNK),
-            set(sql.RAW_FILES),
-            upload,
-            dump.sha256,
-            decompress_cmd=decompress_cmd or ["zstd", "-dc"],
-            table_of=member_table_name,
-            meta_files=META_FILES,
-        )
+    blob = common.cache_archive(http, bucket, dump.url, archive_blob_name(dump), dump.sha256)
+    logger.info(f"Extracting gs://{GCS_BUCKET}/{archive_blob_name(dump)}")
+    meta = common.extract_members(
+        common.gcs_chunks(blob),
+        set(sql.RAW_FILES),
+        upload,
+        dump.sha256,
+        decompress_cmd=decompress_cmd or ["zstd", "-dc"],
+        table_of=member_table_name,
+        meta_files=META_FILES,
+    )
     state.schema_sequence = meta.get("SCHEMA_SEQUENCE")
     logger.info(f"Extracted {len(sql.RAW_FILES)} statistics files (meta={meta})")
 
