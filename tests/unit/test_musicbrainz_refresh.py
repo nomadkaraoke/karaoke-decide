@@ -390,7 +390,9 @@ class TestRun:
         monkeypatch.setattr(mr, "load_raw_tables", load)
         mr.run(bq, MagicMock(), MagicMock(), dump_id="d", reuse_gcs=True, do_publish=False)
         extract.assert_not_called()
-        load.assert_called_once_with(bq, "d")
+        load.assert_called_once()
+        assert load.call_args.args == (bq, "d")
+        assert isinstance(load.call_args.kwargs["present"], set)
 
     def test_main_returns_1_on_failure(self, monkeypatch):
         monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
