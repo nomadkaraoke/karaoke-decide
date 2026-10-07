@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from karaoke_decide.etl import musicbrainz_mirror as mirror
 from karaoke_decide.etl import musicbrainz_refresh as mr
 from karaoke_decide.etl import musicbrainz_sql as sql
 
@@ -293,8 +294,32 @@ class TestRun:
         assert rc == 0
         extract.assert_called_once()
         copied = [c.args[1] for c in bq.copy_table.call_args_list]
-        assert copied == [f"{sql.P}.{name}" for name in sql.MODEL_ORDER]
+        app = [f"{sql.P}.{name}" for name in sql.MODEL_ORDER]
+        # App tables first (all of them), then the full mirror.
+        assert copied[: len(app)] == app
+        assert set(copied[len(app) :]) == {f"{mirror.MIRROR_DATASET}.{t}" for t in mirror.table_widths()}
         assert self._statuses(bq) == ["success"]
+
+    def test_skip_mirror_publishes_only_app_tables(self, monkeypatch):
+        bq = _mock_bq()
+        self._run(bq, monkeypatch, do_mirror=False)
+        copied = [c.args[1] for c in bq.copy_table.call_args_list]
+        assert copied == [f"{sql.P}.{name}" for name in sql.MODEL_ORDER]
+
+    def test_mirror_crash_does_not_fail_published_run(self, monkeypatch):
+        bq = _mock_bq()
+        monkeypatch.setattr(mirror, "build_and_publish", MagicMock(side_effect=RuntimeError("boom")))
+        rc, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        assert self._statuses(bq) == ["success"]
+
+    def test_failed_validation_skips_mirror(self, monkeypatch):
+        bq = _mock_bq(canary_ok=False)
+        build = MagicMock()
+        monkeypatch.setattr(mirror, "build_and_publish", build)
+        with pytest.raises(mr.RefreshError):
+            self._run(bq, monkeypatch)
+        build.assert_not_called()
 
     def test_failed_validation_never_touches_prod(self, monkeypatch):
         bq = _mock_bq(canary_ok=False)

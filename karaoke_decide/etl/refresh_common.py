@@ -88,13 +88,15 @@ def extract_members(
     decompress_cmd: list[str],
     table_of: Callable[[str], str | None],
     meta_files: Iterable[str] = (),
+    required: set[str] | None = None,
 ) -> dict[str, str]:
     """Stream a compressed tar and call ``on_member(table, fileobj)`` for wanted members.
 
     ``table_of`` maps a member path to a table name (or None to skip it).
     Small metadata members whose basename is in ``meta_files`` are returned as
-    ``{basename: text}``. Raises RefreshError on a checksum mismatch or missing
-    members.
+    ``{basename: text}``. Raises RefreshError on a checksum mismatch or if any
+    ``required`` member (default: all of ``wanted``) is missing; other missing
+    wanted members are only logged.
     """
     meta_names = set(meta_files)
     proc = subprocess.Popen(decompress_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -152,9 +154,12 @@ def extract_members(
     actual = hasher.hexdigest()
     if actual != expected_sha256.lower():
         raise RefreshError(f"SHA256 mismatch: expected {expected_sha256}, got {actual}")
-    missing = wanted - found
+    missing = (wanted if required is None else required) - found
     if missing:
         raise RefreshError(f"Archive is missing tables: {sorted(missing)}")
+    optional_missing = wanted - found - missing
+    if optional_missing:
+        logger.warning(f"Archive is missing optional tables: {sorted(optional_missing)}")
     return meta
 
 

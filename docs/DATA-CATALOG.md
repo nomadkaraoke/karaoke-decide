@@ -306,6 +306,53 @@ JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
 WHERE k.Artist = 'Queen'
 ```
 
+### Full mirror: `musicbrainz` dataset (every dump table)
+
+Since v0.12.0, `mb-refresh` also publishes **every** table from `mbdump.tar.bz2` (236 core
+tables) and `mbdump-derived.tar.bz2` (34: tags, ratings, annotations, `*_meta`) to
+`nomadkaraoke.musicbrainz.<table>`. Tables keep MusicBrainz's own names, columns and integer
+keys, so the official schema docs apply as-is: https://musicbrainz.org/doc/MusicBrainz_Database/Schema.
+The `karaoke_decide.mb_*` tables above are app-shaped extracts. Use the mirror for anything they
+don't cover: works and songwriters, relationships (`l_*` + `link`/`link_type`), aliases, labels,
+events, genres and tags, cover-art presence, and so on.
+
+- Types: integers become INT64, booleans BOOL, timestamps TIMESTAMP. Everything else stays STRING
+  (UUIDs, text, Postgres arrays kept verbatim as `{1,2}`). Strings are decoded from PG COPY escapes;
+  empty strings stay `''` and are not turned into NULL.
+- Clustered by `gid` (MBID) where a table has one, else by its first column (`id` or FK), so
+  MBID lookups are cheap.
+- Columns come from `karaoke_decide/etl/musicbrainz_schema.json`, generated from musicbrainz-server
+  by `scripts/gen_musicbrainz_schema.py`. After a MusicBrainz schema change (SCHEMA_SEQUENCE bump,
+  a few times a year), re-run it and commit the result.
+- Best-effort per table: the mirror is built after the app tables are published. A table that fails
+  to load, cast or sanity-check (drops below 90% of last week's rows) keeps last week's copy and logs
+  an ERROR. It never fails the run. `mb_refresh_log.row_counts` records
+  `mirror_tables_published` / `mirror_tables_skipped`, and each table carries the `mb_dump` label.
+- Skip it with `run --skip-mirror` / `publish --skip-mirror`.
+
+```sql
+-- Genres of an album (genres are user tags whose name is in the genre table)
+SELECT t.name, rgt.count
+FROM `nomadkaraoke.musicbrainz.release_group` rg
+JOIN `nomadkaraoke.musicbrainz.release_group_tag` rgt ON rgt.release_group = rg.id
+JOIN `nomadkaraoke.musicbrainz.tag` t ON t.id = rgt.tag
+JOIN `nomadkaraoke.musicbrainz.genre` g ON g.name = t.name
+WHERE rg.gid = 'b1392450-e666-3926-a536-22c65f834433'   -- OK Computer
+ORDER BY rgt.count DESC;
+
+-- Songwriters of a recording's work(s)
+SELECT w.name AS work, a.name AS writer, lt.name AS role
+FROM `nomadkaraoke.musicbrainz.recording` r
+JOIN `nomadkaraoke.musicbrainz.l_recording_work` lrw ON lrw.entity0 = r.id
+JOIN `nomadkaraoke.musicbrainz.work` w ON w.id = lrw.entity1
+JOIN `nomadkaraoke.musicbrainz.l_artist_work` law ON law.entity1 = w.id
+JOIN `nomadkaraoke.musicbrainz.link` l ON l.id = law.link
+JOIN `nomadkaraoke.musicbrainz.link_type` lt ON lt.id = l.link_type
+JOIN `nomadkaraoke.musicbrainz.artist` a ON a.id = law.entity0
+WHERE r.gid = '70595637-9310-45f2-a266-58f8de4874a7'     -- Creep
+  AND lt.name IN ('writer', 'composer', 'lyricist');
+```
+
 ### Release tables (albums, editions, tracklists)
 
 Added in v0.11.0, built by `mb-refresh` from the `release*`, `medium`, `track` and

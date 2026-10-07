@@ -437,6 +437,17 @@ musicbrainz_staging_dataset = gcp.bigquery.Dataset(
     opts=pulumi.ResourceOptions(protect=True),
 )
 
+# Full MusicBrainz mirror: every table in mbdump + mbdump-derived, with real
+# column names and types, replaced weekly by mb-refresh (musicbrainz_mirror.py).
+musicbrainz_dataset = gcp.bigquery.Dataset(
+    "musicbrainz-dataset",
+    dataset_id="musicbrainz",
+    project=project,
+    location="US",
+    description="Full MusicBrainz mirror (core + derived dump tables, typed), refreshed weekly by mb-refresh",
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
 mb_refresh_sa = gcp.serviceaccount.Account(
     "mb-refresh-sa",
     account_id="mb-refresh",
@@ -452,7 +463,11 @@ gcp.projects.IAMMember(
     role="roles/bigquery.jobUser",
     member=mb_refresh_member,
 )
-for _name, _dataset in [("prod", bigquery_dataset), ("staging", musicbrainz_staging_dataset)]:
+for _name, _dataset in [
+    ("prod", bigquery_dataset),
+    ("staging", musicbrainz_staging_dataset),
+    ("mirror", musicbrainz_dataset),
+]:
     gcp.bigquery.DatasetIamMember(
         f"mb-refresh-bq-editor-{_name}",
         project=project,
