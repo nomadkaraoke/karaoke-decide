@@ -628,9 +628,10 @@ CANARY_CHECKS: dict[str, str] = {
         WHERE aca.artist_mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711' AND rg.primary_type = 'Album'
     """,
     "ok_computer_releases": f"""
-        SELECT COUNT(*) > 10 AND MIN(release_date) = '1997-05-21'
+        -- Not MIN(release_date): dates are strings, so year-only '1997' sorts first.
+        SELECT COUNT(*) > 10 AND COUNTIF(release_date = '1997-05-21') > 0
                AND COUNTIF(ARRAY_LENGTH(labels) > 0) > 0 AND COUNTIF('CD' IN UNNEST(formats)) > 0 AS ok,
-               FORMAT('rows=%d min_date=%s', COUNT(*), IFNULL(MIN(release_date), 'NULL')) AS detail
+               FORMAT('rows=%d on_1997_05_21=%d', COUNT(*), COUNTIF(release_date = '1997-05-21')) AS detail
         FROM `{S}.mb_releases`
         WHERE release_group_mbid = 'b1392450-e666-3926-a536-22c65f834433'
     """,
