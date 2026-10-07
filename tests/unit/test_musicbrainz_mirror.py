@@ -250,11 +250,59 @@ class TestRawLoading:
         assert f"{sql.S}.raw_artist" in loaded
         assert "could not clear" in caplog.text
 
+    def test_tables_absent_from_dump_become_empty_tables_without_errors(self, caplog):
+        bq = MagicMock()
+        bq.get_table.return_value = MagicMock(num_rows=1)
+        present = set(mr.all_raw_tables()) - {"l_area_artist", "alternative_medium"}
+        with caplog.at_level(logging.INFO, logger="mb_refresh"):
+            mr.load_raw_tables(bq, "d", present=present)
+        loaded = {c.args[1] for c in bq.load_table_from_uri.call_args_list}
+        created = {c.args[0].table_id for c in bq.create_table.call_args_list}
+        assert f"{sql.S}.raw_l_area_artist" not in loaded
+        assert created == {"raw_l_area_artist", "raw_alternative_medium"}
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert "mirrored as empty" in caplog.text
+
+    def test_required_table_absent_from_dump_still_fails(self):
+        bq = MagicMock()
+        bq.get_table.return_value = MagicMock(num_rows=1)
+
+        def load(uri, dest, job_config=None):
+            job = MagicMock()
+            if dest.endswith(".raw_artist"):
+                job.result.side_effect = RuntimeError("404 Not found")
+            return job
+
+        bq.load_table_from_uri.side_effect = load
+        present = set(mr.all_raw_tables()) - {"artist"}
+        with pytest.raises(mr.RefreshError, match="raw_artist"):
+            mr.load_raw_tables(bq, "d", present=present)
+
+    @staticmethod
+    def _gcs(names):
+        gcs = MagicMock()
+        blobs = []
+        for n in names:
+            blob = MagicMock()
+            blob.name = f"staging/d/{n}.tsv"
+            blobs.append(blob)
+        gcs.bucket.return_value.list_blobs.return_value = blobs
+        return gcs
+
+    def test_staged_tables_from_gcs(self):
+        names = [*mr.required_tables(), "l_artist_work"]
+        assert mr.staged_tables(self._gcs(names), "d") == set(names)
+
+    def test_staged_tables_fails_fast_when_app_table_missing(self):
+        # e.g. an empty listing (wrong --dump-id with --reuse-gcs) must not empty the mirror.
+        with pytest.raises(mr.RefreshError, match="Required tables not staged"):
+            mr.staged_tables(self._gcs(["l_artist_work"]), "d")
+
 
 class TestOptionalExtract:
     def test_missing_optional_member_only_warns(self, caplog):
         archive = make_archive({"mbdump/artist": b"x\n"})
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.INFO):
             mr.extract_members(
                 chunks(archive),
                 {"artist", "work"},
@@ -263,7 +311,7 @@ class TestOptionalExtract:
                 decompress_cmd=PY_BUNZIP,
                 required={"artist"},
             )
-        assert "missing optional tables: ['work']" in caplog.text
+        assert "no member for optional tables: ['work']" in caplog.text
 
     def test_missing_required_member_raises(self):
         archive = make_archive({"mbdump/work": b"x\n"})

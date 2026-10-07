@@ -205,12 +205,46 @@ def raw_load_config(column_count: int) -> bigquery.LoadJobConfig:
     )
 
 
-def load_raw_tables(bq: bigquery.Client, dump_id: str) -> None:
-    """Load every extracted table. App tables must load; mirror-only failures are logged."""
+def staged_tables(gcs: storage.Client, dump_id: str) -> set[str]:
+    """Tables extracted to GCS staging for this dump; fails fast if an app table is missing."""
+    prefix = f"{GCS_STAGING_PREFIX}/{dump_id}/"
+    blobs = gcs.bucket(GCS_BUCKET).list_blobs(prefix=prefix)
+    names = {blob.name[len(prefix) :].removesuffix(".tsv") for blob in blobs}
+    missing = required_tables() - names
+    if missing:
+        raise RefreshError(f"Required tables not staged in GCS for {dump_id}: {sorted(missing)}")
+    return names
+
+
+def create_empty_raw_table(bq: bigquery.Client, table: str, ncols: int) -> bool:
+    """Mirror-only table absent from the dump (MusicBrainz omits empty tables): load as empty."""
+    dest = f"{sql.S}.raw_{table}"
+    try:
+        bq.delete_table(dest, not_found_ok=True)
+        bq.create_table(bigquery.Table(dest, schema=raw_schema(ncols)))
+    except Exception as e:  # noqa: BLE001 - mirror-only, best-effort
+        logger.error(f"MusicBrainz mirror: could not create empty {dest}, skipping {table}: {e}")
+        return False
+    return True
+
+
+def load_raw_tables(bq: bigquery.Client, dump_id: str, present: set[str] | None = None) -> None:
+    """Load every extracted table. App tables must load; mirror-only failures are logged.
+
+    ``present`` = tables actually in GCS staging (None: assume all). Mirror-only
+    tables missing from it are empty in MusicBrainz, which leaves them out of the
+    dump, so they become empty tables rather than load errors. A table that had
+    rows last week and goes missing is still caught by the mirror's row check.
+    """
     required = required_tables()
     jobs = []
+    absent: list[str] = []
     for table, ncols in all_raw_tables().items():
         dest = f"{sql.S}.raw_{table}"
+        if present is not None and table not in present and table not in required:
+            if create_empty_raw_table(bq, table, ncols):
+                absent.append(table)
+            continue
         if table not in required:
             # A failed WRITE_TRUNCATE load keeps the old table; never mirror a stale one.
             try:
@@ -235,6 +269,8 @@ def load_raw_tables(bq: bigquery.Client, dump_id: str) -> None:
             logger.error(f"MusicBrainz mirror: load of {table} failed (schema change?): {e}")
             continue
         logger.info(f"Loaded {dest}: {bq.get_table(dest).num_rows:,} rows")
+    if absent:
+        logger.info(f"{len(absent)} tables not in the dump (empty in MusicBrainz), mirrored as empty: {absent}")
 
 
 def build_models(bq: bigquery.Client) -> None:
@@ -335,7 +371,7 @@ def run(
         if not skip_extract:
             if not reuse_gcs:
                 extract_dump_to_gcs(http, gcs, state)
-            load_raw_tables(bq, state.dump_id)
+            load_raw_tables(bq, state.dump_id, present=staged_tables(gcs, state.dump_id))
         build_models(bq)
         validate(bq, state)
         if not do_publish:

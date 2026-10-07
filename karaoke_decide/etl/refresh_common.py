@@ -159,7 +159,8 @@ def extract_members(
         raise RefreshError(f"Archive is missing tables: {sorted(missing)}")
     optional_missing = wanted - found - missing
     if optional_missing:
-        logger.warning(f"Archive is missing optional tables: {sorted(optional_missing)}")
+        # Expected: MusicBrainz leaves empty tables out of its dumps.
+        logger.info(f"Archive has no member for optional tables: {sorted(optional_missing)}")
     return meta
 
 
