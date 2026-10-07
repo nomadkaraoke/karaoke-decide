@@ -266,6 +266,10 @@ def _mock_bq(num_rows=1000, published=False, canary_ok=True):
 
 
 class TestRun:
+    @pytest.fixture(autouse=True)
+    def _everything_staged(self, monkeypatch):
+        monkeypatch.setattr(mr, "staged_tables", lambda gcs, dump_id: set(mr.all_raw_tables()))
+
     def _run(self, bq, monkeypatch, **kwargs):
         extract = MagicMock()
         monkeypatch.setattr(mr, "extract_dump_to_gcs", extract)

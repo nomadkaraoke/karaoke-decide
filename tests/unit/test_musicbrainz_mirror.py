@@ -278,15 +278,25 @@ class TestRawLoading:
         with pytest.raises(mr.RefreshError, match="raw_artist"):
             mr.load_raw_tables(bq, "d", present=present)
 
-    def test_staged_tables_from_gcs(self):
+    @staticmethod
+    def _gcs(names):
         gcs = MagicMock()
-        gcs.bucket.return_value.list_blobs.return_value = [
-            MagicMock(name="a"),
-            MagicMock(name="b"),
-        ]
-        gcs.bucket.return_value.list_blobs.return_value[0].name = "staging/d/artist.tsv"
-        gcs.bucket.return_value.list_blobs.return_value[1].name = "staging/d/l_artist_work.tsv"
-        assert mr.staged_tables(gcs, "d") == {"artist", "l_artist_work"}
+        blobs = []
+        for n in names:
+            blob = MagicMock()
+            blob.name = f"staging/d/{n}.tsv"
+            blobs.append(blob)
+        gcs.bucket.return_value.list_blobs.return_value = blobs
+        return gcs
+
+    def test_staged_tables_from_gcs(self):
+        names = [*mr.required_tables(), "l_artist_work"]
+        assert mr.staged_tables(self._gcs(names), "d") == set(names)
+
+    def test_staged_tables_fails_fast_when_app_table_missing(self):
+        # e.g. an empty listing (wrong --dump-id with --reuse-gcs) must not empty the mirror.
+        with pytest.raises(mr.RefreshError, match="Required tables not staged"):
+            mr.staged_tables(self._gcs(["l_artist_work"]), "d")
 
 
 class TestOptionalExtract:

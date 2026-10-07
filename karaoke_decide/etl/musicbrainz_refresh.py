@@ -206,9 +206,14 @@ def raw_load_config(column_count: int) -> bigquery.LoadJobConfig:
 
 
 def staged_tables(gcs: storage.Client, dump_id: str) -> set[str]:
-    """Tables extracted to GCS staging for this dump."""
+    """Tables extracted to GCS staging for this dump; fails fast if an app table is missing."""
     prefix = f"{GCS_STAGING_PREFIX}/{dump_id}/"
-    return {blob.name[len(prefix) :].removesuffix(".tsv") for blob in gcs.bucket(GCS_BUCKET).list_blobs(prefix=prefix)}
+    blobs = gcs.bucket(GCS_BUCKET).list_blobs(prefix=prefix)
+    names = {blob.name[len(prefix) :].removesuffix(".tsv") for blob in blobs}
+    missing = required_tables() - names
+    if missing:
+        raise RefreshError(f"Required tables not staged in GCS for {dump_id}: {sorted(missing)}")
+    return names
 
 
 def create_empty_raw_table(bq: bigquery.Client, table: str, ncols: int) -> bool:
