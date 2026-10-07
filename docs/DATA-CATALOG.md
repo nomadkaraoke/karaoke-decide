@@ -19,6 +19,13 @@ This document describes all music data available in BigQuery for use in features
      Loads the latest [full export](https://data.metabrainz.org/pub/musicbrainz/data/fullexport/),
      rebuilds every table below in `musicbrainz_staging`, validates (row-count bounds + canaries),
      then copies to prod. A failed run leaves prod untouched and logs an ERROR.
+   - Download etiquette (both `mb-refresh` and `lb-refresh`, `refresh_common.cache_archive`): each
+     dump archive is fetched **once per dump**, over one connection, into
+     `gs://nomadkaraoke-musicbrainz-data/staging/[listenbrainz/]archives/<dump_id>/`. A stall or
+     disconnect resumes with an HTTP `Range` request (`If-Range` on the ETag, so a replaced file is
+     never spliced; up to 10 resumes, linear backoff). Extraction then streams from that GCS copy, and
+     retries and `--force` reruns reuse it without contacting data.metabrainz.org. The bucket's 3-day
+     `staging/` lifecycle rule deletes it.
    - Check freshness: `SELECT * FROM karaoke_decide.mb_refresh_log ORDER BY finished_at DESC LIMIT 5`,
      or the `mb_dump` label on any `mb_*` table (`bq show karaoke_decide.mb_artists`)
 

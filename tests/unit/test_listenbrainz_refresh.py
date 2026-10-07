@@ -16,6 +16,7 @@ import pytest
 from karaoke_decide.etl import listenbrainz_refresh as lr
 from karaoke_decide.etl import listenbrainz_sql as sql
 from karaoke_decide.etl.refresh_common import PUBLISH_ATTEMPTS, PartialPublishError, RefreshError
+from tests.unit.fake_gcs import FakeBucket
 
 # Portable stand-in for `zstd -dc` so tests don't need zstd installed: the
 # test archives are zlib-compressed instead.
@@ -178,29 +179,14 @@ class TestExtract:
         return make_archive(files)
 
     def _run(self, archive: bytes, sha: str):
-        uploaded: dict[str, bytes] = {}
-
-        class Blob:
-            def __init__(self, name):
-                self.name = name
-
-            def open(self, mode, **kwargs):
-                buf = io.BytesIO()
-                close = buf.close
-
-                def finish():
-                    uploaded[self.name] = buf.getvalue()
-                    close()
-
-                buf.close = finish  # type: ignore[method-assign]
-                return buf
-
+        bucket = FakeBucket()
         gcs = MagicMock()
-        gcs.bucket.return_value.blob.side_effect = Blob
+        gcs.bucket.return_value = bucket
         dump = lr.StatsDump(DUMP_ID, "https://example.test/stats.tar.zst", sha)
         http = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=archive)))
         state = lr.RunState(dump_id=DUMP_ID)
         lr.extract_dump_to_gcs(http, gcs, state, dump, decompress_cmd=PY_UNZLIB)
+        uploaded = {k: v for k, v in bucket.objects.items() if k != lr.archive_blob_name(dump)}
         return uploaded, state
 
     def test_uploads_only_artist_and_recording_files(self):

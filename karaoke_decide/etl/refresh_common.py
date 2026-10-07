@@ -1,9 +1,16 @@
 """Building blocks shared by the dump -> BigQuery refresh jobs.
 
 Used by ``musicbrainz_refresh`` (``mb-refresh``) and ``listenbrainz_refresh``
-(``lb-refresh``). Both follow the same shape: stream a public dump archive,
-copy the members they need to GCS staging, load + build in a staging dataset,
-validate, then copy the results over prod and record the run in a log table.
+(``lb-refresh``). Both follow the same shape: download a public dump archive
+once into our GCS bucket (resuming after stalls), stream the members they need
+from that copy to GCS staging, load + build in a staging dataset, validate,
+then copy the results over prod and record the run in a log table.
+
+Bandwidth etiquette for data.metabrainz.org: each archive is fetched over a
+single connection, at most once per dump. A stall or disconnect resumes with
+an HTTP Range request (If-Range on the ETag, so a changed file is never
+spliced) instead of restarting, and the verified copy in GCS is reused by
+retries and reruns until the bucket's staging/ lifecycle rule removes it.
 """
 
 from __future__ import annotations
@@ -16,11 +23,13 @@ import subprocess
 import sys
 import tarfile
 import threading
-from collections.abc import Callable, Iterable
+import time
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import IO, Any
 
+import httpx
 from google.cloud import bigquery
 
 logger = logging.getLogger("etl_refresh")
@@ -28,6 +37,15 @@ logger = logging.getLogger("etl_refresh")
 CHUNK = 8 * 1024 * 1024
 GIB = 1024**3
 PUBLISH_ATTEMPTS = 3
+
+# Download resilience. A stalled connection is abandoned after READ_TIMEOUT_S
+# and resumed from the last byte received; MAX_RESUMES bounds a server that
+# keeps failing. Backoff grows linearly so we don't hammer a struggling server.
+READ_TIMEOUT_S = 120.0
+MAX_RESUMES = 10
+RESUME_BACKOFF_S = 15.0
+# Upload buffer for the archive copy in GCS (also the resumable-upload chunk).
+ARCHIVE_UPLOAD_CHUNK = 64 * 1024 * 1024
 
 
 class RefreshError(RuntimeError):
@@ -58,6 +76,130 @@ class RunState:
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     schema_sequence: str | None = None
     row_counts: dict[str, int] = field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------
+# Resumable download + GCS archive cache
+# --------------------------------------------------------------------------
+
+
+def _retryable(error: Exception) -> bool:
+    if isinstance(error, httpx.TransportError):  # timeouts, resets, protocol errors
+        return True
+    if isinstance(error, httpx.HTTPStatusError):
+        code = error.response.status_code
+        return code >= 500 or code in (408, 429)
+    return False
+
+
+def resumable_chunks(
+    http: httpx.Client,
+    url: str,
+    chunk_size: int = CHUNK,
+    max_resumes: int = MAX_RESUMES,
+    backoff_s: float = RESUME_BACKOFF_S,
+    read_timeout_s: float = READ_TIMEOUT_S,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[bytes]:
+    """Yield the body of ``url``; after a stall/disconnect, resume where it stopped.
+
+    Resumes use ``Range: bytes=<received>-`` with ``If-Range`` set to the first
+    response's ETag (or Last-Modified). If the server answers anything but a
+    206 starting at exactly ``received`` (e.g. the file was replaced), we stop
+    rather than splice two different files. Callers still verify the SHA256.
+    """
+    received = 0
+    validator: str | None = None
+    total: int | None = None
+    resumes = 0
+    timeout = httpx.Timeout(60.0, read=read_timeout_s)
+    while True:
+        headers = {}
+        if received:
+            headers["Range"] = f"bytes={received}-"
+            if validator:
+                headers["If-Range"] = validator
+        try:
+            with http.stream("GET", url, headers=headers, timeout=timeout, follow_redirects=True) as resp:
+                resp.raise_for_status()
+                if received:
+                    expected = f"bytes {received}-"
+                    if resp.status_code != 206 or not resp.headers.get("content-range", "").startswith(expected):
+                        raise RefreshError(
+                            f"Cannot resume {url} at byte {received}: HTTP {resp.status_code} "
+                            f"content-range={resp.headers.get('content-range')!r} (file changed or Range unsupported)"
+                        )
+                else:
+                    etag = resp.headers.get("etag")
+                    validator = etag if etag and not etag.startswith("W/") else resp.headers.get("last-modified")
+                    length = resp.headers.get("content-length")
+                    total = int(length) if length and length.isdigit() else None
+                for part in resp.iter_bytes(chunk_size):
+                    received += len(part)
+                    yield part
+            if total is None or received >= total:
+                return
+            error: Exception = RefreshError(f"connection closed at byte {received:,} of {total:,}")
+        except Exception as e:  # noqa: BLE001 - classified below
+            if not _retryable(e):
+                raise
+            error = e
+        resumes += 1
+        if resumes > max_resumes:
+            raise RefreshError(f"Download of {url} failed after {max_resumes} resumes: {error!r}") from error
+        wait = backoff_s * resumes
+        logger.warning(
+            f"Download of {url} interrupted at {received / GIB:.2f} GiB ({error!r}); "
+            f"resuming in {wait:.0f}s ({resumes}/{max_resumes})"
+        )
+        sleep(wait)
+
+
+def cache_archive(
+    http: httpx.Client,
+    bucket: Any,
+    url: str,
+    blob_name: str,
+    expected_sha256: str,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Any:
+    """Ensure a SHA256-verified copy of ``url`` exists at ``blob_name``; return the blob.
+
+    A copy verified by an earlier run (``sha256`` in its metadata) is reused
+    without contacting the origin at all.
+    """
+    expected = expected_sha256.lower()
+    blob = bucket.blob(blob_name)
+    if blob.exists():
+        blob.reload()
+        if (blob.metadata or {}).get("sha256") == expected:
+            logger.info(f"Reusing cached archive gs://{bucket.name}/{blob_name} (no download)")
+            return blob
+    logger.info(f"Downloading {url} -> gs://{bucket.name}/{blob_name}")
+    hasher = hashlib.sha256()
+    start = time.monotonic()
+    size = 0
+    with blob.open("wb", chunk_size=ARCHIVE_UPLOAD_CHUNK, content_type="application/octet-stream") as out:
+        for part in resumable_chunks(http, url, sleep=sleep):
+            hasher.update(part)
+            out.write(part)
+            size += len(part)
+    actual = hasher.hexdigest()
+    if actual != expected:
+        blob.delete()
+        raise RefreshError(f"SHA256 mismatch for {url}: expected {expected}, got {actual}")
+    blob.metadata = {"sha256": expected, "source_url": url}
+    blob.patch()
+    secs = max(time.monotonic() - start, 1e-9)
+    logger.info(f"Cached {size / GIB:.2f} GiB in {secs:.0f}s ({size / secs / 1024**2:.0f} MiB/s), SHA256 verified")
+    return blob
+
+
+def gcs_chunks(blob: Any, chunk_size: int = CHUNK) -> Iterator[bytes]:
+    """Stream a GCS object's bytes (same region as the jobs: no egress cost)."""
+    with blob.open("rb", chunk_size=ARCHIVE_UPLOAD_CHUNK) as f:
+        while part := f.read(chunk_size):
+            yield part
 
 
 # --------------------------------------------------------------------------
