@@ -12,11 +12,14 @@ Runs as the ``mb-refresh`` Cloud Run Job (Cloud Scheduler, weekly). Steps:
 5. VALIDATE  Row-count bounds vs prod + canary checks. Any failure stops the
              run before prod is touched.
 6. PUBLISH   Copy jobs (free, atomic per table) staging -> ``karaoke_decide``,
-             label each table with ``mb_dump=<dump_id>``, log to
-             ``karaoke_decide.mb_refresh_log``, delete staging.
+             label each table with ``mb_dump=<dump_id>``.
+7. MIRROR    Best-effort: every dump table, typed, -> the ``musicbrainz``
+             dataset (musicbrainz_mirror). Per-table failures keep last week's
+             copy and log an ERROR; they never fail the run.
+8. LOG       ``karaoke_decide.mb_refresh_log``, delete staging.
 
 Usage:
-    python -m karaoke_decide.etl.musicbrainz_refresh run [--dump-id ID] [--force] [--no-publish]
+    python -m karaoke_decide.etl.musicbrainz_refresh run [--dump-id ID] [--force] [--no-publish] [--skip-mirror]
     python -m karaoke_decide.etl.musicbrainz_refresh run --skip-extract   # rebuild from loaded raw tables
     python -m karaoke_decide.etl.musicbrainz_refresh run --reuse-gcs      # reload TSVs already in GCS staging
     python -m karaoke_decide.etl.musicbrainz_refresh publish --dump-id ID # validate + publish existing staging
@@ -40,6 +43,7 @@ from google.cloud import (  # type: ignore[attr-defined]  # storage has no stubs
     storage,
 )
 
+from karaoke_decide.etl import musicbrainz_mirror as mirror
 from karaoke_decide.etl import musicbrainz_sql as sql
 from karaoke_decide.etl import refresh_common as common
 from karaoke_decide.etl.refresh_common import (  # noqa: F401 - re-exported for callers/tests
@@ -57,6 +61,7 @@ DUMP_BASE_URL = "https://data.metabrainz.org/pub/musicbrainz/data/fullexport"
 GCS_BUCKET = "nomadkaraoke-musicbrainz-data"
 GCS_STAGING_PREFIX = "staging"
 LOG_TABLE = f"{sql.P}.mb_refresh_log"
+ARCHIVES = ("mbdump.tar.bz2", "mbdump-derived.tar.bz2")
 META_FILES = ("SCHEMA_SEQUENCE", "TIMESTAMP", "REPLICATION_SEQUENCE")
 STALE_AFTER_DAYS = 14
 # Largest model (karaoke_recording_links) estimates ~35 GiB: spotify_tracks
@@ -109,11 +114,13 @@ def extract_members(
     on_member: Any,
     expected_sha256: str,
     decompress_cmd: list[str] | None = None,
+    required: set[str] | None = None,
 ) -> dict[str, str]:
     """Stream a .tar.bz2, call ``on_member(table, fileobj)`` for wanted tables.
 
     Returns the small metadata files (SCHEMA_SEQUENCE etc.) found in the
-    archive. Raises RefreshError on a checksum mismatch or missing members.
+    archive. Raises RefreshError on a checksum mismatch or missing ``required``
+    members (default: all wanted).
     """
     return common.extract_members(
         compressed_chunks,
@@ -123,7 +130,23 @@ def extract_members(
         decompress_cmd=decompress_cmd or ["lbzip2", "-dc"],
         table_of=member_table_name,
         meta_files=META_FILES,
+        required=required,
     )
+
+
+def archive_tables(archive: str) -> dict[str, int]:
+    """{table: column count} to extract+load from one archive: app tables + full mirror."""
+    widths = {t: len(cols) for t, cols in mirror.mirror_tables().get(archive, {}).items()}
+    return {**widths, **sql.RAW_TABLES.get(archive, {})}
+
+
+def all_raw_tables() -> dict[str, int]:
+    return {t: n for archive in ARCHIVES for t, n in archive_tables(archive).items()}
+
+
+def required_tables() -> set[str]:
+    """Tables the app models need; anything else is mirror-only (best-effort)."""
+    return {t for tables in sql.RAW_TABLES.values() for t in tables}
 
 
 def gcs_uri(dump_id: str, table: str) -> str:
@@ -139,7 +162,8 @@ def extract_dump_to_gcs(http: httpx.Client, gcs: storage.Client, state: RunState
         with blob.open("wb", chunk_size=64 * 1024 * 1024, content_type="text/tab-separated-values") as out:
             shutil.copyfileobj(fileobj, out, CHUNK)
 
-    for archive, tables in sql.RAW_TABLES.items():
+    for archive in ARCHIVES:
+        tables = archive_tables(archive)
         if archive not in sums:
             raise RefreshError(f"{archive} not listed in SHA256SUMS for {state.dump_id}")
         url = f"{DUMP_BASE_URL}/{state.dump_id}/{archive}"
@@ -147,7 +171,9 @@ def extract_dump_to_gcs(http: httpx.Client, gcs: storage.Client, state: RunState
         timeout = httpx.Timeout(60.0, read=600.0)
         with http.stream("GET", url, timeout=timeout, follow_redirects=True) as resp:
             resp.raise_for_status()
-            meta = extract_members(resp.iter_bytes(CHUNK), set(tables), upload, sums[archive])
+            meta = extract_members(
+                resp.iter_bytes(CHUNK), set(tables), upload, sums[archive], required=set(sql.RAW_TABLES[archive])
+            )
         if "SCHEMA_SEQUENCE" in meta:
             state.schema_sequence = meta["SCHEMA_SEQUENCE"]
         logger.info(f"{archive}: extracted {len(tables)} tables (meta={meta})")
@@ -180,18 +206,30 @@ def raw_load_config(column_count: int) -> bigquery.LoadJobConfig:
 
 
 def load_raw_tables(bq: bigquery.Client, dump_id: str) -> None:
+    """Load every extracted table. App tables must load; mirror-only failures are logged."""
+    required = required_tables()
     jobs = []
-    for tables in sql.RAW_TABLES.values():
-        for table, ncols in tables.items():
-            dest = f"{sql.S}.raw_{table}"
-            jobs.append(
-                (dest, bq.load_table_from_uri(gcs_uri(dump_id, table), dest, job_config=raw_load_config(ncols)))
-            )
-    for dest, job in jobs:
+    for table, ncols in all_raw_tables().items():
+        dest = f"{sql.S}.raw_{table}"
+        if table not in required:
+            # A failed WRITE_TRUNCATE load keeps the old table; never mirror a stale one.
+            bq.delete_table(dest, not_found_ok=True)
+        try:
+            job = bq.load_table_from_uri(gcs_uri(dump_id, table), dest, job_config=raw_load_config(ncols))
+        except Exception as e:  # noqa: BLE001 - classified below
+            if table in required:
+                raise RefreshError(f"Load into {dest} failed to start: {e}") from e
+            logger.error(f"MusicBrainz mirror: load of {table} failed to start: {e}")
+            continue
+        jobs.append((table, dest, job))
+    for table, dest, job in jobs:
         try:
             job.result()
-        except Exception as e:
-            raise RefreshError(f"Load into {dest} failed: {e}") from e
+        except Exception as e:  # noqa: BLE001 - classified below
+            if table in required:
+                raise RefreshError(f"Load into {dest} failed: {e}") from e
+            logger.error(f"MusicBrainz mirror: load of {table} failed (schema change?): {e}")
+            continue
         logger.info(f"Loaded {dest}: {bq.get_table(dest).num_rows:,} rows")
 
 
@@ -233,6 +271,16 @@ def publish(bq: bigquery.Client, state: RunState) -> None:
     common.publish_tables(bq, sql.MODEL_ORDER, sql.S, sql.P, "mb_dump", state.dump_id)
 
 
+def publish_mirror(bq: bigquery.Client, state: RunState) -> None:
+    """Best-effort full mirror; runs after the app tables are live and never raises."""
+    try:
+        result = mirror.build_and_publish(bq, state.dump_id, state.schema_sequence)
+    except Exception:  # noqa: BLE001 - must not fail an already-published refresh
+        logger.exception("MusicBrainz mirror failed; app tables are published, musicbrainz.* left as-is")
+        return
+    state.row_counts.update(result.summary())
+
+
 # --------------------------------------------------------------------------
 # Run log + cleanup
 # --------------------------------------------------------------------------
@@ -243,10 +291,9 @@ def _log(bq: bigquery.Client) -> common.RunLog:
 
 
 def cleanup_staging(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> None:
-    for tables in sql.RAW_TABLES.values():
-        for table in tables:
-            bq.delete_table(f"{sql.S}.raw_{table}", not_found_ok=True)
-    for name in sql.MODEL_ORDER:
+    for table in all_raw_tables():
+        bq.delete_table(f"{sql.S}.raw_{table}", not_found_ok=True)
+    for name in [*sql.MODEL_ORDER, *mirror.staging_table_names()]:
         bq.delete_table(f"{sql.S}.{name}", not_found_ok=True)
     blobs = list(gcs.bucket(GCS_BUCKET).list_blobs(prefix=f"{GCS_STAGING_PREFIX}/{dump_id}/"))
     for blob in blobs:
@@ -268,6 +315,7 @@ def run(
     do_publish: bool = True,
     skip_extract: bool = False,
     reuse_gcs: bool = False,
+    do_mirror: bool = True,
 ) -> int:
     log = _log(bq)
     log.ensure()
@@ -293,13 +341,15 @@ def run(
     except Exception as e:
         log.write(state, common.log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
+    if do_mirror:
+        publish_mirror(bq, state)
     log.write(state, "success")
     cleanup_staging(bq, gcs, state.dump_id)
     logger.info(f"MusicBrainz refresh complete: {state.dump_id}")
     return 0
 
 
-def publish_existing(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> int:
+def publish_existing(bq: bigquery.Client, gcs: storage.Client, dump_id: str, do_mirror: bool = True) -> int:
     """Validate and publish staging tables built by an earlier --no-publish run."""
     log = _log(bq)
     log.ensure()
@@ -310,6 +360,8 @@ def publish_existing(bq: bigquery.Client, gcs: storage.Client, dump_id: str) -> 
     except Exception as e:
         log.write(state, common.log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
+    if do_mirror:
+        publish_mirror(bq, state)
     log.write(state, "success")
     cleanup_staging(bq, gcs, dump_id)
     return 0
@@ -333,8 +385,10 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument(
         "--reuse-gcs", action="store_true", help="Skip the download; load TSVs already extracted to GCS staging"
     )
+    p_run.add_argument("--skip-mirror", action="store_true", help="Don't build/publish the musicbrainz.* mirror")
     p_pub = sub.add_parser("publish", help="Validate + publish existing staging tables")
     p_pub.add_argument("--dump-id", required=True)
+    p_pub.add_argument("--skip-mirror", action="store_true", help="Don't build/publish the musicbrainz.* mirror")
     sub.add_parser("status", help="Show recent runs")
     args = parser.parse_args(argv)
 
@@ -345,7 +399,7 @@ def main(argv: list[str] | None = None) -> int:
             return status(bq)
         gcs = storage.Client(project=sql.PROJECT_ID)
         if args.command == "publish":
-            return publish_existing(bq, gcs, args.dump_id)
+            return publish_existing(bq, gcs, args.dump_id, do_mirror=not args.skip_mirror)
         with httpx.Client(headers={"User-Agent": "nomadkaraoke-mb-refresh/1.0 (https://nomadkaraoke.com)"}) as http:
             return run(
                 bq,
@@ -356,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
                 do_publish=not args.no_publish,
                 skip_extract=args.skip_extract,
                 reuse_gcs=args.reuse_gcs,
+                do_mirror=not args.skip_mirror,
             )
     except Exception:
         logger.exception("MusicBrainz refresh failed")

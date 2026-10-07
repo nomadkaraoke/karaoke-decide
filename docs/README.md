@@ -16,7 +16,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 
 ### ✅ What's Working
 - **MBID-First Architecture COMPLETE (2026-01-15):**
-  - **BigQuery MusicBrainz tables:** 3.0M artists, 766K tags, 455K Spotify mappings, plus release groups/releases/tracks (albums + release dates, v0.11.0) — refreshed weekly by the `mb-refresh` Cloud Run Job (see DATA-CATALOG.md)
+  - **BigQuery MusicBrainz tables:** 3.0M artists, 766K tags, 455K Spotify mappings, plus release groups/releases/tracks (albums + release dates, v0.11.0); full typed mirror of every core+derived dump table in the `musicbrainz` dataset (v0.12.0) — refreshed weekly by the `mb-refresh` Cloud Run Job (see DATA-CATALOG.md)
   - **ListenBrainz popularity (2026-09-28):** current listen counts + listeners per artist/recording MBID across 9 stats ranges, plus per-user top artists for collaborative filtering — refreshed from each ListenBrainz export by the `lb-refresh` Cloud Run Job (see DATA-CATALOG.md)
   - **MusicBrainz recordings (Phase 7):** 40.3M recordings, 6.4M ISRCs, 177K karaoke songs linked
   - **MBID search APIs:** `search_artists_mbid()`, `get_artist_by_mbid()`, `lookup_mbids_by_names()`
