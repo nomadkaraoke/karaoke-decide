@@ -77,6 +77,10 @@ Row counts as of dump `20260926-002121`; all rebuilt weekly by `mb-refresh`.
 | `mb_artists_normalized` | 2,995,592 | Pre-joined for fast search |
 | `mb_recordings_enriched` | 53,679,830 | Derived: recordings ⋈ ISRC ⋈ Spotify, clustered for search (see below) |
 | `karaoke_recording_links` | 177,420 | Karaoke songs → MB recordings |
+| `mb_release_groups` | new (v0.11.0) | "Albums": every release group, with MB's own `first_release_date`, type, rating, tags |
+| `mb_releases` | new (v0.11.0) | Editions of each release group: earliest date, countries, labels, formats |
+| `mb_tracks` | new (v0.11.0) | Every track on every release (tracklists; recording → releases) |
+| `mb_artist_credit_artists` | new (v0.11.0) | Artist credit → artist MBIDs (find releases/recordings by artist MBID) |
 | `mb_refresh_log` | — | One row per refresh run (dump, status, row counts, error) |
 | `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
 
@@ -300,6 +304,64 @@ FROM `nomadkaraoke.karaoke_decide.karaokenerds_raw` k
 JOIN `nomadkaraoke.karaoke_decide.karaoke_recording_links` krl
   ON k.Id = krl.karaoke_id
 WHERE k.Artist = 'Queen'
+```
+
+### Release tables (albums, editions, tracklists)
+
+Added in v0.11.0, built by `mb-refresh` from the `release*`, `medium`, `track` and
+`artist_credit_name` dump tables plus `release_group_meta` / `release_group_tag` from the
+derived archive. Before this, album data only came from the July-2025 Spotify snapshot
+(`spotify_albums`).
+
+**`mb_release_groups`** (clustered by `artist_normalized, name_normalized`) — one row per album/single/EP:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `release_group_mbid` | STRING | |
+| `title`, `artist_credit` | STRING | Display strings |
+| `artist_credit_id` | INT64 | Join to `mb_artist_credit_artists` |
+| `primary_type` | STRING | Album / Single / EP / Broadcast / Other |
+| `secondary_types` | ARRAY<STRING> | Compilation, Live, Soundtrack, Remix, … (empty = studio) |
+| `first_release_date` | STRING | `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, from MusicBrainz's `release_group_meta` (same as the MB API) |
+| `first_release_year` | INT64 | |
+| `release_count` | INT64 | Number of editions |
+| `rating`, `rating_count` | INT64 | Community rating 0–100 |
+| `tags` | ARRAY<STRING> | Top 5 release-group tags by votes |
+| `name_normalized`, `artist_normalized` | STRING | Accent-folded `norm()` (`'Maxïmo Park'` → `'maximo park'`) |
+
+**`mb_releases`** (clustered by `release_group_mbid`): `release_mbid, release_group_mbid, title,
+artist_credit, artist_credit_id, status` (Official/Promotion/Bootleg/…), `packaging, language,
+release_date` (earliest release event), `release_year, countries` (ISO codes, incl. `XW`/`XE`),
+`labels` (ARRAY<STRUCT<name, catalog_number>>), `formats` (e.g. `["CD"]`), `medium_count,
+track_count, barcode, disambiguation`.
+
+**`mb_tracks`** (clustered by `recording_mbid, release_mbid`): `track_mbid, recording_mbid,
+release_mbid, release_group_mbid, medium_position, medium_format, track_position, track_number,
+title, artist_credit, length_ms`.
+
+**`mb_artist_credit_artists`** (clustered by `artist_mbid`): `artist_credit_id, position,
+artist_mbid, credited_name, join_phrase`.
+
+```sql
+-- Studio albums by an artist (by MBID), oldest first
+SELECT rg.title, rg.first_release_date, rg.release_count
+FROM `nomadkaraoke.karaoke_decide.mb_artist_credit_artists` aca
+JOIN `nomadkaraoke.karaoke_decide.mb_release_groups` rg USING (artist_credit_id)
+WHERE aca.artist_mbid = 'a74b1b7f-71a5-4011-9441-d0b5e4122711'   -- Radiohead
+  AND rg.primary_type = 'Album' AND ARRAY_LENGTH(rg.secondary_types) = 0
+ORDER BY rg.first_release_date;
+
+-- Original release date of an album by name
+SELECT title, artist_credit, primary_type, first_release_date
+FROM `nomadkaraoke.karaoke_decide.mb_release_groups`
+WHERE artist_normalized = 'radiohead' AND name_normalized = 'ok computer';
+
+-- Albums a recording appears on
+SELECT DISTINCT rg.title, rg.primary_type, rg.secondary_types, rg.first_release_date
+FROM `nomadkaraoke.karaoke_decide.mb_tracks` t
+JOIN `nomadkaraoke.karaoke_decide.mb_release_groups` rg USING (release_group_mbid)
+WHERE t.recording_mbid = '70595637-9310-45f2-a266-58f8de4874a7'  -- Creep
+ORDER BY rg.first_release_date;
 ```
 
 ### isrc_spotify_mapping (View)
