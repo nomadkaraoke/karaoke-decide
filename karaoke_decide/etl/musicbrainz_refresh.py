@@ -213,7 +213,11 @@ def load_raw_tables(bq: bigquery.Client, dump_id: str) -> None:
         dest = f"{sql.S}.raw_{table}"
         if table not in required:
             # A failed WRITE_TRUNCATE load keeps the old table; never mirror a stale one.
-            bq.delete_table(dest, not_found_ok=True)
+            try:
+                bq.delete_table(dest, not_found_ok=True)
+            except Exception as e:  # noqa: BLE001 - mirror-only, best-effort
+                logger.error(f"MusicBrainz mirror: could not clear {dest}, skipping {table}: {e}")
+                continue
         try:
             job = bq.load_table_from_uri(gcs_uri(dump_id, table), dest, job_config=raw_load_config(ncols))
         except Exception as e:  # noqa: BLE001 - classified below

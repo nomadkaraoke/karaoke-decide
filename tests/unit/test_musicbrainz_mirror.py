@@ -234,6 +234,22 @@ class TestRawLoading:
         assert f"{sql.S}.raw_work" in deleted
         assert f"{sql.S}.raw_artist" not in deleted  # app tables are never pre-deleted
 
+    def test_mirror_only_delete_failure_skips_table_without_failing(self, caplog):
+        bq = MagicMock()
+        bq.get_table.return_value = MagicMock(num_rows=1)
+
+        def delete(table_id, not_found_ok=False):
+            if table_id.endswith(".raw_work"):
+                raise RuntimeError("transient")
+
+        bq.delete_table.side_effect = delete
+        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
+            mr.load_raw_tables(bq, "d")
+        loaded = {c.args[1] for c in bq.load_table_from_uri.call_args_list}
+        assert f"{sql.S}.raw_work" not in loaded
+        assert f"{sql.S}.raw_artist" in loaded
+        assert "could not clear" in caplog.text
+
 
 class TestOptionalExtract:
     def test_missing_optional_member_only_warns(self, caplog):
