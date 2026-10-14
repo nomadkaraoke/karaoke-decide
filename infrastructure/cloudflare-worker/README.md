@@ -43,6 +43,12 @@ pulumi up
 
 ### Finding Your IDs
 
+Production values are already committed in `infrastructure/Pulumi.prod.yaml`: since
+2026-10-14 the Worker lives in the dedicated **Nomad Karaoke** Cloudflare account
+(`4585249dcf5d2f9fb4e075c5382cd071`) on zone nomadkaraoke.com
+(`2324a342622e93343cf4e08227d82c02`), not Andrew's personal account. The workspace
+`.envrc` `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` point at that account.
+
 **Account ID:** Cloudflare Dashboard → any domain → Overview → right sidebar
 
 **Zone ID:** Cloudflare Dashboard → nomadkaraoke.com → Overview → right sidebar → Zone ID
