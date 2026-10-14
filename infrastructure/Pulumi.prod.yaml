@@ -3,6 +3,6 @@ config:
   gcp:region: us-central1
   karaoke-decide:environment: production
   cloudflare:apiToken:
-    secure: AAABANHUtwvCvGG362g5W6aq6KoQnM95s6TFzWoHEjxGL0KNnUmyZNqP+eGkoo++4O03T44CMiWnBxh9bzIOM9kV+RFwSlqB
-  karaoke-decide:cloudflareAccountId: a7dd2a2bee7151ef4dc7a9f53d99b520
-  karaoke-decide:cloudflareZoneId: 807f07f458f9cd38251f3b7948d55172
+    secure: AAABAKy4kgs4EFA/P8J6e288FmxHUVUGcoB2/PpgPJ/O1CkXOWUNm/8mT2+XhIa1ZyxBlCE4tZ/tjHnsokPlB4Ke3JV3VCwXjwNvBWgurgYzlC7yZw==
+  karaoke-decide:cloudflareAccountId: 4585249dcf5d2f9fb4e075c5382cd071
+  karaoke-decide:cloudflareZoneId: 2324a342622e93343cf4e08227d82c02
