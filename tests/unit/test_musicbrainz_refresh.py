@@ -234,11 +234,20 @@ class TestModels:
         # Computed by MusicBrainz and only shipped in the derived archive.
         assert {"release_group_meta", "release_group_tag"} <= set(derived)
 
-    @pytest.mark.parametrize("model", ["mb_artist_credit_artists", "mb_release_groups", "mb_releases", "mb_tracks"])
+    @pytest.mark.parametrize(
+        "model", ["mb_artist_credit_artists", "mb_release_groups", "mb_releases", "mb_tracks", "mb_release_tracks"]
+    )
     def test_release_models_registered_with_bounds_and_canaries(self, model):
         assert model in sql.MODEL_ORDER
         assert sql.ROW_COUNT_BOUNDS[model] is not None
         assert any(f"{sql.S}.{model}`" in q for q in sql.CANARY_CHECKS.values())
+
+    def test_release_tracks_built_after_its_sources_and_clustered_by_release(self):
+        order = sql.MODEL_ORDER
+        assert order.index("mb_release_tracks") > order.index("mb_tracks")
+        assert order.index("mb_release_tracks") > order.index("mb_recordings")
+        assert "CLUSTER BY release_group_mbid, release_mbid" in sql.MODELS["mb_release_tracks"]
+        assert "recording_disambiguation" in sql.MODELS["mb_release_tracks"]
 
     def test_enriched_sql_shared_with_script(self):
         assert "CLUSTER BY name_normalized, artist_normalized" in sql.mb_recordings_enriched_sql("a.b", "a.c")

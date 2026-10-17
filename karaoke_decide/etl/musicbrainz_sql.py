@@ -511,6 +511,29 @@ MODELS: dict[str, str] = {
     LEFT JOIN `{S}.raw_medium_format` mf ON mf.c0 = md.c3
     LEFT JOIN `{S}.raw_artist_credit` ac ON ac.c0 = tr.c7
     """,
+    # mb_tracks re-clustered by release, plus the recording disambiguation, so
+    # "tracklist of this edition / album" reads a few MB instead of the ~9 GB a
+    # release_mbid filter on mb_tracks scans. Serves karaoke-gen's Bulk album
+    # mode (we never call the live MusicBrainz API).
+    "mb_release_tracks": f"""
+    CREATE OR REPLACE TABLE `{S}.mb_release_tracks`
+    CLUSTER BY release_group_mbid, release_mbid
+    AS
+    SELECT
+        t.release_group_mbid,
+        t.release_mbid,
+        t.medium_position,
+        t.medium_format,
+        t.track_position,
+        t.track_number,
+        t.title,
+        t.artist_credit,
+        t.length_ms,
+        t.recording_mbid,
+        r.disambiguation AS recording_disambiguation
+    FROM `{S}.mb_tracks` t
+    LEFT JOIN `{S}.mb_recordings` r USING (recording_mbid)
+    """,
 }
 
 MODEL_ORDER: list[str] = list(MODELS)
@@ -541,6 +564,8 @@ ROW_COUNT_BOUNDS: dict[str, tuple[float, float] | None] = {
     "mb_release_groups": (0.98, 1.25),
     "mb_releases": (0.98, 1.25),
     "mb_tracks": (0.98, 1.25),
+    # Same rows as mb_tracks. Missing prod (first run) skips the ratio check.
+    "mb_release_tracks": (0.98, 1.25),
 }
 
 # Sanity checks against staging. Each query returns one BOOL column ``ok`` and
@@ -641,6 +666,19 @@ CANARY_CHECKS: dict[str, str] = {
         FROM `{S}.mb_tracks` t
         JOIN `{S}.mb_release_groups` rg USING (release_group_mbid)
         WHERE t.recording_mbid = '70595637-9310-45f2-a266-58f8de4874a7'
+    """,
+    "ok_computer_release_tracks": f"""
+        -- 12-track original tracklist, in order, with every row carrying its recording.
+        SELECT COUNT(*) = 12 AND COUNTIF(recording_mbid IS NULL) = 0
+               AND ARRAY_AGG(title ORDER BY medium_position, track_position)[OFFSET(0)] = 'Airbag' AS ok,
+               FORMAT('rows=%d', COUNT(*)) AS detail
+        FROM `{S}.mb_release_tracks`
+        WHERE release_group_mbid = 'b1392450-e666-3926-a536-22c65f834433'
+          AND release_mbid = (
+              SELECT release_mbid FROM `{S}.mb_releases`
+              WHERE release_group_mbid = 'b1392450-e666-3926-a536-22c65f834433'
+                AND status = 'Official' AND track_count = 12
+              ORDER BY release_date, release_mbid LIMIT 1)
     """,
     "release_groups_unique": f"""
         SELECT COUNT(*) = COUNT(DISTINCT release_group_mbid) AS ok,
