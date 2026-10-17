@@ -234,7 +234,9 @@ class TestModels:
         # Computed by MusicBrainz and only shipped in the derived archive.
         assert {"release_group_meta", "release_group_tag"} <= set(derived)
 
-    @pytest.mark.parametrize("model", ["mb_artist_credit_artists", "mb_release_groups", "mb_releases", "mb_tracks", "mb_release_tracks"])
+    @pytest.mark.parametrize(
+        "model", ["mb_artist_credit_artists", "mb_release_groups", "mb_releases", "mb_tracks", "mb_release_tracks"]
+    )
     def test_release_models_registered_with_bounds_and_canaries(self, model):
         assert model in sql.MODEL_ORDER
         assert sql.ROW_COUNT_BOUNDS[model] is not None
