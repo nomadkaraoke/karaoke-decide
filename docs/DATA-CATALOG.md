@@ -87,6 +87,7 @@ Row counts as of dump `20260926-002121`; all rebuilt weekly by `mb-refresh`.
 | `mb_release_groups` | new (v0.11.0) | "Albums": every release group, with MB's own `first_release_date`, type, rating, tags |
 | `mb_releases` | new (v0.11.0) | Editions of each release group: earliest date, countries, labels, formats |
 | `mb_tracks` | new (v0.11.0) | Every track on every release (tracklists; recording → releases) |
+| `mb_release_tracks` | new (v0.14.0) | `mb_tracks` clustered by release + recording disambiguation: cheap tracklist-by-release lookups (karaoke-gen Bulk album mode) |
 | `mb_artist_credit_artists` | new (v0.11.0) | Artist credit → artist MBIDs (find releases/recordings by artist MBID) |
 | `mb_refresh_log` | — | One row per refresh run (dump, status, row counts, error) |
 | `isrc_spotify_mapping` | 17,012,103 | View: ISRC cross-reference |
@@ -392,6 +393,11 @@ track_count, barcode, disambiguation`.
 **`mb_tracks`** (clustered by `recording_mbid, release_mbid`): `track_mbid, recording_mbid,
 release_mbid, release_group_mbid, medium_position, medium_format, track_position, track_number,
 title, artist_credit, length_ms`.
+
+**`mb_release_tracks`** (clustered by `release_group_mbid, release_mbid`): the same rows as
+`mb_tracks` minus `track_mbid`, plus `recording_disambiguation`. Use it for "tracklist of this
+release/album": filtering on `release_group_mbid` (+ `release_mbid`) reads a few MB, versus
+~9 GB for a `release_mbid` filter on `mb_tracks`.
 
 **`mb_artist_credit_artists`** (clustered by `artist_mbid`): `artist_credit_id, position,
 artist_mbid, credited_name, join_phrase`.
