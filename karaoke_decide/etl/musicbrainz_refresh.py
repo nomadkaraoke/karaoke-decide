@@ -18,7 +18,8 @@ Runs as the ``mb-refresh`` Cloud Run Job (Cloud Scheduler, weekly). Steps:
              label each table with ``mb_dump=<dump_id>``.
 7. MIRROR    Best-effort: every dump table, typed, -> the ``musicbrainz``
              dataset (musicbrainz_mirror). Per-table failures keep last week's
-             copy and log an ERROR; they never fail the run.
+             copy and log a WARNING, plus ONE ERROR summary per run; they
+             never fail the run.
 8. LOG       ``karaoke_decide.mb_refresh_log``, delete staging.
 
 Usage:
@@ -237,20 +238,27 @@ def staged_tables(gcs: storage.Client, dump_id: str) -> set[str]:
     return names
 
 
-def create_empty_raw_table(bq: bigquery.Client, table: str, ncols: int) -> bool:
-    """Mirror-only table absent from the dump (MusicBrainz omits empty tables): load as empty."""
+def create_empty_raw_table(bq: bigquery.Client, table: str, ncols: int) -> str | None:
+    """Mirror-only table absent from the dump (MusicBrainz omits empty tables): load as empty.
+
+    Returns a failure reason, or None on success.
+    """
     dest = f"{sql.S}.raw_{table}"
     try:
         bq.delete_table(dest, not_found_ok=True)
         bq.create_table(bigquery.Table(dest, schema=raw_schema(ncols)))
     except Exception as e:  # noqa: BLE001 - mirror-only, best-effort
-        logger.error(f"MusicBrainz mirror: could not create empty {dest}, skipping {table}: {e}")
-        return False
-    return True
+        logger.warning(f"MusicBrainz mirror: could not create empty {dest}, skipping {table}: {e}")
+        return f"could not create empty raw table: {e}"
+    return None
 
 
-def load_raw_tables(bq: bigquery.Client, dump_id: str, present: set[str] | None = None) -> None:
-    """Load every extracted table. App tables must load; mirror-only failures are logged.
+def load_raw_tables(bq: bigquery.Client, dump_id: str, present: set[str] | None = None) -> dict[str, str]:
+    """Load every extracted table. App tables must load; mirror-only failures are returned.
+
+    Returns {table: reason} for mirror-only tables that did not load. Each is
+    logged as a WARNING; the mirror step reports them all in one ERROR summary
+    (one alert per bad run, not one per table).
 
     ``present`` = tables actually in GCS staging (None: assume all). Mirror-only
     tables missing from it are empty in MusicBrainz, which leaves them out of the
@@ -260,25 +268,30 @@ def load_raw_tables(bq: bigquery.Client, dump_id: str, present: set[str] | None 
     required = required_tables()
     jobs = []
     absent: list[str] = []
+    failures: dict[str, str] = {}
     for table, ncols in all_raw_tables().items():
         dest = f"{sql.S}.raw_{table}"
         if present is not None and table not in present and table not in required:
-            if create_empty_raw_table(bq, table, ncols):
+            if (reason := create_empty_raw_table(bq, table, ncols)) is None:
                 absent.append(table)
+            else:
+                failures[table] = reason
             continue
         if table not in required:
             # A failed WRITE_TRUNCATE load keeps the old table; never mirror a stale one.
             try:
                 bq.delete_table(dest, not_found_ok=True)
             except Exception as e:  # noqa: BLE001 - mirror-only, best-effort
-                logger.error(f"MusicBrainz mirror: could not clear {dest}, skipping {table}: {e}")
+                logger.warning(f"MusicBrainz mirror: could not clear {dest}, skipping {table}: {e}")
+                failures[table] = f"could not clear stale raw table: {e}"
                 continue
         try:
             job = bq.load_table_from_uri(gcs_uri(dump_id, table), dest, job_config=raw_load_config(ncols))
         except Exception as e:  # noqa: BLE001 - classified below
             if table in required:
                 raise RefreshError(f"Load into {dest} failed to start: {e}") from e
-            logger.error(f"MusicBrainz mirror: load of {table} failed to start: {e}")
+            logger.warning(f"MusicBrainz mirror: load of {table} failed to start: {e}")
+            failures[table] = f"load failed to start: {e}"
             continue
         jobs.append((table, dest, job))
     for table, dest, job in jobs:
@@ -287,11 +300,13 @@ def load_raw_tables(bq: bigquery.Client, dump_id: str, present: set[str] | None 
         except Exception as e:  # noqa: BLE001 - classified below
             if table in required:
                 raise RefreshError(f"Load into {dest} failed: {e}") from e
-            logger.error(f"MusicBrainz mirror: load of {table} failed (schema change?): {e}")
+            logger.warning(f"MusicBrainz mirror: load of {table} failed (schema change?): {e}")
+            failures[table] = f"load failed (schema change?): {e}"
             continue
         logger.info(f"Loaded {dest}: {bq.get_table(dest).num_rows:,} rows")
     if absent:
         logger.info(f"{len(absent)} tables not in the dump (empty in MusicBrainz), mirrored as empty: {absent}")
+    return failures
 
 
 def build_models(bq: bigquery.Client) -> None:
@@ -332,10 +347,10 @@ def publish(bq: bigquery.Client, state: RunState) -> None:
     common.publish_tables(bq, sql.MODEL_ORDER, sql.S, sql.P, "mb_dump", state.dump_id)
 
 
-def publish_mirror(bq: bigquery.Client, state: RunState) -> None:
+def publish_mirror(bq: bigquery.Client, state: RunState, load_failures: dict[str, str] | None = None) -> None:
     """Best-effort full mirror; runs after the app tables are live and never raises."""
     try:
-        result = mirror.build_and_publish(bq, state.dump_id, state.schema_sequence)
+        result = mirror.build_and_publish(bq, state.dump_id, state.schema_sequence, load_failures=load_failures)
     except Exception:  # noqa: BLE001 - must not fail an already-published refresh
         logger.exception("MusicBrainz mirror failed; app tables are published, musicbrainz.* left as-is")
         return
@@ -388,11 +403,12 @@ def run(
         logger.info(f"Dump {state.dump_id} already published; nothing to do")
         return 0
 
+    load_failures: dict[str, str] = {}
     try:
         if not skip_extract:
             if not reuse_gcs:
                 extract_dump_to_gcs(http, gcs, state)
-            load_raw_tables(bq, state.dump_id, present=staged_tables(gcs, state.dump_id))
+            load_failures = load_raw_tables(bq, state.dump_id, present=staged_tables(gcs, state.dump_id))
         build_models(bq)
         validate(bq, state)
         if not do_publish:
@@ -403,7 +419,7 @@ def run(
         log.write(state, common.log_status(e), f"{e}\n{traceback.format_exc()}")
         raise
     if do_mirror:
-        publish_mirror(bq, state)
+        publish_mirror(bq, state, load_failures)
     log.write(state, "success")
     cleanup_staging(bq, gcs, state.dump_id)
     logger.info(f"MusicBrainz refresh complete: {state.dump_id}")

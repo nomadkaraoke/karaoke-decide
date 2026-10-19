@@ -13,8 +13,10 @@ musicbrainz-server sources by ``scripts/gen_musicbrainz_schema.py``.
 
 The mirror is best-effort per table and never blocks the app tables: it runs
 after they are published, and a table that fails to load, build or validate
-keeps last week's copy and is reported with an ERROR log (so the error
-monitor alerts) instead of failing the run.
+keeps last week's copy instead of failing the run. Each such table gets a
+WARNING with the details, then the run logs ONE ERROR summarising them all, so
+the error monitor (which alerts on every new ERROR pattern) raises one alert
+per bad run rather than one per table.
 """
 
 from __future__ import annotations
@@ -39,8 +41,16 @@ STAGING_PREFIX = "mbx_"  # typed staging copy: musicbrainz_staging.mbx_<table>
 BUILD_WORKERS = 8
 MAX_BYTES_TABLE = 80 * GIB
 # A table may shrink a little week to week (deletes/merges); a big drop means a
-# broken extract/load, so keep last week's copy instead.
+# broken extract/load, so keep last week's copy instead. A drop must be large
+# both relatively and absolutely: tiny tables (l_artist_genre has ~6 rows)
+# routinely lose a few rows to ordinary edits, and because a kept table is
+# compared against the same stale copy next week, a false positive there would
+# alert every week forever.
 MIN_ROW_RATIO = 0.9
+MIN_ROW_DROP = 50
+# Bounds on the run summary so one ERROR stays readable.
+SUMMARY_MAX_TABLES = 25
+SUMMARY_MAX_ERROR_CHARS = 300
 
 # PostgreSQL COPY text decoding without pg()'s ''->NULL: the mirror keeps
 # MusicBrainz values verbatim (e.g. comment = '').
@@ -136,28 +146,61 @@ def check_rows(new: int | None, old: int | None) -> str | None:
     """Row-count sanity vs the published copy; None = OK."""
     if new is None:
         return "staging table missing"
-    if old and new < old * MIN_ROW_RATIO:
-        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%})"
+    if old and new < old * MIN_ROW_RATIO and old - new >= MIN_ROW_DROP:
+        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%}, -{old - new:,})"
     return None
 
 
-def build_and_publish(bq: bigquery.Client, dump_id: str, schema_sequence: str | None = None) -> MirrorResult:
-    """Build every mirror table from the loaded raw tables and publish the good ones."""
+def summary_error(skipped: dict[str, str], total: int, schema_hint: str | None = None) -> str:
+    """One ERROR line for every table this run kept from last week."""
+    names = sorted(skipped)
+    shown = ", ".join(names[:SUMMARY_MAX_TABLES])
+    if len(names) > SUMMARY_MAX_TABLES:
+        shown += f", ... and {len(names) - SUMMARY_MAX_TABLES} more"
+    first = names[0]
+    reason = skipped[first]
+    if len(reason) > SUMMARY_MAX_ERROR_CHARS:
+        reason = reason[:SUMMARY_MAX_ERROR_CHARS] + "..."
+    message = (
+        f"MusicBrainz mirror: {len(names)} of {total} tables failed and kept the previous copy in "
+        f"{MIRROR_DATASET}: {shown} (first error, {first}: {reason}). "
+        "Per-table details are in this run's WARNING logs."
+    )
+    return f"{message} {schema_hint}" if schema_hint else message
+
+
+def build_and_publish(
+    bq: bigquery.Client,
+    dump_id: str,
+    schema_sequence: str | None = None,
+    load_failures: dict[str, str] | None = None,
+) -> MirrorResult:
+    """Build every mirror table from the loaded raw tables and publish the good ones.
+
+    ``load_failures`` = {table: reason} from the raw load step, so a table that
+    never loaded is reported with its real cause, not "raw table not loaded".
+    """
     result = MirrorResult()
+    load_failures = load_failures or {}
     tables = {t: cols for archive in mirror_tables().values() for t, cols in archive.items()}
+    schema_hint = None
     if schema_sequence and str(schema()["schema_sequence"]) != str(schema_sequence).strip():
-        logger.error(
+        schema_hint = (
             f"MusicBrainz SCHEMA_SEQUENCE is {schema_sequence} but musicbrainz_schema.json is for "
             f"{schema()['schema_sequence']}; tables whose shape changed will be skipped. "
             "Re-run scripts/gen_musicbrainz_schema.py."
         )
+        logger.warning(schema_hint)
 
     with ThreadPoolExecutor(max_workers=BUILD_WORKERS) as pool:
         failures = dict(zip(tables, pool.map(lambda t: _build_one(bq, t, tables[t]), tables), strict=True))
 
     copy_cfg = bigquery.CopyJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE)
     for table in tables:
-        reason = failures[table] or check_rows(
+        reason = failures[table]
+        if reason is not None and table in load_failures:
+            reason = load_failures[table]
+        reason = reason or check_rows(
             num_rows(bq, f"{sql.S}.{STAGING_PREFIX}{table}"), num_rows(bq, f"{MIRROR_DATASET}.{table}")
         )
         if reason is None:
@@ -171,12 +214,13 @@ def build_and_publish(bq: bigquery.Client, dump_id: str, schema_sequence: str | 
                 _label(bq, dest, dump_id)
                 continue
         result.skipped[table] = reason
-        logger.error(f"MusicBrainz mirror: kept previous musicbrainz.{table} ({reason})")
+        logger.warning(f"MusicBrainz mirror: kept previous musicbrainz.{table} ({reason})")
 
-    logger.info(
-        f"MusicBrainz mirror: published {len(result.published)}/{len(tables)} tables to {MIRROR_DATASET}"
-        + (f"; skipped {sorted(result.skipped)}" if result.skipped else "")
-    )
+    logger.info(f"MusicBrainz mirror: published {len(result.published)}/{len(tables)} tables to {MIRROR_DATASET}")
+    if result.skipped:
+        logger.error(summary_error(result.skipped, len(tables), schema_hint))
+    elif schema_hint:
+        logger.error(schema_hint)
     return result
 
 
