@@ -29,8 +29,9 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Health check. The search service (karaoke-decide-search) runs this same image with
-# HEALTHCHECK_PATH=/api/search/health.
+# Health check for local `docker run` only (Cloud Run ignores Docker HEALTHCHECK and uses
+# its own probes). Nothing sets HEALTHCHECK_PATH; the search service (same image, different
+# command) is probed on /api/search/health by Cloud Run.
 ENV HEALTHCHECK_PATH=/api/health
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f "http://localhost:8000${HEALTHCHECK_PATH}" || exit 1

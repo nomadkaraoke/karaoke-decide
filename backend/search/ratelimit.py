@@ -18,6 +18,9 @@ from fastapi import HTTPException, Request
 
 DEVICE_HEADER = "X-Device-Id"
 CF_IP_HEADER = "CF-Connecting-IP"
+# Set by the Cloudflare Worker (non-cf name: Cloudflare may overwrite CF-Connecting-IP on
+# the Worker's subrequest to run.app).
+CLIENT_IP_HEADER = "X-Nomad-Client-IP"
 # Device ids are client-chosen; anything longer is truncated before keying.
 MAX_DEVICE_ID_CHARS = 128
 
@@ -128,10 +131,11 @@ def device_id(request: Request) -> str | None:
 
 
 def client_ip(request: Request) -> str | None:
-    """Cloudflare's client IP when proxied through the Worker, else the socket peer."""
-    value = (request.headers.get(CF_IP_HEADER) or "").strip()
-    if value:
-        return value
+    """The Worker's X-Nomad-Client-IP, else CF-Connecting-IP, else the socket peer."""
+    for header in (CLIENT_IP_HEADER, CF_IP_HEADER):
+        value = (request.headers.get(header) or "").strip()
+        if value:
+            return value
     return request.client.host if request.client else None
 
 

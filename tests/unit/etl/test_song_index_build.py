@@ -507,6 +507,19 @@ def test_repeated_gate_failure_alerts_once(
     assert len(_errors(caplog)) == 1
 
 
+def test_main_exit_code_first_failure_1_repeat_0(
+    store: FakeStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only a first-time failure fails the Cloud Run task; a repeat is already alerted."""
+    monkeypatch.setattr(sib.song_eval, "dual_eval", lambda _c, _o, cases: _dual(len(cases), 50))
+    monkeypatch.setattr(sib, "GcsStore", lambda *_a, **_k: store)
+    monkeypatch.setattr(sib, "CloudRunAdmin", lambda *_a, **_k: FakeAdmin())
+    monkeypatch.setattr(sib, "_storage_client", lambda: None)
+    monkeypatch.setattr(sib.common, "configure_logging", lambda: None)
+    assert sib.main(["run", "--workdir", str(tmp_path / "a")]) == 1
+    assert sib.main(["run", "--workdir", str(tmp_path / "b")]) == 0
+
+
 def test_download_stage_reaches_manifest_build_stats(
     published: tuple[FakeStore, FakeAdmin, dict[str, Any]],
 ) -> None:

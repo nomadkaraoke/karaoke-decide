@@ -66,9 +66,19 @@ test("defaults apply without env bindings", async () => {
 test("search requests keep the client IP for rate limiting; main API requests drop it", async () => {
   await get("/api/search?q=x", { "cf-connecting-ip": "203.0.113.9", "cf-ray": "r" });
   await get("/api/health", { "cf-connecting-ip": "203.0.113.9" });
-  assert.equal(calls[0].headers.get("cf-connecting-ip"), "203.0.113.9");
+  assert.equal(calls[0].headers.get("x-nomad-client-ip"), "203.0.113.9");
   assert.equal(calls[0].headers.get("cf-ray"), null);
+  assert.equal(calls[1].headers.get("x-nomad-client-ip"), null);
   assert.equal(calls[1].headers.get("cf-connecting-ip"), null);
+});
+
+test("a client-supplied X-Nomad-Client-IP is overwritten (search) or dropped (main API)", async () => {
+  await get("/api/search?q=x", { "cf-connecting-ip": "203.0.113.9", "x-nomad-client-ip": "6.6.6.6" });
+  await get("/api/search?q=x", { "x-nomad-client-ip": "6.6.6.6" });
+  await get("/api/health", { "x-nomad-client-ip": "6.6.6.6" });
+  assert.equal(calls[0].headers.get("x-nomad-client-ip"), "203.0.113.9");
+  assert.equal(calls[1].headers.get("x-nomad-client-ip"), null);
+  assert.equal(calls[2].headers.get("x-nomad-client-ip"), null);
 });
 
 test("proxied responses lose backend CORS headers", async () => {

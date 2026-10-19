@@ -63,7 +63,7 @@ Useful for post-deploy verification and scheduled monitoring.
 
 ## Song search ✅ Implemented
 
-Served by the separate `karaoke-decide-search` Cloud Run service (`backend/search/app.py`). The Worker routes `/api/search` and `/api/search/*` there; every other `/api/*` path goes to the main API. No auth. Clients send `X-Device-Id`, which is used for rate limits.
+Served by the separate `karaoke-decide-search` Cloud Run service (`backend/search/app.py`). The Worker routes `/api/search` and `/api/search/*` there; every other `/api/*` path goes to the main API. No auth. Clients send `X-Device-Id`, which is used for rate limits; the per-IP limit uses the `X-Nomad-Client-IP` header the Worker sets from `CF-Connecting-IP` (client-supplied values are overwritten). OpenAPI: `/api/search/openapi.json`; Swagger UI: `/api/search/docs` (both reachable through the Worker).
 
 **Rate limits:**
 - Search endpoints: 300 requests per device and 1,500 per IP, per 5 minutes.

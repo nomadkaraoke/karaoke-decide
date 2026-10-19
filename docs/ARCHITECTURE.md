@@ -70,7 +70,7 @@ Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
 - Cloud Run URL not exposed to users
 - Can add edge caching/rate limiting in future
 
-The same Worker also routes `/api/search` and `/api/search/*` to the search service (`SEARCH_BACKEND_URL`), keeping the client's `CF-Connecting-IP` for its per-IP rate limit. It also serves `decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz` as an edge-cached (7-day) passthrough to the public `nomadkaraoke-song-index-public` bucket. Only that exact path shape is fetched; anything else under `/offline-index/` is a 404. See [Song search](#song-search).
+The same Worker also routes `/api/search` and `/api/search/*` to the search service (`SEARCH_BACKEND_URL`), passing the client IP in a non-cf `X-Nomad-Client-IP` header (Cloudflare can overwrite `CF-Connecting-IP` on the subrequest to run.app) for its per-IP rate limit; the Worker overwrites any client-supplied value, and the backend prefers it over `CF-Connecting-IP`, then the socket peer. It also serves `decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz` as an edge-cached (7-day) passthrough to the public `nomadkaraoke-song-index-public` bucket. Only that exact path shape is fetched; anything else under `/offline-index/` is a 404. See [Song search](#song-search).
 
 **Configuration:** Managed via Pulumi in `infrastructure/__main__.py`, which deploys `infrastructure/cloudflare-worker/api-proxy.js` as-is. Routing tests: `infrastructure/cloudflare-worker/api-proxy.test.mjs`. See `infrastructure/cloudflare-worker/README.md` for setup.
 
@@ -124,7 +124,7 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
   - Before a `pulumi up` that changes this service, run `pulumi refresh`. Otherwise Pulumi sends the stale env from its state, which drops `SONG_INDEX_RUN`. The new revision would then load `latest.json`, which is the same index unless a build's rollout was pinned or failed. Traffic is never changed by Pulumi (`traffics` is ignored).
 - **First rollout (bootstrap).** The service can't pass `/ready` until an index exists. So:
   1. Run `pulumi up -c searchServiceEnabled=false`. This creates everything except the service.
-  2. Run the job once with `--no-deploy`. It publishes and writes `latest.json` without a rollout.
+  2. Run the job once with `--no-deploy` immediately after phase 1, before the scheduler's next 13:30 UTC run (or first pause it: `gcloud scheduler jobs pause song-index-build-scheduler --location us-central1`, and resume afterwards). It publishes and writes `latest.json` without a rollout; a scheduled run before the service exists would try a rollout and fail.
   3. Run `pulumi config rm searchServiceEnabled && pulumi up`.
 
   Until the service exists, CI skips its search deploy and job-image steps with a warning.

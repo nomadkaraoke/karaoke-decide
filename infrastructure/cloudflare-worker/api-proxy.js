@@ -99,9 +99,12 @@ export default {
     headers.delete("cf-ipcountry");
     headers.delete("cf-ray");
     headers.delete("cf-visitor");
+    // Never trust a client-supplied value.
+    headers.delete("x-nomad-client-ip");
     if (search && clientIp) {
-      // The search service rate-limits per client IP (backend/search/ratelimit.py).
-      headers.set("cf-connecting-ip", clientIp);
+      // The search service rate-limits per client IP (backend/search/ratelimit.py). Cloudflare
+      // may overwrite CF-Connecting-IP on this subrequest to run.app, so pass a non-cf header.
+      headers.set("x-nomad-client-ip", clientIp);
     }
 
     // Forward the request to Cloud Run

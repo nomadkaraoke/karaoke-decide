@@ -533,9 +533,10 @@ def _gate_message(run: str, failures: list[str], serving: str | None) -> str:
     )
 
 
-def _report(storage: Storage | None, key: str, message: str) -> None:
+def _report(storage: Storage | None, key: str, message: str) -> bool:
     """Log ``message`` as the run's one ERROR the first time ``key`` fails; INFO on
-    repeats (recorded in ``REPORTED_FAILURES``), so one root cause pages once."""
+    repeats (recorded in ``REPORTED_FAILURES``), so one root cause pages once.
+    Returns True when this call was the first report (the task should exit non-zero)."""
     state: dict[str, Any] = {}
     if storage is not None:
         try:
@@ -544,16 +545,17 @@ def _report(storage: Storage | None, key: str, message: str) -> None:
             logger.warning(f"Can't read gs://{INDEX_BUCKET}/{REPORTED_FAILURES}: {exc}")
     if key in state:
         logger.info(f"Already reported {state[key]}: {message}")
-        return
+        return False
     logger.error(message)
     if storage is None:
-        return
+        return True
     state[key] = datetime.now(UTC).isoformat(timespec="seconds")
     state = dict(sorted(state.items(), key=lambda kv: str(kv[1]))[-REPORTED_FAILURES_KEEP:])
     try:
         storage.upload_bytes(INDEX_BUCKET, REPORTED_FAILURES, json.dumps(state).encode(), content_type=_CT_JSON)
     except Exception as exc:  # noqa: BLE001
         logger.warning(f"Can't record the failure in gs://{INDEX_BUCKET}/{REPORTED_FAILURES}: {exc}")
+    return True
 
 
 def _prune(storage: Storage, keep: set[str]) -> None:
@@ -611,8 +613,8 @@ def build_and_publish(
     failures = gate_failures(manifest["eval"], manifest["dual_eval"], (prev or {}).get("eval"))
     if failures:
         key = f"gate:{run}:{json.dumps(VERSIONS, sort_keys=True)}"
-        _report(storage, key, _gate_message(run, failures, serving))
-        return {"published": False, "run": run, "token": token, "failures": failures}
+        first = _report(storage, key, _gate_message(run, failures, serving))
+        return {"published": False, "run": run, "token": token, "failures": failures, "already_reported": not first}
 
     run_dir = f"{INDEX_PREFIX}/{index_run}"
     for name in SERVER_FILES:
@@ -639,7 +641,7 @@ def build_and_publish(
     rollout = run_admin.set_env(INDEX_RUN_ENV, index_run)
     if not rollout.serving:
         pinned = ", ".join(rollout.pinned) or "an older revision"
-        _report(
+        first = _report(
             storage,
             f"pinned:{','.join(sorted(rollout.pinned))}",
             f"song-index-build: {SEARCH_SERVICE} traffic is pinned to {pinned}; new index {index_run} is "
@@ -647,7 +649,8 @@ def build_and_publish(
             f"To serve it: gcloud run services update-traffic {SEARCH_SERVICE} --to-latest "
             f"--region {REGION}.",
         )
-        return {"published": False, "run": run, "token": token, "index_run": index_run, "pinned": rollout.pinned}
+        return {"published": False, "run": run, "token": token, "index_run": index_run, "pinned": rollout.pinned,
+                "already_reported": not first}
     storage.upload_bytes(
         INDEX_BUCKET, INDEX_LATEST, json.dumps({"run": run, "token": token}).encode(), content_type=_CT_JSON
     )
@@ -753,7 +756,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.exception(f"song-index-build failed; search keeps serving its current index: {exc}")
         return 1
     logger.info(f"song-index-build finished {datetime.now(UTC):%Y-%m-%d %H:%M} UTC: {json.dumps(out)}")
-    return 0 if out.get("published") or out.get("skipped") else 1
+    # A repeat of an already-alerted failure exits 0 so Cloud Run's task-failure log
+    # doesn't page again every day; a first-time failure or a crash exits 1.
+    return 0 if out.get("published") or out.get("skipped") or out.get("already_reported") else 1
 
 
 if __name__ == "__main__":

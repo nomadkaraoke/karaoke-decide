@@ -275,7 +275,7 @@ def create_search_app(
         lifespan=lifespan,
         docs_url="/api/search/docs",
         redoc_url=None,
-        openapi_url="/openapi.json",
+        openapi_url="/api/search/openapi.json",
     )
     app.state.search = SearchState()
     app.add_middleware(

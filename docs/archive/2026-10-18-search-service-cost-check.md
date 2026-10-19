@@ -57,7 +57,7 @@ Derived directly from the billing rows above (agree with public Cloud Run us-cen
 
 - Services, request-based: CPU $0.000024 per vCPU-s (2.5697 / 107,083); memory $0.0000025 per GiB-s; requests $0.40 per million after 2 M free/month.
 - Jobs: CPU $0.000018 per vCPU-s (observed $1.79999e-5); memory $0.000002 per GiB-s (observed 1.8625e-15 per byte-s).
-- Monthly free tier (180k vCPU-s, 360k GiB-s, 2 M requests) is already consumed by gen + decide (about 270k vCPU-s/month), so new usage is costed at full price below (conservative).
+- Monthly free tier (180k vCPU-s, 360k GiB-s, 2 M requests) is largely consumed by gen + decide on the CPU/memory side (about 270k vCPU-s/month; their requests total only ~480k/month, well under the 2 M free requests), so new CPU/memory usage is costed at full price below (conservative).
 
 ## Ping volume (corrected after review)
 
@@ -72,7 +72,7 @@ Per month (30 days). Searches 5,000 x 0.2 s = 1,000 s; cold starts 1/day x 30 s 
 | Scenario | Probes/month | Ping s | Total billed s (1 vCPU, 4 GiB) | CPU $ | Memory $ | Requests $ (if charged, $0.40/M) | Service total |
 |---|---|---|---|---|---|---|---|
 | Nominal, 6 regions (default) | 259,200 | 2,592 | 4,492 | 0.108 | 0.045 | 0.106 (likely free) | **$0.15 (to $0.26)** |
-| Pessimistic, 6 regions | 259,200 | 25,920 | 27,820 | 0.668 | 0.278 | 0.106 | **$0.95 (0.95 incl. requests)** |
+| Pessimistic, 6 regions | 259,200 | 25,920 | 27,820 | 0.668 | 0.278 | 0.106 | **$0.95 (to $1.06 incl. requests)** |
 | Nominal, 3 regions | 129,600 | 1,296 | 3,196 | 0.077 | 0.032 | 0.054 | **$0.11 (to $0.16)** |
 | Pessimistic, 3 regions | 129,600 | 12,960 | 14,860 | 0.357 | 0.149 | 0.054 | **$0.51 (to $0.56)** |
 

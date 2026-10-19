@@ -289,7 +289,7 @@ def test_health_is_not_rate_limited(client: TestClient) -> None:
 
 
 def test_openapi_names_the_contract_models(client: TestClient) -> None:
-    schemas = client.get("/openapi.json").json()["components"]["schemas"]
+    schemas = client.get("/api/search/openapi.json").json()["components"]["schemas"]
     for name in (
         "SearchResponse",
         "Identification",
