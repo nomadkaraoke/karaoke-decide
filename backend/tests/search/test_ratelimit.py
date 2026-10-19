@@ -134,3 +134,24 @@ def test_api_default_device_limit_is_300(client: TestClient) -> None:
     for _ in range(300):
         assert client.get("/api/search/popular", params={"limit": 1}, headers=h).status_code == 200
     assert client.get("/api/search/popular", params={"limit": 1}, headers=h).status_code == 429
+
+
+def _req(headers: dict[str, str], peer: str | None = "10.0.0.1"):
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+        "client": (peer, 1234) if peer else None,
+    }
+    return Request(scope)
+
+
+def test_client_ip_prefers_worker_header_then_cf_then_peer() -> None:
+    from backend.search.ratelimit import client_ip
+
+    both = _req({"X-Nomad-Client-IP": "1.1.1.1", "CF-Connecting-IP": "2.2.2.2"})
+    assert client_ip(both) == "1.1.1.1"
+    assert client_ip(_req({"CF-Connecting-IP": "2.2.2.2"})) == "2.2.2.2"
+    assert client_ip(_req({})) == "10.0.0.1"
+    assert client_ip(_req({}, peer=None)) is None

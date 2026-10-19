@@ -649,8 +649,14 @@ def build_and_publish(
             f"To serve it: gcloud run services update-traffic {SEARCH_SERVICE} --to-latest "
             f"--region {REGION}.",
         )
-        return {"published": False, "run": run, "token": token, "index_run": index_run, "pinned": rollout.pinned,
-                "already_reported": not first}
+        return {
+            "published": False,
+            "run": run,
+            "token": token,
+            "index_run": index_run,
+            "pinned": rollout.pinned,
+            "already_reported": not first,
+        }
     storage.upload_bytes(
         INDEX_BUCKET, INDEX_LATEST, json.dumps({"run": run, "token": token}).encode(), content_type=_CT_JSON
     )
