@@ -1,0 +1,275 @@
+# Vendored from kjbox kj-controller/text_normalize.py @ 8973e4b; keep in step (parity tests in tests/unit/song_search/).
+"""Single source of truth for song-text normalization.
+
+Pure functions (no Flask / SQLite). The same pipeline is applied to indexed
+catalog text AND to user queries so both meet in one canonical space. A JS twin
+(static/text_normalize.js) mirrors this exactly and is verified by a parity test.
+
+Two flavours, differing only in step 3:
+  * ``normalize`` — SEARCH text (indexes + queries). Drops just the word
+    feat./ft./featuring and KEEPS the featured artist, so "hayley stay the
+    night" finds "Zedd feat. Hayley Williams - Stay the Night" (the remote
+    Divebar/KN Cloud Function matches the same way).
+  * ``identity_normalize`` — SONG IDENTITY (grouping keys, persisted play-stats
+    ``song_key``, same-song joins). Strips the whole feat clause so
+    "Zedd feat. X" and "Zedd" are one song.
+
+Pipeline order (order matters):
+  1. Unicode NFD + strip combining marks + Latin special-char fold
+  2. lowercase
+  3. feat./ft./featuring: drop the word (search) / the whole clause (identity)
+  4. expand symbol conjunctions  &  +  -> " and "
+  5. drop apostrophes; replace remaining punctuation with space
+  6. token-level word abbreviations (pt->part, vs->versus, ...)
+  7. number canonicalization: words/roman -> digits, with tens+ones adjacency
+"""
+
+import re
+import unicodedata
+
+# Bump whenever the pipeline or any map changes; gates catalog reindex.
+NORMALIZER_VERSION = 3
+
+# Version of the INDEXED search text (``index_text``): NORMALIZER_VERSION plus
+# the index-only augmentation revision. Stamped by the FTS indexes (external
+# catalog, catalog mirror) instead of NORMALIZER_VERSION so an index-side change
+# reindexes them without invalidating song_id.db (which keys off
+# NORMALIZER_VERSION alone). Bump the suffix when ``index_text`` changes.
+SEARCH_INDEX_VERSION = f"{NORMALIZER_VERSION}.1"
+
+# Non-decomposable Latin chars that NFD cannot handle.
+LATIN_SPECIAL_MAP = {
+    "ø": "o",
+    "Ø": "o",
+    "æ": "ae",
+    "Æ": "ae",
+    "ß": "ss",
+    "ð": "d",
+    "Ð": "d",
+    "ł": "l",
+    "Ł": "l",
+    "ı": "i",
+    "đ": "d",
+    "Đ": "d",
+    "þ": "th",
+    "Þ": "th",
+}
+_LATIN_SPECIAL_RE = re.compile("[" + re.escape("".join(LATIN_SPECIAL_MAP)) + "]")
+
+
+# feat./ft./featuring qualifier; stops at a closing bracket or end of string.
+# \b: only a whole word "ft" — without it "Soft Cell" normalized to "so", "Hayloft II"
+# to "haylo", "Taylor Swift" to "taylor swi" (fixed in NORMALIZER_VERSION 2).
+# Identity only: the clause runs to a closing bracket or END OF STRING, so it must
+# never be applied to search text (it ate "... Hayley Williams Stay the Night" from
+# concatenated "artist title" index text — fixed in NORMALIZER_VERSION 3).
+_FEAT_RE = re.compile(
+    r"\s*[\[(]?\s*\b(?:feat\.?|ft\.?|featuring)\s+[^\])]+[\])]?",
+    re.IGNORECASE,
+)
+# Search: just the feat word (followed by whitespace), names kept.
+_FEAT_WORD_RE = re.compile(r"\b(?:feat\.?|ft\.?|featuring)(?=\s)", re.IGNORECASE)
+_SYMBOL_AND_RE = re.compile(r"\s*[&+]\s*")
+_APOS_RE = re.compile("[‘’ʼ`']+")
+_PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
+
+
+def _strip_accents(text: str) -> str:
+    s = unicodedata.normalize("NFD", text)
+    # Strip U+0300–U+036F combining marks. Kept as an explicit range (not a
+    # category check) so static/text_normalize.js can mirror it exactly.
+    s = re.sub(r"[̀-ͯ]", "", s)
+    s = _LATIN_SPECIAL_RE.sub(lambda m: LATIN_SPECIAL_MAP[m.group()], s)
+    return s
+
+
+def normalize(text: str | None) -> str:
+    """Canonical SEARCH text for `text` (featured artists kept)."""
+    return _normalize(text, _FEAT_WORD_RE)
+
+
+def identity_normalize(text: str | None) -> str:
+    """Canonical SONG-IDENTITY text for `text` (feat clause stripped)."""
+    return _normalize(text, _FEAT_RE)
+
+
+def _normalize(text: str | None, feat_re: re.Pattern[str]) -> str:
+    if not text:
+        return ""
+    s = _strip_accents(text)
+    s = s.lower()
+    s = feat_re.sub(" ", s)
+    s = _SYMBOL_AND_RE.sub(" and ", s)
+    s = _APOS_RE.sub("", s)
+    s = _PUNCT_RE.sub(" ", s)
+    toks = s.split()
+    toks = [ABBREV_MAP.get(t, t) for t in toks]
+    toks = _canonicalize_numbers(toks)
+    return " ".join(toks)
+
+
+def tokens(text: str | None) -> list[str]:
+    """Return the canonical token list for `text`."""
+    n = normalize(text)
+    return n.split() if n else []
+
+
+# Conservative whole-token abbreviations (avoid ambiguous single letters).
+ABBREV_MAP = {
+    "pt": "part",
+    "pts": "parts",
+    "vs": "versus",
+}
+
+NUMBER_WORDS = {
+    "zero": 0,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "sixty": 60,
+    "seventy": 70,
+    "eighty": 80,
+    "ninety": 90,
+}
+
+# Exclude ambiguous standalone i/v/x/l/c/d/m.
+ROMAN_NUMERALS = {
+    "ii": 2,
+    "iii": 3,
+    "iv": 4,
+    "vi": 6,
+    "vii": 7,
+    "viii": 8,
+    "ix": 9,
+}
+
+_TENS = {20, 30, 40, 50, 60, 70, 80, 90}
+
+
+def _canonicalize_numbers(toks: list[str]) -> list[str]:
+    out = []
+    i = 0
+    n = len(toks)
+    while i < n:
+        t = toks[i]
+        val = NUMBER_WORDS.get(t)
+        if val is None:
+            val = ROMAN_NUMERALS.get(t)
+        if val is None:
+            out.append(t)
+            i += 1
+            continue
+        # tens + ones adjacency: "twenty one" -> 21
+        if val in _TENS and i + 1 < n:
+            ones = NUMBER_WORDS.get(toks[i + 1])
+            if ones is not None and 1 <= ones <= 9:
+                val += ones
+                i += 1
+        out.append(str(val))
+        i += 1
+    return out
+
+
+def joined_forms(norm_text: str | None) -> list[str]:
+    """Adjacent token pairs of already-normalized text, joined into one word.
+
+    Titles like "(Over)Thinking", "Over, Thinking" or "AC/DC" normalize to two
+    tokens, so a singer typing the run-together form ("overthinking", "acdc",
+    "blink182") would miss them. Indexing every adjacent pair as one extra
+    token makes those queries hit. Pairs that already equal a token are skipped.
+    """
+    toks = norm_text.split() if norm_text else []
+    seen = set(toks)
+    out = []
+    for a, b in zip(toks, toks[1:]):
+        j = a + b
+        if j not in seen:
+            seen.add(j)
+            out.append(j)
+    return out
+
+
+def index_text(text: str | None, title: str | None = None) -> str:
+    """Canonical text for the INDEXED side of a search (never the query).
+
+    ``normalize(text)`` followed by its ``joined_forms``, so both "over
+    thinking" and "overthinking" find "(Over)Thinking". Queries stay plain
+    ``normalize`` — feeding them through here would AND in the joined tokens.
+
+    Decide extension (not in kjbox): ``index_text(artist, title)`` indexes each
+    field separately (so joined forms never straddle artist/title and featured
+    names are kept per field) and concatenates the two.
+    """
+    if title is not None:
+        return " ".join(p for p in (index_text(text), index_text(title)) if p)
+    n = normalize(text)
+    extra = joined_forms(n)
+    return n + " " + " ".join(extra) if extra else n
+
+
+def fts_match_query(text: str | None) -> str:
+    """Build an FTS5-safe MATCH string from canonical tokens.
+
+    Each term quoted; last term prefix-matched. "" if no tokens.
+    """
+    toks = tokens(text)
+    if not toks:
+        return ""
+    quoted = [f'"{t}"' for t in toks[:-1]]
+    quoted.append(f'"{toks[-1]}"*')
+    return " ".join(quoted)
+
+
+def group_key(artist: str | None, title: str | None) -> str:
+    """Deterministic (artist, title) -> collapse key for grouping results.
+
+    Also the persisted play-stats ``song_key`` — never change its output
+    without migrating stored keys. Result grouping that should ignore
+    file-quality tags uses ``result_group_key``.
+    """
+    return f"{identity_normalize(artist)}|||{identity_normalize(title)}"
+
+
+def song_key(artist: str | None, title: str | None) -> str:
+    """Song identity across decide/mobile: ``identity_normalize`` of each field
+    joined by a single ``|`` (feat clause stripped from both)."""
+    return f"{identity_normalize(artist)}|{identity_normalize(title)}"
+
+
+# Bracketed file-quality tags that karaoke filenames carry on the artist or
+# title ("Fall Out Boy (MPX)", "Dance, Dance [HM]"). They describe the file,
+# not the song, so they must not split a song into its own search-result
+# group. Musical qualifiers like "(Live)" are deliberately NOT here.
+_FILE_TAG_RE = re.compile(
+    r"\s*[\[(]\s*(?:mpx|multiplex|hm|homemade)\s*[\])]",
+    re.IGNORECASE,
+)
+# Decide extension (not in kjbox): public name for the song-id merge key
+# (build_song_id.merge_key) and the availability index.
+FILE_TAG_RE = _FILE_TAG_RE
+
+
+def result_group_key(artist: str | None, title: str | None) -> str:
+    """``group_key`` with file-quality tags dropped — for collapsing search
+    results only (never persisted, so the stored ``song_key`` is unchanged)."""
+    return group_key(_FILE_TAG_RE.sub(" ", artist or ""), _FILE_TAG_RE.sub(" ", title or ""))

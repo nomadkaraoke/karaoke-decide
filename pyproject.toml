@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.14.1"
+version = "0.15.0"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"
@@ -29,6 +29,7 @@ google-cloud-storage = "^3.10.1"
 google-cloud-secret-manager = "^2.26.0"
 google-cloud-bigquery = "^3.13.0"
 google-cloud-tasks = "^2.21.0"
+google-cloud-run = "0.15.0"  # song-index-build rolls karaoke-decide-search to a new index (same pin as karaoke-gen)
 # LLM (Vertex AI Gemini — karaoke-suitability judge for the candidates tool)
 google-genai = "^1.0.0"
 # HTTP clients
@@ -40,6 +41,7 @@ python-jose = { extras = ["cryptography"], version = "^3.3.0" }
 python-slugify = "^8.0.1"
 python-dotenv = "^1.0.0"
 ytmusicapi = ">=1.11"
+rapidfuzz = "^3.14"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

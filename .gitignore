@@ -100,3 +100,6 @@ frontend/.env.local
 # Emulator data
 emulator-data/
 data/
+
+# Local stacks (scripts/search-local-stack.sh)
+.local-stack/

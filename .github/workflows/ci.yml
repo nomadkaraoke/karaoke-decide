@@ -364,6 +364,55 @@ jobs:
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}
 
+      - name: Deploy search service
+        # Same image, different command. Settings must match infrastructure/__main__.py
+        # (tests/unit/test_infra_ci_parity.py). --update-env-vars/--update-secrets merge
+        # into the live env: the song-index-build job owns the index-run variable and a
+        # deploy must keep it (never use --set-env-vars here).
+        # Pulumi creates the service once an index exists (docs/ARCHITECTURE.md
+        # § Song search); until then this step is skipped.
+        run: |
+          if ! out=$(gcloud run services describe karaoke-decide-search --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::karaoke-decide-search does not exist yet (created by Pulumi); skipping its deploy"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run deploy karaoke-decide-search \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account song-search@nomadkaraoke.iam.gserviceaccount.com \
+            --memory 4Gi \
+            --cpu 1 \
+            --cpu-throttling \
+            --cpu-boost \
+            --concurrency 80 \
+            --max-instances 3 \
+            --min-instances 0 \
+            --port 8000 \
+            --command uvicorn \
+            --args backend.search.app:search_app,--host,0.0.0.0,--port,8000 \
+            --startup-probe httpGet.path=/api/search/ready,httpGet.port=8000,timeoutSeconds=5,periodSeconds=10,failureThreshold=24 \
+            --update-env-vars "SONG_INDEX_BUCKET=nomadkaraoke-kn-data,SONG_INDEX_OFFLINE_URL_TEMPLATE=https://decide.nomadkaraoke.com/offline-index/{run}/offline.db.gz,GEN_API_URL=https://api.nomadkaraoke.com" \
+            --update-secrets "DECIDE_GEN_PARTNER_SECRET=decide-gen-partner-secret:latest"
+
+      - name: Update song-index-build job image
+        # Same as mb-refresh: pin the daily index build job to the deployed image.
+        run: |
+          if ! out=$(gcloud run jobs describe song-index-build --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::song-index-build does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run jobs update song-index-build \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
       - name: Verify deployment
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.IMAGE_NAME }} \

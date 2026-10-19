@@ -1,0 +1,7270 @@
+[
+ {
+  "q": "toto africa",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Toto",
+    "title": "Africa",
+    "score": 1.195,
+    "popularity": 85,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "toto|africa"
+   },
+   "candidates": [
+    {
+     "artist": "Toto",
+     "title": "Africa",
+     "score": 1.195,
+     "popularity": 85,
+     "karaoke": true,
+     "song_key": "toto|africa"
+    },
+    {
+     "artist": "Weezer",
+     "title": "Africa",
+     "score": 0.727,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "weezer|africa"
+    },
+    {
+     "artist": "Camilo",
+     "title": "Tutu",
+     "score": 0.524,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "camilo|tutu"
+    },
+    {
+     "artist": "Hozier",
+     "title": "Too Sweet",
+     "score": 0.503,
+     "popularity": 88,
+     "karaoke": true,
+     "song_key": "hozier|too sweet"
+    },
+    {
+     "artist": "Three Days Grace",
+     "title": "Never Too Late",
+     "score": 0.471,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "3 days grace|never too late"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "toto|africa",
+    "artist": "Toto",
+    "title": "Africa",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "CC",
+      "brand_name": "CC Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9a96d322850",
+      "rank": 6
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "big green tractor jason aldean",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Jason Aldean",
+    "title": "Big Green Tractor",
+    "score": 1.178,
+    "popularity": 68,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "jason aldean|big green tractor"
+   },
+   "candidates": [
+    {
+     "artist": "Jason Aldean",
+     "title": "Big Green Tractor",
+     "score": 1.178,
+     "popularity": 68,
+     "karaoke": true,
+     "song_key": "jason aldean|big green tractor"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "jason aldean|big green tractor",
+    "artist": "Jason Aldean",
+    "title": "Big Green Tractor",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=fc2d2521152",
+      "rank": 66
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "feliz navidad jose feliciano",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "José Feliciano",
+    "title": "Feliz Navidad",
+    "score": 1.091,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.74,
+     "title_lead": 2
+    },
+    "song_key": "jose feliciano|feliz navidad"
+   },
+   "candidates": [
+    {
+     "artist": "José Feliciano",
+     "title": "Feliz Navidad",
+     "score": 1.091,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "jose feliciano|feliz navidad"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "jose feliciano|feliz navidad",
+    "artist": "José Feliciano",
+    "title": "Feliz Navidad",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=fa4a8cb95d7",
+      "rank": 96
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "bohemian rhapsody queen",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Queen",
+    "title": "Bohemian Rhapsody",
+    "score": 1.198,
+    "popularity": 88,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "queen|bohemian rhapsody"
+   },
+   "candidates": [
+    {
+     "artist": "Queen",
+     "title": "Bohemian Rhapsody",
+     "score": 1.198,
+     "popularity": 88,
+     "karaoke": true,
+     "song_key": "queen|bohemian rhapsody"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "queen|bohemian rhapsody",
+    "artist": "Queen",
+    "title": "Bohemian Rhapsody",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=c568dcc53e9",
+      "rank": 16
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "adele rolling in the deep",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Adele",
+    "title": "Rolling in the Deep",
+    "score": 1.192,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "adele|rolling in the deep"
+   },
+   "candidates": [
+    {
+     "artist": "Adele",
+     "title": "Rolling in the Deep",
+     "score": 1.192,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "adele|rolling in the deep"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "adele|rolling in the deep",
+    "artist": "Adele",
+    "title": "Rolling in the Deep",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "OBSK",
+      "brand_name": "ObsKure Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2fe8062f530",
+      "rank": 76
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "abba waterloo",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "ABBA",
+    "title": "Waterloo",
+    "score": 1.182,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "abba|waterloo"
+   },
+   "candidates": [
+    {
+     "artist": "ABBA",
+     "title": "Waterloo",
+     "score": 1.182,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "abba|waterloo"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "abba|waterloo",
+    "artist": "ABBA",
+    "title": "Waterloo",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=da52411246c",
+      "rank": 26
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "rihanna push up on me",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "Rihanna",
+    "title": "We Found Love",
+    "score": 0.562,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.34,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 0.62,
+     "title_sim": 0.38,
+     "title_lead": 0
+    },
+    "song_key": "rihanna|we found love"
+   },
+   "candidates": [
+    {
+     "artist": "Rihanna",
+     "title": "We Found Love",
+     "score": 0.562,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "rihanna|we found love"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "Just Jack Starz in their Eyes",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Just Jack",
+    "title": "Starz in Their Eyes",
+    "score": 1.155,
+    "popularity": 45,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "just jack|starz in their eyes"
+   },
+   "candidates": [
+    {
+     "artist": "Just Jack",
+     "title": "Starz in Their Eyes",
+     "score": 1.155,
+     "popularity": 45,
+     "karaoke": true,
+     "song_key": "just jack|starz in their eyes"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "just jack|starz in their eyes",
+    "artist": "Just Jack",
+    "title": "Starz in Their Eyes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=f33828e3d87",
+      "rank": 56
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Goodbye yellow brick road",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Elton John",
+    "title": "Goodbye Yellow Brick Road",
+    "score": 1.107,
+    "popularity": 77,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "elton john|goodbye yellow brick road"
+   },
+   "candidates": [
+    {
+     "artist": "Elton John",
+     "title": "Goodbye Yellow Brick Road",
+     "score": 1.107,
+     "popularity": 77,
+     "karaoke": true,
+     "song_key": "elton john|goodbye yellow brick road"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "elton john|goodbye yellow brick road",
+    "artist": "Elton John",
+    "title": "Goodbye Yellow Brick Road",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=71dc38d34a6",
+      "rank": 66
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "zedd clarity",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Zedd",
+    "title": "Clarity",
+    "score": 1.182,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "zedd|clarity"
+   },
+   "candidates": [
+    {
+     "artist": "Zedd",
+     "title": "Clarity",
+     "score": 1.182,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "zedd|clarity"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "zedd|clarity",
+    "artist": "Zedd",
+    "title": "Clarity",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9cb1969692b",
+      "rank": 16
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "paper bag fiona apple",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Fiona Apple",
+    "title": "Paper Bag",
+    "score": 1.168,
+    "popularity": 58,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "fiona apple|paper bag"
+   },
+   "candidates": [
+    {
+     "artist": "Fiona Apple",
+     "title": "Paper Bag",
+     "score": 1.168,
+     "popularity": 58,
+     "karaoke": true,
+     "song_key": "fiona apple|paper bag"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "fiona apple|paper bag",
+    "artist": "Fiona Apple",
+    "title": "Paper Bag",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=34b320ae12e",
+      "rank": 46
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "cherry pie warrant",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Warrant",
+    "title": "Cherry Pie",
+    "score": 1.176,
+    "popularity": 66,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "warrant|cherry pie"
+   },
+   "candidates": [
+    {
+     "artist": "Warrant",
+     "title": "Cherry Pie",
+     "score": 1.176,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "warrant|cherry pie"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "warrant|cherry pie",
+    "artist": "Warrant",
+    "title": "Cherry Pie",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=cc33b7f3162",
+      "rank": 66
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Labi Siffre – Bless the Telephone",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "the strokes Eternal Summer",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "Gordon Lightfoot - If You Could Read My Mind",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Gordon Lightfoot",
+    "title": "If You Could Read My Mind",
+    "score": 1.18,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 6
+    },
+    "song_key": "gordon lightfoot|if you could read my mind"
+   },
+   "candidates": [
+    {
+     "artist": "Gordon Lightfoot",
+     "title": "If You Could Read My Mind",
+     "score": 1.18,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "gordon lightfoot|if you could read my mind"
+    }
+   ]
+  },
+  "kind": "same",
+  "groups": [
+   {
+    "song_key": "gordon lightfoot|if you could read my mind",
+    "artist": "Gordon Lightfoot",
+    "title": "If You Could Read My Mind",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=a505fb77f37",
+      "rank": 96
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "If You Could Read My Mind Song by Gordon Lightfoot",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Gordon Lightfoot",
+    "title": "If You Could Read My Mind",
+    "score": 1.18,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 6
+    },
+    "song_key": "gordon lightfoot|if you could read my mind"
+   },
+   "candidates": [
+    {
+     "artist": "Gordon Lightfoot",
+     "title": "If You Could Read My Mind",
+     "score": 1.18,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "gordon lightfoot|if you could read my mind"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "gordon lightfoot|if you could read my mind",
+    "artist": "Gordon Lightfoot",
+    "title": "If You Could Read My Mind",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=a505fb77f37",
+      "rank": 96
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Narrowhead see you around",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Narrow Head",
+    "title": "See You Around",
+    "score": 0.928,
+    "popularity": null,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.94,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.98,
+     "title_sim": 0.72,
+     "title_lead": 3
+    },
+    "song_key": "narrow head|see you around"
+   },
+   "candidates": [
+    {
+     "artist": "Narrow Head",
+     "title": "See You Around",
+     "score": 0.928,
+     "popularity": null,
+     "karaoke": true,
+     "song_key": "narrow head|see you around"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "narrow head|see you around",
+    "artist": "Narrow Head",
+    "title": "See You Around",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8426392f04a",
+      "rank": 26
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Front Porch Step - Island of the Misfit Boy",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Front Porch Step",
+    "title": "Island of the Misfit Boy",
+    "score": 1.135,
+    "popularity": 25,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 5
+    },
+    "song_key": "front porch step|island of the misfit boy"
+   },
+   "candidates": [
+    {
+     "artist": "Front Porch Step",
+     "title": "Island of the Misfit Boy",
+     "score": 1.135,
+     "popularity": 25,
+     "karaoke": true,
+     "song_key": "front porch step|island of the misfit boy"
+    }
+   ]
+  },
+  "kind": "same",
+  "groups": [
+   {
+    "song_key": "front porch step|island of the misfit boy",
+    "artist": "Front Porch Step",
+    "title": "Island of the Misfit Boy",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=fb0d0d40bb9",
+      "rank": 36
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Tulsa's Last Magician Willi Carlisle",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "Espresso",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Sabrina Carpenter",
+    "title": "Espresso",
+    "score": 1.12,
+    "popularity": 90,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "sabrina carpenter|espresso"
+   },
+   "candidates": [
+    {
+     "artist": "Sabrina Carpenter",
+     "title": "Espresso",
+     "score": 1.12,
+     "popularity": 90,
+     "karaoke": true,
+     "song_key": "sabrina carpenter|espresso"
+    },
+    {
+     "artist": "Laza Bossa",
+     "title": "Espresso",
+     "score": 1.042,
+     "popularity": 62,
+     "karaoke": false,
+     "song_key": "laza bossa|espresso"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "sabrina carpenter|espresso",
+    "artist": "Sabrina Carpenter",
+    "title": "Espresso",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=6585f0a2450",
+      "rank": 46
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "despacito",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Luis Fonsi",
+    "title": "Despacito",
+    "score": 1.11,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "luis fonsi|despacito"
+   },
+   "candidates": [
+    {
+     "artist": "Luis Fonsi",
+     "title": "Despacito",
+     "score": 1.11,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "luis fonsi|despacito"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "luis fonsi|despacito",
+    "artist": "Luis Fonsi",
+    "title": "Despacito",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=6d689da4643",
+      "rank": 26
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "wonderwall",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Oasis",
+    "title": "Wonderwall",
+    "score": 1.114,
+    "popularity": 84,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "oasis|wonderwall"
+   },
+   "candidates": [
+    {
+     "artist": "Oasis",
+     "title": "Wonderwall",
+     "score": 1.114,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "oasis|wonderwall"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "oasis|wonderwall",
+    "artist": "Oasis",
+    "title": "Wonderwall",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=868cd7b7a57",
+      "rank": 46
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "dancing queen",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "ABBA",
+    "title": "Dancing Queen",
+    "score": 1.112,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "abba|dancing queen"
+   },
+   "candidates": [
+    {
+     "artist": "ABBA",
+     "title": "Dancing Queen",
+     "score": 1.112,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "abba|dancing queen"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "abba|dancing queen",
+    "artist": "ABBA",
+    "title": "Dancing Queen",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=4155b10931d",
+      "rank": 36
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Pink pony club",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Chappell Roan",
+    "title": "Pink Pony Club",
+    "score": 1.113,
+    "popularity": 83,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "chappell roan|pink pony club"
+   },
+   "candidates": [
+    {
+     "artist": "Chappell Roan",
+     "title": "Pink Pony Club",
+     "score": 1.113,
+     "popularity": 83,
+     "karaoke": true,
+     "song_key": "chappell roan|pink pony club"
+    },
+    {
+     "artist": "Zach Bryan",
+     "title": "Pink Skies",
+     "score": 0.573,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "zach bryan|pink skies"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "chappell roan|pink pony club",
+    "artist": "Chappell Roan",
+    "title": "Pink Pony Club",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3d0fcfe5ff8",
+      "rank": 86
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Party in the usa",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Miley Cyrus",
+    "title": "Party in the U.S.A.",
+    "score": 1.11,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "miley cyrus|party in the u s a"
+   },
+   "candidates": [
+    {
+     "artist": "Miley Cyrus",
+     "title": "Party in the U.S.A.",
+     "score": 1.11,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "miley cyrus|party in the u s a"
+    },
+    {
+     "artist": "Linkin Park",
+     "title": "In the End",
+     "score": 0.783,
+     "popularity": 86,
+     "karaoke": true,
+     "song_key": "linkin park|in the end"
+    },
+    {
+     "artist": "Pink Floyd",
+     "title": "Another Brick in the Wall, Pt. 2",
+     "score": 0.606,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "pink floyd|another brick in the wall part 2"
+    },
+    {
+     "artist": "Katy Perry",
+     "title": "Hot n Cold",
+     "score": 0.437,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "katy perry|hot n cold"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "miley cyrus|party in the u s a",
+    "artist": "Miley Cyrus",
+    "title": "Party in the U.S.A.",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=6e84faead30",
+      "rank": 36
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Die young",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Kesha",
+    "title": "Die Young",
+    "score": 1.109,
+    "popularity": 79,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "kesha|die young"
+   },
+   "candidates": [
+    {
+     "artist": "Kesha",
+     "title": "Die Young",
+     "score": 1.109,
+     "popularity": 79,
+     "karaoke": true,
+     "song_key": "kesha|die young"
+    },
+    {
+     "artist": "Roddy Ricch",
+     "title": "Die Young",
+     "score": 1.038,
+     "popularity": 58,
+     "karaoke": false,
+     "song_key": "roddy ricch|die young"
+    },
+    {
+     "artist": "Sylvan Esso",
+     "title": "Die Young",
+     "score": 1.03,
+     "popularity": 50,
+     "karaoke": false,
+     "song_key": "sylvan esso|die young"
+    },
+    {
+     "artist": "Elton John",
+     "title": "Your Song",
+     "score": 0.522,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "elton john|your song"
+    },
+    {
+     "artist": "Fall Out Boy",
+     "title": "My Songs Know What You Did in the Dark (Light Em Up)",
+     "score": 0.515,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "fall out boy|my songs know what you did in the dark light em up"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "kesha|die young",
+    "artist": "Kesha",
+    "title": "Die Young",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "OBSK",
+      "brand_name": "ObsKure Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=4c360c07aea",
+      "rank": 76
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "You belong with me",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Taylor Swift",
+    "title": "You Belong with Me",
+    "score": 1.11,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "taylor swift|you belong with me"
+   },
+   "candidates": [
+    {
+     "artist": "Taylor Swift",
+     "title": "You Belong with Me",
+     "score": 1.11,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "taylor swift|you belong with me"
+    },
+    {
+     "artist": "Avril Lavigne",
+     "title": "I'm with You",
+     "score": 0.583,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "avril lavigne|im with you"
+    },
+    {
+     "artist": "Pink Floyd",
+     "title": "Wish You Were Here",
+     "score": 0.547,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "pink floyd|wish you were here"
+    },
+    {
+     "artist": "Whitney Houston",
+     "title": "I Wanna Dance with Somebody (Who Loves Me)",
+     "score": 0.547,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "whitney houston|i wanna dance with somebody who loves me"
+    },
+    {
+     "artist": "Queen",
+     "title": "We Will Rock You",
+     "score": 0.545,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "queen|we will rock you"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "taylor swift|you belong with me",
+    "artist": "Taylor Swift",
+    "title": "You Belong with Me",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=71d906bd5fe",
+      "rank": 36
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "My immortal",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Evanescence",
+    "title": "My Immortal",
+    "score": 1.106,
+    "popularity": 76,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "evanescence|my immortal"
+   },
+   "candidates": [
+    {
+     "artist": "Evanescence",
+     "title": "My Immortal",
+     "score": 1.106,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "evanescence|my immortal"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "evanescence|my immortal",
+    "artist": "Evanescence",
+    "title": "My Immortal",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2f896ae31bd",
+      "rank": 66
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "I want it that way",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Backstreet Boys",
+    "title": "I Want It That Way",
+    "score": 1.11,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 5
+    },
+    "song_key": "backstreet boys|i want it that way"
+   },
+   "candidates": [
+    {
+     "artist": "Backstreet Boys",
+     "title": "I Want It That Way",
+     "score": 1.11,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "backstreet boys|i want it that way"
+    },
+    {
+     "artist": "Journey",
+     "title": "Any Way You Want It",
+     "score": 0.703,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "journey|any way you want it"
+    },
+    {
+     "artist": "Billie Eilish",
+     "title": "What Was I Made For?",
+     "score": 0.663,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "billie eilish|what was i made for"
+    },
+    {
+     "artist": "Lady Gaga",
+     "title": "Born This Way",
+     "score": 0.563,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "lady gaga|born this way"
+    },
+    {
+     "artist": "Frank Sinatra",
+     "title": "My Way",
+     "score": 0.55,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "frank sinatra|my way"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "backstreet boys|i want it that way",
+    "artist": "Backstreet Boys",
+    "title": "I Want It That Way",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9f36e01b5eb",
+      "rank": 86
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "toxicity",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "System of a Down",
+    "title": "Toxicity",
+    "score": 1.11,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "system of a down|toxicity"
+   },
+   "candidates": [
+    {
+     "artist": "System of a Down",
+     "title": "Toxicity",
+     "score": 1.11,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "system of a down|toxicity"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "system of a down|toxicity",
+    "artist": "System of a Down",
+    "title": "Toxicity",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=e95d14e5126",
+      "rank": 16
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Vegas lights",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Panic! at the Disco",
+    "title": "Vegas Lights",
+    "score": 1.09,
+    "popularity": 60,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "panic at the disco|vegas lights"
+   },
+   "candidates": [
+    {
+     "artist": "Panic! at the Disco",
+     "title": "Vegas Lights",
+     "score": 1.09,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "panic at the disco|vegas lights"
+    },
+    {
+     "artist": "The Weeknd",
+     "title": "Blinding Lights",
+     "score": 0.656,
+     "popularity": 90,
+     "karaoke": true,
+     "song_key": "the weeknd|blinding lights"
+    },
+    {
+     "artist": "José Feliciano",
+     "title": "Light My Fire",
+     "score": 0.509,
+     "popularity": 50,
+     "karaoke": true,
+     "song_key": "jose feliciano|light my fire"
+    },
+    {
+     "artist": "Fall Out Boy",
+     "title": "My Songs Know What You Did in the Dark (Light Em Up)",
+     "score": 0.442,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "fall out boy|my songs know what you did in the dark light em up"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "panic at the disco|vegas lights",
+    "artist": "Panic! at the Disco",
+    "title": "Vegas Lights",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9daa345460f",
+      "rank": 56
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "something in the orange",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Zach Bryan",
+    "title": "Something in the Orange",
+    "score": 1.112,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "zach bryan|something in the orange"
+   },
+   "candidates": [
+    {
+     "artist": "Zach Bryan",
+     "title": "Something in the Orange",
+     "score": 1.112,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "zach bryan|something in the orange"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "zach bryan|something in the orange",
+    "artist": "Zach Bryan",
+    "title": "Something in the Orange",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8cd914bd176",
+      "rank": 86
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "gives you hell",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The All-American Rejects",
+    "title": "Gives You Hell",
+    "score": 1.105,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "the all american rejects|gives you hell"
+   },
+   "candidates": [
+    {
+     "artist": "The All-American Rejects",
+     "title": "Gives You Hell",
+     "score": 1.105,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "the all american rejects|gives you hell"
+    },
+    {
+     "artist": "Adele",
+     "title": "Hello",
+     "score": 0.637,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "adele|hello"
+    },
+    {
+     "artist": "Bon Jovi",
+     "title": "You Give Love a Bad Name",
+     "score": 0.561,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "bon jovi|you give love a bad name"
+    },
+    {
+     "artist": "Pink Floyd",
+     "title": "Wish You Were Here",
+     "score": 0.55,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "pink floyd|wish you were here"
+    },
+    {
+     "artist": "OK Go",
+     "title": "Here It Goes Again",
+     "score": 0.535,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "ok go|here it goes again"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "the all american rejects|gives you hell",
+    "artist": "The All-American Rejects",
+    "title": "Gives You Hell",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=02484f6ad05",
+      "rank": 16
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "still into you",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Paramore",
+    "title": "Still into You",
+    "score": 1.108,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "paramore|still into you"
+   },
+   "candidates": [
+    {
+     "artist": "Paramore",
+     "title": "Still into You",
+     "score": 1.108,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "paramore|still into you"
+    },
+    {
+     "artist": "Dave Matthews Band",
+     "title": "Crash into Me",
+     "score": 0.584,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "dave matthews band|crash into me"
+    },
+    {
+     "artist": "Jason Aldean",
+     "title": "Try That in a Small Town",
+     "score": 0.478,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "jason aldean|try that in a small town"
+    },
+    {
+     "artist": "They Might Be Giants",
+     "title": "Birdhouse in Your Soul",
+     "score": 0.462,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "they might be giants|birdhouse in your soul"
+    },
+    {
+     "artist": "Paramore",
+     "title": "Ain't It Fun",
+     "score": 0.434,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "paramore|aint it fun"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "paramore|still into you",
+    "artist": "Paramore",
+    "title": "Still into You",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8c665c6a163",
+      "rank": 46
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "aint it fun",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Paramore",
+    "title": "Ain't It Fun",
+    "score": 1.104,
+    "popularity": 74,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "paramore|aint it fun"
+   },
+   "candidates": [
+    {
+     "artist": "Paramore",
+     "title": "Ain't It Fun",
+     "score": 1.104,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "paramore|aint it fun"
+    },
+    {
+     "artist": "Weezer",
+     "title": "Say It Ain't So",
+     "score": 0.655,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "weezer|say it aint so"
+    },
+    {
+     "artist": "Cyndi Lauper",
+     "title": "Girls Just Want to Have Fun",
+     "score": 0.649,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "cyndi lauper|girls just want to have fun"
+    },
+    {
+     "artist": "Journey",
+     "title": "Any Way You Want It",
+     "score": 0.533,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "journey|any way you want it"
+    },
+    {
+     "artist": "Bruno Mars",
+     "title": "Uptown Funk",
+     "score": 0.519,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "bruno mars|uptown funk"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "paramore|aint it fun",
+    "artist": "Paramore",
+    "title": "Ain't It Fun",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=c2c59bf4e05",
+      "rank": 56
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "i hate everything about you",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Three Days Grace",
+    "title": "I Hate Everything About You",
+    "score": 1.106,
+    "popularity": 76,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 5
+    },
+    "song_key": "3 days grace|i hate everything about you"
+   },
+   "candidates": [
+    {
+     "artist": "Three Days Grace",
+     "title": "I Hate Everything About You",
+     "score": 1.106,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "3 days grace|i hate everything about you"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "3 days grace|i hate everything about you",
+    "artist": "Three Days Grace",
+    "title": "I Hate Everything About You",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=d7e34607b73",
+      "rank": 86
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "istanbul not constantinople",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "They Might Be Giants",
+    "title": "Istanbul (Not Constantinople)",
+    "score": 1.092,
+    "popularity": 62,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "they might be giants|istanbul not constantinople"
+   },
+   "candidates": [
+    {
+     "artist": "They Might Be Giants",
+     "title": "Istanbul (Not Constantinople)",
+     "score": 1.092,
+     "popularity": 62,
+     "karaoke": true,
+     "song_key": "they might be giants|istanbul not constantinople"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "they might be giants|istanbul not constantinople",
+    "artist": "They Might Be Giants",
+    "title": "Istanbul (Not Constantinople)",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=f7b0f747483",
+      "rank": 16
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Forever and ever amen",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Randy Travis",
+    "title": "Forever and Ever, Amen",
+    "score": 1.096,
+    "popularity": 66,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "randy travis|forever and ever amen"
+   },
+   "candidates": [
+    {
+     "artist": "Randy Travis",
+     "title": "Forever and Ever, Amen",
+     "score": 1.096,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "randy travis|forever and ever amen"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "randy travis|forever and ever amen",
+    "artist": "Randy Travis",
+    "title": "Forever and Ever, Amen",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8b27ea2a45d",
+      "rank": 36
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Rock that body",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Black Eyed Peas",
+    "title": "Rock That Body",
+    "score": 1.098,
+    "popularity": 68,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "black eyed peas|rock that body"
+   },
+   "candidates": [
+    {
+     "artist": "Black Eyed Peas",
+     "title": "Rock That Body",
+     "score": 1.098,
+     "popularity": 68,
+     "karaoke": true,
+     "song_key": "black eyed peas|rock that body"
+    },
+    {
+     "artist": "Backstreet Boys",
+     "title": "I Want It That Way",
+     "score": 0.626,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "backstreet boys|i want it that way"
+    },
+    {
+     "artist": "Bob Seger",
+     "title": "Old Time Rock & Roll",
+     "score": 0.605,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "bob seger|old time rock and roll"
+    },
+    {
+     "artist": "Ashanti",
+     "title": "Rock wit U (Awww Baby)",
+     "score": 0.6,
+     "popularity": 58,
+     "karaoke": true,
+     "song_key": "ashanti|rock wit u awww baby"
+    },
+    {
+     "artist": "Brandy & Monica",
+     "title": "The Boy Is Mine",
+     "score": 0.53,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "brandy and monica|the boy is mine"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "black eyed peas|rock that body",
+    "artist": "Black Eyed Peas",
+    "title": "Rock That Body",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=4dc070511bf",
+      "rank": 56
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Sour times",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Portishead",
+    "title": "Sour Times",
+    "score": 1.094,
+    "popularity": 64,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "portishead|sour times"
+   },
+   "candidates": [
+    {
+     "artist": "Portishead",
+     "title": "Sour Times",
+     "score": 1.094,
+     "popularity": 64,
+     "karaoke": true,
+     "song_key": "portishead|sour times"
+    },
+    {
+     "artist": "Muse",
+     "title": "Time Is Running Out",
+     "score": 0.667,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "muse|time is running out"
+    },
+    {
+     "artist": "Green Day",
+     "title": "Good Riddance (Time of Your Life)",
+     "score": 0.661,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "green day|good riddance time of your life"
+    },
+    {
+     "artist": "Justin Bieber",
+     "title": "Sorry",
+     "score": 0.614,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "justin bieber|sorry"
+    },
+    {
+     "artist": "Pitbull",
+     "title": "Timber",
+     "score": 0.611,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "pitbull|timber"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "portishead|sour times",
+    "artist": "Portishead",
+    "title": "Sour Times",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2459d59bdc3",
+      "rank": 96
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Walking on the sun",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Smash Mouth",
+    "title": "Walkin' on the Sun",
+    "score": 1.012,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.98,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.87,
+     "title_sim": 0.97,
+     "title_lead": 4
+    },
+    "song_key": "smash mouth|walkin on the sun"
+   },
+   "candidates": [
+    {
+     "artist": "Smash Mouth",
+     "title": "Walkin' on the Sun",
+     "score": 1.012,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "smash mouth|walkin on the sun"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "smash mouth|walkin on the sun",
+    "artist": "Smash Mouth",
+    "title": "Walkin' on the Sun",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3c97c684f1c",
+      "rank": 26
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Dark on me",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Starset",
+    "title": "Dark on Me",
+    "score": 1.088,
+    "popularity": 58,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "starset|dark on me"
+   },
+   "candidates": [
+    {
+     "artist": "Starset",
+     "title": "Dark on Me",
+     "score": 1.088,
+     "popularity": 58,
+     "karaoke": true,
+     "song_key": "starset|dark on me"
+    },
+    {
+     "artist": "a-ha",
+     "title": "Take on Me",
+     "score": 0.559,
+     "popularity": 86,
+     "karaoke": true,
+     "song_key": "a ha|take on me"
+    },
+    {
+     "artist": "Reel Big Fish",
+     "title": "Take on Me",
+     "score": 0.528,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "reel big fish|take on me"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "starset|dark on me",
+    "artist": "Starset",
+    "title": "Dark on Me",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=94f201e9433",
+      "rank": 46
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "hallelujah",
+  "identify": {
+   "status": "candidates",
+   "best": {
+    "artist": "Jeff Buckley",
+    "title": "Hallelujah",
+    "score": 1.102,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "jeff buckley|hallelujah"
+   },
+   "candidates": [
+    {
+     "artist": "Jeff Buckley",
+     "title": "Hallelujah",
+     "score": 1.102,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "jeff buckley|hallelujah"
+    },
+    {
+     "artist": "Leonard Cohen",
+     "title": "Hallelujah",
+     "score": 1.1,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "leonard cohen|hallelujah"
+    },
+    {
+     "artist": "Pentatonix",
+     "title": "Hallelujah",
+     "score": 1.092,
+     "popularity": 62,
+     "karaoke": true,
+     "song_key": "pentatonix|hallelujah"
+    },
+    {
+     "artist": "Rufus Wainwright",
+     "title": "Hallelujah",
+     "score": 1.035,
+     "popularity": 55,
+     "karaoke": false,
+     "song_key": "rufus wainwright|hallelujah"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "jeff buckley|hallelujah",
+    "artist": "Jeff Buckley",
+    "title": "Hallelujah",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=d48b395b066",
+      "rank": 86
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     }
+    ]
+   },
+   {
+    "song_key": "leonard cohen|hallelujah",
+    "artist": "Leonard Cohen",
+    "title": "Hallelujah",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b82400a9342",
+      "rank": 66
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     }
+    ]
+   },
+   {
+    "song_key": "pentatonix|hallelujah",
+    "artist": "Pentatonix",
+    "title": "Hallelujah",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8d8bc9d195a",
+      "rank": 96
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "take a hint",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Victorious Cast",
+    "title": "Take a Hint",
+    "score": 1.09,
+    "popularity": 60,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "victorious cast|take a hint"
+   },
+   "candidates": [
+    {
+     "artist": "Victorious Cast",
+     "title": "Take a Hint",
+     "score": 1.09,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "victorious cast|take a hint"
+    },
+    {
+     "artist": "a-ha",
+     "title": "Take on Me",
+     "score": 0.778,
+     "popularity": 86,
+     "karaoke": true,
+     "song_key": "a ha|take on me"
+    },
+    {
+     "artist": "Reel Big Fish",
+     "title": "Take on Me",
+     "score": 0.683,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "reel big fish|take on me"
+    },
+    {
+     "artist": "The Used",
+     "title": "The Taste of Ink",
+     "score": 0.654,
+     "popularity": 62,
+     "karaoke": true,
+     "song_key": "the used|the taste of ink"
+    },
+    {
+     "artist": "Hozier",
+     "title": "Take Me to Church",
+     "score": 0.599,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "hozier|take me to church"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "victorious cast|take a hint",
+    "artist": "Victorious Cast",
+    "title": "Take a Hint",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "CC",
+      "brand_name": "CC Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=de94e98c381",
+      "rank": 6
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "give it up victorious",
+  "identify": {
+   "status": "candidates",
+   "best": {
+    "artist": "Victorious Cast",
+    "title": "Give It Up",
+    "score": 1.128,
+    "popularity": 58,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "victorious cast|give it up"
+   },
+   "candidates": [
+    {
+     "artist": "Victorious Cast",
+     "title": "Give It Up",
+     "score": 1.128,
+     "popularity": 58,
+     "karaoke": true,
+     "song_key": "victorious cast|give it up"
+    },
+    {
+     "artist": "KC and the Sunshine Band",
+     "title": "Give It Up",
+     "score": 0.814,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "kc and the sunshine band|give it up"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "victorious cast|give it up",
+    "artist": "Victorious Cast",
+    "title": "Give It Up",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=f531bc75343",
+      "rank": 16
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   },
+   {
+    "song_key": "kc and the sunshine band|give it up",
+    "artist": "KC and the Sunshine Band",
+    "title": "Give It Up",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=5419d0325e5",
+      "rank": 36
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "perry firework",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Katy Perry",
+    "title": "Firework",
+    "score": 1.15,
+    "popularity": 80,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "katy perry|firework"
+   },
+   "candidates": [
+    {
+     "artist": "Katy Perry",
+     "title": "Firework",
+     "score": 1.15,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "katy perry|firework"
+    },
+    {
+     "artist": "Miley Cyrus",
+     "title": "Party in the U.S.A.",
+     "score": 0.465,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "miley cyrus|party in the u s a"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "katy perry|firework",
+    "artist": "Katy Perry",
+    "title": "Firework",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff938ee4d7a",
+      "rank": 56
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "gaga born",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Lady Gaga",
+    "title": "Born This Way",
+    "score": 0.881,
+    "popularity": 74,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 0.33,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 0.53,
+     "title_lead": 1
+    },
+    "song_key": "lady gaga|born this way"
+   },
+   "candidates": [
+    {
+     "artist": "Lady Gaga",
+     "title": "Born This Way",
+     "score": 0.881,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "lady gaga|born this way"
+    },
+    {
+     "artist": "Bob Seger",
+     "title": "Turn the Page",
+     "score": 0.565,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "bob seger|turn the page"
+    },
+    {
+     "artist": "Portishead",
+     "title": "Glory Box",
+     "score": 0.45,
+     "popularity": 68,
+     "karaoke": true,
+     "song_key": "portishead|glory box"
+    },
+    {
+     "artist": "Avril Lavigne",
+     "title": "Sk8er Boi",
+     "score": 0.442,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "avril lavigne|sk8er boi"
+    },
+    {
+     "artist": "Brandy & Monica",
+     "title": "The Boy Is Mine",
+     "score": 0.427,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "brandy and monica|the boy is mine"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "lady gaga|born this way",
+    "artist": "Lady Gaga",
+    "title": "Born This Way",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=46b091be7c3",
+      "rank": 16
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Seal kiss",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Seal",
+    "title": "Kiss from a Rose",
+    "score": 0.912,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.47,
+     "title_lead": 1
+    },
+    "song_key": "seal|kiss from a rose"
+   },
+   "candidates": [
+    {
+     "artist": "Seal",
+     "title": "Kiss from a Rose",
+     "score": 0.912,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "seal|kiss from a rose"
+    },
+    {
+     "artist": "Tom Jones",
+     "title": "Kiss",
+     "score": 0.723,
+     "popularity": 45,
+     "karaoke": true,
+     "song_key": "tom jones|kiss"
+    },
+    {
+     "artist": "Prince",
+     "title": "Kiss",
+     "score": 0.719,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "prince|kiss"
+    },
+    {
+     "artist": "Reel Big Fish",
+     "title": "Sell Out",
+     "score": 0.623,
+     "popularity": 50,
+     "karaoke": true,
+     "song_key": "reel big fish|sell out"
+    },
+    {
+     "artist": "Katy Perry",
+     "title": "I Kissed a Girl",
+     "score": 0.559,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "katy perry|i kissed a girl"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "seal|kiss from a rose",
+    "artist": "Seal",
+    "title": "Kiss from a Rose",
+    "karaoke": true,
+    "version_count": 4,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2bbcfb9eaba",
+      "rank": 66
+     },
+     {
+      "brand_code": "OBSK",
+      "brand_name": "ObsKure Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=09c884263ce",
+      "rank": 76
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Why I am Dave",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Dave Matthews Band",
+    "title": "Why I Am",
+    "score": 1.102,
+    "popularity": 45,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.33,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "dave matthews band|why i am"
+   },
+   "candidates": [
+    {
+     "artist": "Dave Matthews Band",
+     "title": "Why I Am",
+     "score": 1.102,
+     "popularity": 45,
+     "karaoke": true,
+     "song_key": "dave matthews band|why i am"
+    },
+    {
+     "artist": "Whitney Houston",
+     "title": "I Wanna Dance with Somebody (Who Loves Me)",
+     "score": 0.579,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "whitney houston|i wanna dance with somebody who loves me"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "dave matthews band|why i am",
+    "artist": "Dave Matthews Band",
+    "title": "Why I Am",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=092c9908fc8",
+      "rank": 96
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Why I am  dave matthews",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Dave Matthews Band",
+    "title": "Why I Am",
+    "score": 1.128,
+    "popularity": 45,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.67,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "dave matthews band|why i am"
+   },
+   "candidates": [
+    {
+     "artist": "Dave Matthews Band",
+     "title": "Why I Am",
+     "score": 1.128,
+     "popularity": 45,
+     "karaoke": true,
+     "song_key": "dave matthews band|why i am"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "dave matthews band|why i am",
+    "artist": "Dave Matthews Band",
+    "title": "Why I Am",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=092c9908fc8",
+      "rank": 96
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Buy me presents Sabrina",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Sabrina Carpenter",
+    "title": "Buy Me Presents",
+    "score": 1.13,
+    "popularity": 60,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "sabrina carpenter|buy me presents"
+   },
+   "candidates": [
+    {
+     "artist": "Sabrina Carpenter",
+     "title": "Buy Me Presents",
+     "score": 1.13,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "sabrina carpenter|buy me presents"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "sabrina carpenter|buy me presents",
+    "artist": "Sabrina Carpenter",
+    "title": "Buy Me Presents",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=52f1f146a9f",
+      "rank": 56
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Just the way you are billy",
+  "identify": {
+   "status": "candidates",
+   "best": {
+    "artist": "Billy Joel",
+    "title": "Just the Way You Are",
+    "score": 1.142,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 5
+    },
+    "song_key": "billy joel|just the way you are"
+   },
+   "candidates": [
+    {
+     "artist": "Billy Joel",
+     "title": "Just the Way You Are",
+     "score": 1.142,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "billy joel|just the way you are"
+    },
+    {
+     "artist": "Bruno Mars",
+     "title": "Just the Way You Are",
+     "score": 0.919,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "bruno mars|just the way you are"
+    },
+    {
+     "artist": "Billie Eilish",
+     "title": "What Was I Made For?",
+     "score": 0.478,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "billie eilish|what was i made for"
+    },
+    {
+     "artist": "Nirvana",
+     "title": "Come as You Are",
+     "score": 0.466,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "nirvana|come as you are"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "billy joel|just the way you are",
+    "artist": "Billy Joel",
+    "title": "Just the Way You Are",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=6fea6c71bb6",
+      "rank": 36
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   },
+   {
+    "song_key": "bruno mars|just the way you are",
+    "artist": "Bruno Mars",
+    "title": "Just the Way You Are",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "OBSK",
+      "brand_name": "ObsKure Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=588ccc2f1e0",
+      "rank": 76
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   },
+   {
+    "song_key": "billie eilish|what was i made for",
+    "artist": "Billie Eilish",
+    "title": "What Was I Made For?",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=63df9ff775f",
+      "rank": 26
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   },
+   {
+    "song_key": "nirvana|come as you are",
+    "artist": "Nirvana",
+    "title": "Come as You Are",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=48ec7d23075",
+      "rank": 36
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "day in the life fool sinatra",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Frank Sinatra",
+    "title": "A Day in the Life of a Fool",
+    "score": 1.033,
+    "popularity": 40,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 0.89,
+     "title_lead": 5
+    },
+    "song_key": "frank sinatra|a day in the life of a fool"
+   },
+   "candidates": [
+    {
+     "artist": "Frank Sinatra",
+     "title": "A Day in the Life of a Fool",
+     "score": 1.033,
+     "popularity": 40,
+     "karaoke": true,
+     "song_key": "frank sinatra|a day in the life of a fool"
+    },
+    {
+     "artist": "Frank Sinatra",
+     "title": "My Way",
+     "score": 0.606,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "frank sinatra|my way"
+    },
+    {
+     "artist": "Frank Sinatra",
+     "title": "Fly Me to the Moon",
+     "score": 0.599,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "frank sinatra|fly me to the moon"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "frank sinatra|a day in the life of a fool",
+    "artist": "Frank Sinatra",
+    "title": "A Day in the Life of a Fool",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "CC",
+      "brand_name": "CC Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9e281e2ff53",
+      "rank": 6
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Main Street bob seg",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Bob Seger",
+    "title": "Mainstreet",
+    "score": 1.131,
+    "popularity": 55,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.72,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "bob seger|mainstreet"
+   },
+   "candidates": [
+    {
+     "artist": "Bob Seger",
+     "title": "Mainstreet",
+     "score": 1.131,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "bob seger|mainstreet"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "bob seger|mainstreet",
+    "artist": "Bob Seger",
+    "title": "Mainstreet",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=dd8d74899bb",
+      "rank": 46
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "square one Tom petty",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Tom Petty",
+    "title": "Square One",
+    "score": 1.15,
+    "popularity": 50,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.91,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "tom petty|square 1"
+   },
+   "candidates": [
+    {
+     "artist": "Tom Petty",
+     "title": "Square One",
+     "score": 1.15,
+     "popularity": 50,
+     "karaoke": true,
+     "song_key": "tom petty|square 1"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "tom petty|square 1",
+    "artist": "Tom Petty",
+    "title": "Square One",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2dc5389480f",
+      "rank": 86
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Yer so bad",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Tom Petty",
+    "title": "Yer So Bad",
+    "score": 1.078,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "tom petty|yer so bad"
+   },
+   "candidates": [
+    {
+     "artist": "Tom Petty",
+     "title": "Yer So Bad",
+     "score": 1.078,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "tom petty|yer so bad"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "tom petty|yer so bad",
+    "artist": "Tom Petty",
+    "title": "Yer So Bad",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2564dfc2191",
+      "rank": 96
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "beer reel big",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Reel Big Fish",
+    "title": "Beer",
+    "score": 1.135,
+    "popularity": 52,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.67,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "reel big fish|beer"
+   },
+   "candidates": [
+    {
+     "artist": "Reel Big Fish",
+     "title": "Beer",
+     "score": 1.135,
+     "popularity": 52,
+     "karaoke": true,
+     "song_key": "reel big fish|beer"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "reel big fish|beer",
+    "artist": "Reel Big Fish",
+    "title": "Beer",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=7f1313cb8b5",
+      "rank": 36
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "afraid neighbourhood",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Neighbourhood",
+    "title": "Afraid",
+    "score": 1.18,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "the neighbourhood|afraid"
+   },
+   "candidates": [
+    {
+     "artist": "The Neighbourhood",
+     "title": "Afraid",
+     "score": 1.18,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "the neighbourhood|afraid"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "the neighbourhood|afraid",
+    "artist": "The Neighbourhood",
+    "title": "Afraid",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=32183c75fc1",
+      "rank": 66
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "system hypnotized",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "System of a Down",
+    "title": "Hypnotize",
+    "score": 1.024,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.93,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 0.85,
+     "title_sim": 0.95,
+     "title_lead": 1
+    },
+    "song_key": "system of a down|hypnotize"
+   },
+   "candidates": [
+    {
+     "artist": "System of a Down",
+     "title": "Hypnotize",
+     "score": 1.024,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "system of a down|hypnotize"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "system of a down|hypnotize",
+    "artist": "System of a Down",
+    "title": "Hypnotize",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=dfcc73ac3f9",
+      "rank": 26
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Arctic Monkeys! Fluorescent",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Arctic Monkeys",
+    "title": "Fluorescent Adolescent",
+    "score": 1.016,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 0.69,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.69,
+     "title_lead": 1
+    },
+    "song_key": "arctic monkeys|fluorescent adolescent"
+   },
+   "candidates": [
+    {
+     "artist": "Arctic Monkeys",
+     "title": "Fluorescent Adolescent",
+     "score": 1.016,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "arctic monkeys|fluorescent adolescent"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "arctic monkeys|fluorescent adolescent",
+    "artist": "Arctic Monkeys",
+    "title": "Fluorescent Adolescent",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=83d5b62ad94",
+      "rank": 96
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Missy Elliot get your freak on",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Missy Elliott",
+    "title": "Get Ur Freak On",
+    "score": 1.088,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.96,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.95,
+     "title_sim": 0.94,
+     "title_lead": 1
+    },
+    "song_key": "missy elliott|get ur freak on"
+   },
+   "candidates": [
+    {
+     "artist": "Missy Elliott",
+     "title": "Get Ur Freak On",
+     "score": 1.088,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "missy elliott|get ur freak on"
+    },
+    {
+     "artist": "Frank Sinatra",
+     "title": "New York, New York",
+     "score": 0.42,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "frank sinatra|new york new york"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "missy elliott|get ur freak on",
+    "artist": "Missy Elliott",
+    "title": "Get Ur Freak On",
+    "karaoke": true,
+    "version_count": 4,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3fe20a430a9",
+      "rank": 46
+     },
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=73b988493bc",
+      "rank": 56
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Get ur freak on missy",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Missy Elliott",
+    "title": "Get Ur Freak On",
+    "score": 1.142,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "missy elliott|get ur freak on"
+   },
+   "candidates": [
+    {
+     "artist": "Missy Elliott",
+     "title": "Get Ur Freak On",
+     "score": 1.142,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "missy elliott|get ur freak on"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "missy elliott|get ur freak on",
+    "artist": "Missy Elliott",
+    "title": "Get Ur Freak On",
+    "karaoke": true,
+    "version_count": 4,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3fe20a430a9",
+      "rank": 46
+     },
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=73b988493bc",
+      "rank": 56
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo park books",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 0.894,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.53,
+     "title_lead": 1
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 0.894,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo books",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 0.854,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 0.33,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 0.53,
+     "title_lead": 1
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 0.854,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    },
+    {
+     "artist": "Randy Travis",
+     "title": "Diggin' Up Bones",
+     "score": 0.407,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "randy travis|diggin up bones"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "books from boxes",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 1.078,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 1.078,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    },
+    {
+     "artist": "Randy Travis",
+     "title": "Diggin' Up Bones",
+     "score": 0.424,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "randy travis|diggin up bones"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "fall out boy dance dance",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Fall Out Boy",
+    "title": "Dance, Dance",
+    "score": 1.186,
+    "popularity": 76,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "fall out boy|dance dance"
+   },
+   "candidates": [
+    {
+     "artist": "Fall Out Boy",
+     "title": "Dance, Dance",
+     "score": 1.186,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "fall out boy|dance dance"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "fall out boy|dance dance",
+    "artist": "Fall Out Boy",
+    "title": "Dance, Dance",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=96b2a64a5d8",
+      "rank": 16
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "rihanna breaking",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Rihanna",
+    "title": "Breakin' Dishes",
+    "score": 0.959,
+    "popularity": 62,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.97,
+     "title_cov": 0.67,
+     "artist_cov": 1.0,
+     "sim": 0.79,
+     "title_sim": 0.67,
+     "title_lead": 1
+    },
+    "song_key": "rihanna|breakin dishes"
+   },
+   "candidates": [
+    {
+     "artist": "Rihanna",
+     "title": "Breakin' Dishes",
+     "score": 0.959,
+     "popularity": 62,
+     "karaoke": true,
+     "song_key": "rihanna|breakin dishes"
+    },
+    {
+     "artist": "Toto",
+     "title": "Rosanna",
+     "score": 0.586,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "toto|rosanna"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "rihanna|breakin dishes",
+    "artist": "Rihanna",
+    "title": "Breakin' Dishes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=59f961cbac2",
+      "rank": 86
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "the stokes The Adults Are Talking",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "The Adults Are Talking",
+    "score": 1.087,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.96,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.99,
+     "title_sim": 0.91,
+     "title_lead": 4
+    },
+    "song_key": "the strokes|the adults are talking"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "The Adults Are Talking",
+     "score": 1.087,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "the strokes|the adults are talking"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "the strokes|the adults are talking",
+    "artist": "The Strokes",
+    "title": "The Adults Are Talking",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=5f001c15610",
+      "rank": 96
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "the stokes bad decisions",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Bad Decisions",
+    "score": 1.168,
+    "popularity": 60,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "the strokes|bad decisions"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Bad Decisions",
+     "score": 1.168,
+     "popularity": 60,
+     "karaoke": true,
+     "song_key": "the strokes|bad decisions"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "the strokes|bad decisions",
+    "artist": "The Strokes",
+    "title": "Bad Decisions",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "CC",
+      "brand_name": "CC Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=7cc9c5da17c",
+      "rank": 6
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "the stokes why are sundays so depressing",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "The Strokes",
+    "title": "The Adults Are Talking",
+    "score": 0.563,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.36,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 0.59,
+     "title_sim": 0.43,
+     "title_lead": 0
+    },
+    "song_key": "the strokes|the adults are talking"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "The Adults Are Talking",
+     "score": 0.563,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "the strokes|the adults are talking"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "strokes adults are talking",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "The Adults Are Talking",
+    "score": 1.107,
+    "popularity": 70,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.91,
+     "title_lead": 3
+    },
+    "song_key": "the strokes|the adults are talking"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "The Adults Are Talking",
+     "score": 1.107,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "the strokes|the adults are talking"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "the strokes|the adults are talking",
+    "artist": "The Strokes",
+    "title": "The Adults Are Talking",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=5f001c15610",
+      "rank": 96
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo park boks",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 0.828,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.92,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 0.85,
+     "title_sim": 0.44,
+     "title_lead": 1
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 0.828,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    },
+    {
+     "artist": "Bob Seger",
+     "title": "Turn the Page",
+     "score": 0.466,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "bob seger|turn the page"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo park boxs",
+  "identify": {
+   "status": "candidates",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 0.826,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.92,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 0.85,
+     "title_sim": 0.44,
+     "title_lead": 0
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 0.826,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    },
+    {
+     "artist": "Bob Seger",
+     "title": "Turn the Page",
+     "score": 0.466,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "bob seger|turn the page"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   },
+   {
+    "song_key": "bob seger|turn the page",
+    "artist": "Bob Seger",
+    "title": "Turn the Page",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=e917593457c",
+      "rank": 66
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo park books from boxs",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "score": 1.082,
+    "popularity": 48,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.98,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 0.97,
+     "title_lead": 3
+    },
+    "song_key": "maximo park|books from boxes"
+   },
+   "candidates": [
+    {
+     "artist": "Maxïmo Park",
+     "title": "Books from Boxes",
+     "score": 1.082,
+     "popularity": 48,
+     "karaoke": true,
+     "song_key": "maximo park|books from boxes"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "maximo park|books from boxes",
+    "artist": "Maxïmo Park",
+    "title": "Books from Boxes",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ff5c8b8246b",
+      "rank": 86
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "maximo park limasol",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "cheery pie",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Warrant",
+    "title": "Cherry Pie",
+    "score": 0.953,
+    "popularity": 66,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.89,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.85,
+     "title_sim": 0.9,
+     "title_lead": 2
+    },
+    "song_key": "warrant|cherry pie"
+   },
+   "candidates": [
+    {
+     "artist": "Warrant",
+     "title": "Cherry Pie",
+     "score": 0.953,
+     "popularity": 66,
+     "karaoke": true,
+     "song_key": "warrant|cherry pie"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "warrant|cherry pie",
+    "artist": "Warrant",
+    "title": "Cherry Pie",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=cc33b7f3162",
+      "rank": 66
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "She used to be mi e",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Sara Bareilles",
+    "title": "She Used to Be Mine",
+    "score": 0.988,
+    "popularity": 68,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.93,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.88,
+     "title_sim": 0.97,
+     "title_lead": 4
+    },
+    "song_key": "sara bareilles|she used to be mine"
+   },
+   "candidates": [
+    {
+     "artist": "Sara Bareilles",
+     "title": "She Used to Be Mine",
+     "score": 0.988,
+     "popularity": 68,
+     "karaoke": true,
+     "song_key": "sara bareilles|she used to be mine"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "sara bareilles|she used to be mine",
+    "artist": "Sara Bareilles",
+    "title": "She Used to Be Mine",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=1433c719e51",
+      "rank": 56
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "The Strokes Machu Pichu",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Machu Picchu",
+    "score": 1.045,
+    "popularity": 64,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 0.98,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 0.96,
+     "title_lead": 2
+    },
+    "song_key": "the strokes|machu picchu"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Machu Picchu",
+     "score": 1.045,
+     "popularity": 64,
+     "karaoke": false,
+     "song_key": "the strokes|machu picchu"
+    },
+    {
+     "artist": "Camilo, Evaluna Montaner",
+     "title": "Machu Picchu",
+     "score": 0.737,
+     "popularity": 50,
+     "karaoke": true,
+     "song_key": "camilo evaluna montaner|machu picchu"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "the strokes max pichu",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Machu Picchu",
+    "score": 0.914,
+    "popularity": 64,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 0.88,
+     "title_cov": 0.76,
+     "artist_cov": 1.0,
+     "sim": 0.89,
+     "title_sim": 0.76,
+     "title_lead": 0
+    },
+    "song_key": "the strokes|machu picchu"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Machu Picchu",
+     "score": 0.914,
+     "popularity": 64,
+     "karaoke": false,
+     "song_key": "the strokes|machu picchu"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "the strokes max picu",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Machu Picchu",
+    "score": 0.875,
+    "popularity": 64,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 0.85,
+     "title_cov": 0.7,
+     "artist_cov": 1.0,
+     "sim": 0.86,
+     "title_sim": 0.7,
+     "title_lead": 0
+    },
+    "song_key": "the strokes|machu picchu"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Machu Picchu",
+     "score": 0.875,
+     "popularity": 64,
+     "karaoke": false,
+     "song_key": "the strokes|machu picchu"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "the strokes macchu pichu",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Machu Picchu",
+    "score": 1.028,
+    "popularity": 64,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 0.96,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.96,
+     "title_sim": 0.92,
+     "title_lead": 2
+    },
+    "song_key": "the strokes|machu picchu"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Machu Picchu",
+     "score": 1.028,
+     "popularity": 64,
+     "karaoke": false,
+     "song_key": "the strokes|machu picchu"
+    },
+    {
+     "artist": "Camilo, Evaluna Montaner",
+     "title": "Machu Picchu",
+     "score": 0.681,
+     "popularity": 50,
+     "karaoke": true,
+     "song_key": "camilo evaluna montaner|machu picchu"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "the stokes max picu",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "The Strokes",
+    "title": "Machu Picchu",
+    "score": 0.872,
+    "popularity": 64,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 0.85,
+     "title_cov": 0.7,
+     "artist_cov": 1.0,
+     "sim": 0.84,
+     "title_sim": 0.7,
+     "title_lead": 0
+    },
+    "song_key": "the strokes|machu picchu"
+   },
+   "candidates": [
+    {
+     "artist": "The Strokes",
+     "title": "Machu Picchu",
+     "score": 0.872,
+     "popularity": 64,
+     "karaoke": false,
+     "song_key": "the strokes|machu picchu"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "Blake Sheltom Texas",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Blake Shelton",
+    "title": "Texas",
+    "score": 1.159,
+    "popularity": 55,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.95,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "blake shelton|texas"
+   },
+   "candidates": [
+    {
+     "artist": "Blake Shelton",
+     "title": "Texas",
+     "score": 1.159,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "blake shelton|texas"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "blake shelton|texas",
+    "artist": "Blake Shelton",
+    "title": "Texas",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=28ccd7c09dc",
+      "rank": 86
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Breaking Rust LIivn' on Borrowed Time",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "queen bohemian rapsody",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Queen",
+    "title": "Bohemian Rhapsody",
+    "score": 1.122,
+    "popularity": 88,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.98,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 0.97,
+     "title_lead": 2
+    },
+    "song_key": "queen|bohemian rhapsody"
+   },
+   "candidates": [
+    {
+     "artist": "Queen",
+     "title": "Bohemian Rhapsody",
+     "score": 1.122,
+     "popularity": 88,
+     "karaoke": true,
+     "song_key": "queen|bohemian rhapsody"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "queen|bohemian rhapsody",
+    "artist": "Queen",
+    "title": "Bohemian Rhapsody",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=c568dcc53e9",
+      "rank": 16
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "ok go your so damn hot",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "OK Go",
+    "title": "You're So Damn Hot",
+    "score": 1.074,
+    "popularity": 40,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.98,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 0.97,
+     "title_lead": 4
+    },
+    "song_key": "ok go|youre so damn hot"
+   },
+   "candidates": [
+    {
+     "artist": "OK Go",
+     "title": "You're So Damn Hot",
+     "score": 1.074,
+     "popularity": 40,
+     "karaoke": true,
+     "song_key": "ok go|youre so damn hot"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "ok go|youre so damn hot",
+    "artist": "OK Go",
+    "title": "You're So Damn Hot",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2e7dae4ba91",
+      "rank": 26
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "Jaden Michaels Momma's Girl",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "huntrix golden",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Huntrix",
+    "title": "Golden",
+    "score": 1.198,
+    "popularity": 88,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "huntrix|golden"
+   },
+   "candidates": [
+    {
+     "artist": "Huntrix",
+     "title": "Golden",
+     "score": 1.198,
+     "popularity": 88,
+     "karaoke": true,
+     "song_key": "huntrix|golden"
+    },
+    {
+     "artist": "Harry Styles",
+     "title": "Golden",
+     "score": 0.717,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "harry styles|golden"
+    },
+    {
+     "artist": "Jill Scott",
+     "title": "Golden",
+     "score": 0.697,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "jill scott|golden"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "huntrix|golden",
+    "artist": "Huntrix",
+    "title": "Golden",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=95fdb9c91e2",
+      "rank": 46
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "my tears richo",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Taylor Swift",
+    "title": "my tears ricochet",
+    "score": 0.925,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.83,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.85,
+     "title_sim": 0.84,
+     "title_lead": 2
+    },
+    "song_key": "taylor swift|my tears ricochet"
+   },
+   "candidates": [
+    {
+     "artist": "Taylor Swift",
+     "title": "my tears ricochet",
+     "score": 0.925,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "taylor swift|my tears ricochet"
+    },
+    {
+     "artist": "The Weeknd",
+     "title": "Save Your Tears",
+     "score": 0.563,
+     "popularity": 84,
+     "karaoke": true,
+     "song_key": "the weeknd|save your tears"
+    },
+    {
+     "artist": "Blake Shelton",
+     "title": "Texas",
+     "score": 0.541,
+     "popularity": 55,
+     "karaoke": true,
+     "song_key": "blake shelton|texas"
+    },
+    {
+     "artist": "George Strait",
+     "title": "Texas",
+     "score": 0.481,
+     "popularity": 45,
+     "karaoke": false,
+     "song_key": "george strait|texas"
+    },
+    {
+     "artist": "Camilo",
+     "title": "Vida de Rico",
+     "score": 0.472,
+     "popularity": 74,
+     "karaoke": true,
+     "song_key": "camilo|vida de rico"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "taylor swift|my tears ricochet",
+    "artist": "Taylor Swift",
+    "title": "my tears ricochet",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=e6e442af0b8",
+      "rank": 46
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "RONAN KEATING ARTHUR THEME",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "that song from titanic",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "the let it go song from frozen",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "is this the real life is this just fantasy",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "sweet caroline ba ba ba",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "dont stop believing journey song",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Journey",
+    "title": "Don't Stop Believin'",
+    "score": 1.055,
+    "popularity": 86,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.89,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.9,
+     "title_sim": 0.86,
+     "title_lead": 3
+    },
+    "song_key": "journey|dont stop believin"
+   },
+   "candidates": [
+    {
+     "artist": "Journey",
+     "title": "Don't Stop Believin'",
+     "score": 1.055,
+     "popularity": 86,
+     "karaoke": true,
+     "song_key": "journey|dont stop believin"
+    },
+    {
+     "artist": "Journey",
+     "title": "Any Way You Want It",
+     "score": 0.508,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "journey|any way you want it"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "journey|dont stop believin",
+    "artist": "Journey",
+    "title": "Don't Stop Believin'",
+    "karaoke": true,
+    "version_count": 55,
+    "versions": [
+     {
+      "brand_code": "CC",
+      "brand_name": "CC Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=75681f85ba7",
+      "rank": 6
+     },
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b1573b56af6",
+      "rank": 16
+     },
+     {
+      "brand_code": "FBK",
+      "brand_name": "Funbox Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=ef439bd02a6",
+      "rank": 26
+     },
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=5f769f06dd8",
+      "rank": 36
+     },
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=0496adf4788",
+      "rank": 46
+     },
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=592acace006",
+      "rank": 56
+     },
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=cc81923c608",
+      "rank": 66
+     },
+     {
+      "brand_code": "OBSK",
+      "brand_name": "ObsKure Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=52bec5a89c3",
+      "rank": 76
+     },
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=7b5fda7408a",
+      "rank": 86
+     },
+     {
+      "brand_code": "DBK",
+      "brand_name": "Deep Bench Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=6cc73aa8fb7",
+      "rank": 96
+     },
+     {
+      "brand_code": "COMM01",
+      "brand_name": "COMM01",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=8436beaa506",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM02",
+      "brand_name": "COMM02",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3f499bba8d6",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM03",
+      "brand_name": "COMM03",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=126fcab5db6",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM04",
+      "brand_name": "COMM04",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=98e87ea8080",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM05",
+      "brand_name": "COMM05",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=0f6dd64b03e",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM06",
+      "brand_name": "COMM06",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=2c0f217e8b5",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM07",
+      "brand_name": "COMM07",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=a24e9c1c955",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM08",
+      "brand_name": "COMM08",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=449e060ae6e",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM09",
+      "brand_name": "COMM09",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b65cb9c52f0",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM10",
+      "brand_name": "COMM10",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=0f560be4ab7",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM11",
+      "brand_name": "COMM11",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=0de5262cfcd",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM12",
+      "brand_name": "COMM12",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=0f42e5ddf26",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM13",
+      "brand_name": "COMM13",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b15f573e5f0",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM14",
+      "brand_name": "COMM14",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=20938c96c69",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM15",
+      "brand_name": "COMM15",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=86dbb877150",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM16",
+      "brand_name": "COMM16",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3cf9a67d06d",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM17",
+      "brand_name": "COMM17",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=3cfdcb62617",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM18",
+      "brand_name": "COMM18",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=4fb30f49669",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM19",
+      "brand_name": "COMM19",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=a4a0bd86e98",
+      "rank": 1006
+     },
+     {
+      "brand_code": "COMM20",
+      "brand_name": "COMM20",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=e1c29ef06a2",
+      "rank": 1006
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     },
+     {
+      "brand_code": "SC",
+      "brand_name": "Sound Choice",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2016
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     },
+     {
+      "brand_code": "SF",
+      "brand_name": "Sunfly",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2036
+     },
+     {
+      "brand_code": "CB",
+      "brand_name": "Chart Buster",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2046
+     },
+     {
+      "brand_code": "ZM",
+      "brand_name": "Zoom",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2056
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     },
+     {
+      "brand_code": "PT",
+      "brand_name": "Party Tyme",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2096
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     },
+     {
+      "brand_code": "DISC01",
+      "brand_name": "DISC01",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC02",
+      "brand_name": "DISC02",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC03",
+      "brand_name": "DISC03",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC04",
+      "brand_name": "DISC04",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC05",
+      "brand_name": "DISC05",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC06",
+      "brand_name": "DISC06",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC07",
+      "brand_name": "DISC07",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC08",
+      "brand_name": "DISC08",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC09",
+      "brand_name": "DISC09",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC10",
+      "brand_name": "DISC10",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC11",
+      "brand_name": "DISC11",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC12",
+      "brand_name": "DISC12",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC13",
+      "brand_name": "DISC13",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     },
+     {
+      "brand_code": "DISC14",
+      "brand_name": "DISC14",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 3006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "xqzv blorp wibble",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "zzqxnothing",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "dracula tame impala",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "score": 1.188,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "tame impala|dracula"
+   },
+   "candidates": [
+    {
+     "artist": "Tame Impala",
+     "title": "Dracula",
+     "score": 1.188,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "tame impala|dracula"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "tame impala|dracula",
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=be16cd966be",
+      "rank": 16
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "dracula",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "score": 1.108,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "tame impala|dracula"
+   },
+   "candidates": [
+    {
+     "artist": "Tame Impala",
+     "title": "Dracula",
+     "score": 1.108,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "tame impala|dracula"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "tame impala|dracula",
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=be16cd966be",
+      "rank": 16
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "tame impala dracla",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "score": 1.102,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.97,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.97,
+     "title_sim": 0.92,
+     "title_lead": 1
+    },
+    "song_key": "tame impala|dracula"
+   },
+   "candidates": [
+    {
+     "artist": "Tame Impala",
+     "title": "Dracula",
+     "score": 1.102,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "tame impala|dracula"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "tame impala|dracula",
+    "artist": "Tame Impala",
+    "title": "Dracula",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "LC",
+      "brand_name": "Lemmy Caution",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=be16cd966be",
+      "rank": 16
+     },
+     {
+      "brand_code": "EK",
+      "brand_name": "Easy Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2106
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "drop dead olivia",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Rodrigo",
+    "title": "drop dead",
+    "score": 1.145,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.5,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "olivia rodrigo|drop dead"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Rodrigo",
+     "title": "drop dead",
+     "score": 1.145,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "olivia rodrigo|drop dead"
+    },
+    {
+     "artist": "Adele",
+     "title": "Rolling in the Deep",
+     "score": 0.442,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "adele|rolling in the deep"
+    },
+    {
+     "artist": "Bee Gees",
+     "title": "How Deep Is Your Love",
+     "score": 0.397,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "bee gees|how deep is your love"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "olivia rodrigo|drop dead",
+    "artist": "Olivia Rodrigo",
+    "title": "drop dead",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=fe21319d553",
+      "rank": 46
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "drop dead olivia rodrigo",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Rodrigo",
+    "title": "drop dead",
+    "score": 1.185,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 2
+    },
+    "song_key": "olivia rodrigo|drop dead"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Rodrigo",
+     "title": "drop dead",
+     "score": 1.185,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "olivia rodrigo|drop dead"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "olivia rodrigo|drop dead",
+    "artist": "Olivia Rodrigo",
+    "title": "drop dead",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "NOMAD",
+      "brand_name": "Nomad Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=fe21319d553",
+      "rank": 46
+     },
+     {
+      "brand_code": "SBI",
+      "brand_name": "SBI Karaoke",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2026
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "honeybee olivia rodrigo",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Rodrigo",
+    "title": "honeybee",
+    "score": 1.115,
+    "popularity": 55,
+    "karaoke": false,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "olivia rodrigo|honeybee"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Rodrigo",
+     "title": "honeybee",
+     "score": 1.115,
+     "popularity": 55,
+     "karaoke": false,
+     "song_key": "olivia rodrigo|honeybee"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": []
+ },
+ {
+  "q": "the cure olivia rodrigo",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "whats wrong with me olivia rodrigo",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "man i need olivia dean",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "score": 1.192,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "olivia dean|man i need"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Dean",
+     "title": "Man I Need",
+     "score": 1.192,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "olivia dean|man i need"
+    },
+    {
+     "artist": "Olivia Rodrigo",
+     "title": "drop dead",
+     "score": 0.589,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "olivia rodrigo|drop dead"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "olivia dean|man i need",
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b0423ed1ff9",
+      "rank": 86
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "man i need",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "score": 1.112,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 3
+    },
+    "song_key": "olivia dean|man i need"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Dean",
+     "title": "Man I Need",
+     "score": 1.112,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "olivia dean|man i need"
+    },
+    {
+     "artist": "Shania Twain",
+     "title": "Man! I Feel Like a Woman!",
+     "score": 0.748,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "shania twain|man i feel like a woman"
+    },
+    {
+     "artist": "Michael Jackson",
+     "title": "Man in the Mirror",
+     "score": 0.618,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "michael jackson|man in the mirror"
+    },
+    {
+     "artist": "Billy Joel",
+     "title": "Piano Man",
+     "score": 0.568,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "billy joel|piano man"
+    },
+    {
+     "artist": "Elton John",
+     "title": "Rocket Man (I Think It's Going to Be a Long, Long Time)",
+     "score": 0.552,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "elton john|rocket man i think its going to be a long long time"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "olivia dean|man i need",
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b0423ed1ff9",
+      "rank": 86
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "olivia dean man i ned",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "score": 1.107,
+    "popularity": 82,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.97,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.98,
+     "title_sim": 0.95,
+     "title_lead": 2
+    },
+    "song_key": "olivia dean|man i need"
+   },
+   "candidates": [
+    {
+     "artist": "Olivia Dean",
+     "title": "Man I Need",
+     "score": 1.107,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "olivia dean|man i need"
+    },
+    {
+     "artist": "Olivia Rodrigo",
+     "title": "drop dead",
+     "score": 0.585,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "olivia rodrigo|drop dead"
+    },
+    {
+     "artist": "Shania Twain",
+     "title": "Man! I Feel Like a Woman!",
+     "score": 0.483,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "shania twain|man i feel like a woman"
+    },
+    {
+     "artist": "Elton John",
+     "title": "Rocket Man (I Think It's Going to Be a Long, Long Time)",
+     "score": 0.45,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "elton john|rocket man i think its going to be a long long time"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "olivia dean|man i need",
+    "artist": "Olivia Dean",
+    "title": "Man I Need",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "SDK",
+      "brand_name": "SNDL Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=b0423ed1ff9",
+      "rank": 86
+     },
+     {
+      "brand_code": "VS",
+      "brand_name": "Vocal Star",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2066
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "the fate of ophelia",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Taylor Swift",
+    "title": "The Fate of Ophelia",
+    "score": 1.12,
+    "popularity": 90,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 4
+    },
+    "song_key": "taylor swift|the fate of ophelia"
+   },
+   "candidates": [
+    {
+     "artist": "Taylor Swift",
+     "title": "The Fate of Ophelia",
+     "score": 1.12,
+     "popularity": 90,
+     "karaoke": true,
+     "song_key": "taylor swift|the fate of ophelia"
+    },
+    {
+     "artist": "Adele",
+     "title": "Set Fire to the Rain",
+     "score": 0.466,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "adele|set fire to the rain"
+    },
+    {
+     "artist": "Johnny Cash",
+     "title": "Ring of Fire",
+     "score": 0.465,
+     "popularity": 76,
+     "karaoke": true,
+     "song_key": "johnny cash|ring of fire"
+    },
+    {
+     "artist": "Lady Gaga",
+     "title": "Poker Face",
+     "score": 0.452,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "lady gaga|poker face"
+    },
+    {
+     "artist": "Tom Petty",
+     "title": "Free Fallin'",
+     "score": 0.42,
+     "popularity": 80,
+     "karaoke": true,
+     "song_key": "tom petty|free fallin"
+    }
+   ]
+  },
+  "kind": "completed",
+  "groups": [
+   {
+    "song_key": "taylor swift|the fate of ophelia",
+    "artist": "Taylor Swift",
+    "title": "The Fate of Ophelia",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=7ce0ed1e58b",
+      "rank": 56
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "fate of ophelia taylor swfit",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Taylor Swift",
+    "title": "The Fate of Ophelia",
+    "score": 1.085,
+    "popularity": 90,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.94,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 0.9,
+     "title_sim": 0.9,
+     "title_lead": 3
+    },
+    "song_key": "taylor swift|the fate of ophelia"
+   },
+   "candidates": [
+    {
+     "artist": "Taylor Swift",
+     "title": "The Fate of Ophelia",
+     "score": 1.085,
+     "popularity": 90,
+     "karaoke": true,
+     "song_key": "taylor swift|the fate of ophelia"
+    },
+    {
+     "artist": "Taylor Swift",
+     "title": "Shake It Off",
+     "score": 0.64,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "taylor swift|shake it off"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": [
+   {
+    "song_key": "taylor swift|the fate of ophelia",
+    "artist": "Taylor Swift",
+    "title": "The Fate of Ophelia",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "FAKEY",
+      "brand_name": "FakeyOke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=7ce0ed1e58b",
+      "rank": 56
+     },
+     {
+      "brand_code": "SK",
+      "brand_name": "Sing King",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2076
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "elizabeth taylor taylor swift",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "Taylor Swift",
+    "title": "Elizabeth Taylor",
+    "score": 1.091,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 0.75,
+     "title_lead": 2
+    },
+    "song_key": "taylor swift|elizabeth taylor"
+   },
+   "candidates": [
+    {
+     "artist": "Taylor Swift",
+     "title": "Elizabeth Taylor",
+     "score": 1.091,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "taylor swift|elizabeth taylor"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "taylor swift|elizabeth taylor",
+    "artist": "Taylor Swift",
+    "title": "Elizabeth Taylor",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "PMK",
+      "brand_name": "Punk Media Karaoke",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=9916ef5478a",
+      "rank": 66
+     },
+     {
+      "brand_code": "MR",
+      "brand_name": "Mr. Entertainer",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2086
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "walk my walk breaking rust",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "ninajirachi delete",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "getting killed geese",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "geese getting kiled",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "berghain rosalia",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "Toto",
+    "title": "Rosanna",
+    "score": 0.594,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.34,
+     "title_cov": 1.0,
+     "artist_cov": 0.0,
+     "sim": 0.43,
+     "title_sim": 0.45,
+     "title_lead": 0
+    },
+    "song_key": "toto|rosanna"
+   },
+   "candidates": [
+    {
+     "artist": "Toto",
+     "title": "Rosanna",
+     "score": 0.594,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "toto|rosanna"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "spaghetti le sserafim",
+  "identify": {
+   "status": "confident",
+   "best": {
+    "artist": "LE SSERAFIM",
+    "title": "SPAGHETTI",
+    "score": 1.185,
+    "popularity": 75,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 1.0,
+     "title_cov": 1.0,
+     "artist_cov": 1.0,
+     "sim": 1.0,
+     "title_sim": 1.0,
+     "title_lead": 1
+    },
+    "song_key": "le sserafim|spaghetti"
+   },
+   "candidates": [
+    {
+     "artist": "LE SSERAFIM",
+     "title": "SPAGHETTI",
+     "score": 1.185,
+     "popularity": 75,
+     "karaoke": true,
+     "song_key": "le sserafim|spaghetti"
+    }
+   ]
+  },
+  "kind": "cosmetic",
+  "groups": [
+   {
+    "song_key": "le sserafim|spaghetti",
+    "artist": "LE SSERAFIM",
+    "title": "SPAGHETTI",
+    "karaoke": true,
+    "version_count": 2,
+    "versions": [
+     {
+      "brand_code": "BELLY",
+      "brand_name": "BellySings",
+      "kind": "community",
+      "youtube_url": "https://www.youtube.com/watch?v=68b40d53f31",
+      "rank": 36
+     },
+     {
+      "brand_code": "KV",
+      "brand_name": "Karaoke Version",
+      "kind": "commercial",
+      "youtube_url": null,
+      "rank": 2006
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "q": "winter ahead",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "ABBA",
+    "title": "The Winner Takes It All",
+    "score": 0.525,
+    "popularity": 72,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.4,
+     "title_cov": 0.33,
+     "artist_cov": 0.0,
+     "sim": 0.65,
+     "title_sim": 0.53,
+     "title_lead": 1
+    },
+    "song_key": "abba|the winner takes it all"
+   },
+   "candidates": [
+    {
+     "artist": "ABBA",
+     "title": "The Winner Takes It All",
+     "score": 0.525,
+     "popularity": 72,
+     "karaoke": true,
+     "song_key": "abba|the winner takes it all"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "redred cortis",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "body to body bts",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "Black Eyed Peas",
+    "title": "Rock That Body",
+    "score": 0.575,
+    "popularity": 68,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.46,
+     "title_cov": 0.33,
+     "artist_cov": 0.0,
+     "sim": 0.85,
+     "title_sim": 0.53,
+     "title_lead": 0
+    },
+    "song_key": "black eyed peas|rock that body"
+   },
+   "candidates": [
+    {
+     "artist": "Black Eyed Peas",
+     "title": "Rock That Body",
+     "score": 0.575,
+     "popularity": 68,
+     "karaoke": true,
+     "song_key": "black eyed peas|rock that body"
+    },
+    {
+     "artist": "Bon Jovi",
+     "title": "It's My Life",
+     "score": 0.544,
+     "popularity": 82,
+     "karaoke": true,
+     "song_key": "bon jovi|its my life"
+    },
+    {
+     "artist": "Justin Bieber",
+     "title": "Baby",
+     "score": 0.529,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "justin bieber|baby"
+    },
+    {
+     "artist": "Clean Bandit",
+     "title": "Baby",
+     "score": 0.515,
+     "popularity": 62,
+     "karaoke": true,
+     "song_key": "clean bandit|baby"
+    },
+    {
+     "artist": "Brandy & Monica",
+     "title": "The Boy Is Mine",
+     "score": 0.5,
+     "popularity": 70,
+     "karaoke": true,
+     "song_key": "brandy and monica|the boy is mine"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "the happy dictator gorillaz",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "birdbrain jamie paige",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "aint in la adela",
+  "identify": {
+   "status": "none",
+   "best": {
+    "artist": "Adele",
+    "title": "Set Fire to the Rain",
+    "score": 0.568,
+    "popularity": 78,
+    "karaoke": true,
+    "detail": {
+     "q_cov": 0.4,
+     "title_cov": 0.33,
+     "artist_cov": 1.0,
+     "sim": 0.53,
+     "title_sim": 0.33,
+     "title_lead": 0
+    },
+    "song_key": "adele|set fire to the rain"
+   },
+   "candidates": [
+    {
+     "artist": "Adele",
+     "title": "Set Fire to the Rain",
+     "score": 0.568,
+     "popularity": 78,
+     "karaoke": true,
+     "song_key": "adele|set fire to the rain"
+    }
+   ]
+  },
+  "kind": "content",
+  "groups": []
+ },
+ {
+  "q": "",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": " ",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "karaoke",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "x",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "🎤🎤",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "שיר",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ },
+ {
+  "q": "歌",
+  "identify": {
+   "status": "none",
+   "best": null,
+   "candidates": []
+  },
+  "kind": null,
+  "groups": []
+ }
+]

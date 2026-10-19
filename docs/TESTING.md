@@ -178,6 +178,27 @@ test.describe('Smoke Tests', () => {
 });
 ```
 
+## Search local stack
+
+The search service (`backend/search`) on a small fixture index, for the mobile app's Maestro E2E flows. Run it together with gen's local stack (`scripts/local-stack.sh` in karaoke-gen, API on :8010).
+
+```bash
+make search-stack-up            # or scripts/search-local-stack.sh up   (idempotent)
+scripts/search-local-stack.sh status
+scripts/search-local-stack.sh down
+curl -s 'http://127.0.0.1:8020/api/search?q=starlite%20muse' | jq .identification.status   # "confident"
+```
+
+- `up` builds the fixture index into `.local-stack/song-index/` (`python -m karaoke_decide.song_search.fixtures build <dir>`, which reuses the song-index-build job's local dry run on `tests/fixtures/song_search/`), then runs `uvicorn backend.search.app:search_app` on :8020 with `SONG_INDEX_LOCAL_DIR`, `GEN_API_URL` (default `http://127.0.0.1:8010`) and `DECIDE_GEN_PARTNER_SECRET=local-stack-secret`. The pid is `.local-stack/search.pid`, the log `.local-stack/search.log`.
+- `GET /api/search/offline-index` returns a URL on the same server (`/api/search/_local/offline.db.gz`), a route mounted only when `SONG_INDEX_LOCAL_DIR` is set. For an Android emulator set `SEARCH_LOCAL_PUBLIC_URL=http://10.0.2.2:8020` before `up` so the manifest URL is reachable from the device; `SEARCH_LOCAL_PORT` changes the port.
+- **`/api/search/resolve`** calls gen's `POST /api/kjbox/catalog/resolve`, which needs both stacks to share the partner secret. Start gen's local stack with it (gen reads `DECIDE_GEN_PARTNER_SECRET` from the environment, and `local-stack.sh` passes its environment through to the backend):
+
+  ```bash
+  DECIDE_GEN_PARTNER_SECRET=local-stack-secret scripts/local-stack.sh up   # in karaoke-gen
+  ```
+
+  Without it gen rejects the call and `/resolve` answers `{}` (same as when decide has no secret).
+
 ## CI Pipeline
 
 ### Required Checks (Block PR Merge)

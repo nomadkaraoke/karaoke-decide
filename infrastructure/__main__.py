@@ -8,9 +8,13 @@ Resources managed:
 - Cloud Run service (backend API)
 - MusicBrainz weekly refresh (Cloud Run Job, Scheduler, staging dataset, bucket)
 - ListenBrainz refresh (Cloud Run Job, Scheduler, staging dataset)
+- Song search (karaoke-decide-search Cloud Run service, song-index-build daily Job,
+  public offline-index bucket, uptime ping)
 - IAM bindings (service account permissions)
 - Cloudflare Worker (API proxy)
 """
+
+from pathlib import Path
 
 import pulumi
 import pulumi_cloudflare as cloudflare
@@ -651,6 +655,333 @@ gcp.cloudscheduler.Job(
 )
 
 # =============================================================================
+# Song search (Cloud Run service + daily index build job)
+# =============================================================================
+# karaoke-decide-search serves /api/search* for the Nomad Karaoke app (same image
+# as the API, different command). It loads song_id.db + availability.db for the run
+# named by SONG_INDEX_RUN (empty/absent -> song-index/latest.json). The
+# song-index-build job builds the indexes daily, publishes them, and rolls the
+# service by setting SONG_INDEX_RUN (a new revision); nothing else may set it.
+# See backend/search/app.py, karaoke_decide/etl/song_index_build.py and
+# docs/ARCHITECTURE.md § Song search.
+#
+# The CI deploy step (.github/workflows/ci.yml) repeats these settings with
+# `gcloud run deploy --update-env-vars` (never --set-env-vars, which would wipe
+# SONG_INDEX_RUN); tests/unit/test_infra_ci_parity.py keeps the two in step.
+#
+# First rollout: the service can't pass its /api/search/ready startup probe until an
+# index exists, so bootstrap with searchServiceEnabled=false, run the job once with
+# --no-deploy, then enable the service (docs/ARCHITECTURE.md § Song search, ops).
+
+SEARCH_SERVICE_NAME = "karaoke-decide-search"
+SONG_INDEX_JOB_NAME = "song-index-build"
+# Created and owned by karaoke-gen (kn-data-sync writes song-id/, full/, community/).
+KN_DATA_BUCKET = "nomadkaraoke-kn-data"
+SONG_INDEX_PUBLIC_BUCKET = "nomadkaraoke-song-index-public"
+# The secret resource is owned by karaoke-gen's Pulumi (modules/secrets.py); decide
+# only reads it.
+DECIDE_GEN_PARTNER_SECRET = "decide-gen-partner-secret"
+SEARCH_HOST = "decide.nomadkaraoke.com"
+SEARCH_OFFLINE_URL_TEMPLATE = "https://decide.nomadkaraoke.com/offline-index/{run}/offline.db.gz"
+SEARCH_GEN_API_URL = "https://api.nomadkaraoke.com"
+
+search_service_enabled = config.get_bool("searchServiceEnabled")
+if search_service_enabled is None:
+    search_service_enabled = True
+
+# Public, get-only home of offline.db.gz (the app downloads it through the Worker's
+# /offline-index/ passthrough). allUsers may read an object by its exact name but
+# can't list, and run dirs carry an unguessable token. Server DBs stay in kn-data.
+song_index_public_bucket = gcp.storage.Bucket(
+    "song-index-public-bucket",
+    name=SONG_INDEX_PUBLIC_BUCKET,
+    project=project,
+    location="US-CENTRAL1",
+    uniform_bucket_level_access=True,
+    public_access_prevention="inherited",
+    # No age-based lifecycle: the served offline.db.gz may be any age (a stalled
+    # KN sync means no new run), and the manifest keeps advertising it. The job
+    # prunes to the live runs + the previous 3.
+    soft_delete_policy={"retention_duration_seconds": 0},
+)
+gcp.storage.BucketIAMMember(
+    "song-index-public-object-reader",
+    bucket=song_index_public_bucket.name,
+    # objects.get only (no objects.list, unlike objectViewer).
+    role="roles/storage.legacyObjectReader",
+    member="allUsers",
+)
+
+# --- Search service runtime identity ---------------------------------------
+song_search_sa = gcp.serviceaccount.Account(
+    "song-search-sa",
+    account_id="song-search",
+    display_name="Song Search Service",
+    description="Runtime identity of the karaoke-decide-search Cloud Run service",
+    project=project,
+)
+song_search_member = song_search_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+song_search_index_reader = gcp.storage.BucketIAMMember(
+    "song-search-kn-data-reader",
+    bucket=KN_DATA_BUCKET,
+    role="roles/storage.objectViewer",
+    member=song_search_member,
+)
+song_search_secret_access = gcp.secretmanager.SecretIamMember(
+    "song-search-gen-partner-secret-access",
+    project=project,
+    secret_id=DECIDE_GEN_PARTNER_SECRET,
+    role="roles/secretmanager.secretAccessor",
+    member=song_search_member,
+)
+
+# --- Index build job identity ----------------------------------------------
+song_index_build_sa = gcp.serviceaccount.Account(
+    "song-index-build-sa",
+    account_id="song-index-build",
+    display_name="Song Index Build Job",
+    description="Runs the daily song-index-build Cloud Run Job and rolls karaoke-decide-search",
+    project=project,
+)
+song_index_build_member = song_index_build_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+# Read the sources (song-id/, full/, community/) and list song-index/ for pruning.
+gcp.storage.BucketIAMMember(
+    "song-index-build-kn-data-reader",
+    bucket=KN_DATA_BUCKET,
+    role="roles/storage.objectViewer",
+    member=song_index_build_member,
+)
+# Write/overwrite/delete only under song-index/ (KN exports stay read-only).
+gcp.storage.BucketIAMMember(
+    "song-index-build-kn-data-writer",
+    bucket=KN_DATA_BUCKET,
+    role="roles/storage.objectAdmin",
+    member=song_index_build_member,
+    condition={
+        "title": "song-index prefix only",
+        "description": "song-index-build may only write and prune song-index/",
+        "expression": (f'resource.name.startsWith("projects/_/buckets/{KN_DATA_BUCKET}/objects/song-index/")'),
+    },
+)
+gcp.storage.BucketIAMMember(
+    "song-index-build-public-admin",
+    bucket=song_index_public_bucket.name,
+    role="roles/storage.objectAdmin",
+    member=song_index_build_member,
+)
+# Read revisions: pruning keeps every run a live revision serves, via
+# RevisionsClient.get_revision. Revisions are separate IAM-checked resources and
+# Cloud Run documents no service-to-revision inheritance of a service-level grant,
+# so run.developer on the service alone isn't relied on; run.viewer is read-only.
+gcp.projects.IAMMember(
+    "song-index-build-run-viewer",
+    project=project,
+    role="roles/run.viewer",
+    member=song_index_build_member,
+)
+# Deploying a revision that runs as song-search requires actAs on it.
+gcp.serviceaccount.IAMMember(
+    "song-index-build-act-as-song-search",
+    service_account_id=song_search_sa.name,
+    role="roles/iam.serviceAccountUser",
+    member=song_index_build_member,
+)
+
+song_index_build_job = gcp.cloudrunv2.Job(
+    "song-index-build-job",
+    name=SONG_INDEX_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "karaoke_decide.etl.song_index_build"],
+                    "args": ["run"],
+                    # The job disk is in-memory and shares these 8 GiB with the build.
+                    "resources": {"limits": {"cpu": "2", "memory": "8Gi"}},
+                }
+            ],
+            "service_account": song_index_build_sa.email,
+            "timeout": "3600s",
+            # A failed run (or failed eval gate) logs one ERROR (error monitor alerts)
+            # and leaves the served index untouched; tomorrow's run retries.
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),
+)
+
+song_index_build_invoker = gcp.cloudrunv2.JobIamMember(
+    "song-index-build-scheduler-invoker",
+    project=project,
+    location=region,
+    name=song_index_build_job.name,
+    role="roles/run.invoker",
+    member=song_index_build_member,
+)
+
+# kn-data-sync exports song-id/ + the KN full export from ~04:30 ET; 13:30 UTC is
+# well after both. A run with an unchanged source exits after reading two JSON files.
+gcp.cloudscheduler.Job(
+    "song-index-build-scheduler",
+    name="song-index-build-daily",
+    description="Daily song-search index build + eval gate + rollout (no-op unless the source changed)",
+    project=project,
+    region=region,
+    schedule="30 13 * * *",
+    time_zone="UTC",
+    attempt_deadline="60s",
+    http_target={
+        "uri": song_index_build_job.name.apply(
+            lambda name: f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{name}:run"
+        ),
+        "http_method": "POST",
+        "oauth_token": {
+            "service_account_email": song_index_build_sa.email,
+            "scope": "https://www.googleapis.com/auth/cloud-platform",
+        },
+    },
+    opts=pulumi.ResourceOptions(depends_on=[song_index_build_invoker]),
+)
+
+search_service = None
+if search_service_enabled:
+    search_service = gcp.cloudrunv2.Service(
+        "karaoke-decide-search-api",
+        name=SEARCH_SERVICE_NAME,
+        project=project,
+        location=region,
+        ingress="INGRESS_TRAFFIC_ALL",
+        launch_stage="GA",
+        deletion_protection=False,
+        template={
+            "containers": [
+                {
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["uvicorn"],
+                    "args": ["backend.search.app:search_app", "--host", "0.0.0.0", "--port", "8000"],
+                    "ports": {"container_port": 8000, "name": "http1"},
+                    # SONG_INDEX_RUN is deliberately absent: the song-index-build job
+                    # adds and owns it (absent/empty -> the loader reads latest.json).
+                    # envs are ignore_changes'd below so Pulumi never resets it.
+                    "envs": [
+                        {"name": "SONG_INDEX_BUCKET", "value": KN_DATA_BUCKET},
+                        {"name": "SONG_INDEX_OFFLINE_URL_TEMPLATE", "value": SEARCH_OFFLINE_URL_TEMPLATE},
+                        {"name": "GEN_API_URL", "value": SEARCH_GEN_API_URL},
+                        {
+                            "name": "DECIDE_GEN_PARTNER_SECRET",
+                            "value_source": {
+                                "secret_key_ref": {
+                                    "secret": DECIDE_GEN_PARTNER_SECRET,
+                                    "version": "latest",
+                                }
+                            },
+                        },
+                    ],
+                    "resources": {
+                        # The index lives in the in-memory /tmp alongside the process.
+                        "limits": {"cpu": "1", "memory": "4Gi"},
+                        "cpu_idle": True,
+                        "startup_cpu_boost": True,
+                    },
+                    # uvicorn listens only after the index has loaded, so the probe is
+                    # refused until then: poll every 10 s for up to 240 s (Cloud Run's
+                    # cap on failure_threshold x period_seconds). /ready is 503 if the
+                    # load failed, so a revision without an index never takes traffic.
+                    "startup_probe": {
+                        "http_get": {"path": "/api/search/ready", "port": 8000},
+                        "timeout_seconds": 5,
+                        "period_seconds": 10,
+                        "failure_threshold": 24,
+                    },
+                }
+            ],
+            "scaling": {
+                "min_instance_count": 0,  # scale to zero; must match CI --min-instances 0
+                "max_instance_count": 3,
+            },
+            "max_instance_request_concurrency": 80,
+            "service_account": song_search_sa.email,
+        },
+        traffics=[
+            {
+                "percent": 100,
+                "type": "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST",
+            }
+        ],
+        opts=pulumi.ResourceOptions(
+            depends_on=[song_search_index_reader, song_search_secret_access],
+            # CI owns the image (pinned to the commit SHA) and, after creation, the env
+            # (--update-env-vars); the build job owns SONG_INDEX_RUN; operators own
+            # traffic (a rollback pins it; Pulumi must never un-pin it). Run
+            # `pulumi refresh` before an `up` that changes this service, so the
+            # template Pulumi sends carries the live SONG_INDEX_RUN.
+            ignore_changes=[
+                "template.containers[0].image",
+                "template.containers[0].envs",
+                "traffics",
+                "client",
+                "client_version",
+            ],
+        ),
+    )
+
+    gcp.cloudrunv2.ServiceIamMember(
+        "karaoke-decide-search-invoker",
+        name=search_service.name.apply(lambda name: f"projects/{project}/locations/{region}/services/{name}"),
+        project=project,
+        location=region,
+        role="roles/run.invoker",
+        member="allUsers",
+    )
+
+    # The job rolls the service (update + wait); scoped to this one service.
+    gcp.cloudrunv2.ServiceIamMember(
+        "song-index-build-search-developer",
+        name=search_service.name.apply(lambda name: f"projects/{project}/locations/{region}/services/{name}"),
+        project=project,
+        location=region,
+        role="roles/run.developer",
+        member=song_index_build_member,
+    )
+
+    # 60 s ping through the Worker from the 3-location minimum: keeps an instance
+    # warm (cpu_idle, so idle time costs ~nothing) and exercises the Worker route.
+    # No alert policy: a hard-down search service shows up in the app's own
+    # fallbacks and in ERROR logs, which already page #alerts.
+    gcp.monitoring.UptimeCheckConfig(
+        "search-health-uptime",
+        display_name="Song Search - /api/search/health",
+        project=project,
+        timeout="10s",
+        period="60s",
+        selected_regions=["USA_OREGON", "USA_IOWA", "USA_VIRGINIA"],
+        monitored_resource={
+            "type": "uptime_url",
+            "labels": {"project_id": project, "host": SEARCH_HOST},
+        },
+        http_check={
+            "path": "/api/search/health",
+            "port": 443,
+            "use_ssl": True,
+            "validate_ssl": True,
+            "request_method": "GET",
+            "accepted_response_status_codes": [{"status_value": 200}],
+        },
+        content_matchers=[{"content": '"ok":true', "matcher": "CONTAINS_STRING"}],
+    )
+
+    pulumi.export("search_service_url", search_service.uri)
+
+pulumi.export("song_index_public_bucket", song_index_public_bucket.name)
+
+# =============================================================================
 # Cloudflare Worker (API Proxy)
 # =============================================================================
 # Proxies /api/* requests from decide.nomadkaraoke.com to Cloud Run backend.
@@ -664,69 +995,9 @@ gcp.cloudscheduler.Job(
 cloudflare_account_id = config.get("cloudflareAccountId") or ""
 cloudflare_zone_id = config.get("cloudflareZoneId") or ""
 
-# Worker script content
-API_PROXY_WORKER_SCRIPT = """
-const DEFAULT_BACKEND_URL = "https://karaoke-decide-718638054799.us-central1.run.app";
-
-export default {
-  async fetch(request, env, ctx) {
-    const backendBaseUrl = env.BACKEND_URL || DEFAULT_BACKEND_URL;
-    const url = new URL(request.url);
-
-    // Only proxy /api/* requests
-    if (!url.pathname.startsWith("/api")) {
-      // Pass through to origin (GitHub Pages)
-      return fetch(request);
-    }
-
-    // Build the backend URL
-    const backendUrl = new URL(url.pathname + url.search, backendBaseUrl);
-
-    // Clone headers, removing Cloudflare-specific ones
-    const headers = new Headers(request.headers);
-    headers.delete("cf-connecting-ip");
-    headers.delete("cf-ipcountry");
-    headers.delete("cf-ray");
-    headers.delete("cf-visitor");
-
-    // Forward the request to Cloud Run
-    const backendRequest = new Request(backendUrl.toString(), {
-      method: request.method,
-      headers: headers,
-      body: request.body,
-      redirect: "follow",
-    });
-
-    try {
-      const response = await fetch(backendRequest);
-
-      // Clone response and remove CORS headers (not needed for same-origin)
-      const newHeaders = new Headers(response.headers);
-      newHeaders.delete("access-control-allow-origin");
-      newHeaders.delete("access-control-allow-credentials");
-      newHeaders.delete("access-control-allow-methods");
-      newHeaders.delete("access-control-allow-headers");
-
-      return new Response(response.body, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: "Backend unavailable",
-          message: error.message,
-        }),
-        {
-          status: 502,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-    }
-  },
-};
-"""
+# Worker script: the same file a manual setup pastes (cloudflare-worker/api-proxy.js),
+# read here so the two can't drift.
+API_PROXY_WORKER_SCRIPT = (Path(__file__).parent / "cloudflare-worker" / "api-proxy.js").read_text()
 
 # Only create Cloudflare resources if account and zone IDs are configured
 if cloudflare_account_id and cloudflare_zone_id:
@@ -738,6 +1009,13 @@ if cloudflare_account_id and cloudflare_zone_id:
         content=API_PROXY_WORKER_SCRIPT,
         main_module="worker.js",
         compatibility_date="2024-01-01",
+        # /api/search* goes to the search service (the script has the same URL as
+        # its default, for the bootstrap phase before the service exists).
+        bindings=(
+            [{"name": "SEARCH_BACKEND_URL", "type": "plain_text", "text": search_service.uri}]
+            if search_service is not None
+            else []
+        ),
     )
 
     # Route to trigger Worker for /api/* requests
@@ -745,6 +1023,15 @@ if cloudflare_account_id and cloudflare_zone_id:
         "api-proxy-route",
         zone_id=cloudflare_zone_id,
         pattern="decide.nomadkaraoke.com/api/*",
+        script=api_proxy_worker.script_name,
+    )
+
+    # Edge-cached passthrough for the app's offline.db.gz download
+    # (/offline-index/<run-token>/offline.db.gz -> the public song-index bucket).
+    cloudflare.WorkersRoute(
+        "offline-index-route",
+        zone_id=cloudflare_zone_id,
+        pattern="decide.nomadkaraoke.com/offline-index/*",
         script=api_proxy_worker.script_name,
     )
 
