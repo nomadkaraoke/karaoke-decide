@@ -12,6 +12,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.search.models import ResolveResponse
 from backend.search.ratelimit import RateLimits
 from karaoke_decide.song_search.text_normalize import song_key
 
