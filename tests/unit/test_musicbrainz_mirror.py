@@ -156,10 +156,12 @@ class TestCheckRows:
             (11, 14, True),
             (89, 100, True),
             (0, 6, True),
-            (0, 99, True),
-            # ...but a mid-size table emptying entirely is a broken extract.
-            (0, 100, False),
+            (0, 49, True),
+            # ...but a large absolute drop is a broken extract, whatever the table size.
+            (0, 50, False),
             (0, 999, False),
+            (1, 500, False),
+            (450, 500, True),
         ],
     )
     def test_bounds(self, new, old, ok):

@@ -41,15 +41,13 @@ STAGING_PREFIX = "mbx_"  # typed staging copy: musicbrainz_staging.mbx_<table>
 BUILD_WORKERS = 8
 MAX_BYTES_TABLE = 80 * GIB
 # A table may shrink a little week to week (deletes/merges); a big drop means a
-# broken extract/load, so keep last week's copy instead. Only tables with at
-# least MIN_ROWS_FOR_RATIO rows are checked: tiny ones (l_artist_genre has ~6
-# rows) routinely lose a few rows to ordinary edits, and because a kept table is
+# broken extract/load, so keep last week's copy instead. A drop must be large
+# both relatively and absolutely: tiny tables (l_artist_genre has ~6 rows)
+# routinely lose a few rows to ordinary edits, and because a kept table is
 # compared against the same stale copy next week, a false positive there would
 # alert every week forever.
 MIN_ROW_RATIO = 0.9
-MIN_ROWS_FOR_RATIO = 1000
-# Below that, only a table of this size emptying entirely counts as a broken load.
-MIN_ROWS_FOR_EMPTY_CHECK = 100
+MIN_ROW_DROP = 50
 # Bounds on the run summary so one ERROR stays readable.
 SUMMARY_MAX_TABLES = 25
 SUMMARY_MAX_ERROR_CHARS = 300
@@ -148,10 +146,8 @@ def check_rows(new: int | None, old: int | None) -> str | None:
     """Row-count sanity vs the published copy; None = OK."""
     if new is None:
         return "staging table missing"
-    if old and old >= MIN_ROWS_FOR_RATIO and new < old * MIN_ROW_RATIO:
-        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%})"
-    if old and old >= MIN_ROWS_FOR_EMPTY_CHECK and new == 0:
-        return f"empty vs published {old:,} rows"
+    if old and new < old * MIN_ROW_RATIO and old - new >= MIN_ROW_DROP:
+        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%}, -{old - new:,})"
     return None
 
 
