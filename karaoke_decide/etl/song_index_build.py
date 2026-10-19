@@ -369,6 +369,19 @@ def _brief(result: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in result.items() if not isinstance(v, list)}
 
 
+# How many dual-eval disagreements are logged and kept in the manifest.
+DUAL_EVAL_DISAGREEMENTS_CAP = 100
+
+
+def cap_disagreements(
+    disagreements: list[dict[str, Any]], cap: int = DUAL_EVAL_DISAGREEMENTS_CAP
+) -> list[dict[str, Any]]:
+    """First ``cap`` disagreements, ``confident_disagree`` ones first (stable within a type).
+    The ``q`` strings are eval-set test queries, not user data, so they are safe to log."""
+    ordered = sorted(disagreements, key=lambda d: d.get("type") != "confident_disagree")
+    return ordered[:cap]
+
+
 def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _Stats | None = None) -> dict[str, Any]:
     """Build the three indexes into ``workdir`` from local inputs (deleted once used),
     evaluate them, and return the manifest (``files`` hashed from the built files).
@@ -408,11 +421,18 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
     offline_db.unlink(missing_ok=True)  # only the .gz is published
     dual = {
         **dual,
+        "disagreements": cap_disagreements(dual.get("disagreements", [])),
         "disagree_rate": round(dual["confident_disagree"] / dual["total"], 6) if dual["total"] else 0.0,
         "max_disagree": DUAL_EVAL_MAX_DISAGREE,
     }
     logger.info(f"Eval result: {json.dumps(_brief(ev))}")
     logger.info(f"Dual eval result: {json.dumps(_brief(dual))}")
+    logger.info(
+        f"Dual eval disagreements (first {len(dual['disagreements'])} of "
+        f"{dual['confident_disagree'] + dual['offline_downgraded']}, confident_disagree first): "
+        f"{json.dumps(dual['disagreements'], ensure_ascii=False)}",
+        extra={"json_fields": {"dual_eval_disagreements": dual["disagreements"]}},
+    )
 
     index_run = f"{run}-{token}"
     files: dict[str, dict[str, Any]] = {

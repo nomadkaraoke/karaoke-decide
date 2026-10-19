@@ -404,6 +404,36 @@ def test_dual_eval_disagreement_blocks_publish(
     assert len(errors) == 1 and "confident_disagree" in errors[0].getMessage()
 
 
+def test_dual_eval_disagreements_logged_capped_and_in_manifest(
+    store: FakeStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    side = {"status": "confident", "artist": "A", "title": "T"}
+    items = [{"q": f"d{i}", "type": "offline_downgraded", "cloud": side, "offline": side} for i in range(150)]
+    items += [{"q": f"c{i}", "type": "confident_disagree", "cloud": side, "offline": side} for i in range(30)]
+
+    def fake(_c: Any, _o: Any, cases: list[Any]) -> dict[str, Any]:
+        return {**_dual(len(cases), 30), "offline_downgraded": 150, "disagreements": items}
+
+    monkeypatch.setattr(sib.song_eval, "dual_eval", fake)
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert out["published"] is False  # 30 confident disagreements trips the gate
+    rec = next(r for r in caplog.records if "Dual eval disagreements" in r.getMessage())
+    assert rec.levelno == logging.INFO
+    logged = rec.json_fields["dual_eval_disagreements"]  # type: ignore[attr-defined]
+    assert len(logged) == sib.DUAL_EVAL_DISAGREEMENTS_CAP == 100
+    assert [d["type"] for d in logged[:30]] == ["confident_disagree"] * 30
+    assert logged[30]["type"] == "offline_downgraded"
+    assert '"q": "c0"' in rec.getMessage() and "first 100 of 180" in rec.getMessage()
+    assert len(_errors(caplog)) == 1
+
+
+def test_cap_disagreements_caps_and_orders_confident_first() -> None:
+    many = [{"q": f"q{i}", "type": "offline_downgraded"} for i in range(250)]
+    assert len(sib.cap_disagreements(many)) == 100
+    assert sib.cap_disagreements([many[0], {"q": "x", "type": "confident_disagree"}])[0]["q"] == "x"
+
+
 # ---- deploy failure + pruning -------------------------------------------------------------
 
 
