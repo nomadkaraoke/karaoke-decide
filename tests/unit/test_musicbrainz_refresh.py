@@ -279,10 +279,10 @@ class TestRun:
     def _everything_staged(self, monkeypatch):
         monkeypatch.setattr(mr, "staged_tables", lambda gcs, dump_id: set(mr.all_raw_tables()))
 
-    def _run(self, bq, monkeypatch, **kwargs):
+    def _run(self, bq, monkeypatch, load_failures=None, **kwargs):
         extract = MagicMock()
         monkeypatch.setattr(mr, "extract_dump_to_gcs", extract)
-        monkeypatch.setattr(mr, "load_raw_tables", MagicMock())
+        monkeypatch.setattr(mr, "load_raw_tables", MagicMock(return_value=load_failures or {}))
         gcs = MagicMock()
         rc = mr.run(bq, gcs, MagicMock(), dump_id="20260926-002121", **kwargs)
         return rc, extract
@@ -325,6 +325,14 @@ class TestRun:
         rc, _ = self._run(bq, monkeypatch)
         assert rc == 0
         assert self._statuses(bq) == ["success"]
+
+    def test_mirror_load_failures_reach_the_mirror_summary(self, monkeypatch):
+        bq = _mock_bq()
+        build = MagicMock(return_value=mirror.MirrorResult())
+        monkeypatch.setattr(mirror, "build_and_publish", build)
+        failures = {"work": "load failed: 404 Not found"}
+        self._run(bq, monkeypatch, load_failures=failures)
+        assert build.call_args.kwargs["load_failures"] == failures
 
     def test_failed_validation_skips_mirror(self, monkeypatch):
         bq = _mock_bq(canary_ok=False)

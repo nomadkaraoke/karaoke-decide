@@ -142,7 +142,21 @@ class TestBuildSql:
 class TestCheckRows:
     @pytest.mark.parametrize(
         "new,old,ok",
-        [(100, None, True), (0, None, True), (95, 100, True), (89, 100, False), (None, 100, False), (0, 0, True)],
+        [
+            (100, None, True),
+            (0, None, True),
+            (95_000, 100_000, True),
+            (89_000, 100_000, False),
+            (899, 1000, False),
+            (None, 100, False),
+            (0, 0, True),
+            # Tiny tables churn by a few rows a week (2026-10-18: l_artist_genre 6 -> 3,
+            # l_genre_release_group 14 -> 11); a ratio there is noise, not a broken load.
+            (3, 6, True),
+            (11, 14, True),
+            (0, 999, True),
+            (89, 100, True),
+        ],
     )
     def test_bounds(self, new, old, ok):
         assert (mirror.check_rows(new, old) is None) is ok
@@ -184,8 +198,8 @@ class TestBuildAndPublish:
         assert result.summary()["mirror_tables_published"] == len(mirror.table_widths())
 
     def test_failed_build_and_row_drop_keep_previous_copy(self, caplog):
-        bq = _mirror_bq(build_fail={"label"}, rows={"work": (500, 1000)})
-        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
+        bq = _mirror_bq(build_fail={"label"}, rows={"work": (500_000, 1_000_000)})
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
             result = mirror.build_and_publish(bq, "20261007-002147", "31")
         assert set(result.skipped) == {"label", "work"}
         assert "build failed" in result.skipped["label"]
@@ -193,12 +207,78 @@ class TestBuildAndPublish:
         assert f"{mirror.MIRROR_DATASET}.label" not in dests
         assert f"{mirror.MIRROR_DATASET}.work" not in dests
         assert f"{mirror.MIRROR_DATASET}.release" in dests
-        assert "kept previous musicbrainz.label" in caplog.text
+        warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert any("kept previous musicbrainz.label" in m for m in warnings)
+        assert any("kept previous musicbrainz.work" in m for m in warnings)
+
+    def test_per_table_problems_produce_one_error_summary(self, caplog):
+        # 2026-10-07: one bad run logged an ERROR per table (~71 distinct alerts).
+        bq = _mirror_bq(build_fail={"label", "area", "place"}, rows={"work": (500_000, 1_000_000)})
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            mirror.build_and_publish(bq, "20261007-002147", "31")
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert "4 of " in errors[0]
+        for t in ("area", "label", "place", "work"):
+            assert t in errors[0]
+        assert "first error" in errors[0] and "Bad int64 value" in errors[0]
+
+    def test_summary_truncates_long_table_lists_and_errors(self, caplog):
+        many = set(list(mirror.table_widths())[:60])
+        bq = _mirror_bq(build_fail=many)
+        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
+            mirror.build_and_publish(bq, "d", "31")
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert "60 of " in errors[0]
+        assert "more" in errors[0]
+        assert len(errors[0]) < 2000
+
+    def test_clean_run_logs_no_error(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            mirror.build_and_publish(_mirror_bq(), "d", "31")
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    def test_tiny_table_churn_is_published(self):
+        bq = _mirror_bq(rows={"l_artist_genre": (3, 6), "l_genre_release_group": (11, 14)})
+        result = mirror.build_and_publish(bq, "20261017-002136", "31")
+        assert result.skipped == {}
+        dests = {c.args[1] for c in bq.copy_table.call_args_list}
+        assert f"{mirror.MIRROR_DATASET}.l_artist_genre" in dests
+
+    def test_load_failures_are_reported_with_their_cause(self, caplog):
+        bq = _mirror_bq()
+        missing = {"raw_work", "raw_label"}
+        real_get = bq.get_table.side_effect
+
+        def get_table(table_id):
+            if table_id.rsplit(".", 1)[-1] in missing:
+                raise RuntimeError("404 Not found")
+            return real_get(table_id)
+
+        bq.get_table.side_effect = get_table
+        load_failures = {"work": "load failed: 404 Not found: gs://x/work.tsv", "label": "load failed: 404 nope"}
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            result = mirror.build_and_publish(bq, "d", "31", load_failures=load_failures)
+        assert result.skipped == load_failures
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert "404" in errors[0]
+        assert "raw table not loaded" not in errors[0]
 
     def test_schema_sequence_mismatch_logs_error(self, caplog):
         with caplog.at_level(logging.ERROR, logger="mb_refresh"):
             mirror.build_and_publish(_mirror_bq(), "d", "99")
-        assert "gen_musicbrainz_schema.py" in caplog.text
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert "gen_musicbrainz_schema.py" in errors[0]
+
+    def test_schema_mismatch_with_skipped_tables_is_one_error(self, caplog):
+        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
+            mirror.build_and_publish(_mirror_bq(build_fail={"label"}), "d", "99")
+        errors = [r.getMessage() for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert "gen_musicbrainz_schema.py" in errors[0] and "label" in errors[0]
 
 
 class TestRawLoading:
@@ -227,9 +307,12 @@ class TestRawLoading:
 
         bq.load_table_from_uri.side_effect = load
         bq.get_table.return_value = MagicMock(num_rows=1)
-        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
-            mr.load_raw_tables(bq, "d")
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            failures = mr.load_raw_tables(bq, "d")
+        assert set(failures) == {"work"} and "bad width" in failures["work"]
         assert "load of work failed" in caplog.text
+        # Per-table problems are WARNINGs; the mirror logs one ERROR summary per run.
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
         deleted = {c.args[0] for c in bq.delete_table.call_args_list}
         assert f"{sql.S}.raw_work" in deleted
         assert f"{sql.S}.raw_artist" not in deleted  # app tables are never pre-deleted
@@ -243,12 +326,39 @@ class TestRawLoading:
                 raise RuntimeError("transient")
 
         bq.delete_table.side_effect = delete
-        with caplog.at_level(logging.ERROR, logger="mb_refresh"):
-            mr.load_raw_tables(bq, "d")
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            failures = mr.load_raw_tables(bq, "d")
         loaded = {c.args[1] for c in bq.load_table_from_uri.call_args_list}
         assert f"{sql.S}.raw_work" not in loaded
         assert f"{sql.S}.raw_artist" in loaded
         assert "could not clear" in caplog.text
+        assert set(failures) == {"work"} and "transient" in failures["work"]
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+    def test_mirror_only_load_start_failure_is_returned(self, caplog):
+        bq = MagicMock()
+        bq.get_table.return_value = MagicMock(num_rows=1)
+
+        def load(uri, dest, job_config=None):
+            if dest.endswith(".raw_work"):
+                raise RuntimeError("quota")
+            return MagicMock()
+
+        bq.load_table_from_uri.side_effect = load
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            failures = mr.load_raw_tables(bq, "d")
+        assert set(failures) == {"work"} and "quota" in failures["work"]
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+    def test_empty_table_create_failure_is_returned(self, caplog):
+        bq = MagicMock()
+        bq.get_table.return_value = MagicMock(num_rows=1)
+        bq.create_table.side_effect = RuntimeError("denied")
+        present = set(mr.all_raw_tables()) - {"l_area_artist"}
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            failures = mr.load_raw_tables(bq, "d", present=present)
+        assert set(failures) == {"l_area_artist"} and "denied" in failures["l_area_artist"]
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
 
     def test_tables_absent_from_dump_become_empty_tables_without_errors(self, caplog):
         bq = MagicMock()
