@@ -264,6 +264,9 @@ _FILE_TAG_RE = re.compile(
     r"\s*[\[(]\s*(?:mpx|multiplex|hm|homemade)\s*[\])]",
     re.IGNORECASE,
 )
+# Decide extension (not in kjbox): public name for the song-id merge key
+# (build_song_id.merge_key) and the availability index.
+FILE_TAG_RE = _FILE_TAG_RE
 
 
 def result_group_key(artist: str | None, title: str | None) -> str:

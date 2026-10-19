@@ -110,6 +110,60 @@ def test_spelling_variants_merge_into_one_song(idx: AvailabilityIndex) -> None:
     assert fob is not None and "IKV" in _brands(fob)
 
 
+def _song_id_rows(path: Path, where: str = "1") -> list[tuple[str, str, int | None]]:
+    conn = sqlite3.connect(path.parent / "song_id.db")
+    try:
+        return conn.execute(f"SELECT artist, title, pop FROM songs WHERE {where}").fetchall()
+    finally:
+        conn.close()
+
+
+def test_spellings_merge_under_song_id_display(idx: AvailabilityIndex, built: tuple[Path, dict[str, Any]]) -> None:
+    # song_id.db folds "Get Ur Freak On" / "Get Your Freak On" into one song; KN has
+    # both spellings. Availability must hold ONE song under song_id's display key.
+    ((artist, title, pop),) = _song_id_rows(built[0], "artist = 'Missy Elliott' AND title LIKE 'Get %Freak On'")
+    song = idx.song(song_key(artist, title))
+    assert song is not None
+    assert (song["artist"], song["title"], song["pop"]) == (artist, title, pop)
+    assert sorted(_brands(song)) == ["FAKEY", "NOMAD", "SK", "VS"]
+    other = "Get Your Freak On" if title == "Get Ur Freak On" else "Get Ur Freak On"
+    assert idx.song(song_key("Missy Elliott", other)) is None
+    # Both spellings stay searchable.
+    for q in ("missy get ur freak on", "missy get your freak on"):
+        assert idx.search(q)[0]["song_key"] == song["song_key"], q
+
+
+def test_every_song_id_karaoke_song_is_in_availability(
+    idx: AvailabilityIndex, built: tuple[Path, dict[str, Any]]
+) -> None:
+    rows = _song_id_rows(built[0], "karaoke = 1")
+    assert len(rows) > 390
+    missing = [(a, t) for a, t, _ in rows if idx.song(song_key(a, t)) is None]
+    assert missing == []
+
+
+def test_file_tagged_kn_row_joins_untagged_song_id_song(idx: AvailabilityIndex) -> None:
+    song = idx.song(song_key("Fall Out Boy", "Centuries"))
+    assert song is not None
+    assert (song["artist"], song["title"]) == ("Fall Out Boy", "Centuries")
+    assert "IKV" in _brands(song) and song["pop"] is not None
+    assert idx.song(song_key("Fall Out Boy (MPX)", "Centuries")) is None
+
+
+def test_unresolved_rows_fall_back_to_their_own_spelling(idx: AvailabilityIndex) -> None:
+    song = idx.song(song_key("Andrew Lloyd Webber", "Starlight Express"))
+    assert song is not None
+    assert (song["artist"], song["title"], song["pop"]) == ("Andrew Lloyd Webber", "Starlight Express", None)
+
+
+def test_featured_spelling_stays_searchable(idx: AvailabilityIndex) -> None:
+    # "Zedd feat. Hayley Williams" merged into "Zedd - Stay the Night"; the featured
+    # name is still indexed.
+    res = idx.search("hayley stay the night")
+    assert res and res[0]["song_key"] == song_key("Zedd", "Stay the Night")
+    assert res[0]["artist"] == "Zedd"
+
+
 def test_community_without_url_sorts_after_playable(idx: AvailabilityIndex) -> None:
     song = idx.song(song_key("Bob Seger", "Night Moves"))
     assert song is not None

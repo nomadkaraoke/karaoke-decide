@@ -39,7 +39,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from karaoke_decide.song_search.identify import song_norm
-from karaoke_decide.song_search.text_normalize import NORMALIZER_VERSION
+from karaoke_decide.song_search.text_normalize import FILE_TAG_RE, NORMALIZER_VERSION
 
 SCHEMA_VERSION = 3
 
@@ -55,6 +55,22 @@ _WORD_FOLDS = {"ur": "your", "u": "you"}
 def _fold_title(nt: str) -> str:
     """Space-less title with spelling variants folded (merge key only, never displayed)."""
     return "".join(_WORD_FOLDS.get(w, w[:-1] if len(w) >= 6 and w.endswith("ing") else w) for w in nt.split())
+
+
+def _exact_key(artist: str, title: str) -> tuple[str, str]:
+    """(space-less artist, title) norms before spelling folds; file-quality tags
+    ("(MPX)", "[HM]") dropped (decide-side: kjbox keeps them in the key)."""
+    na = song_norm(FILE_TAG_RE.sub(" ", artist)).replace(" ", "")
+    nt = song_norm(FILE_TAG_RE.sub(" ", title))
+    return na, nt
+
+
+def merge_key(artist: str, title: str) -> str:
+    """The key ``build`` merges songs on: space-less artist norm + spelling-folded
+    title. Every spelling of one ``song_id.db`` song shares it (the availability
+    index resolves KN rows to song-id songs through it)."""
+    na, nt = _exact_key(artist, title)
+    return f"{na}|{_fold_title(nt)}"
 
 
 def _open(path: Path) -> IO[str]:
@@ -79,8 +95,8 @@ def build(tsv_paths: list[Path], out_path: Path, run: str) -> dict[str, Any]:
     → ``{songs, words, built_at, run}`` (also stored in the ``meta`` table)."""
     srcs = [Path(p) for p in tsv_paths]
     dst = str(out_path)
-    merged: dict[tuple[str, str], _Song] = {}
-    folds: dict[tuple[str, str], tuple[str, str]] = {}  # exact key → spelling-folded key, only where they differ
+    merged: dict[str, _Song] = {}
+    folds: dict[str, str] = {}  # exact key → spelling-folded key (merge_key), only where they differ
     for row in _rows(srcs):
         if len(row) < 4:
             continue
@@ -94,13 +110,14 @@ def build(tsv_paths: list[Path], out_path: Path, run: str) -> dict[str, Any]:
             continue  # MusicBrainz cover/tribute uploads ("George Benson (Hscc Cover Ft …)")
         if na.replace(" ", "") == nt.replace(" ", "") and not k and (p or 0) < 40:
             continue  # MusicBrainz "self-titled" junk ("Future — Future"); real ones have karaoke/popularity
-        key = (na.replace(" ", ""), nt.replace(" ", ""))
+        ena, ent = _exact_key(artist, title)
+        key = f"{ena}|{ent.replace(' ', '')}"
         cur = merged.get(key)
         if cur is None:
             merged[key] = [artist, title, p, k]
-            folded = _fold_title(nt)
-            if folded != key[1]:
-                folds[key] = (key[0], folded)
+            folded = merge_key(artist, title)
+            if folded != key:
+                folds[key] = folded
         else:
             if p is not None and (cur[2] is None or p > cur[2]):
                 cur[0], cur[1], cur[2] = artist, title, p
@@ -110,7 +127,7 @@ def build(tsv_paths: list[Path], out_path: Path, run: str) -> dict[str, Any]:
     # Between spellings: the one with a karaoke version, then the more popular (both
     # "Get Your Freak On" and "Get Ur Freak On" are on KaraokeNerds) — ranked by the
     # shown spelling's own popularity, not the group's running max.
-    shown: dict[tuple[str, str], tuple[int, int]] = {}  # folded key → rank of the spelling currently displayed
+    shown: dict[str, tuple[int, int]] = {}  # folded key → rank of the spelling currently displayed
     for key, fkey in folds.items():
         cur = merged.pop(key)
         rank = (cur[3], cur[2] if cur[2] is not None else -1)

@@ -18,10 +18,12 @@ are sorted as in ``routes._group_search_results``: playable first, then
 ``rank_version``. Here "playable" means "has a YouTube URL" (no local files or
 Divebar mirror in decide).
 
-Decide-side changes from kjbox: songs are keyed by ``song_key`` (identity
-normalised, file-quality tags such as "(MPX)" dropped) rather than lower-cased
-text, popularity comes from ``song_id.db``, and the ``libraries`` /
-``song_libraries`` tables are seeded from the brand registry (spec §5.4).
+Decide-side changes from kjbox: each KN row resolves to its ``song_id.db`` song via
+``build_song_id.merge_key`` (the key song_id merges spellings on, file-quality tags
+dropped) and is stored under ``song_key`` of song_id's display spelling, with its
+popularity; unresolved rows use ``song_key`` of their own spelling. Every merged
+spelling is indexed. The ``libraries`` / ``song_libraries`` tables are seeded from
+the brand registry (spec §5.4).
 
 Schema:
   songs(song_key PK, artist, title, pop, version_count)
@@ -48,8 +50,8 @@ from typing import Any
 
 from karaoke_decide.song_search import fuzzy_match
 from karaoke_decide.song_search.brand_names import brand_name
+from karaoke_decide.song_search.build_song_id import merge_key
 from karaoke_decide.song_search.text_normalize import (
-    _FILE_TAG_RE,
     NORMALIZER_VERSION,
     SEARCH_INDEX_VERSION,
     fts_match_query,
@@ -130,12 +132,6 @@ def _normalize_youtube_url(url: str | None) -> str:
     return url
 
 
-def _availability_key(artist: str, title: str) -> str:
-    """``song_key`` with file-quality tags ("(MPX)", "[HM]") dropped, the way
-    ``result_group_key`` collapses them — one song per group (A78)."""
-    return song_key(_FILE_TAG_RE.sub(" ", artist), _FILE_TAG_RE.sub(" ", title))
-
-
 def _iter_kn_export(path: Path) -> Iterator[dict[str, Any]]:
     """Rows of a gzipped KN export: community is ``{"Items": [...]}``, full a bare
     list (kjbox catalog_mirror._iter_kn_export accepts either shape)."""
@@ -148,28 +144,53 @@ def _iter_kn_export(path: Path) -> Iterator[dict[str, Any]]:
             yield item
 
 
+# A song_id.db song: (display artist, display title, popularity).
+_Canonical = tuple[str, str, int | None]
+
+
 class _Song:
-    __slots__ = ("artist", "title", "tracks", "seen", "codes")
+    __slots__ = ("artist", "title", "pop", "canonical", "spellings", "tracks", "seen", "codes")
 
     def __init__(self, artist: str, title: str) -> None:
         self.artist = artist
         self.title = title
+        self.pop: int | None = None
+        self.canonical = False  # display spelling + pop come from song_id.db
+        self.spellings: dict[tuple[str, str], None] = {}  # every spelling merged in (ordered set)
         self.tracks: list[dict[str, Any]] = []
         self.seen: set[tuple[str, str | None]] = set()  # community (brand, url) dedupe
         self.codes: set[str] = set()  # upper-cased brand codes present
 
 
-def _merge(community_rows: Iterator[dict[str, Any]], full_rows: Iterator[dict[str, Any]]) -> dict[str, _Song]:
+def _merge(
+    community_rows: Iterator[dict[str, Any]],
+    full_rows: Iterator[dict[str, Any]],
+    song_ids: dict[str, _Canonical],
+) -> dict[str, _Song]:
     """kjbox ``_group_results`` (community, deduped by (brand, url)) then
-    ``_merge_full_catalog`` (full codes not already on the song → commercial, no URL),
-    keyed by ``song_key`` instead of lower-cased text. First spelling seen is shown."""
+    ``_merge_full_catalog`` (full codes not already on the song → commercial, no URL).
+
+    Songs are keyed by ``song_key`` of the song_id.db song a KN row resolves to
+    through ``build_song_id.merge_key`` (so "Get Ur Freak On" and "Get Your Freak
+    On" are one song, under song_id's display spelling — the key A4/A5 join on).
+    Unresolved rows fall back to ``song_key`` of their own spelling (first seen shown).
+    """
     songs: dict[str, _Song] = {}
 
     def get(artist: str, title: str) -> _Song:
-        key = _availability_key(artist, title)
+        canon = song_ids.get(merge_key(artist, title))
+        if canon is not None:
+            key = song_key(canon[0], canon[1])
+        else:
+            key = song_key(artist, title)
         s = songs.get(key)
         if s is None:
             s = songs[key] = _Song(artist, title)
+        if canon is not None and not s.canonical:
+            s.artist, s.title, s.pop = canon
+            s.canonical = True
+            s.spellings[(canon[0], canon[1])] = None
+        s.spellings[(artist, title)] = None
         return s
 
     for r in community_rows:
@@ -205,6 +226,17 @@ def _merge(community_rows: Iterator[dict[str, Any]], full_rows: Iterator[dict[st
     return songs
 
 
+def _index_texts(song: _Song) -> tuple[str, str]:
+    """(FTS text, trigram text) over every spelling merged into ``song``, so featured
+    names and alternate spellings stay searchable."""
+    fts: dict[str, None] = {}
+    tri: dict[str, None] = {}
+    for artist, title in song.spellings:
+        fts[index_text(artist, title)] = None
+        tri[normalize(f"{artist} {title}")] = None
+    return " ".join(t for t in fts if t), " ".join(t for t in tri if t)
+
+
 def _sorted_versions(tracks: list[dict[str, Any]]) -> list[tuple[str, str, str, str | None, int]]:
     """(brand_code, brand_name, kind, youtube_url, rank), playable first then rank
     (kjbox routes._group_search_results), brand code as a deterministic tie-break."""
@@ -217,20 +249,22 @@ def _sorted_versions(tracks: list[dict[str, Any]]) -> list[tuple[str, str, str, 
     return out
 
 
-def _load_pop(song_id_db: Path | None) -> dict[str, int]:
-    """song_key → popularity from ``song_id.db`` (max over spellings sharing a key)."""
+def _load_song_ids(song_id_db: Path | None) -> dict[str, _Canonical]:
+    """merge_key → (display artist, display title, pop) for every song_id.db song."""
     if song_id_db is None:
         return {}
-    pops: dict[str, int] = {}
+    out: dict[str, _Canonical] = {}
     conn = sqlite3.connect(f"file:{song_id_db}?mode=ro", uri=True)
     try:
-        for artist, title, pop in conn.execute("SELECT artist, title, pop FROM songs WHERE pop IS NOT NULL"):
-            key = _availability_key(artist, title)
-            if pop > pops.get(key, -1):
-                pops[key] = pop
+        for artist, title, pop in conn.execute("SELECT artist, title, pop FROM songs ORDER BY rowid"):
+            key = merge_key(artist, title)
+            cur = out.get(key)
+            # build() merges on merge_key, so keys are unique; keep the more popular if not.
+            if cur is None or (pop is not None and (cur[2] is None or pop > cur[2])):
+                out[key] = (artist, title, pop)
     finally:
         conn.close()
-    return pops
+    return out
 
 
 def _library_rows() -> list[tuple[str, str, str, str]]:
@@ -249,8 +283,9 @@ def build_availability_db(
     """Build ``out_path`` from the KN full + community exports; atomic replace.
 
     → ``{songs, versions, song_libraries, built_at, run}`` (counts also in ``meta``)."""
-    songs = _merge(_iter_kn_export(Path(community_json_gz)), _iter_kn_export(Path(full_json_gz)))
-    pops = _load_pop(song_id_db)
+    songs = _merge(
+        _iter_kn_export(Path(community_json_gz)), _iter_kn_export(Path(full_json_gz)), _load_song_ids(song_id_db)
+    )
     library_codes = {c for c, _, _, _ in _library_rows()}
 
     dst = str(out_path)
@@ -270,10 +305,11 @@ def build_availability_db(
         link_rows: list[tuple[str, str]] = []
         for rowid, (key, s) in enumerate(sorted(songs.items()), start=1):
             versions = _sorted_versions(s.tracks)
-            song_rows.append((rowid, key, s.artist, s.title, pops.get(key), len(versions)))
+            song_rows.append((rowid, key, s.artist, s.title, s.pop, len(versions)))
             version_rows.extend((key, *v) for v in versions)
-            fts_rows.append((rowid, index_text(s.artist, s.title)))
-            tri_rows.append((rowid, normalize(f"{s.artist} {s.title}")))
+            fts_text, tri_text = _index_texts(s)
+            fts_rows.append((rowid, fts_text))
+            tri_rows.append((rowid, tri_text))
             # A brand links to a library only when it IS that library's catalogue
             # (registry brands); unknown brands stay just brands (spec §5.4).
             libs = {c for c in (resolve_brand(brand_code=v[0])[0] for v in versions) if c in library_codes}
