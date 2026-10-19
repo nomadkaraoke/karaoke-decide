@@ -1,1 +1,1 @@
-"""Song search: vendored kjbox normaliser, fuzzy matcher and brand ranking."""
+"""Song search: vendored kjbox normaliser, fuzzy matcher, brand ranking and song identification."""
