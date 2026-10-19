@@ -14,6 +14,8 @@ import pytest
 from karaoke_decide.song_search.build_song_id import build
 from karaoke_decide.song_search.identify import (
     CONFIDENT_MARGIN,
+    GENERIC_TITLE_POP_LEAD,
+    SAME_TITLE_POP_LEAD,
     Match,
     SongIdentifier,
     _same_song,
@@ -224,6 +226,21 @@ def test_generic_title_shared_by_several_artists_asks_which_one(fixture_identifi
     assert {"Justin Bieber", "Brandy", "Ashanti"} <= {
         c["artist"] for c in fixture_identifier.identify("baby", limit=10)["candidates"]
     }
+    # Guard: the same-title runner-up's popularity lead must sit between the normal
+    # and the generic-title bar, so only the generic-title rule makes this "candidates".
+    best, runner = r["candidates"][0], r["candidates"][1]
+    assert runner["title"] == "Baby" and best["karaoke"] and runner["karaoke"]
+    assert SAME_TITLE_POP_LEAD <= best["popularity"] - runner["popularity"] < GENERIC_TITLE_POP_LEAD
+
+
+def test_same_lead_with_only_two_same_title_artists_is_confident(tmp_path: Path) -> None:
+    """Companion to A21: the same 16-point lead auto-picks when only two artists share
+    the title (the normal SAME_TITLE_POP_LEAD bar applies)."""
+    src = tmp_path / "songs.tsv"
+    src.write_text("Justin Bieber\tBaby\t78\t1\nClean Bandit\tBaby\t62\t1\n", encoding="utf-8")
+    db = tmp_path / "song_id.db"
+    build([src], db, run="t")
+    assert _best(SongIdentifier(db), "baby") == ("confident", ("Justin Bieber", "Baby"))
 
 
 def test_same_title_clear_popularity_lead_picks_the_leader(fixture_identifier: SongIdentifier) -> None:
