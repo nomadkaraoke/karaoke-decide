@@ -13,7 +13,10 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
 3. EVAL      ``run_eval`` (cloud matcher, labelled set) and ``dual_eval`` (offline vs
              cloud, labelled + frozen synthetic set). Gates: ``wrong_auto`` may rise by
              at most 1 and the ``auto`` rate drop by at most 2 points vs the previous
-             manifest; ``confident_disagree / total`` <= ``DUAL_EVAL_MAX_DISAGREE``.
+             manifest; ``confident_disagree / total`` <= ``DUAL_EVAL_MAX_DISAGREE``
+             (both matchers confident on different songs, version/credit variants
+             being the same song); offline confident-wrong vs the labels at most
+             ``DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS`` above the cloud's.
              A failed gate publishes nothing and logs one ERROR (the first time
              for that source run + versions; repeats are INFO, recorded in
              ``song-index/reported-failures.json``).
@@ -98,9 +101,13 @@ OFFLINE_FILE = "offline.db.gz"
 KEEP_PREVIOUS_RUNS = 3
 EVAL_MAX_WRONG_AUTO_RISE = 1
 EVAL_MAX_AUTO_RATE_DROP = 2.0  # percentage points
-# Max share of dual-eval queries where offline is confident about a song the cloud
-# is not confident about. Starting value; Task A10 calibrates it on the full index.
+# Max share of dual-eval queries where offline and the cloud are both confident about
+# different songs (``identify.same_song``: "Song (live)" / "A & B" vs "A feat. B" are the
+# same song). Offline being sure where the cloud is unsure is reported, not gated.
 DUAL_EVAL_MAX_DISAGREE = 0.01
+# Offline may auto-apply a non-label song on at most this many more labelled dual-eval
+# cases than the cloud does (absolute).
+DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS = 2
 DEPLOY_TIMEOUT_S = 900
 
 SCHEMA_VERSION = song_id_builder.SCHEMA_VERSION
@@ -376,10 +383,16 @@ DUAL_EVAL_DISAGREEMENTS_CAP = 100
 def cap_disagreements(
     disagreements: list[dict[str, Any]], cap: int = DUAL_EVAL_DISAGREEMENTS_CAP
 ) -> list[dict[str, Any]]:
-    """First ``cap`` disagreements, ``confident_disagree`` ones first (stable within a type).
+    """First ``cap`` disagreements in ``song_eval.DISAGREEMENT_ORDER`` (the gated
+    ``confident_disagree`` first; stable within a type; unknown types last).
     The ``q`` strings are eval-set test queries, not user data, so they are safe to log."""
-    ordered = sorted(disagreements, key=lambda d: d.get("type") != "confident_disagree")
-    return ordered[:cap]
+    order = song_eval.DISAGREEMENT_ORDER
+
+    def rank(d: dict[str, Any]) -> int:
+        t = d.get("type")
+        return order.index(t) if t in order else len(order)
+
+    return sorted(disagreements, key=rank)[:cap]
 
 
 def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _Stats | None = None) -> dict[str, Any]:
@@ -419,9 +432,11 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
         cloud.close()
         offline.close()
     offline_db.unlink(missing_ok=True)  # only the .gz is published
+    all_disagreements = dual.get("disagreements", [])
     dual = {
         **dual,
-        "disagreements": cap_disagreements(dual.get("disagreements", [])),
+        "disagreements": cap_disagreements(all_disagreements),
+        "wrong_auto_cases": dual.get("wrong_auto_cases", [])[:DUAL_EVAL_DISAGREEMENTS_CAP],
         "disagree_rate": round(dual["confident_disagree"] / dual["total"], 6) if dual["total"] else 0.0,
         "max_disagree": DUAL_EVAL_MAX_DISAGREE,
     }
@@ -429,7 +444,7 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
     logger.info(f"Dual eval result: {json.dumps(_brief(dual))}")
     logger.info(
         f"Dual eval disagreements (first {len(dual['disagreements'])} of "
-        f"{dual['confident_disagree'] + dual['offline_downgraded']}, confident_disagree first): "
+        f"{len(all_disagreements)}, confident_disagree first): "
         f"{json.dumps(dual['disagreements'], ensure_ascii=False)}",
         extra={"json_fields": {"dual_eval_disagreements": dual["disagreements"]}},
     )
@@ -481,6 +496,12 @@ def gate_failures(ev: dict[str, Any], dual: dict[str, Any], prev_eval: dict[str,
         failures.append(
             f"dual_eval confident_disagree {dual['confident_disagree']}/{total} = {rate:.2%} "
             f"(max {DUAL_EVAL_MAX_DISAGREE:.2%})"
+        )
+    offline_wrong, cloud_wrong = dual.get("offline_wrong_auto", 0), dual.get("cloud_wrong_auto", 0)
+    if offline_wrong > cloud_wrong + DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS:
+        failures.append(
+            f"dual_eval offline_wrong_auto {offline_wrong} vs cloud_wrong_auto {cloud_wrong} "
+            f"of {dual.get('labelled', total)} labelled (max excess {DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS})"
         )
     return failures
 

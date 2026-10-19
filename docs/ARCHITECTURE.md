@@ -109,6 +109,13 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
 
 ### Search ops notes
 
+- **Eval gates** (`gate_failures` in `karaoke_decide/etl/song_index_build.py`). A build publishes only if all of these hold:
+  - **Cloud eval** (labelled set): `wrong_auto` rises by at most 1, and the `auto` rate drops by at most 2 points, compared with the previous manifest.
+  - **Dual eval** (offline `offline.db` with margin bonus vs cloud `song_id.db`, over the labelled set plus 900 frozen synthetic cases). "Same song" means the matcher's own `identify.same_song`: the same base title (version suffixes such as "(live)" or "- Remastered" are dropped) and a credited artist in common ("A & B" = "A feat. B"). Two checks:
+    - `confident_disagree` (both sides confident, on different songs) must be at most `DUAL_EVAL_MAX_DISAGREE` (1%) of cases.
+    - On labelled cases, `offline_wrong_auto` (offline confident on a song that isn't the label) must be at most `cloud_wrong_auto + 2`.
+  - Reported but not gated: `offline_more_confident` (offline is sure of the cloud's own unsure best guess), `offline_confident_cloud_unsure_other` (offline is sure, the cloud is unsure and its guess is another song) and `offline_downgraded` (the cloud is sure, offline asks).
+  - The manifest's `dual_eval.disagreements` holds up to 100 entries, gated class first. They are also logged as `jsonPayload.dual_eval_disagreements`. `wrong_auto_cases` lists the label misses.
 - **Alerts.** A failed build, a failed eval gate or a failed rollout logs exactly one ERROR, which pages #alerts through the error monitor. The served index is untouched, and tomorrow's run retries. There are no other alert policies.
 - **Force a rebuild** (same source; for example after a matcher version change that you don't want to wait a day for):
   `gcloud run jobs execute song-index-build --region us-central1 --args=run,--force`

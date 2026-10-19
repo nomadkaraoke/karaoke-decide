@@ -23,7 +23,8 @@ For negatives (no artist/title), "none" or "cand" is fine; confident is WRONG.
 Decide-side change from kjbox: the scoring loop is ``run_eval(identifier, cases)``,
 returning ``{total, auto, wrong_auto, candidates, none, wrong}`` for the index-build
 job's eval gate; the CLI prints kjbox's report on top of it. ``dual_eval(cloud, offline,
-cases)`` compares the phone's offline identification with the cloud's (spec §8).
+cases)`` compares the phone's offline identification with the cloud's (spec §8); it
+judges "same song" with the matcher's own ``identify.same_song``.
 """
 
 from __future__ import annotations
@@ -39,9 +40,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Protocol
 
-from karaoke_decide.song_search.identify import SongIdentifier
+from karaoke_decide.song_search.identify import SongIdentifier, same_song, same_title, shared_credit
 from karaoke_decide.song_search.text_normalize import identity_normalize as normalize  # song identity
-from karaoke_decide.song_search.text_normalize import song_key
 
 
 def _key(s: str | None) -> str:
@@ -124,49 +124,121 @@ def _brief(r: dict[str, Any]) -> dict[str, Any]:
     return {"status": r["status"], "artist": b["artist"] if b else None, "title": b["title"] if b else None}
 
 
+def _same(a: dict[str, Any] | None, b: dict[str, Any] | None) -> bool:
+    """Same song under ``identify.same_song`` (base title + a shared credit): "Redneck
+    Woman (live)" = "Redneck Woman", "Michael Andrews & Gary Jules" = "… feat. Gary Jules"."""
+    return a is not None and b is not None and same_song(a["artist"], a["title"], b["artist"], b["title"])
+
+
+def _labelled(case: dict[str, Any]) -> bool:
+    return bool(case.get("artist") or case.get("title"))
+
+
+def _label_wrong(case: dict[str, Any], r: dict[str, Any]) -> bool:
+    """Confident on a song that is not the case's label (``same_song`` semantics; a
+    label with only a title or only an artist checks just that part)."""
+    if r["status"] != "confident":
+        return False
+    b = r["best"]
+    if case.get("title") and not same_title(case["title"], b["title"]):
+        return True
+    return bool(case.get("artist")) and not shared_credit(case["artist"], b["artist"])
+
+
+# Disagreement types, in report order: the gated one first.
+CONFIDENT_DISAGREE = "confident_disagree"
+OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER = "offline_confident_cloud_unsure_other"
+OFFLINE_MORE_CONFIDENT = "offline_more_confident"
+OFFLINE_DOWNGRADED = "offline_downgraded"
+DISAGREEMENT_ORDER = (
+    CONFIDENT_DISAGREE,
+    OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER,
+    OFFLINE_MORE_CONFIDENT,
+    OFFLINE_DOWNGRADED,
+)
+
+
+def classify_pair(cloud: dict[str, Any], offline: dict[str, Any]) -> str | None:
+    """One query's cloud vs offline relation (``{status, best}`` each; ``best`` needs
+    ``artist`` and ``title``), or None when they agree / neither is confident.
+
+    ``confident_disagree``: both confident, different songs (``_same``) — gated.
+    ``offline_confident_cloud_unsure_other``: offline confident, the cloud is not and its
+    best guess (if any) is another song. ``offline_more_confident``: offline confident on
+    the cloud's own (unconfident) best guess. ``offline_downgraded``: cloud confident,
+    offline not (the price of the smaller index and the stricter margin)."""
+    oc, cc = offline["status"] == "confident", cloud["status"] == "confident"
+    same = _same(cloud.get("best"), offline.get("best"))
+    if oc and cc:
+        return None if same else CONFIDENT_DISAGREE
+    if oc:
+        return OFFLINE_MORE_CONFIDENT if same else OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER
+    if cc:
+        return OFFLINE_DOWNGRADED
+    return None
+
+
 def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]]) -> dict[str, Any]:
     """Offline vs cloud identification over the same queries (spec §8 dual eval).
 
-    → ``{total, confident_disagree, offline_downgraded, downgraded_cloud_best_karaoke,
-    downgraded_cloud_best_non_karaoke, disagreements}``.
+    → ``{total, confident_disagree, offline_confident_cloud_unsure_other,
+    offline_more_confident, offline_downgraded, downgraded_cloud_best_karaoke,
+    downgraded_cloud_best_non_karaoke, labelled, cloud_wrong_auto, offline_wrong_auto,
+    disagreements, wrong_auto_cases}``.
 
-    ``confident_disagree``: offline is confident but the cloud is not confident about
-    the same song (``song_key``) — it names another song, or the cloud asks "Which
-    one?" / has nothing. Must stay ~0: offline naming the wrong song is an anti-goal.
-    ``offline_downgraded``: the cloud is confident, offline is not (it asks instead);
-    allowed, it is the price of the smaller index and the stricter margin. It is split
-    by the cloud answer: a karaoke song (offline lost confidence on a song it holds)
-    vs a non-karaoke song (expected: most are not on the phone at all).
-    ``disagreements`` lists both kinds: ``{q, type, cloud, offline}`` with each side's
-    ``{status, artist, title}``. ``offline`` is built with
-    ``margin_bonus=offline.OFFLINE_MARGIN_BONUS``."""
-    confident_disagree = downgraded = downgraded_karaoke = 0
+    Per-query types are ``classify_pair``'s. Only ``confident_disagree`` (both sides sure,
+    different songs) is gated by rate; the two "offline sure, cloud unsure" counts are
+    informational. ``offline_downgraded`` is split by the cloud answer: a karaoke song
+    (offline lost confidence on a song it holds) vs a non-karaoke one (mostly not on the
+    phone at all). Over labelled cases (an artist and/or title), ``cloud_wrong_auto`` /
+    ``offline_wrong_auto`` count confident answers that are not the label; the build gates
+    offline against cloud. ``disagreements`` lists ``{q, type, cloud, offline}`` (each side
+    ``{status, artist, title}``) ordered by ``DISAGREEMENT_ORDER``; ``wrong_auto_cases``
+    lists ``{q, want, cloud_wrong, offline_wrong, cloud, offline}`` where either side is
+    wrong. ``offline`` is built with ``margin_bonus=offline.OFFLINE_MARGIN_BONUS``."""
+    counts: Counter[str] = Counter()
+    downgraded_karaoke = labelled = cloud_wrong = offline_wrong = 0
     disagreements: list[dict[str, Any]] = []
+    wrong_cases: list[dict[str, Any]] = []
     for c in cases:
         rc, ro = cloud.identify(c["q"]), offline.identify(c["q"])
-        same = (
-            rc["best"] is not None
-            and ro["best"] is not None
-            and song_key(rc["best"]["artist"], rc["best"]["title"])
-            == song_key(ro["best"]["artist"], ro["best"]["title"])
-        )
-        if ro["status"] == "confident" and not (rc["status"] == "confident" and same):
-            kind = "confident_disagree"
-            confident_disagree += 1
-        elif rc["status"] == "confident" and ro["status"] != "confident":
-            kind = "offline_downgraded"
-            downgraded += 1
-            downgraded_karaoke += 1 if rc["best"].get("karaoke") else 0
-        else:
+        if _labelled(c):
+            labelled += 1
+            cw, ow = _label_wrong(c, rc), _label_wrong(c, ro)
+            cloud_wrong += cw
+            offline_wrong += ow
+            if cw or ow:
+                wrong_cases.append(
+                    {
+                        "q": c["q"],
+                        "want": {"artist": c.get("artist"), "title": c.get("title")},
+                        "cloud_wrong": cw,
+                        "offline_wrong": ow,
+                        "cloud": _brief(rc),
+                        "offline": _brief(ro),
+                    }
+                )
+        kind = classify_pair(rc, ro)
+        if kind is None:
             continue
+        counts[kind] += 1
+        if kind == OFFLINE_DOWNGRADED and rc["best"].get("karaoke"):
+            downgraded_karaoke += 1
         disagreements.append({"q": c["q"], "type": kind, "cloud": _brief(rc), "offline": _brief(ro)})
+    disagreements.sort(key=lambda d: DISAGREEMENT_ORDER.index(d["type"]))
     return {
         "total": len(cases),
-        "confident_disagree": confident_disagree,
-        "offline_downgraded": downgraded,
+        CONFIDENT_DISAGREE: counts[CONFIDENT_DISAGREE],
+        OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER: counts[OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER],
+        OFFLINE_MORE_CONFIDENT: counts[OFFLINE_MORE_CONFIDENT],
+        OFFLINE_DOWNGRADED: counts[OFFLINE_DOWNGRADED],
         "downgraded_cloud_best_karaoke": downgraded_karaoke,
-        "downgraded_cloud_best_non_karaoke": downgraded - downgraded_karaoke,
+        "downgraded_cloud_best_non_karaoke": counts[OFFLINE_DOWNGRADED] - downgraded_karaoke,
+        "labelled": labelled,
+        "cloud_wrong_auto": cloud_wrong,
+        "offline_wrong_auto": offline_wrong,
         "disagreements": disagreements,
+        "wrong_auto_cases": wrong_cases,
     }
 
 

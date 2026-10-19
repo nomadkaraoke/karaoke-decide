@@ -21,6 +21,9 @@ from karaoke_decide.song_search.identify import (
     SongIdentifier,
     _same_song,
     _word_sim,
+    same_song,
+    same_title,
+    shared_credit,
     song_norm,
 )
 
@@ -155,6 +158,23 @@ def test_same_song_credit_variants_and_misspellings() -> None:
         Match("The Strokes", "Machu Picchu", 1.0, 64, True), Match("The Strokes", "Machu Piccu", 1.0, 30, False)
     )
     assert not _same_song(Match("Kesha", "Die Young", 1.0, 80, True), Match("Sylvan Esso", "Die Young", 1.0, 50, False))
+
+
+def test_same_song_text_helpers_strip_versions_and_collapse_credits() -> None:
+    """The string-level helpers the dual eval uses (``_same_song`` delegates to them)."""
+    assert same_title("Redneck Woman (live)", "Redneck Woman")
+    assert same_title("Hold It Against Me (remix)", "Hold It Against Me (Jump Smokers)")
+    assert same_title("Astronaut In The Ocean - Alok Remix", "Astronaut In The Ocean")
+    assert same_title("Troubled", "Trouble")  # the matcher's near-dup spelling rule (>= 92%): artist decides
+    assert not same_title("Yellow", "Mellow Yellow")
+    assert not same_title("Hayloft", "Hayloft II")
+    assert shared_credit("Michael Andrews & Gary Jules", "Michael Andrews feat. Gary Jules")
+    assert shared_credit("Little Mix ft Sean Paul", "Little Mix, Sean Paul")
+    assert not shared_credit("Elephante", "Cage The Elephant")
+    assert not shared_credit(None, "Muse")
+    assert same_song("Gretchen Wilson", "Redneck Woman (live)", "Gretchen Wilson", "Redneck Woman")
+    assert not same_song("Elephante", "Troubled", "Cage The Elephant", "Trouble")
+    assert not same_song("Kesha", "Die Young", "Sylvan Esso", "Die Young")
 
 
 def test_word_sim() -> None:
