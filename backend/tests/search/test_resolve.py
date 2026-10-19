@@ -295,3 +295,74 @@ def test_search_limits_do_not_consume_resolve_budget(rclient: TestClient, gen: G
     for _ in range(30):
         assert rclient.get("/api/search", params={"q": "muse"}, headers=HEADERS).status_code == 200
     assert _get(rclient, "query number 1").status_code == 200
+
+
+def test_mapping_failure_is_200_empty_warning_only_and_not_cached(
+    rclient: TestClient, gen: Gen, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from backend.search.resolve import GenResolver
+
+    gen.answer(kind="content", confident=True, canonical_artist="Muse", canonical_title="Starlight")
+    real = GenResolver._map
+
+    def boom(*a: Any, **k: Any) -> ResolveResponse:
+        raise KeyError("versions")
+
+    monkeypatch.setattr(GenResolver, "_map", staticmethod(boom))
+    with caplog.at_level(logging.DEBUG):
+        r = _get(rclient, "muse starlite")
+    assert r.status_code == 200
+    assert r.json() == {}
+    assert not [rec for rec in caplog.records if rec.levelno >= logging.ERROR]
+    assert any(rec.levelno == logging.WARNING for rec in caplog.records)
+    monkeypatch.setattr(GenResolver, "_map", staticmethod(real))
+    assert _get(rclient, "muse starlite").json()["corrected"]["artist"] == "Muse"
+    assert len(gen.requests) == 2
+
+
+def test_secret_never_leaks_into_logs_or_bodies(
+    rclient: TestClient, gen: Gen, caplog: pytest.LogCaptureFixture
+) -> None:
+    gen.handler = lambda r: httpx.Response(500, text="boom")
+    with caplog.at_level(logging.DEBUG):
+        r = _get(rclient, "muse starlite")
+    assert "s3cret" not in caplog.text
+    assert "s3cret" not in r.text
+
+
+def test_lru_touching_oldest_key_keeps_it(index_dir: Path, monkeypatch: pytest.MonkeyPatch, gen: Gen) -> None:
+    gen.answer(kind="none")
+    with _make_client(index_dir, monkeypatch, gen, RateLimits(10_000, 10_000, 300)) as c:
+        for i in range(500):
+            _get(c, f"query number {i}")
+        _get(c, "query number 0")  # touch the oldest: now newest
+        _get(c, "query number 500")  # evicts number 1, not 0
+        n = len(gen.requests)
+        _get(c, "query number 0")
+        assert len(gen.requests) == n  # survived
+        _get(c, "query number 1")
+        assert len(gen.requests) == n + 1  # evicted
+
+
+def test_client_timeout_is_the_constant(rclient: TestClient) -> None:
+    from backend.search.resolve import GEN_TIMEOUT_S
+
+    resolver = rclient.app.state.search.resolver  # type: ignore[attr-defined]
+    assert resolver._client.timeout == httpx.Timeout(GEN_TIMEOUT_S)
+
+
+def test_cache_hit_echoes_this_requests_typed_text(rclient: TestClient, gen: Gen) -> None:
+    gen.answer(kind="content", confident=True, canonical_artist="Muse", canonical_title="Starlight")
+    assert _get(rclient, "Muse Starlite").json()["typed"] == "Muse Starlite"
+    assert _get(rclient, "muse STARLITE").json()["typed"] == "muse STARLITE"
+    assert len(gen.requests) == 1
+
+
+def test_nested_nulls_are_preserved_like_search(rclient: TestClient, gen: Gen) -> None:
+    gen.answer(kind="content", confident=True, canonical_artist="Muse", canonical_title="Starlight")
+    body = _get(rclient, "muse starlite").json()
+    assert "popularity" in body["corrected"]
+    assert any(v["youtube_url"] is None for v in body["groups"][0]["versions"])
+    gen.answer(kind="ambiguous", alternatives=[{"artist": "Nobody", "title": "Nothing Song"}])
+    alt = _get(rclient, "nothing").json()["alternatives"][0]
+    assert alt["popularity"] is None

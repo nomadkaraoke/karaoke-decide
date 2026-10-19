@@ -54,6 +54,7 @@ class GenResolver:
         self._secret = (secret if secret is not None else os.environ.get("DECIDE_GEN_PARTNER_SECRET", "")).strip()
         base = (gen_url or os.environ.get("GEN_API_URL", "")).strip() or DEFAULT_GEN_API_URL
         self._url = base.rstrip("/") + RESOLVE_PATH
+        self.timeout_s = GEN_TIMEOUT_S
         self._client = httpx.AsyncClient(timeout=GEN_TIMEOUT_S, transport=transport)
         self._cache: OrderedDict[str, ResolveResponse] = OrderedDict()
         self._lock = threading.Lock()
@@ -86,11 +87,16 @@ class GenResolver:
         key = q.casefold()
         hit = self._cached(key)
         if hit is not None:
-            return hit, "cached"
+            # The verdict applies, but echo THIS request's text as `typed`.
+            return (hit.model_copy(update={"typed": q}) if hit.corrected is not None else hit), "cached"
         verdict = await self._call_gen(q)
         if verdict is None:
             return _EMPTY, "error"
-        response = await asyncio.to_thread(self._map, q, verdict, self._service)
+        try:
+            response = await asyncio.to_thread(self._map, q, verdict, self._service)
+        except Exception as exc:  # noqa: BLE001 — an odd gen payload or index trouble must never 500
+            logger.warning("resolve mapping failed: %s", type(exc).__name__)
+            return _EMPTY, "error"
         if verdict.get("reason") != "unavailable":
             self._store(key, response)
         return response, str(verdict.get("kind"))

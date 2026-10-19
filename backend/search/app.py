@@ -182,7 +182,7 @@ def build_router(limiter: RateLimiter, resolve_limiter: RateLimiter) -> APIRoute
     @router.get(
         "/resolve",
         response_model=ResolveResponse,
-        response_model_exclude_defaults=True,
+        response_model_exclude_unset=True,
         dependencies=resolve_limited,
     )
     async def resolve(

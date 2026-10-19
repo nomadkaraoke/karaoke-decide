@@ -106,7 +106,7 @@ def load(run: str, bucket: str, dest_dir: Path, *, client: Any = None) -> IndexP
     """Download and verify ``song_id.db`` + ``availability.db`` for ``run``
     (``"<run>-<token>"``; empty → ``song-index/latest.json``) into ``dest_dir/<run>``."""
     if client is None:
-        from google.cloud import storage  # type: ignore[attr-defined]  # storage has no stubs
+        from google.cloud import storage
 
         client = storage.Client()
     b = client.bucket(bucket)
