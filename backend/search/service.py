@@ -127,6 +127,27 @@ class SearchService:
             logger.warning("availability song lookup failed for %r", key, exc_info=True)
             return None
 
+    def groups_for_song(self, artist: str, title: str, limit: int = 20) -> tuple[SongRef, list[SongGroup]]:
+        """The song ``artist``/``title`` names plus availability groups for it, its own
+        group first (same merge rule as ``search``). ``ref.karaoke`` is False when the
+        song has no availability group."""
+        key = song_key(artist, title)
+        found = self.availability.search(f"{artist} {title}", _clamp(limit, MAX_GROUPS))
+        own = next((g for g in found if g["song_key"] == key), None) or self._song_or_none(key)
+        merged: dict[str, dict[str, Any]] = {}
+        if own is not None:
+            merged[own["song_key"]] = own
+        for g in found:
+            merged.setdefault(g["song_key"], g)
+        ref = SongRef(
+            artist=own["artist"] if own else artist,
+            title=own["title"] if own else title,
+            song_key=key,
+            popularity=own.get("pop") if own else None,
+            karaoke=own is not None and bool(own["versions"]),
+        )
+        return ref, [_group(g) for g in list(merged.values())[:limit]]
+
     def popular(self, limit: int = 30) -> list[SongGroup]:
         return [_group(g) for g in self.availability.popular(_clamp(limit, MAX_GROUPS))]
 

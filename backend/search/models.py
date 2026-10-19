@@ -74,6 +74,23 @@ class SongDetail(BaseModel):
     versions: list[Version]
 
 
+class Split(BaseModel):
+    artist: str
+    title: str
+
+
+class ResolveResponse(BaseModel):
+    """kjbox ``/sing/search/resolve`` shape. Every field is optional: ``{}`` means
+    "nothing to offer" (including any failure of the gen call)."""
+
+    corrected: SongRef | None = None
+    kind: Literal["cosmetic", "content"] | None = None
+    typed: str | None = None
+    groups: list[SongGroup] = Field(default_factory=list)
+    split: Split | None = None
+    alternatives: list[SongRef] = Field(default_factory=list)
+
+
 class SearchEvent(BaseModel):
     sid: str = Field(min_length=1, max_length=64)
     type: str = Field(min_length=1, max_length=64)
