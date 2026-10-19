@@ -1,4 +1,4 @@
-.PHONY: install dev test test-unit test-backend test-e2e lint format clean help
+.PHONY: search-stack-up search-stack-down install dev test test-unit test-backend test-e2e lint format clean help
 
 # Default target
 help:
@@ -36,6 +36,13 @@ dev:
 
 cli:
 	poetry run karaoke-decide $(ARGS)
+
+# Search local stack (fixture index on :8020; see docs/TESTING.md)
+search-stack-up:
+	./scripts/search-local-stack.sh up
+
+search-stack-down:
+	./scripts/search-local-stack.sh down
 
 # Testing
 TEST_TIMEOUT ?= 300

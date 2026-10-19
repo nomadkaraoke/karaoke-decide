@@ -11,7 +11,8 @@ Probes:
                           failed to load never takes traffic.
 
 Environment:
-  SONG_INDEX_LOCAL_DIR             an already-built index dir; skips the download (local stack)
+  SONG_INDEX_LOCAL_DIR             an already-built index dir; skips the download (local stack).
+                                   Also mounts GET /api/search/_local/offline.db.gz (never in prod)
   SONG_INDEX_RUN                   published "<run>-<token>" dir to load (empty → latest.json)
   SONG_INDEX_BUCKET                bucket holding song-index/ (default nomadkaraoke-kn-data)
   SONG_INDEX_DIR                   where downloads go (default /tmp/song-index; in-memory on Cloud Run)
@@ -35,6 +36,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from backend.search import index_loader
 from backend.search.events import configure_logging, log_event
@@ -224,6 +226,21 @@ def build_router(limiter: RateLimiter, resolve_limiter: RateLimiter) -> APIRoute
     return router
 
 
+def build_local_router(index_dir: Path) -> APIRouter:
+    """Serves the local index's ``offline.db.gz``, standing in for the public bucket the
+    offline manifest points at in production. Mounted only when SONG_INDEX_LOCAL_DIR is set."""
+    router = APIRouter(prefix="/api/search/_local", include_in_schema=False)
+
+    @router.get(f"/{index_loader.OFFLINE_FILE}")
+    def local_offline_file() -> FileResponse:
+        path = index_dir / index_loader.OFFLINE_FILE
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="No offline index in the local index dir")
+        return FileResponse(path, media_type="application/gzip")
+
+    return router
+
+
 def create_search_app(
     *,
     search_limits: RateLimits = SEARCH_LIMITS,
@@ -268,6 +285,9 @@ def create_search_app(
         allow_headers=["*"],
     )
     app.include_router(build_router(RateLimiter(search_limits), RateLimiter(resolve_limits)))
+    local_dir = os.environ.get("SONG_INDEX_LOCAL_DIR", "").strip()
+    if local_dir:  # local stack only: never mounted in production
+        app.include_router(build_local_router(Path(local_dir)))
     return app
 
 
