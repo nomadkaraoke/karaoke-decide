@@ -21,9 +21,10 @@ Divebar mirror in decide).
 Decide-side changes from kjbox: each KN row resolves to its ``song_id.db`` song via
 ``build_song_id.merge_key`` (the key song_id merges spellings on, file-quality tags
 dropped) and is stored under ``song_key`` of song_id's display spelling, with its
-popularity; unresolved rows use ``song_key`` of their own spelling. Every merged
-spelling is indexed. The ``libraries`` / ``song_libraries`` tables are seeded from
-the brand registry (spec §5.4).
+popularity; unresolved rows use ``song_key`` of their own spelling with file tags
+dropped (the untagged spelling shown). Every merged spelling is indexed. The
+``libraries`` / ``song_libraries`` tables are seeded from the brand registry
+(spec §5.4).
 
 Schema:
   songs(song_key PK, artist, title, pop, version_count)
@@ -52,6 +53,7 @@ from karaoke_decide.song_search import fuzzy_match
 from karaoke_decide.song_search.brand_names import brand_name
 from karaoke_decide.song_search.build_song_id import merge_key
 from karaoke_decide.song_search.text_normalize import (
+    FILE_TAG_RE,
     NORMALIZER_VERSION,
     SEARCH_INDEX_VERSION,
     fts_match_query,
@@ -162,6 +164,10 @@ class _Song:
         self.codes: set[str] = set()  # upper-cased brand codes present
 
 
+def _tagged(artist: str, title: str) -> bool:
+    return bool(FILE_TAG_RE.search(artist) or FILE_TAG_RE.search(title))
+
+
 def _merge(
     community_rows: Iterator[dict[str, Any]],
     full_rows: Iterator[dict[str, Any]],
@@ -173,7 +179,8 @@ def _merge(
     Songs are keyed by ``song_key`` of the song_id.db song a KN row resolves to
     through ``build_song_id.merge_key`` (so "Get Ur Freak On" and "Get Your Freak
     On" are one song, under song_id's display spelling — the key A4/A5 join on).
-    Unresolved rows fall back to ``song_key`` of their own spelling (first seen shown).
+    Unresolved rows fall back to ``song_key`` of their own spelling, file tags dropped
+    (first untagged spelling seen is shown).
     """
     songs: dict[str, _Song] = {}
 
@@ -182,10 +189,14 @@ def _merge(
         if canon is not None:
             key = song_key(canon[0], canon[1])
         else:
-            key = song_key(artist, title)
+            # File tags ("(MPX)", "[HM]") describe the file, not the song: tagged and
+            # untagged spellings of an unresolved song stay one song.
+            key = song_key(FILE_TAG_RE.sub(" ", artist), FILE_TAG_RE.sub(" ", title))
         s = songs.get(key)
         if s is None:
             s = songs[key] = _Song(artist, title)
+        elif not s.canonical and _tagged(s.artist, s.title) and not _tagged(artist, title):
+            s.artist, s.title = artist, title  # show the untagged spelling
         if canon is not None and not s.canonical:
             s.artist, s.title, s.pop = canon
             s.canonical = True

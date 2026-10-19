@@ -165,6 +165,37 @@ def test_display_spelling_is_ranked_by_its_own_popularity(tmp_path: Path) -> Non
     assert rows == [("Band", "Breakin Ur Heart", 100, 1)]
 
 
+def test_tie_prefers_the_spelling_without_a_file_tag(tmp_path: Path) -> None:
+    """Merged spellings tied on popularity (incl. blank) show the untagged one."""
+    rows = _build_rows(
+        tmp_path,
+        [
+            ("Fall Out Boy (MPX)", "Centuries", "", 1),  # tagged spelling seen first
+            ("Fall Out Boy", "Centuries", "", 1),
+            ("Paramore", "Misery Business [HM]", 60, 1),
+            ("Paramore", "Misery Business", 60, 0),
+            ("Muse", "Uprising (Multiplex)", 50, 1),  # more popular tagged spelling still wins
+            ("Muse", "Uprising", 40, 1),
+        ],
+    )
+    assert rows == [
+        ("Fall Out Boy", "Centuries", None, 1),
+        ("Muse", "Uprising (Multiplex)", 50, 1),
+        ("Paramore", "Misery Business", 60, 1),
+    ]
+
+
+def test_fold_tie_prefers_the_spelling_without_a_file_tag(tmp_path: Path) -> None:
+    rows = _build_rows(
+        tmp_path,
+        [
+            ("Missy Elliott", "Get Ur Freak On", "", 1),  # folds onto the tagged spelling's key
+            ("Missy Elliott (MPX)", "Get Your Freak On", "", 1),
+        ],
+    )
+    assert rows == [("Missy Elliott", "Get Ur Freak On", None, 1)]
+
+
 def test_fold_keeps_different_songs_apart(tmp_path: Path) -> None:
     rows = _build_rows(
         tmp_path,

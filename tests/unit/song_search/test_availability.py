@@ -156,6 +156,45 @@ def test_unresolved_rows_fall_back_to_their_own_spelling(idx: AvailabilityIndex)
     assert (song["artist"], song["title"], song["pop"]) == ("Andrew Lloyd Webber", "Starlight Express", None)
 
 
+def test_unresolved_tagged_and_untagged_rows_are_one_song(tmp_path: Path) -> None:
+    """No song_id match: "(MPX)" / "[HM]" tags must not split a KN song in two."""
+    full = tmp_path / "full.json"
+    full.write_text(
+        '[{"Artist": "Obscure Band (MPX)", "Title": "Deep Cut", "Brands": "SC"},'
+        ' {"Artist": "Obscure Band", "Title": "Deep Cut [HM]", "Brands": "SF"}]',
+        encoding="utf-8",
+    )
+    community = tmp_path / "community.json"
+    community.write_text(
+        '{"Items": [{"Artist": "Obscure Band", "Title": "Deep Cut", "Brand": "NOMAD", "Watch": ""}]}',
+        encoding="utf-8",
+    )
+    out = tmp_path / "a.db"
+    stats = build_availability_db(
+        _gz(full, tmp_path / "f.json.gz"), _gz(community, tmp_path / "c.json.gz"), None, out, run="r"
+    )
+    assert stats["songs"] == 1
+    song = AvailabilityIndex(out).song(song_key("Obscure Band", "Deep Cut"))
+    assert song is not None
+    assert (song["artist"], song["title"]) == ("Obscure Band", "Deep Cut")
+    assert sorted(_brands(song)) == ["NOMAD", "SC", "SF"]
+
+
+def test_unresolved_display_prefers_the_untagged_spelling(tmp_path: Path) -> None:
+    full = tmp_path / "full.json"
+    full.write_text(
+        '[{"Artist": "Obscure Band (MPX)", "Title": "Deep Cut", "Brands": "SC"},'
+        ' {"Artist": "Obscure Band", "Title": "Deep Cut", "Brands": "SF"}]',
+        encoding="utf-8",
+    )
+    community = tmp_path / "community.json"
+    community.write_text('{"Items": []}', encoding="utf-8")
+    out = tmp_path / "a.db"
+    build_availability_db(_gz(full, tmp_path / "f.json.gz"), _gz(community, tmp_path / "c.json.gz"), None, out, run="r")
+    song = AvailabilityIndex(out).song(song_key("Obscure Band", "Deep Cut"))
+    assert song is not None and (song["artist"], song["title"]) == ("Obscure Band", "Deep Cut")
+
+
 def test_featured_spelling_stays_searchable(idx: AvailabilityIndex) -> None:
     # "Zedd feat. Hayley Williams" merged into "Zedd - Stay the Night"; the featured
     # name is still indexed.

@@ -13,7 +13,8 @@ Output SQLite:
   meta(key, value)                                       schema/normalizer versions, counts, built_at, run
 
 Duplicates are merged on the space-less normalized artist+title ("u s a" == "usa"),
-keeping the most popular display spelling and OR-ing the karaoke flag. Then spelling
+keeping the most popular display spelling (on a tie, one without a file tag such as
+"(MPX)") and OR-ing the karaoke flag. Then spelling
 variants of the same artist's title are folded together ("Breaking Dishes" ==
 "Breakin' Dishes", "Get Your Freak On" == "Get Ur Freak On"), showing the spelling
 that has a karaoke version (the name singers will find), else the more popular one.
@@ -73,6 +74,12 @@ def merge_key(artist: str, title: str) -> str:
     return f"{na}|{_fold_title(nt)}"
 
 
+def _untagged(artist: str, title: str) -> int:
+    """1 when the spelling carries no file-quality tag ("(MPX)", "[HM]"): between
+    otherwise tied spellings the untagged one is shown (decide-side)."""
+    return 0 if FILE_TAG_RE.search(artist) or FILE_TAG_RE.search(title) else 1
+
+
 def _open(path: Path) -> IO[str]:
     if path.suffix == ".gz":
         return gzip.open(path, "rt", encoding="utf-8")
@@ -121,23 +128,26 @@ def build(tsv_paths: list[Path], out_path: Path, run: str) -> dict[str, Any]:
         else:
             if p is not None and (cur[2] is None or p > cur[2]):
                 cur[0], cur[1], cur[2] = artist, title, p
+            elif p == cur[2] and _untagged(artist, title) > _untagged(cur[0], cur[1]):
+                cur[0], cur[1] = artist, title  # tie (incl. both blank): untagged spelling shows
             cur[3] = cur[3] or k
     # Fold spelling variants into one song. Folding is idempotent, so a folded key is
     # either an unfolded song's own key or a new group started by the first variant.
     # Between spellings: the one with a karaoke version, then the more popular (both
     # "Get Your Freak On" and "Get Ur Freak On" are on KaraokeNerds) — ranked by the
-    # shown spelling's own popularity, not the group's running max.
-    shown: dict[str, tuple[int, int]] = {}  # folded key → rank of the spelling currently displayed
+    # shown spelling's own popularity, not the group's running max. Decide-side: on a
+    # tie, the spelling without a file tag ("(MPX)", "[HM]").
+    shown: dict[str, tuple[int, int, int]] = {}  # folded key → rank of the spelling currently displayed
     for key, fkey in folds.items():
         cur = merged.pop(key)
-        rank = (cur[3], cur[2] if cur[2] is not None else -1)
+        rank = (cur[3], cur[2] if cur[2] is not None else -1, _untagged(cur[0], cur[1]))
         target = merged.get(fkey)
         if target is None:
             merged[fkey] = cur
             shown[fkey] = rank
         else:
             if fkey not in shown:
-                shown[fkey] = (target[3], target[2] if target[2] is not None else -1)
+                shown[fkey] = (target[3], target[2] if target[2] is not None else -1, _untagged(target[0], target[1]))
             if rank > shown[fkey]:
                 target[0], target[1] = cur[0], cur[1]
                 shown[fkey] = rank
