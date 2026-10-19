@@ -7,6 +7,7 @@ Songs are joined across song_id.db and availability.db by ``song_key`` =
 from __future__ import annotations
 
 import logging
+import sqlite3
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -100,7 +101,7 @@ class SearchService:
             corrected = self.availability.search(f"{best.artist} {best.title}", limit)
             own = next((g for g in corrected if g["song_key"] == best.song_key), None)
             if own is None:
-                own = self.availability.song(best.song_key)
+                own = self._song_or_none(best.song_key)
             if own is not None:
                 merged[own["song_key"]] = own
             for g in corrected:
@@ -116,6 +117,15 @@ class SearchService:
         )
         groups = [_group(g) for g in list(merged.values())[:limit]]
         return SearchResult(identification, groups)
+
+    def _song_or_none(self, key: str) -> dict[str, Any] | None:
+        """``availability.song`` for the search path: index trouble degrades to no
+        group, like ``availability.search`` does, instead of failing the search."""
+        try:
+            return self.availability.song(key)
+        except sqlite3.Error:
+            logger.warning("availability song lookup failed for %r", key, exc_info=True)
+            return None
 
     def popular(self, limit: int = 30) -> list[SongGroup]:
         return [_group(g) for g in self.availability.popular(_clamp(limit, MAX_GROUPS))]

@@ -62,6 +62,7 @@ from karaoke_decide.song_search.text_normalize import (
     normalize,
     song_key,
 )
+from karaoke_decide.song_search.thread_conns import ThreadConnections
 from karaoke_decide.song_search.version_priority import (
     COMMERCIAL_BRANDS,
     COMMUNITY_BRANDS,
@@ -398,8 +399,7 @@ class AvailabilityIndex:
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = str(db_path)
         self._local = threading.local()
-        self._conns: list[sqlite3.Connection] = []  # every thread's, for close()
-        self._conns_lock = threading.Lock()
+        self._conns = ThreadConnections()  # every live thread's, for close()
         self._generation = 0
         self._conn()  # fail fast on a missing / unreadable file
 
@@ -413,18 +413,14 @@ class AvailabilityIndex:
             except BaseException:
                 conn.close()
                 raise
-            with self._conns_lock:
-                self._conns.append(conn)
+            self._conns.add(conn)
             self._local.conn, self._local.gen = conn, self._generation
         return conn
 
     def close(self) -> None:
         """Close every thread's connection; later queries reopen."""
-        with self._conns_lock:
-            conns, self._conns = self._conns, []
-            self._generation += 1
-        for conn in conns:
-            conn.close()
+        self._generation += 1  # first, so no thread keeps using a connection closed below
+        self._conns.close_all()
 
     # ---------------------------------------------------------------- public
 

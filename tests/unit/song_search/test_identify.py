@@ -214,9 +214,15 @@ def test_title_then_artist_prefers_the_named_artist(fixture_identifier: SongIden
     assert _best(fixture_identifier, "Starlight Muse") == ("confident", ("Muse", "Starlight"))
 
 
-def test_artist_word_beats_more_popular_same_title(fixture_identifier: SongIdentifier) -> None:
+def test_artist_word_picks_the_named_artist_among_same_titles(fixture_identifier: SongIdentifier) -> None:
+    """Spec §1 (R15): the identified song has no karaoke version; the other two
+    "Machu Picchu"s (Camilo & Evaluna Montaner) do, and must not be picked."""
     r = fixture_identifier.identify("machu picchu strokes")
-    assert r["best"]["artist"] == "The Strokes"
+    assert r["status"] == "confident"
+    assert (r["best"]["artist"], r["best"]["title"]) == ("The Strokes", "Machu Picchu")
+    assert r["best"]["karaoke"] is False
+    rivals = [c for c in r["candidates"] if c["title"] == "Machu Picchu" and c["artist"] != "The Strokes"]
+    assert rivals and all(c["karaoke"] for c in rivals)
 
 
 def test_generic_title_shared_by_several_artists_asks_which_one(fixture_identifier: SongIdentifier) -> None:
@@ -321,16 +327,46 @@ def test_close_closes_every_threads_connection_and_reopens(fixture_db: Path) -> 
     import threading
 
     si = SongIdentifier(fixture_db)
-    t = threading.Thread(target=lambda: si.identify("starlite muse"))
+    opened: list[sqlite3.Connection] = []
+    ready, release = threading.Event(), threading.Event()
+
+    def worker() -> None:
+        opened.append(si._db())
+        ready.set()
+        release.wait()
+
+    t = threading.Thread(target=worker)
     t.start()
-    t.join()
-    assert si.identify("starlite muse")["status"] == "confident"
-    conns = list(si._conns)
-    assert len(conns) == 2
-    si.close()
-    assert si._conns == []
-    for c in conns:
+    ready.wait()
+    try:
+        assert si.identify("starlite muse")["status"] == "confident"
+        opened.append(si._db())
+        assert len(si._conns) == 2  # both threads alive
+        si.close()
+        assert len(si._conns) == 0
+        for c in opened:
+            with pytest.raises(sqlite3.ProgrammingError):
+                c.execute("SELECT 1")
+        assert si.identify("starlite muse")["status"] == "confident"  # reopens
+    finally:
+        release.set()
+        t.join()
+        si.close()
+
+
+def test_connections_of_exited_threads_are_closed_and_dropped(fixture_db: Path) -> None:
+    import threading
+
+    si = SongIdentifier(fixture_db)
+    opened: list[sqlite3.Connection] = []
+    for _ in range(20):  # short-lived worker threads, one after another
+        t = threading.Thread(target=lambda: opened.append(si._db()))
+        t.start()
+        t.join()
+        assert len(si._conns) <= 2
+    si._db()  # this thread registers → the last exited thread's connection goes too
+    assert len(si._conns) == 1
+    for c in opened:
         with pytest.raises(sqlite3.ProgrammingError):
             c.execute("SELECT 1")
-    assert si.identify("starlite muse")["status"] == "confident"  # reopens
     si.close()

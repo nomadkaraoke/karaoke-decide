@@ -5031,13 +5031,13 @@
  {
   "q": "The Strokes Machu Pichu",
   "identify": {
-   "status": "candidates",
+   "status": "confident",
    "best": {
     "artist": "The Strokes",
     "title": "Machu Picchu",
-    "score": 1.095,
+    "score": 1.045,
     "popularity": 64,
-    "karaoke": true,
+    "karaoke": false,
     "detail": {
      "q_cov": 0.98,
      "title_cov": 1.0,
@@ -5052,47 +5052,23 @@
     {
      "artist": "The Strokes",
      "title": "Machu Picchu",
-     "score": 1.095,
+     "score": 1.045,
      "popularity": 64,
-     "karaoke": true,
+     "karaoke": false,
      "song_key": "the strokes|machu picchu"
     },
     {
      "artist": "Camilo, Evaluna Montaner",
      "title": "Machu Picchu",
-     "score": 0.709,
-     "popularity": 72,
-     "karaoke": false,
+     "score": 0.737,
+     "popularity": 50,
+     "karaoke": true,
      "song_key": "camilo evaluna montaner|machu picchu"
     }
    ]
   },
   "kind": "content",
-  "groups": [
-   {
-    "song_key": "the strokes|machu picchu",
-    "artist": "The Strokes",
-    "title": "Machu Picchu",
-    "karaoke": true,
-    "version_count": 2,
-    "versions": [
-     {
-      "brand_code": "SDK",
-      "brand_name": "SNDL Karaoke",
-      "kind": "community",
-      "youtube_url": "https://www.youtube.com/watch?v=e1e988ab5fb",
-      "rank": 86
-     },
-     {
-      "brand_code": "CB",
-      "brand_name": "Chart Buster",
-      "kind": "commercial",
-      "youtube_url": null,
-      "rank": 2046
-     }
-    ]
-   }
-  ]
+  "groups": []
  },
  {
   "q": "the strokes max pichu",
@@ -5101,9 +5077,9 @@
    "best": {
     "artist": "The Strokes",
     "title": "Machu Picchu",
-    "score": 0.964,
+    "score": 0.914,
     "popularity": 64,
-    "karaoke": true,
+    "karaoke": false,
     "detail": {
      "q_cov": 0.88,
      "title_cov": 0.76,
@@ -5118,39 +5094,15 @@
     {
      "artist": "The Strokes",
      "title": "Machu Picchu",
-     "score": 0.964,
+     "score": 0.914,
      "popularity": 64,
-     "karaoke": true,
+     "karaoke": false,
      "song_key": "the strokes|machu picchu"
     }
    ]
   },
   "kind": "content",
-  "groups": [
-   {
-    "song_key": "the strokes|machu picchu",
-    "artist": "The Strokes",
-    "title": "Machu Picchu",
-    "karaoke": true,
-    "version_count": 2,
-    "versions": [
-     {
-      "brand_code": "SDK",
-      "brand_name": "SNDL Karaoke",
-      "kind": "community",
-      "youtube_url": "https://www.youtube.com/watch?v=e1e988ab5fb",
-      "rank": 86
-     },
-     {
-      "brand_code": "CB",
-      "brand_name": "Chart Buster",
-      "kind": "commercial",
-      "youtube_url": null,
-      "rank": 2046
-     }
-    ]
-   }
-  ]
+  "groups": []
  },
  {
   "q": "the strokes max picu",
@@ -5159,9 +5111,9 @@
    "best": {
     "artist": "The Strokes",
     "title": "Machu Picchu",
-    "score": 0.925,
+    "score": 0.875,
     "popularity": 64,
-    "karaoke": true,
+    "karaoke": false,
     "detail": {
      "q_cov": 0.85,
      "title_cov": 0.7,
@@ -5176,50 +5128,26 @@
     {
      "artist": "The Strokes",
      "title": "Machu Picchu",
-     "score": 0.925,
+     "score": 0.875,
      "popularity": 64,
-     "karaoke": true,
+     "karaoke": false,
      "song_key": "the strokes|machu picchu"
     }
    ]
   },
   "kind": "content",
-  "groups": [
-   {
-    "song_key": "the strokes|machu picchu",
-    "artist": "The Strokes",
-    "title": "Machu Picchu",
-    "karaoke": true,
-    "version_count": 2,
-    "versions": [
-     {
-      "brand_code": "SDK",
-      "brand_name": "SNDL Karaoke",
-      "kind": "community",
-      "youtube_url": "https://www.youtube.com/watch?v=e1e988ab5fb",
-      "rank": 86
-     },
-     {
-      "brand_code": "CB",
-      "brand_name": "Chart Buster",
-      "kind": "commercial",
-      "youtube_url": null,
-      "rank": 2046
-     }
-    ]
-   }
-  ]
+  "groups": []
  },
  {
   "q": "the strokes macchu pichu",
   "identify": {
-   "status": "candidates",
+   "status": "confident",
    "best": {
     "artist": "The Strokes",
     "title": "Machu Picchu",
-    "score": 1.078,
+    "score": 1.028,
     "popularity": 64,
-    "karaoke": true,
+    "karaoke": false,
     "detail": {
      "q_cov": 0.96,
      "title_cov": 1.0,
@@ -5234,47 +5162,23 @@
     {
      "artist": "The Strokes",
      "title": "Machu Picchu",
-     "score": 1.078,
+     "score": 1.028,
      "popularity": 64,
-     "karaoke": true,
+     "karaoke": false,
      "song_key": "the strokes|machu picchu"
     },
     {
      "artist": "Camilo, Evaluna Montaner",
      "title": "Machu Picchu",
-     "score": 0.653,
-     "popularity": 72,
-     "karaoke": false,
+     "score": 0.681,
+     "popularity": 50,
+     "karaoke": true,
      "song_key": "camilo evaluna montaner|machu picchu"
     }
    ]
   },
   "kind": "content",
-  "groups": [
-   {
-    "song_key": "the strokes|machu picchu",
-    "artist": "The Strokes",
-    "title": "Machu Picchu",
-    "karaoke": true,
-    "version_count": 2,
-    "versions": [
-     {
-      "brand_code": "SDK",
-      "brand_name": "SNDL Karaoke",
-      "kind": "community",
-      "youtube_url": "https://www.youtube.com/watch?v=e1e988ab5fb",
-      "rank": 86
-     },
-     {
-      "brand_code": "CB",
-      "brand_name": "Chart Buster",
-      "kind": "commercial",
-      "youtube_url": null,
-      "rank": 2046
-     }
-    ]
-   }
-  ]
+  "groups": []
  },
  {
   "q": "the stokes max picu",
@@ -5283,9 +5187,9 @@
    "best": {
     "artist": "The Strokes",
     "title": "Machu Picchu",
-    "score": 0.922,
+    "score": 0.872,
     "popularity": 64,
-    "karaoke": true,
+    "karaoke": false,
     "detail": {
      "q_cov": 0.85,
      "title_cov": 0.7,
@@ -5300,39 +5204,15 @@
     {
      "artist": "The Strokes",
      "title": "Machu Picchu",
-     "score": 0.922,
+     "score": 0.872,
      "popularity": 64,
-     "karaoke": true,
+     "karaoke": false,
      "song_key": "the strokes|machu picchu"
     }
    ]
   },
   "kind": "content",
-  "groups": [
-   {
-    "song_key": "the strokes|machu picchu",
-    "artist": "The Strokes",
-    "title": "Machu Picchu",
-    "karaoke": true,
-    "version_count": 2,
-    "versions": [
-     {
-      "brand_code": "SDK",
-      "brand_name": "SNDL Karaoke",
-      "kind": "community",
-      "youtube_url": "https://www.youtube.com/watch?v=e1e988ab5fb",
-      "rank": 86
-     },
-     {
-      "brand_code": "CB",
-      "brand_name": "Chart Buster",
-      "kind": "commercial",
-      "youtube_url": null,
-      "rank": 2046
-     }
-    ]
-   }
-  ]
+  "groups": []
  },
  {
   "q": "Blake Sheltom Texas",

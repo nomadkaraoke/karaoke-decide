@@ -48,6 +48,7 @@ from rapidfuzz.distance import Levenshtein
 # stripped from the index (see _QUERY_FEAT_CLAUSE_RE below).
 from karaoke_decide.song_search.text_normalize import NORMALIZER_VERSION  # noqa: F401 (re-exported)
 from karaoke_decide.song_search.text_normalize import identity_normalize as normalize
+from karaoke_decide.song_search.thread_conns import ThreadConnections
 
 _INITIALS_RE = re.compile(r"\b(?:[a-z0-9] ){1,}[a-z0-9]\b")
 
@@ -219,8 +220,7 @@ class SongIdentifier:
         # asks "Which one?" a little more often rather than naming the wrong song.
         self.margin_bonus = margin_bonus
         self._local = threading.local()
-        self._conns: list[sqlite3.Connection] = []  # every thread's, for close()
-        self._conns_lock = threading.Lock()
+        self._conns = ThreadConnections()  # every live thread's, for close()
         self._generation = 0
         self._buckets: dict[tuple[str, int], dict[str, int]] = {}
         self._bucket_gen = 0
@@ -238,22 +238,17 @@ class SongIdentifier:
         db, gen = getattr(self._local, "db", None), getattr(self._local, "gen", -1)
         if db is None or gen != self._generation:
             if db is not None:
+                self._conns.discard(db)
                 db.close()
-                with self._conns_lock:
-                    self._conns = [c for c in self._conns if c is not db]
             db = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, check_same_thread=False)
-            with self._conns_lock:
-                self._conns.append(db)
+            self._conns.add(db)
             self._local.db, self._local.gen = db, self._generation
         return db
 
     def close(self) -> None:
         """Close every thread's connection; later queries reopen."""
-        with self._conns_lock:
-            conns, self._conns = self._conns, []
-        for db in conns:
-            db.close()
-        self.reload()
+        self.reload()  # first, so no thread keeps using a connection closed below
+        self._conns.close_all()
 
     def stats(self) -> dict[str, Any]:
         out: dict[str, Any] = {"db_path": self.db_path, "available": self.available}

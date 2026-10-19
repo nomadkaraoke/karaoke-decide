@@ -399,14 +399,39 @@ def test_close_closes_connections_and_reopens(built: tuple[Path, dict[str, Any]]
     import threading
 
     av = AvailabilityIndex(built[0])
-    t = threading.Thread(target=lambda: av.song(STARLIGHT))
+    opened = [av._conn()]
+    ready, release = threading.Event(), threading.Event()
+
+    def worker() -> None:
+        opened.append(av._conn())
+        ready.set()
+        release.wait()
+
+    t = threading.Thread(target=worker)
     t.start()
-    t.join()
-    conns = list(av._conns)
-    assert len(conns) == 2
-    av.close()
-    for c in conns:
-        with pytest.raises(sqlite3.ProgrammingError):
-            c.execute("SELECT 1")
-    assert av.song(STARLIGHT) is not None  # reopens
+    ready.wait()
+    try:
+        assert len(av._conns) == 2
+        av.close()
+        assert len(av._conns) == 0
+        for c in opened:
+            with pytest.raises(sqlite3.ProgrammingError):
+                c.execute("SELECT 1")
+        assert av.song(STARLIGHT) is not None  # reopens
+    finally:
+        release.set()
+        t.join()
+        av.close()
+
+
+def test_connections_of_exited_threads_are_closed_and_dropped(built: tuple[Path, dict[str, Any]]) -> None:
+    import threading
+
+    av = AvailabilityIndex(built[0])
+    for _ in range(20):
+        t = threading.Thread(target=lambda: av.song(STARLIGHT))
+        t.start()
+        t.join()
+        # this thread's (opened by __init__) + at most the last exited thread's
+        assert len(av._conns) <= 2
     av.close()

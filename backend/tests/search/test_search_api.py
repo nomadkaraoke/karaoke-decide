@@ -52,8 +52,6 @@ def test_groups_are_unique_by_song_key(client: TestClient) -> None:
 
 
 def test_confident_song_without_karaoke_has_no_group(client: TestClient) -> None:
-    # The brief's "machu picchu strokes" is `candidates` on the A2 fixture (the
-    # Evaluna Montaner rivals), so a confident non-karaoke fixture song stands in.
     body = _search(client, "rihanna push up on me")
     ident = body["identification"]
     assert ident["status"] == "confident"
@@ -63,10 +61,13 @@ def test_confident_song_without_karaoke_has_no_group(client: TestClient) -> None
     assert all(g["song_key"] != best_key for g in body["groups"])
 
 
-def test_machu_picchu_strokes(client: TestClient) -> None:
-    ident = _search(client, "machu picchu strokes")["identification"]
-    assert ident["status"] in ("confident", "candidates")
+def test_machu_picchu_strokes_confident_without_karaoke(client: TestClient) -> None:
+    body = _search(client, "machu picchu strokes")
+    ident = body["identification"]
+    assert ident["status"] == "confident"
     assert ident["best"]["song_key"] == song_key("The Strokes", "Machu Picchu")
+    assert ident["best"]["karaoke"] is False
+    assert all(g["song_key"] != ident["best"]["song_key"] for g in body["groups"])
 
 
 def test_generic_title_gives_candidates(client: TestClient) -> None:
@@ -302,3 +303,40 @@ def test_openapi_names_the_contract_models(client: TestClient) -> None:
     ):
         assert name in schemas, name
     assert "schema" in schemas["OfflineIndexManifest"]["properties"]
+
+
+# --- readiness (R14) -------------------------------------------------------------------
+
+
+def test_ready_when_index_loaded(client: TestClient) -> None:
+    r = client.get("/api/search/ready")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+
+
+def test_not_ready_with_broken_index_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.search.app import create_search_app
+
+    (tmp_path / "song_id.db").write_bytes(b"not a database")
+    monkeypatch.setenv("SONG_INDEX_LOCAL_DIR", str(tmp_path))
+    with TestClient(create_search_app()) as c:
+        assert c.get("/api/search/ready").status_code == 503
+        assert c.get("/api/search/health").status_code == 200
+
+
+def test_identified_song_lookup_error_degrades(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    import sqlite3
+
+    from karaoke_decide.song_search.availability import AvailabilityIndex
+
+    def no_search(self: object, q: str, limit: int = 60) -> list[dict[str, Any]]:
+        return []
+
+    def broken(self: object, key: str) -> None:
+        raise sqlite3.DatabaseError("database disk image is malformed")
+
+    monkeypatch.setattr(AvailabilityIndex, "search", no_search)
+    monkeypatch.setattr(AvailabilityIndex, "song", broken)
+    body = _search(client, "starlite muse")
+    assert body["identification"]["status"] == "confident"
+    assert body["groups"] == []

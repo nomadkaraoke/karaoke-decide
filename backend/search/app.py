@@ -3,6 +3,13 @@
 Run with ``uvicorn backend.search.app:search_app --host 0.0.0.0 --port 8000``.
 It is NOT mounted into ``backend/main.py``.
 
+Probes:
+  GET /api/search/health  always 200 and never touches the index: the 60 s uptime
+                          ping that keeps an instance warm, and the app's warm-up ping.
+  GET /api/search/ready   200 only once both indexes are loaded, else 503. The Cloud
+                          Run startup probe uses this one, so a revision whose index
+                          failed to load never takes traffic.
+
 Environment:
   SONG_INDEX_LOCAL_DIR             an already-built index dir; skips the download (local stack)
   SONG_INDEX_RUN                   published "<run>-<token>" dir to load (empty → latest.json)
@@ -116,6 +123,14 @@ def build_router(limiter: RateLimiter) -> APIRouter:
         # Warm-up ping + uptime check: must not touch the index.
         return Health(ok=True)
 
+    @router.get("/ready", response_model=Health, responses={503: {"description": "Index not loaded"}})
+    def ready(request: Request) -> Health:
+        # Startup probe: ready only when both databases are open.
+        state = _state(request)
+        if state.service is None or state.index is None:
+            raise HTTPException(status_code=503, detail="Search index not loaded")
+        return Health(ok=True)
+
     @router.get("", response_model=SearchResponse, dependencies=limited)
     def search(
         request: Request,
@@ -185,8 +200,8 @@ def create_search_app(*, search_limits: RateLimits = SEARCH_LIMITS) -> FastAPI:
             offline_url_template=os.environ.get("SONG_INDEX_OFFLINE_URL_TEMPLATE", "").strip()
             or DEFAULT_OFFLINE_URL_TEMPLATE
         )
-        # Blocking startup until the index is in: Cloud Run's startup probe (health)
-        # only passes, and traffic only shifts to this revision, once it is.
+        # Blocking startup until the index is in; Cloud Run's startup probe (/ready)
+        # passes, and traffic shifts to this revision, only once it loaded.
         loaded = await asyncio.to_thread(_load_index)
         if loaded is not None:
             state.index = loaded
