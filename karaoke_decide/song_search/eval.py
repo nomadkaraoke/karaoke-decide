@@ -22,7 +22,8 @@ For negatives (no artist/title), "none" or "cand" is fine; confident is WRONG.
 
 Decide-side change from kjbox: the scoring loop is ``run_eval(identifier, cases)``,
 returning ``{total, auto, wrong_auto, candidates, none, wrong}`` for the index-build
-job's eval gate; the CLI prints kjbox's report on top of it.
+job's eval gate; the CLI prints kjbox's report on top of it. ``dual_eval(cloud, offline,
+cases)`` compares the phone's offline identification with the cloud's (spec §8).
 """
 
 from __future__ import annotations
@@ -36,10 +37,11 @@ import statistics
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from karaoke_decide.song_search.identify import SongIdentifier
 from karaoke_decide.song_search.text_normalize import identity_normalize as normalize  # song identity
+from karaoke_decide.song_search.text_normalize import song_key
 
 
 def _key(s: str | None) -> str:
@@ -110,6 +112,55 @@ def run_eval(identifier: SongIdentifier, cases: list[dict[str, Any]]) -> dict[st
         "candidates": statuses["candidates"],
         "none": statuses["none"],
         "wrong": wrong,
+    }
+
+
+class Identifier(Protocol):
+    def identify(self, query: str, limit: int = 5) -> dict[str, Any]: ...
+
+
+def _brief(r: dict[str, Any]) -> dict[str, Any]:
+    b = r.get("best")
+    return {"status": r["status"], "artist": b["artist"] if b else None, "title": b["title"] if b else None}
+
+
+def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Offline vs cloud identification over the same queries (spec §8 dual eval).
+
+    → ``{total, confident_disagree, offline_downgraded, disagreements}``.
+
+    ``confident_disagree``: offline is confident but the cloud is not confident about
+    the same song (``song_key``) — it names another song, or the cloud asks "Which
+    one?" / has nothing. Must stay ~0: offline naming the wrong song is an anti-goal.
+    ``offline_downgraded``: the cloud is confident, offline is not (it asks instead);
+    allowed, it is the price of the smaller index and the stricter margin.
+    ``disagreements`` lists both kinds: ``{q, type, cloud, offline}`` with each side's
+    ``{status, artist, title}``. ``offline`` is built with
+    ``margin_bonus=offline.OFFLINE_MARGIN_BONUS``."""
+    confident_disagree = downgraded = 0
+    disagreements: list[dict[str, Any]] = []
+    for c in cases:
+        rc, ro = cloud.identify(c["q"]), offline.identify(c["q"])
+        same = (
+            rc["best"] is not None
+            and ro["best"] is not None
+            and song_key(rc["best"]["artist"], rc["best"]["title"])
+            == song_key(ro["best"]["artist"], ro["best"]["title"])
+        )
+        if ro["status"] == "confident" and not (rc["status"] == "confident" and same):
+            kind = "confident_disagree"
+            confident_disagree += 1
+        elif rc["status"] == "confident" and ro["status"] != "confident":
+            kind = "offline_downgraded"
+            downgraded += 1
+        else:
+            continue
+        disagreements.append({"q": c["q"], "type": kind, "cloud": _brief(rc), "offline": _brief(ro)})
+    return {
+        "total": len(cases),
+        "confident_disagree": confident_disagree,
+        "offline_downgraded": downgraded,
+        "disagreements": disagreements,
     }
 
 
