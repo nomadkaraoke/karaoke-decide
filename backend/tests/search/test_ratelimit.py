@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -136,7 +137,7 @@ def test_api_default_device_limit_is_300(client: TestClient) -> None:
     assert client.get("/api/search/popular", params={"limit": 1}, headers=h).status_code == 429
 
 
-def _req(headers: dict[str, str], peer: str | None = "10.0.0.1"):
+def _req(headers: dict[str, str], peer: str | None = "10.0.0.1") -> Any:
     from starlette.requests import Request
 
     scope = {
