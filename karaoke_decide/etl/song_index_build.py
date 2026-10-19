@@ -14,7 +14,9 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
              cloud, labelled + frozen synthetic set). Gates: ``wrong_auto`` may rise by
              at most 1 and the ``auto`` rate drop by at most 2 points vs the previous
              manifest; ``confident_disagree / total`` <= ``DUAL_EVAL_MAX_DISAGREE``.
-             A failed gate publishes nothing and logs exactly one ERROR.
+             A failed gate publishes nothing and logs one ERROR (the first time
+             for that source run + versions; repeats are INFO, recorded in
+             ``song-index/reported-failures.json``).
 4. PUBLISH   ``song_id.db``, ``availability.db``, then ``manifest.json`` to
              ``gs://<index>/song-index/<run>-<token>/``; ``offline.db.gz`` to the public
              bucket at ``<run>-<token>/offline.db.gz`` (``<token>``: 16 random hex chars,
@@ -22,9 +24,12 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
 5. ROLL OUT  Set ``SONG_INDEX_RUN=<run>-<token>`` on Cloud Run service
              ``karaoke-decide-search`` (a new revision; traffic moves only once its
              ``/api/search/ready`` startup probe passes) and wait for it.
+             If traffic is pinned to an older revision (an operator rollback), the
+             new revision gets none: one ERROR, and steps 6-7 are skipped.
 6. POINT     Write ``song-index/latest.json`` = ``{run, token}`` (only after a good
              rollout, so a failed deploy is retried by the next run, not skipped).
-7. PRUNE     Keep the new run plus the previous ``KEEP_PREVIOUS_RUNS`` in both buckets.
+7. PRUNE     Keep the new run, every run a revision with traffic serves, plus the
+             previous ``KEEP_PREVIOUS_RUNS`` in both buckets.
 
 Usage:
     python -m karaoke_decide.etl.song_index_build run [--force]
@@ -50,7 +55,7 @@ import tempfile
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -84,6 +89,9 @@ KN_COMMUNITY = "community/community-data-latest.json.gz"
 # Layout read by backend/search/index_loader.py (kept equal by a test).
 INDEX_PREFIX = "song-index"
 INDEX_LATEST = f"{INDEX_PREFIX}/latest.json"
+# Failures already alerted on (key -> first seen), so a repeat logs INFO, not a daily ERROR.
+REPORTED_FAILURES = f"{INDEX_PREFIX}/reported-failures.json"
+REPORTED_FAILURES_KEEP = 20
 SERVER_FILES = ("song_id.db", "availability.db")
 OFFLINE_FILE = "offline.db.gz"
 
@@ -140,8 +148,17 @@ class Storage(Protocol):
     def delete(self, bucket: str, name: str) -> None: ...
 
 
+@dataclass(frozen=True)
+class Rollout:
+    """Where the service's traffic went after an env update."""
+
+    serving: bool  # 100% of traffic follows the latest revision (the new one)
+    pinned: list[str] = field(default_factory=list)  # revisions holding traffic otherwise
+
+
 class RunAdmin(Protocol):
-    def set_env(self, name: str, value: str) -> None: ...
+    def set_env(self, name: str, value: str) -> Rollout: ...
+    def serving_env_values(self, name: str) -> set[str]: ...
 
 
 class GcsStore:
@@ -189,21 +206,49 @@ class GcsStore:
             pass
 
 
+def _main_container(containers: Any) -> Any:
+    """The serving container: the only one, else the one that declares ports."""
+    if len(containers) == 1:
+        return containers[0]
+    serving = [c for c in containers if c.ports]
+    if len(serving) != 1:
+        raise RuntimeError(f"can't tell the serving container among {[c.name for c in containers]}")
+    return serving[0]
+
+
 class CloudRunAdmin:
     """Sets one env var on a Cloud Run service (a new revision) and waits for it to
     become ready. Cloud Run keeps serving the old revision if the new one fails its
-    startup probe; the operation then raises."""
+    startup probe; the operation then raises. Traffic pinned to a named revision (an
+    operator rollback) is reported as ``Rollout(serving=False)``: the new revision
+    exists but gets no traffic."""
 
-    def __init__(self, service_path: str, client: Any = None) -> None:
+    def __init__(self, service_path: str, client: Any = None, revisions_client: Any = None) -> None:
         self.service_path = service_path
-        self.client = client
+        self._client = client
+        self._revisions = revisions_client
 
-    def set_env(self, name: str, value: str) -> None:
+    @property
+    def client(self) -> Any:
+        if self._client is None:
+            from google.cloud import run_v2
+
+            self._client = run_v2.ServicesClient()
+        return self._client
+
+    @property
+    def revisions(self) -> Any:
+        if self._revisions is None:
+            from google.cloud import run_v2
+
+            self._revisions = run_v2.RevisionsClient()
+        return self._revisions
+
+    def set_env(self, name: str, value: str) -> Rollout:
         from google.cloud import run_v2
 
-        client = self.client or run_v2.ServicesClient()
-        svc = client.get_service(name=self.service_path)
-        container = svc.template.containers[0]
+        svc = self.client.get_service(name=self.service_path)
+        container = _main_container(svc.template.containers)
         for env in container.env:
             if env.name == name:
                 env.value = value
@@ -212,20 +257,42 @@ class CloudRunAdmin:
             container.env.append(run_v2.EnvVar(name=name, value=value))
         svc.template.revision = ""  # let Cloud Run name the new revision
         logger.info(f"Rolling {self.service_path} to {name}={value}")
-        client.update_service(service=svc).result(timeout=DEPLOY_TIMEOUT_S)
-        logger.info(f"{self.service_path} is serving {name}={value}")
+        updated = self.client.update_service(service=svc).result(timeout=DEPLOY_TIMEOUT_S)
+        latest = run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST
+        on_latest = sum(t.percent for t in updated.traffic if t.type_ == latest)
+        if on_latest >= 100:
+            logger.info(f"{self.service_path} is serving {name}={value}")
+            return Rollout(serving=True)
+        pinned = [t.revision for t in updated.traffic if t.percent > 0 and t.type_ != latest and t.revision]
+        return Rollout(serving=False, pinned=pinned)
+
+    def _revision_path(self, revision: str) -> str:
+        return revision if "/" in revision else f"{self.service_path}/revisions/{revision}"
+
+    def serving_env_values(self, name: str) -> set[str]:
+        """``name``'s value on every revision currently receiving traffic."""
+        from google.cloud import run_v2
+
+        svc = self.client.get_service(name=self.service_path)
+        latest = run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST
+        revisions: set[str] = set()
+        for t in svc.traffic_statuses:
+            if t.percent > 0:
+                rev = t.revision or (svc.latest_ready_revision if t.type_ == latest else "")
+                if not rev:
+                    raise RuntimeError(f"traffic status without a revision on {self.service_path}")
+                revisions.add(self._revision_path(rev))
+        values: set[str] = set()
+        for rev in sorted(revisions):
+            container = _main_container(self.revisions.get_revision(name=rev).containers)
+            values.update(e.value for e in container.env if e.name == name and e.value)
+        return values
 
 
 def _storage_client() -> Any:
     from google.cloud import storage  # type: ignore[attr-defined]
 
     return storage.Client(project=PROJECT_ID)
-
-
-def _services_client() -> Any:
-    from google.cloud import run_v2
-
-    return run_v2.ServicesClient()
 
 
 # --------------------------------------------------------------------------
@@ -302,10 +369,11 @@ def _brief(result: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in result.items() if not isinstance(v, list)}
 
 
-def build_local(src: SourceFiles, workdir: Path, run: str, token: str) -> dict[str, Any]:
+def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _Stats | None = None) -> dict[str, Any]:
     """Build the three indexes into ``workdir`` from local inputs (deleted once used),
-    evaluate them, and return the manifest (``files`` hashed from the built files)."""
-    stats = _Stats(workdir)
+    evaluate them, and return the manifest (``files`` hashed from the built files).
+    ``stats`` carries earlier stages (the download) into ``manifest.build``."""
+    stats = stats or _Stats(workdir)
     song_id_db = workdir / "song_id.db"
     availability_db = workdir / "availability.db"
     offline_db = workdir / "offline.db"
@@ -457,18 +525,41 @@ def _source_run(storage: Storage) -> str:
     return str(latest["run"])
 
 
-def _gate_error(run: str, failures: list[str], serving: str | None) -> None:
-    """The one ERROR of a gated run: what failed and where to look."""
-    logger.error(
+def _gate_message(run: str, failures: list[str], serving: str | None) -> str:
+    return (
         f"song-index-build: index for source run {run} not published (eval gate failed: "
         f"{'; '.join(failures)}). Search keeps serving {serving or 'its current index'}. "
         "Details: the 'Eval result' / 'Dual eval result' INFO lines of this song-index-build execution."
     )
 
 
-def _prune(storage: Storage, keep: str) -> None:
-    """Keep ``keep`` plus the ``KEEP_PREVIOUS_RUNS`` newest other runs, in both buckets.
-    Best effort: a failure is a WARNING (the next run prunes again)."""
+def _report(storage: Storage | None, key: str, message: str) -> None:
+    """Log ``message`` as the run's one ERROR the first time ``key`` fails; INFO on
+    repeats (recorded in ``REPORTED_FAILURES``), so one root cause pages once."""
+    state: dict[str, Any] = {}
+    if storage is not None:
+        try:
+            state = _read_json(storage, INDEX_BUCKET, REPORTED_FAILURES) or {}
+        except Exception as exc:  # noqa: BLE001 - alerting must not depend on it
+            logger.warning(f"Can't read gs://{INDEX_BUCKET}/{REPORTED_FAILURES}: {exc}")
+    if key in state:
+        logger.info(f"Already reported {state[key]}: {message}")
+        return
+    logger.error(message)
+    if storage is None:
+        return
+    state[key] = datetime.now(UTC).isoformat(timespec="seconds")
+    state = dict(sorted(state.items(), key=lambda kv: str(kv[1]))[-REPORTED_FAILURES_KEEP:])
+    try:
+        storage.upload_bytes(INDEX_BUCKET, REPORTED_FAILURES, json.dumps(state).encode(), content_type=_CT_JSON)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"Can't record the failure in gs://{INDEX_BUCKET}/{REPORTED_FAILURES}: {exc}")
+
+
+def _prune(storage: Storage, keep: set[str]) -> None:
+    """Keep every run in ``keep`` (the new one + those live revisions serve) plus the
+    ``KEEP_PREVIOUS_RUNS`` newest other runs, in both buckets. Best effort: a failure
+    is a WARNING (the next run prunes again)."""
     targets = [
         (INDEX_BUCKET, f"{INDEX_PREFIX}/", 1),
         (PUBLIC_BUCKET, "", 0),
@@ -477,7 +568,7 @@ def _prune(storage: Storage, keep: str) -> None:
         try:
             names = storage.list_names(bucket, prefix)
             runs = sorted({n.split("/")[depth] for n in names if n.count("/") > depth})
-            others = [r for r in runs if r != keep]
+            others = [r for r in runs if r not in keep]
             doomed = set(others[: max(0, len(others) - KEEP_PREVIOUS_RUNS)])
             for n in names:
                 if n.count("/") > depth and n.split("/")[depth] in doomed:
@@ -505,16 +596,16 @@ def build_and_publish(*, storage: Storage, run_admin: RunAdmin, workdir: Path, f
     token = secrets.token_hex(8)
     index_run = f"{run}-{token}"
     logger.info(f"Building song index {index_run} (previous: {serving or 'none'}, force={force})")
-    with _Stats(workdir).stage("download"):
+    stats = _Stats(workdir)
+    with stats.stage("download"):
         run, src = _fetch_sources(storage, workdir / "inputs")
         index_run = f"{run}-{token}"  # the source may have moved on since the check
-    t_download = round(time.monotonic() - t0, 2)
-    manifest = build_local(src, workdir, run, token)
-    manifest["build"]["seconds"] = {"download": t_download, **manifest["build"]["seconds"]}
+    manifest = build_local(src, workdir, run, token, stats)
 
     failures = gate_failures(manifest["eval"], manifest["dual_eval"], (prev or {}).get("eval"))
     if failures:
-        _gate_error(run, failures, serving)
+        key = f"gate:{run}:{json.dumps(VERSIONS, sort_keys=True)}"
+        _report(storage, key, _gate_message(run, failures, serving))
         return {"published": False, "run": run, "token": token, "failures": failures}
 
     run_dir = f"{INDEX_PREFIX}/{index_run}"
@@ -532,11 +623,27 @@ def build_and_publish(*, storage: Storage, run_admin: RunAdmin, workdir: Path, f
     )
     logger.info(f"Uploaded {index_run} (offline.db.gz {manifest['files'][OFFLINE_FILE]['bytes']:,} bytes)")
 
-    run_admin.set_env(INDEX_RUN_ENV, index_run)
+    rollout = run_admin.set_env(INDEX_RUN_ENV, index_run)
+    if not rollout.serving:
+        pinned = ", ".join(rollout.pinned) or "an older revision"
+        _report(
+            storage,
+            f"pinned:{','.join(sorted(rollout.pinned))}",
+            f"song-index-build: {SEARCH_SERVICE} traffic is pinned to {pinned}; new index {index_run} is "
+            f"uploaded but not serving (its revision gets no traffic); latest.json and pruning skipped. "
+            f"To serve it: gcloud run services update-traffic {SEARCH_SERVICE} --to-latest "
+            f"--region {REGION}.",
+        )
+        return {"published": False, "run": run, "token": token, "index_run": index_run, "pinned": rollout.pinned}
     storage.upload_bytes(
         INDEX_BUCKET, INDEX_LATEST, json.dumps({"run": run, "token": token}).encode(), content_type=_CT_JSON
     )
-    _prune(storage, index_run)
+    try:
+        keep = {index_run} | run_admin.serving_env_values(INDEX_RUN_ENV)
+    except Exception as exc:  # noqa: BLE001 - never prune blind
+        logger.warning(f"Pruning skipped: can't read the runs live revisions serve: {exc}")
+    else:
+        _prune(storage, keep)
     logger.info(f"Published song index {index_run} in {time.monotonic() - t0:.0f}s")
     return {
         "published": True,
@@ -580,7 +687,7 @@ def dry_run(workdir: Path, songs: list[Path], kn_full: Path, kn_community: Path,
     (workdir / "manifest.json").write_text(json.dumps(manifest, indent=1))
     failures = gate_failures(manifest["eval"], manifest["dual_eval"], None)
     if failures:
-        _gate_error(run, failures, None)
+        _report(None, "", _gate_message(run, failures, None))
         return {"published": False, "dry_run": True, "run": run, "failures": failures}
     logger.info(f"Dry run built {run}-{token} in {workdir} (not uploaded)")
     return {"published": True, "dry_run": True, "run": run, "token": token, "workdir": str(workdir)}
@@ -618,10 +725,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             out = build_and_publish(
                 storage=GcsStore(_storage_client()),
-                run_admin=CloudRunAdmin(
-                    f"projects/{PROJECT_ID}/locations/{REGION}/services/{SEARCH_SERVICE}",
-                    client=_services_client(),
-                ),
+                run_admin=CloudRunAdmin(f"projects/{PROJECT_ID}/locations/{REGION}/services/{SEARCH_SERVICE}"),
                 workdir=workdir,
                 force=args.force,
             )

@@ -66,14 +66,24 @@ class FakeStore:
 
 
 class FakeAdmin:
-    def __init__(self, fail: bool = False) -> None:
+    def __init__(self, fail: bool = False, pinned: list[str] | None = None, live_runs: set[str] | None = None) -> None:
         self.calls: list[tuple[str, str]] = []
         self.fail = fail
+        self.pinned = pinned
+        self.live_runs = live_runs or set()
 
-    def set_env(self, name: str, value: str) -> None:
+    def set_env(self, name: str, value: str) -> sib.Rollout:
         self.calls.append((name, value))
         if self.fail:
             raise RuntimeError("revision failed its startup probe")
+        if self.pinned is not None:
+            return sib.Rollout(serving=False, pinned=self.pinned)
+        self.live_runs = {value}
+        return sib.Rollout(serving=True)
+
+    def serving_env_values(self, name: str) -> set[str]:
+        assert name == "SONG_INDEX_RUN"
+        return set(self.live_runs)
 
 
 def _gz(data: bytes) -> bytes:
@@ -340,7 +350,12 @@ def test_gate_dual_eval_disagreement() -> None:
 
 def _assert_not_published(store: FakeStore, admin: FakeAdmin, before: dict[tuple[str, str], bytes]) -> None:
     assert admin.calls == []
-    assert store.objects == before  # nothing uploaded, latest.json untouched
+    after = {k: v for k, v in store.objects.items() if k != (IDX, sib.REPORTED_FAILURES)}
+    assert after == before  # nothing uploaded, latest.json untouched
+
+
+def _errors(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    return [r for r in caplog.records if r.levelno >= logging.ERROR]
 
 
 def test_eval_regression_blocks_publish(
@@ -413,30 +428,179 @@ def test_keeps_the_previous_three_runs(store: FakeStore, tmp_path: Path) -> None
     assert kept_public == {out["index_run"], *old[-3:]}
 
 
+def test_pinned_traffic_skips_latest_and_pruning(
+    store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    for i in range(5):
+        store.put(IDX, f"song-index/20261010-13300{i}-{i:016x}/manifest.json", b"{}")
+    store.deletes.clear()
+    admin = FakeAdmin(pinned=["karaoke-decide-search-00041-old"])
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=admin, workdir=tmp_path)
+    assert out["published"] is False and out["pinned"] == ["karaoke-decide-search-00041-old"]
+    assert len(admin.calls) == 1
+    assert (IDX, "song-index/latest.json") not in store.objects
+    assert store.deletes == []
+    errors = _errors(caplog)
+    assert len(errors) == 1
+    msg = errors[0].getMessage()
+    assert "pinned to karaoke-decide-search-00041-old" in msg and out["index_run"] in msg
+    assert "latest.json and pruning skipped" in msg
+    # the next day: same pin → INFO, not another page
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        sib.build_and_publish(storage=store, run_admin=admin, workdir=tmp_path / "again")
+    assert _errors(caplog) == []
+
+
+def test_prune_keeps_runs_live_revisions_serve(store: FakeStore, tmp_path: Path) -> None:
+    old = [f"20261010-13300{i}-{i:016x}" for i in range(5)]
+    for run in old:
+        store.put(IDX, f"song-index/{run}/manifest.json", b"{}")
+        store.put(PUB, f"{run}/offline.db.gz", b"x")
+
+    class SplitTraffic(FakeAdmin):
+        def serving_env_values(self, name: str) -> set[str]:
+            return {*self.live_runs, old[0]}  # e.g. a tagged/canary revision on the oldest run
+
+    out = sib.build_and_publish(storage=store, run_admin=SplitTraffic(), workdir=tmp_path)
+    kept = {n.split("/")[1] for n in store.list_names(IDX, "song-index/") if n.count("/") == 2}
+    assert kept == {out["index_run"], old[0], *old[-3:]}
+    assert {n.split("/")[0] for n in store.list_names(PUB, "")} == {out["index_run"], old[0], *old[-3:]}
+
+
+def test_prune_skipped_when_live_runs_unknown(
+    store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    for i in range(5):
+        store.put(IDX, f"song-index/20261010-13300{i}-{i:016x}/manifest.json", b"{}")
+    store.deletes.clear()
+
+    class Blind(FakeAdmin):
+        def serving_env_values(self, name: str) -> set[str]:
+            raise RuntimeError("permission denied")
+
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=Blind(), workdir=tmp_path)
+    assert out["published"] is True
+    assert store.deletes == []
+    assert _errors(caplog) == [] and any("Pruning skipped" in r.getMessage() for r in caplog.records)
+
+
+def test_repeated_gate_failure_alerts_once(
+    store: FakeStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(sib.song_eval, "dual_eval", lambda _c, _o, cases: _dual(len(cases), 50))
+    with caplog.at_level(logging.INFO):
+        sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "a")
+    assert len(_errors(caplog)) == 1
+    caplog.clear()
+    with caplog.at_level(logging.INFO):  # tomorrow, same source run + versions
+        out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "b")
+    assert out["published"] is False
+    assert _errors(caplog) == []
+    assert any("Already reported" in r.getMessage() for r in caplog.records)
+    caplog.clear()
+    seed_sources(store, run="20261019-133000")  # a new source run that still fails pages again
+    with caplog.at_level(logging.INFO):
+        sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "c")
+    assert len(_errors(caplog)) == 1
+
+
+def test_download_stage_reaches_manifest_build_stats(
+    published: tuple[FakeStore, FakeAdmin, dict[str, Any]],
+) -> None:
+    store, _admin, out = published
+    build = manifest_of(store, out["index_run"])["build"]
+    assert list(build["seconds"])[0] == "download"
+    assert build["peak_workdir_mib"] > 0
+
+
 # ---- production adapters -----------------------------------------------------------------
 
 
-def _service(env: dict[str, str]) -> run_v2.Service:
+LATEST = run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST
+PINNED = run_v2.TrafficTargetAllocationType.TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION
+SVC = "projects/p/locations/r/services/s"
+SECRET = run_v2.EnvVar(
+    name="DECIDE_GEN_PARTNER_SECRET",
+    value_source=run_v2.EnvVarSource(
+        secret_key_ref=run_v2.SecretKeySelector(secret="decide-gen-partner-secret", version="latest")
+    ),
+)
+
+
+def _env(env: dict[str, str]) -> list[run_v2.EnvVar]:
+    return [run_v2.EnvVar(name=k, value=v) for k, v in env.items()]
+
+
+def _service(env: dict[str, str], traffic: list[run_v2.TrafficTarget] | None = None) -> run_v2.Service:
     return run_v2.Service(
-        name="projects/p/locations/r/services/s",
+        name=SVC,
         template=run_v2.RevisionTemplate(
             revision="s-00042-abc",
-            containers=[run_v2.Container(env=[run_v2.EnvVar(name=k, value=v) for k, v in env.items()])],
+            containers=[run_v2.Container(name="app", env=[*_env(env), SECRET])],
         ),
+        traffic=traffic if traffic is not None else [run_v2.TrafficTarget(type_=LATEST, percent=100)],
     )
+
+
+def _admin_client(env: dict[str, str], traffic: list[run_v2.TrafficTarget] | None = None) -> MagicMock:
+    client = MagicMock()
+    client.get_service.return_value = _service(env)
+    client.update_service.return_value.result.return_value = _service(env, traffic)
+    return client
 
 
 @pytest.mark.parametrize("env", [{"GEN_API_URL": "x", "SONG_INDEX_RUN": "old"}, {"GEN_API_URL": "x"}])
 def test_cloud_run_admin_updates_the_env(env: dict[str, str]) -> None:
-    client = MagicMock()
-    client.get_service.return_value = _service(env)
-    sib.CloudRunAdmin("projects/p/locations/r/services/s", client=client).set_env("SONG_INDEX_RUN", "new-run")
-    client.get_service.assert_called_once_with(name="projects/p/locations/r/services/s")
+    client = _admin_client(env)
+    rollout = sib.CloudRunAdmin(SVC, client=client).set_env("SONG_INDEX_RUN", "new-run")
+    assert rollout == sib.Rollout(serving=True)
+    client.get_service.assert_called_once_with(name=SVC)
     svc = client.update_service.call_args.kwargs["service"]
     got = {e.name: e.value for e in svc.template.containers[0].env}
-    assert got == {"GEN_API_URL": "x", "SONG_INDEX_RUN": "new-run"}
+    assert got == {"GEN_API_URL": "x", "SONG_INDEX_RUN": "new-run", "DECIDE_GEN_PARTNER_SECRET": ""}
+    secret = [e for e in svc.template.containers[0].env if e.name == "DECIDE_GEN_PARTNER_SECRET"][0]
+    assert secret.value_source.secret_key_ref.secret == "decide-gen-partner-secret"  # secret ref kept as a ref
+    assert secret.value_source.secret_key_ref.version == "latest"
     assert svc.template.revision == ""  # a fresh revision name, never a clash with the current one
     client.update_service.return_value.result.assert_called_once()
+
+
+def test_cloud_run_admin_reports_pinned_traffic() -> None:
+    client = _admin_client({}, [run_v2.TrafficTarget(type_=PINNED, revision="s-00041-old", percent=100)])
+    rollout = sib.CloudRunAdmin(SVC, client=client).set_env("SONG_INDEX_RUN", "new-run")
+    assert rollout == sib.Rollout(serving=False, pinned=["s-00041-old"])
+
+
+def test_cloud_run_admin_picks_the_serving_container() -> None:
+    sidecar = run_v2.Container(name="sidecar")
+    main = run_v2.Container(name="app", ports=[run_v2.ContainerPort(container_port=8000)])
+    assert sib._main_container([sidecar, main]) is not None
+    assert sib._main_container([sidecar, main]).name == "app"
+    with pytest.raises(RuntimeError, match="serving container"):
+        sib._main_container([sidecar, run_v2.Container(name="other")])
+
+
+def test_cloud_run_admin_serving_env_values() -> None:
+    client, revisions = MagicMock(), MagicMock()
+    client.get_service.return_value = run_v2.Service(
+        name=SVC,
+        latest_ready_revision=f"{SVC}/revisions/s-00043-new",
+        traffic_statuses=[
+            run_v2.TrafficTargetStatus(type_=PINNED, revision="s-00041-old", percent=90),
+            run_v2.TrafficTargetStatus(type_=LATEST, percent=10),  # revision resolved via latest_ready
+            run_v2.TrafficTargetStatus(type_=PINNED, revision="s-00040-older", percent=0),
+        ],
+    )
+    runs = {f"{SVC}/revisions/s-00041-old": "run-a", f"{SVC}/revisions/s-00043-new": "run-b"}
+    revisions.get_revision.side_effect = lambda name: run_v2.Revision(
+        containers=[run_v2.Container(env=[*_env({"SONG_INDEX_RUN": runs[name]}), SECRET])]
+    )
+    admin = sib.CloudRunAdmin(SVC, client=client, revisions_client=revisions)
+    assert admin.serving_env_values("SONG_INDEX_RUN") == {"run-a", "run-b"}
+    assert revisions.get_revision.call_count == 2  # 0% revisions aren't read
 
 
 def test_gcs_store_reads_missing_as_none() -> None:
@@ -487,7 +651,6 @@ def test_main_logs_one_error_on_failure(
     monkeypatch.setattr(sib, "GcsStore", lambda *_a, **_k: store)
     monkeypatch.setattr(sib, "CloudRunAdmin", lambda *_a, **_k: FakeAdmin())
     monkeypatch.setattr(sib, "_storage_client", lambda: None)
-    monkeypatch.setattr(sib, "_services_client", lambda: None)
     monkeypatch.setattr(sib.common, "configure_logging", lambda: None)
     with caplog.at_level(logging.INFO):
         assert sib.main(["run", "--workdir", str(tmp_path)]) == 1
