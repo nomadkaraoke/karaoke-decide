@@ -22,6 +22,7 @@ from karaoke_decide.song_search.offline import (
     OFFLINE_SCHEMA_VERSION,
     build_offline_db,
     offline_groups,
+    rival_key,
     select_rivals,
 )
 from karaoke_decide.song_search.text_normalize import NORMALIZER_VERSION, song_key
@@ -67,8 +68,8 @@ def _rows(db: Path, sql: str, args: tuple[Any, ...] = ()) -> list[tuple[Any, ...
         conn.close()
 
 
-def _karaoke_title_norms(song_id_db: Path) -> set[str]:
-    return {r[0] for r in _rows(song_id_db, "SELECT nt FROM songs WHERE karaoke = 1")}
+def _karaoke_title_keys(song_id_db: Path) -> set[str]:
+    return {rival_key(r[0]) for r in _rows(song_id_db, "SELECT title FROM songs WHERE karaoke = 1")}
 
 
 # ---- contents ---------------------------------------------------------------------
@@ -78,7 +79,7 @@ def test_offline_has_only_karaoke_songs_and_rivals(sources: tuple[Path, Path], b
     song_id_db, _ = sources
     out, stats = built
     karaoke = set(_rows(song_id_db, "SELECT artist, title, pop FROM songs WHERE karaoke = 1"))
-    rivals = {(a, t, p) for a, t, p, _k in select_rivals(song_id_db, _karaoke_title_norms(song_id_db))}
+    rivals = {(a, t, p) for a, t, p, _k in select_rivals(song_id_db, _karaoke_title_keys(song_id_db))}
     assert karaoke and rivals and not karaoke & rivals
     assert set(_rows(out, "SELECT artist, title, pop FROM songs WHERE karaoke = 1")) == karaoke
     assert set(_rows(out, "SELECT artist, title, pop FROM songs WHERE karaoke = 0")) == rivals
@@ -90,15 +91,22 @@ def test_offline_has_only_karaoke_songs_and_rivals(sources: tuple[Path, Path], b
 
 
 def test_select_rivals_rule(sources: tuple[Path, Path]) -> None:
-    """Non-karaoke, same song_norm title as a karaoke song, pop ≥ 30, top N per title."""
+    """Non-karaoke songs sharing a karaoke song's base title (version suffix dropped,
+    plural "s" folded), any popularity, the top N per title by COALESCE(pop, 30)."""
     song_id_db, _ = sources
-    rivals = select_rivals(song_id_db, {"baby"})
+    rivals = select_rivals(song_id_db, {rival_key("Baby")})
     assert ("Madison Beer", "Baby", 55, 0) in rivals
-    assert all(k == 0 and p is not None and p >= 30 for _a, _t, p, k in rivals)
+    assert all(k == 0 for *_rest, k in rivals)
     assert {t for _a, t, _p, _k in rivals} == {"Baby"}
-    assert select_rivals(song_id_db, {"baby"}, min_pop=56) == [r for r in rivals if r[2] >= 56]
-    assert len(select_rivals(song_id_db, {"baby"}, per_title_cap=1)) == 1
+    assert [p for _a, _t, p, _k in rivals] == sorted((p for _a, _t, p, _k in rivals), reverse=True)
+    assert select_rivals(song_id_db, {rival_key("Baby")}, per_title_cap=1) == rivals[:1]
     assert select_rivals(song_id_db, set()) == []
+
+
+def test_rival_key_folds_suffixes_and_plurals() -> None:
+    assert rival_key("Lanterns") == rival_key("Lantern") == rival_key("Lantern (Live) - 2004 Remaster")
+    assert rival_key("Baby") != rival_key("Babe")
+    assert rival_key("(Untitled)") == rival_key("(untitled)") != ""
 
 
 def test_song_key_column_and_versions_join(built: tuple[Path, Any]) -> None:
@@ -180,6 +188,59 @@ def test_rival_blocks_false_confidence(
     assert (without["best"]["artist"], without["best"]["title"]) == ("Justin Bieber", "Baby")
 
 
+def _pair(tmp_path: Path, rows: list[tuple[str, str, Any, int]]) -> tuple[SongIdentifier, SongIdentifier]:
+    """(cloud, offline) identifiers over a tiny song-id index of ``rows``."""
+    src = tmp_path / "songs.tsv"
+    src.write_text("".join(f"{a}\t{t}\t{p}\t{k}\n" for a, t, p, k in rows), encoding="utf-8")
+    song_id_db = tmp_path / "song_id.db"
+    build_song_id([src], song_id_db, run="t")
+    full = tmp_path / "full.json"
+    full.write_text(json.dumps([{"Artist": a, "Title": t, "Brands": "SC"} for a, t, _p, k in rows if k]))
+    community = tmp_path / "community.json"
+    community.write_text('{"Items": []}')
+    availability_db = tmp_path / "availability.db"
+    build_availability_db(
+        _gz(full, tmp_path / "f.json.gz"), _gz(community, tmp_path / "c.json.gz"), song_id_db, availability_db, "t"
+    )
+    off = tmp_path / "offline.db"
+    build_offline_db(song_id_db, availability_db, off, run="t")
+    return SongIdentifier(song_id_db), SongIdentifier(off, margin_bonus=OFFLINE_MARGIN_BONUS)
+
+
+@pytest.mark.parametrize(
+    "rows,q",
+    [
+        # (a) a low-popularity same-title rival still makes the title "generic"
+        ([("Alpha", "Baby", 78, 1), ("Beta", "Baby", 62, 1), ("Gamma", "Baby", 25, 0)], "baby"),
+        # (b) blank popularity counts as 30 in the matcher
+        ([("Alpha", "Baby", 78, 1), ("Beta", "Baby", 62, 1), ("Gamma", "Baby", "", 0)], "baby"),
+        # (c) an obscure karaoke song vs a slightly less obscure non-karaoke one
+        ([("Obscure", "Lantern", 10, 1), ("Indie", "Lantern", 25, 0)], "lantern"),
+    ],
+)
+def test_low_or_blank_pop_rivals_keep_the_cloud_verdict(
+    tmp_path: Path, rows: list[tuple[str, str, Any, int]], q: str
+) -> None:
+    cloud, off = _pair(tmp_path, rows)
+    rc, ro = cloud.identify(q), off.identify(q)
+    assert rc["status"] == "candidates"
+    assert ro["status"] == rc["status"]
+
+
+def test_near_title_rival_blocks_naming_another_song(tmp_path: Path) -> None:
+    """Cloud names the non-karaoke "Lantern"; offline must not confidently name
+    the karaoke "Lanterns" (a different song)."""
+    cloud, off = _pair(tmp_path, [("Alpha", "Lanterns", 50, 1), ("Indie", "Lantern", 55, 0)])
+    for q in ("lantern", "lanterns"):
+        rc, ro = cloud.identify(q), off.identify(q)
+        if ro["status"] == "confident":
+            assert rc["status"] == "confident", q
+            assert song_key(ro["best"]["artist"], ro["best"]["title"]) == song_key(
+                rc["best"]["artist"], rc["best"]["title"]
+            ), q
+    assert song_eval.dual_eval(cloud, off, [{"q": "lantern"}, {"q": "lanterns"}])["confident_disagree"] == 0
+
+
 def test_rival_can_win_the_identification(sources: tuple[Path, Path], built: tuple[Path, Any]) -> None:
     """A rival is a real answer ("no karaoke version yet"), it just never has versions."""
     r = SongIdentifier(built[0], margin_bonus=OFFLINE_MARGIN_BONUS).identify("hurt nine inch nails")
@@ -225,6 +286,7 @@ def test_dual_eval_counts(sources: tuple[Path, Path], built: tuple[Path, Any]) -
     assert out["total"] == len(cases) == 123
     assert out["confident_disagree"] == 0, out["disagreements"]
     assert out["offline_downgraded"] == sum(1 for d in out["disagreements"] if d["type"] == "offline_downgraded")
+    assert out["offline_downgraded"] == out["downgraded_cloud_best_karaoke"] + out["downgraded_cloud_best_non_karaoke"]
 
 
 def _fake(results: dict[str, dict[str, Any]]) -> Any:
@@ -235,8 +297,8 @@ def _fake(results: dict[str, dict[str, Any]]) -> Any:
     return Fake()
 
 
-def _r(status: str, artist: str | None = None, title: str | None = None) -> dict[str, Any]:
-    best = {"artist": artist, "title": title, "score": 0.9} if artist else None
+def _r(status: str, artist: str | None = None, title: str | None = None, karaoke: bool = True) -> dict[str, Any]:
+    best = {"artist": artist, "title": title, "score": 0.9, "karaoke": karaoke} if artist else None
     return {"status": status, "best": best, "candidates": [best] if best else []}
 
 
@@ -248,6 +310,7 @@ def test_dual_eval_classifies_each_pair() -> None:
             "c": _r("confident", "X", "One"),  # offline asks → downgraded
             "d": _r("confident", "X", "One (feat. Y)"),  # same song → agree
             "e": _r("none"),
+            "f": _r("confident", "N", "Two", karaoke=False),  # non-karaoke cloud answer, offline has none
         }
     )
     off = _fake(
@@ -257,13 +320,15 @@ def test_dual_eval_classifies_each_pair() -> None:
             "c": _r("candidates", "X", "One"),
             "d": _r("confident", "x", "One"),
             "e": _r("none"),
+            "f": _r("none"),
         }
     )
-    cases = [{"q": q, "artist": None, "title": None} for q in "abcde"]
+    cases = [{"q": q, "artist": None, "title": None} for q in "abcdef"]
     out = song_eval.dual_eval(cloud, off, cases)
-    assert (out["total"], out["confident_disagree"], out["offline_downgraded"]) == (5, 2, 1)
+    assert (out["total"], out["confident_disagree"], out["offline_downgraded"]) == (6, 2, 2)
+    assert (out["downgraded_cloud_best_karaoke"], out["downgraded_cloud_best_non_karaoke"]) == (1, 1)
     by_q = {d["q"]: d for d in out["disagreements"]}
-    assert set(by_q) == {"a", "b", "c"}
+    assert set(by_q) == {"a", "b", "c", "f"}
     assert by_q["a"]["type"] == by_q["b"]["type"] == "confident_disagree"
     assert by_q["a"]["cloud"] == {"status": "confident", "artist": "X", "title": "One"}
     assert by_q["a"]["offline"] == {"status": "confident", "artist": "Z", "title": "One"}

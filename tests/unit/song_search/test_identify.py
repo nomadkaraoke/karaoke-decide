@@ -243,6 +243,24 @@ def test_same_lead_with_only_two_same_title_artists_is_confident(tmp_path: Path)
     assert _best(SongIdentifier(db), "baby") == ("confident", ("Justin Bieber", "Baby"))
 
 
+def test_exact_score_ties_are_ordered_deterministically(tmp_path: Path) -> None:
+    """Decide addition: equal scores rank by popularity, then artist, then title —
+    never by index row order (the TS port must reproduce the same order)."""
+    orders = []
+    for rows in (
+        ["Zeta\tTiedsong\t50\t1", "Alpha\tTiedsong\t50\t1"],
+        ["Alpha\tTiedsong\t50\t1", "Zeta\tTiedsong\t50\t1"],
+    ):
+        src = tmp_path / "songs.tsv"
+        src.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        db = tmp_path / "song_id.db"
+        build([src], db, run="t")
+        cands = SongIdentifier(db).identify("tiedsong")["candidates"]
+        assert cands[0]["score"] == cands[1]["score"]
+        orders.append([c["artist"] for c in cands])
+    assert orders == [["Alpha", "Zeta"], ["Alpha", "Zeta"]]
+
+
 def test_same_title_clear_popularity_lead_picks_the_leader(fixture_identifier: SongIdentifier) -> None:
     r = fixture_identifier.identify("die young")
     assert r["best"]["artist"] == "Kesha"

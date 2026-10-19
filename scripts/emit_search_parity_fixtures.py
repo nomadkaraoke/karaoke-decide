@@ -30,12 +30,17 @@ parity.json schema — a JSON array, one object per query:
         "detail": {str: number}       the scoring breakdown (title_cov, q_cov, …)
       },
       "candidates": [                 ranked best-first (best is candidates[0]); ≤ 5;
+                                      exact score ties: popularity desc, artist, title;
         {artist, title, score, popularity, karaoke, song_key}   no detail
       ]
     },
     "kind": null | "same" | "cosmetic" | "completed" | "content",
                                       identify_kind(q, best.artist, best.title)
-                                      whenever best is not null (any status)
+                                      whenever best is not null (any status).
+                                      Clients must IGNORE kind unless
+                                      identify.status == "confident" (no banner
+                                      for candidates / none); it is emitted for
+                                      every best only so the TS port is tested.
     "groups": [                       offline.offline_groups(db, identify):
       {                               confident → the best song; candidates → each
         "song_key": str,              candidate with versions, identify order;

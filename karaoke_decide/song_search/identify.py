@@ -22,6 +22,8 @@ Pipeline:
 Decide-side changes from kjbox (everything else is kept in step):
   - ``SongIdentifier(db_path, *, margin_bonus=0.0)``: the offline matcher raises the
     confident margin bar (``CONFIDENT_MARGIN + margin_bonus``); 0.0 = kjbox exactly.
+  - exact score ties are ordered by (popularity desc, artist, title) instead of index
+    row order, so the TS port (and every rebuild) gives the same candidate order.
   - ``identify`` truncates the query to ``MAX_QUERY_CHARS`` (kjbox's route did this)
     and returns ``none`` for anything empty after cleanup.
   - kjbox's ``default_db_path(config)`` is gone: callers pass an explicit path.
@@ -147,6 +149,12 @@ def _prefix_ok(word: str) -> bool:
 
 def _compact(text: str | None) -> str:
     return song_norm(text).replace(" ", "")
+
+
+def base_title(title: str) -> str:
+    """Space-less title with version suffixes ("(Live)", "- Remastered 2006") dropped:
+    the per-artist dedupe key above. "" when the whole title is a suffix."""
+    return _compact(_VERSION_SUFFIX_RE.sub("", title))
 
 
 _CREDIT_SPLIT_RE = re.compile(
@@ -509,10 +517,12 @@ class SongIdentifier:
                 continue
             # One entry per artist + base title: "Feliz Navidad" and "Feliz Navidad -
             # Remastered 2006" are the same song for identification purposes.
-            key = (na, _compact(_VERSION_SUFFIX_RE.sub("", title)) or nt)
+            key = (na, base_title(title) or nt)
             if key not in seen or s > seen[key].score:
                 seen[key] = Match(artist, title, s, pop, bool(karaoke), detail)
-        ranked = sorted(seen.values(), key=lambda m: -m.score)
+        # Decide addition: exact score ties rank by popularity, artist, title (kjbox
+        # keeps index order) so the TS port reproduces the order.
+        ranked = sorted(seen.values(), key=lambda m: (-m.score, -(m.pop or 0), m.artist, m.title))
         if not ranked:
             return _none()
         # Credit variants of one song ("Wisin & Yandel" / "Yandel feat. Wisin" —

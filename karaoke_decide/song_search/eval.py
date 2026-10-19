@@ -127,17 +127,20 @@ def _brief(r: dict[str, Any]) -> dict[str, Any]:
 def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]]) -> dict[str, Any]:
     """Offline vs cloud identification over the same queries (spec §8 dual eval).
 
-    → ``{total, confident_disagree, offline_downgraded, disagreements}``.
+    → ``{total, confident_disagree, offline_downgraded, downgraded_cloud_best_karaoke,
+    downgraded_cloud_best_non_karaoke, disagreements}``.
 
     ``confident_disagree``: offline is confident but the cloud is not confident about
     the same song (``song_key``) — it names another song, or the cloud asks "Which
     one?" / has nothing. Must stay ~0: offline naming the wrong song is an anti-goal.
     ``offline_downgraded``: the cloud is confident, offline is not (it asks instead);
-    allowed, it is the price of the smaller index and the stricter margin.
+    allowed, it is the price of the smaller index and the stricter margin. It is split
+    by the cloud answer: a karaoke song (offline lost confidence on a song it holds)
+    vs a non-karaoke song (expected: most are not on the phone at all).
     ``disagreements`` lists both kinds: ``{q, type, cloud, offline}`` with each side's
     ``{status, artist, title}``. ``offline`` is built with
     ``margin_bonus=offline.OFFLINE_MARGIN_BONUS``."""
-    confident_disagree = downgraded = 0
+    confident_disagree = downgraded = downgraded_karaoke = 0
     disagreements: list[dict[str, Any]] = []
     for c in cases:
         rc, ro = cloud.identify(c["q"]), offline.identify(c["q"])
@@ -153,6 +156,7 @@ def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]
         elif rc["status"] == "confident" and ro["status"] != "confident":
             kind = "offline_downgraded"
             downgraded += 1
+            downgraded_karaoke += 1 if rc["best"].get("karaoke") else 0
         else:
             continue
         disagreements.append({"q": c["q"], "type": kind, "cloud": _brief(rc), "offline": _brief(ro)})
@@ -160,6 +164,8 @@ def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]
         "total": len(cases),
         "confident_disagree": confident_disagree,
         "offline_downgraded": downgraded,
+        "downgraded_cloud_best_karaoke": downgraded_karaoke,
+        "downgraded_cloud_best_non_karaoke": downgraded - downgraded_karaoke,
         "disagreements": disagreements,
     }
 

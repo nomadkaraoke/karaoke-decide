@@ -5,15 +5,21 @@ mobile TS port) holding:
 
   * every karaoke song of ``song_id.db`` (``karaoke = 1``), with its versions;
   * **rivals** (``karaoke = 0``): the non-karaoke songs that would compete with a
-    karaoke song for a query, so the matcher's margin / same-title popularity
-    rules see the same field as in the cloud. Rule (``select_rivals``): same
-    ``song_norm`` title as a karaoke song, popularity ≥ 30, the 10 most popular
-    per title. A rival can win the identification ("no karaoke version yet") but
-    never has versions.
+    karaoke song for a query. Rule (``select_rivals``): same **base title**
+    (``rival_key``: the matcher's dedupe title, version suffixes such as "(Live)" /
+    "- Remastered" dropped, plus one trailing plural "s" folded, on both sides) as a
+    karaoke song, any popularity, the 10 most popular per base title ranked by
+    ``COALESCE(pop, 30)`` (how the matcher counts a blank). The matcher's same-title
+    popularity lead, generic-title count and margin then see the same competitors
+    as in the cloud for those titles. Other near-titles (fuzzy misspellings, word
+    variants) are not carried; the residual cases are measured by ``dual_eval`` in
+    the build job's gate (A7/A10). A rival can win the identification ("no karaoke
+    version yet") but never has versions.
 
 Tables: ``songs`` (song-id columns + ``song_key``), ``songs_fts``, ``artists`` (+
-``artists_fts``; popularity copied from the cloud index so the artist-first path
-orders artists as in the cloud), ``vocab``, ``meta`` (song-id keys +
+``artists_fts``; display name, popularity and ``songs`` copied from the cloud index
+so the artist-first path orders artists as in the cloud; ``songs`` is the artist's
+cloud song count, informational, not read by the matcher), ``vocab``, ``meta`` (song-id keys +
 ``offline_schema_version``, ``rivals``, ``versions``, ``availability_run``), plus
 availability's ``versions``, ``libraries`` and ``song_libraries`` for the karaoke
 songs. ``songs.song_key`` is ``text_normalize.song_key(artist, title)`` of the
@@ -33,13 +39,15 @@ from pathlib import Path
 from typing import Any
 
 from karaoke_decide.song_search.build_song_id import build as build_song_id
+from karaoke_decide.song_search.identify import base_title, song_norm
 from karaoke_decide.song_search.text_normalize import song_key
 
 OFFLINE_SCHEMA_VERSION = 1
 OFFLINE_MARGIN_BONUS = 0.03
 
-RIVAL_MIN_POP = 30
 RIVALS_PER_TITLE = 10
+# The matcher scores a blank popularity as 30; rivals are ranked the same way.
+BLANK_POP = 30
 
 # A song-id TSV row: (artist, title, popularity | None, karaoke 0/1)
 SongRow = tuple[str, str, int | None, int]
@@ -59,37 +67,48 @@ _VERSIONS_SQL = """
 """
 
 
+def _uri(path: Path) -> str:
+    return Path(path).resolve().as_uri()
+
+
 def _ro(path: Path) -> sqlite3.Connection:
-    return sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    return sqlite3.connect(f"{_uri(path)}?mode=ro", uri=True)
+
+
+def rival_key(title: str) -> str:
+    """Base-title key rivals are matched on: ``identify.base_title`` (the matcher's
+    per-artist dedupe title) — or the whole space-less title when it is all suffix —
+    with one trailing plural "s" folded ("Lanterns" == "Lantern")."""
+    key = base_title(title) or song_norm(title).replace(" ", "")
+    return key[:-1] if len(key) > 1 and key.endswith("s") else key
 
 
 def select_rivals(
     song_id_db: Path,
-    karaoke_title_norms: set[str],
+    karaoke_title_keys: set[str],
     *,
-    min_pop: int = RIVAL_MIN_POP,
     per_title_cap: int = RIVALS_PER_TITLE,
 ) -> list[SongRow]:
-    """Non-karaoke songs whose title norm (``songs.nt`` = ``song_norm(title)``) is in
-    ``karaoke_title_norms``, with popularity ≥ ``min_pop``: the ``per_title_cap``
-    most popular per title. → ``[(artist, title, pop, 0)]`` ordered by title norm
-    then popularity."""
-    if not karaoke_title_norms:
+    """Non-karaoke songs whose ``rival_key(title)`` is in ``karaoke_title_keys``: the
+    ``per_title_cap`` most popular per key by ``COALESCE(pop, 30)``, then rowid.
+    → ``[(artist, title, pop, 0)]`` ordered by key then rank."""
+    if not karaoke_title_keys:
         return []
     conn = _ro(Path(song_id_db))
     try:
-        conn.execute("CREATE TEMP TABLE titles(nt TEXT PRIMARY KEY) WITHOUT ROWID")
-        conn.executemany("INSERT OR IGNORE INTO temp.titles VALUES (?)", ((t,) for t in karaoke_title_norms))
+        conn.create_function("rival_key", 1, rival_key, deterministic=True)
+        conn.execute("CREATE TEMP TABLE titles(k TEXT PRIMARY KEY) WITHOUT ROWID")
+        conn.executemany("INSERT OR IGNORE INTO temp.titles VALUES (?)", ((t,) for t in karaoke_title_keys))
         rows = conn.execute(
             """
             SELECT artist, title, pop FROM (
-                SELECT s.artist, s.title, s.pop, s.nt,
-                       ROW_NUMBER() OVER (PARTITION BY s.nt ORDER BY s.pop DESC, s.rowid) AS n
-                FROM songs s JOIN temp.titles t ON t.nt = s.nt
-                WHERE s.karaoke = 0 AND s.pop >= ?
-            ) WHERE n <= ? ORDER BY nt, n
+                SELECT s.artist, s.title, s.pop, s.k,
+                       ROW_NUMBER() OVER (PARTITION BY s.k ORDER BY COALESCE(s.pop, ?) DESC, s.rowid) AS n
+                FROM (SELECT rowid, artist, title, pop, rival_key(title) AS k FROM songs WHERE karaoke = 0) s
+                JOIN temp.titles t ON t.k = s.k
+            ) WHERE n <= ? ORDER BY k, n
             """,
-            (min_pop, per_title_cap),
+            (BLANK_POP, per_title_cap),
         ).fetchall()
     finally:
         conn.close()
@@ -97,13 +116,13 @@ def select_rivals(
 
 
 def _karaoke_songs(song_id_db: Path) -> tuple[list[SongRow], set[str]]:
-    """(karaoke song rows, their title norms)."""
+    """(karaoke song rows, their rival keys)."""
     conn = _ro(song_id_db)
     try:
-        rows = conn.execute("SELECT artist, title, pop, nt FROM songs WHERE karaoke = 1 ORDER BY rowid").fetchall()
+        rows = conn.execute("SELECT artist, title, pop FROM songs WHERE karaoke = 1 ORDER BY rowid").fetchall()
     finally:
         conn.close()
-    return [(a, t, p, 1) for a, t, p, _nt in rows], {nt for *_rest, nt in rows}
+    return [(a, t, p, 1) for a, t, p in rows], {rival_key(t) for _a, t, _p in rows}
 
 
 def _write_tsv(path: Path, rows: list[SongRow]) -> None:
@@ -120,8 +139,8 @@ def build_offline_db(song_id_db: Path, availability_db: Path, out_path: Path, ru
     → ``{songs, rivals, versions, bytes}``: karaoke songs, rival songs, version rows,
     file size."""
     song_id_db, availability_db, out_path = Path(song_id_db), Path(availability_db), Path(out_path)
-    karaoke, title_norms = _karaoke_songs(song_id_db)
-    rivals = select_rivals(song_id_db, title_norms)
+    karaoke, title_keys = _karaoke_songs(song_id_db)
+    rivals = select_rivals(song_id_db, title_keys)
 
     dst = str(out_path)
     tsv, tmp = Path(dst + ".songs.tsv"), dst + ".build"
@@ -142,7 +161,7 @@ def build_offline_db(song_id_db: Path, availability_db: Path, out_path: Path, ru
 
 def _add_offline_tables(db_path: Path, song_id_db: Path, availability_db: Path, *, n_rivals: int) -> int:
     """song_key column, cloud artist popularity, versions/libraries; → version rows."""
-    conn = sqlite3.connect(f"file:{db_path}", uri=True)  # URI mode: the ATTACHes below are read-only
+    conn = sqlite3.connect(_uri(db_path), uri=True)  # URI mode: the ATTACHes below are read-only
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN song_key TEXT")
         conn.executemany(
@@ -151,8 +170,8 @@ def _add_offline_tables(db_path: Path, song_id_db: Path, availability_db: Path, 
         )
         conn.execute("CREATE INDEX songs_song_key ON songs(song_key)")
         conn.executescript(_VERSIONS_SQL)
-        conn.execute("ATTACH DATABASE ? AS cloud", (f"file:{song_id_db}?mode=ro",))
-        conn.execute("ATTACH DATABASE ? AS av", (f"file:{availability_db}?mode=ro",))
+        conn.execute("ATTACH DATABASE ? AS cloud", (f"{_uri(song_id_db)}?mode=ro",))
+        conn.execute("ATTACH DATABASE ? AS av", (f"{_uri(availability_db)}?mode=ro",))
         conn.execute(
             "UPDATE artists SET (artist, pop, songs) = "
             "(SELECT c.artist, c.pop, c.songs FROM cloud.artists c WHERE c.na = artists.na) "
