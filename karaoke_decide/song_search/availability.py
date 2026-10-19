@@ -398,16 +398,33 @@ class AvailabilityIndex:
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = str(db_path)
         self._local = threading.local()
+        self._conns: list[sqlite3.Connection] = []  # every thread's, for close()
+        self._conns_lock = threading.Lock()
+        self._generation = 0
         self._conn()  # fail fast on a missing / unreadable file
 
     def _conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
-        if conn is None:
+        if conn is None or getattr(self._local, "gen", -1) != self._generation:
             conn = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, check_same_thread=False)
-            conn.row_factory = sqlite3.Row
-            conn.execute("SELECT 1 FROM meta LIMIT 1")
-            self._local.conn = conn
+            try:
+                conn.row_factory = sqlite3.Row
+                conn.execute("SELECT 1 FROM meta LIMIT 1")
+            except BaseException:
+                conn.close()
+                raise
+            with self._conns_lock:
+                self._conns.append(conn)
+            self._local.conn, self._local.gen = conn, self._generation
         return conn
+
+    def close(self) -> None:
+        """Close every thread's connection; later queries reopen."""
+        with self._conns_lock:
+            conns, self._conns = self._conns, []
+            self._generation += 1
+        for conn in conns:
+            conn.close()
 
     # ---------------------------------------------------------------- public
 

@@ -27,6 +27,7 @@ Decide-side changes from kjbox (everything else is kept in step):
   - ``identify`` truncates the query to ``MAX_QUERY_CHARS`` (kjbox's route did this)
     and returns ``none`` for anything empty after cleanup.
   - kjbox's ``default_db_path(config)`` is gone: callers pass an explicit path.
+  - ``close()`` closes every thread's connection (the search service's shutdown).
 """
 
 from __future__ import annotations
@@ -218,6 +219,8 @@ class SongIdentifier:
         # asks "Which one?" a little more often rather than naming the wrong song.
         self.margin_bonus = margin_bonus
         self._local = threading.local()
+        self._conns: list[sqlite3.Connection] = []  # every thread's, for close()
+        self._conns_lock = threading.Lock()
         self._generation = 0
         self._buckets: dict[tuple[str, int], dict[str, int]] = {}
         self._bucket_gen = 0
@@ -236,9 +239,21 @@ class SongIdentifier:
         if db is None or gen != self._generation:
             if db is not None:
                 db.close()
+                with self._conns_lock:
+                    self._conns = [c for c in self._conns if c is not db]
             db = sqlite3.connect(f"file:{self.db_path}?mode=ro", uri=True, check_same_thread=False)
+            with self._conns_lock:
+                self._conns.append(db)
             self._local.db, self._local.gen = db, self._generation
         return db
+
+    def close(self) -> None:
+        """Close every thread's connection; later queries reopen."""
+        with self._conns_lock:
+            conns, self._conns = self._conns, []
+        for db in conns:
+            db.close()
+        self.reload()
 
     def stats(self) -> dict[str, Any]:
         out: dict[str, Any] = {"db_path": self.db_path, "available": self.available}

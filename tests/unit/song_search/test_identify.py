@@ -7,6 +7,7 @@ and the offline ``margin_bonus``.
 """
 
 import gzip
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -314,3 +315,22 @@ def test_reload_reopens_the_index(fixture_db: Path) -> None:
     s.reload()
     assert s.identify("wonderwall")["best"]["artist"] == "Oasis"
     assert s.stats()["schema_version"] == "3"
+
+
+def test_close_closes_every_threads_connection_and_reopens(fixture_db: Path) -> None:
+    import threading
+
+    si = SongIdentifier(fixture_db)
+    t = threading.Thread(target=lambda: si.identify("starlite muse"))
+    t.start()
+    t.join()
+    assert si.identify("starlite muse")["status"] == "confident"
+    conns = list(si._conns)
+    assert len(conns) == 2
+    si.close()
+    assert si._conns == []
+    for c in conns:
+        with pytest.raises(sqlite3.ProgrammingError):
+            c.execute("SELECT 1")
+    assert si.identify("starlite muse")["status"] == "confident"  # reopens
+    si.close()

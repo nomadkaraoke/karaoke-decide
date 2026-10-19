@@ -29,9 +29,13 @@ USER appuser
 # Expose port
 EXPOSE 8000
 
-# Health check
+# Health check. The search service (karaoke-decide-search) runs this same image with
+# HEALTHCHECK_PATH=/api/search/health.
+ENV HEALTHCHECK_PATH=/api/health
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
+    CMD curl -f "http://localhost:8000${HEALTHCHECK_PATH}" || exit 1
 
-# Run the API server
+# Run the API server. The search service overrides the command (Cloud Run --command):
+#   uvicorn backend.search.app:search_app --host 0.0.0.0 --port 8000
+# It downloads its index to SONG_INDEX_DIR (default /tmp/song-index, in-memory on Cloud Run).
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

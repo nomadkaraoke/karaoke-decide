@@ -393,3 +393,20 @@ def test_libraries_seeded_from_brands(built: tuple[Path, dict[str, Any]]) -> Non
     assert linked == {"CC", "NOMAD", "KV", "SC", "SF"}
     # Unknown brands stay just brands (no library row, no link).
     assert not conn.execute("SELECT 1 FROM song_libraries WHERE library_code = 'XYZ'").fetchall()
+
+
+def test_close_closes_connections_and_reopens(built: tuple[Path, dict[str, Any]]) -> None:
+    import threading
+
+    av = AvailabilityIndex(built[0])
+    t = threading.Thread(target=lambda: av.song(STARLIGHT))
+    t.start()
+    t.join()
+    conns = list(av._conns)
+    assert len(conns) == 2
+    av.close()
+    for c in conns:
+        with pytest.raises(sqlite3.ProgrammingError):
+            c.execute("SELECT 1")
+    assert av.song(STARLIGHT) is not None  # reopens
+    av.close()
