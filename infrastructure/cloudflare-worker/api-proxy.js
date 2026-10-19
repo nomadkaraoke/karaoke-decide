@@ -23,7 +23,18 @@ const DEFAULT_SEARCH_BACKEND_URL = "https://karaoke-decide-search-718638054799.u
 // token = 16 hex). Only that exact shape is fetched: no listing, no other objects.
 const OFFLINE_INDEX_ORIGIN = "https://storage.googleapis.com/nomadkaraoke-song-index-public";
 const OFFLINE_INDEX_PATH = /^\/offline-index\/([A-Za-z0-9][A-Za-z0-9-]{0,79})\/offline\.db\.gz$/;
-const OFFLINE_INDEX_CACHE_TTL = 604800; // 7 days; run dirs are immutable
+// 7 days for hits (run dirs are immutable); never cache errors, so a run uploaded
+// just after a miss isn't hidden behind a cached 403/404.
+const OFFLINE_INDEX_CACHE_TTL_BY_STATUS = { "200-299": 604800, "400-599": -1 };
+const OFFLINE_INDEX_HEADERS = [
+  "content-type",
+  "content-length",
+  "content-range",
+  "accept-ranges",
+  "etag",
+  "last-modified",
+  "cache-control",
+];
 
 function isSearchPath(pathname) {
   return pathname === "/api/search" || pathname.startsWith("/api/search/");
@@ -37,21 +48,26 @@ async function offlineIndex(request, url) {
   if (!match || url.search) {
     return new Response("Not found", { status: 404 });
   }
+  // Forward Range only, so an interrupted download can resume.
+  const headers = new Headers();
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
   const upstream = await fetch(`${OFFLINE_INDEX_ORIGIN}/${match[1]}/offline.db.gz`, {
     method: request.method,
-    cf: { cacheEverything: true, cacheTtl: OFFLINE_INDEX_CACHE_TTL },
+    headers,
+    cf: { cacheEverything: true, cacheTtlByStatus: OFFLINE_INDEX_CACHE_TTL_BY_STATUS },
   });
   if (!upstream.ok) {
     // GCS answers 403 for a missing object when listing is denied; report 404
     // and pass nothing else through.
     return new Response("Not found", { status: 404 });
   }
-  const headers = new Headers();
-  for (const name of ["content-type", "content-length", "etag", "last-modified", "cache-control"]) {
+  const out = new Headers();
+  for (const name of OFFLINE_INDEX_HEADERS) {
     const value = upstream.headers.get(name);
-    if (value) headers.set(name, value);
+    if (value) out.set(name, value);
   }
-  return new Response(upstream.body, { status: upstream.status, headers });
+  return new Response(upstream.body, { status: upstream.status, headers: out });
 }
 
 export default {

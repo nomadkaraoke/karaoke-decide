@@ -4,7 +4,7 @@ This Cloudflare Worker proxies API requests from `decide.nomadkaraoke.com/api/*`
 
 It also:
 - sends `/api/search` and `/api/search/*` to the search service (`SEARCH_BACKEND_URL`, bound by Pulumi), keeping `CF-Connecting-IP` for its rate limits;
-- serves `/offline-index/<run-token>/offline.db.gz` from the public `nomadkaraoke-song-index-public` bucket, edge-cached for 7 days (route `decide.nomadkaraoke.com/offline-index/*`). Only that exact path shape is fetched.
+- serves `/offline-index/<run-token>/offline.db.gz` from the public `nomadkaraoke-song-index-public` bucket, edge-cached for 7 days (errors are never cached; `Range` is forwarded) (route `decide.nomadkaraoke.com/offline-index/*`). Only that exact path shape is fetched.
 
 Pulumi deploys `api-proxy.js` verbatim. Tests: `node --test infrastructure/cloudflare-worker/` (also run by `tests/unit/test_api_proxy_worker.py`).
 

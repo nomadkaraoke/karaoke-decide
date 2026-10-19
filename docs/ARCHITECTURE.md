@@ -96,7 +96,7 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
 | Startup probe | `GET /api/search/ready` every 10 s, 24 tries (240 s, Cloud Run's maximum). uvicorn listens only once the index has loaded, and `/ready` is 503 if the load failed, so a revision without an index never takes traffic. |
 | `song-index-build` job | 2 vCPU, 8 GiB (the in-memory disk shares it), timeout 1 h, no retries. Runs as SA `song-index-build`: objectViewer on kn-data plus objectAdmin limited to `song-index/` by an IAM condition; objectAdmin on the public bucket; `run.developer` on the search service only; project `run.viewer` (to read revisions); actAs on `song-search`. |
 | `song-index-build-daily` scheduler | `30 13 * * *` UTC. This is after kn-data-sync. A run whose source is unchanged exits after reading two JSON files. |
-| `nomadkaraoke-song-index-public` bucket | UBLA, with `allUsers` → `roles/storage.legacyObjectReader`: objects can be read by exact name but not listed. Run dirs carry an unguessable 16-hex token. Lifecycle deletes objects after 30 days; there is no soft delete. |
+| `nomadkaraoke-song-index-public` bucket | UBLA, with `allUsers` → `roles/storage.legacyObjectReader`: objects can be read by exact name but not listed. Run dirs carry an unguessable 16-hex token. No age-based lifecycle (the served file may be any age); the job prunes. No soft delete. |
 | `search-health-uptime` uptime check | `GET https://decide.nomadkaraoke.com/api/search/health` every 60 s from 3 US locations (the minimum). It keeps an instance warm and exercises the Worker route. There is deliberately no alert policy on it. |
 
 **Who owns what.**
@@ -115,12 +115,13 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
 - **Manual rollback = pin traffic** to the previous good revision:
   `gcloud run services update-traffic karaoke-decide-search --region us-central1 --to-revisions=<good-revision>=100`
   - While traffic is pinned, each daily build still uploads its run and creates a revision, but that revision gets no traffic. The job logs one ERROR ("traffic is pinned") and skips `latest.json` and pruning.
-  - Unserved run dirs therefore accumulate, roughly one per day of pinning, in both buckets. In the public bucket the 30-day lifecycle bounds them.
+  - Unserved run dirs therefore accumulate, roughly one per day of pinning, in both buckets. The next unpinned run prunes them (it keeps only the live runs plus the previous 3).
+  - Pulumi ignores `traffics` on this service, so neither `pulumi refresh` nor `pulumi up` un-pins a rollback. CI's `gcloud run deploy` doesn't move pinned traffic either.
   - To undo: `gcloud run services update-traffic karaoke-decide-search --region us-central1 --to-latest`. The next build then prunes.
-- **Stale source.** If kn-data-sync stops producing new runs for over 30 days, the public bucket's lifecycle rule deletes the served `offline.db.gz`. The app then reports "no offline list" and searches in the cloud. Fix the sync, or force a rebuild.
+- **Stale source.** If kn-data-sync stops producing new runs, the service keeps serving the last index, and the offline file stays downloadable: nothing deletes a served run by age. Fix the sync, or force a rebuild.
 - **Changing the service's env or settings.** Edit both `infrastructure/__main__.py` and the CI step (the parity test enforces this).
   - Env changes reach the live service through CI's `--update-env-vars`, because Pulumi ignores env after creation.
-  - Before a `pulumi up` that changes this service, run `pulumi refresh`. Otherwise Pulumi sends the stale env from its state, which drops `SONG_INDEX_RUN`. The service would then fall back to `latest.json`, which is harmless unless traffic was pinned.
+  - Before a `pulumi up` that changes this service, run `pulumi refresh`. Otherwise Pulumi sends the stale env from its state, which drops `SONG_INDEX_RUN`. The new revision would then load `latest.json`, which is the same index unless a build's rollout was pinned or failed. Traffic is never changed by Pulumi (`traffics` is ignored).
 - **First rollout (bootstrap).** The service can't pass `/ready` until an index exists. So:
   1. Run `pulumi up -c searchServiceEnabled=false`. This creates everything except the service.
   2. Run the job once with `--no-deploy`. It publishes and writes `latest.json` without a rollout.

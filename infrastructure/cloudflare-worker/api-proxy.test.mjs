@@ -84,9 +84,27 @@ test("offline index passthrough fetches the public bucket object with edge cachi
     calls[0].url,
     "https://storage.googleapis.com/nomadkaraoke-song-index-public/20261018-133000-0123456789abcdef/offline.db.gz",
   );
-  assert.deepEqual(calls[0].cf, { cacheEverything: true, cacheTtl: 604800 });
+  assert.deepEqual(calls[0].cf, { cacheEverything: true, cacheTtlByStatus: { "200-299": 604800, "400-599": -1 } });
+  assert.equal(calls[0].headers.get("range"), null);
   assert.equal(res.headers.get("content-type"), "application/gzip");
   assert.equal(res.headers.get("x-goog-generation"), null); // only an allowlist passes
+});
+
+test("offline index forwards Range (and nothing else) and passes a 206 through", async () => {
+  globalThis.fetch = async (input, init) => {
+    calls.push({ url: String(input), headers: new Headers(init?.headers) });
+    return new Response("partial", {
+      status: 206,
+      headers: { "content-range": "bytes 100-106/1000", "accept-ranges": "bytes", "x-goog-hash": "h" },
+    });
+  };
+  const res = await get("/offline-index/r-1/offline.db.gz", { range: "bytes=100-", cookie: "c=1" });
+  assert.equal(calls[0].headers.get("range"), "bytes=100-");
+  assert.equal(calls[0].headers.get("cookie"), null);
+  assert.equal(res.status, 206);
+  assert.equal(res.headers.get("content-range"), "bytes 100-106/1000");
+  assert.equal(res.headers.get("accept-ranges"), "bytes");
+  assert.equal(res.headers.get("x-goog-hash"), null);
 });
 
 test("offline index HEAD is allowed, other methods are not", async () => {

@@ -18,6 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 PULUMI = ROOT / "infrastructure" / "__main__.py"
 CI = ROOT / ".github" / "workflows" / "ci.yml"
+PULUMI_STACK = ROOT / "infrastructure" / "Pulumi.prod.yaml"
 
 SERVICE = "karaoke-decide-search"
 JOB = "song-index-build"
@@ -236,9 +237,11 @@ def test_startup_probe_matches(pulumi_service: dict[str, Any], ci_deploy: dict[s
 
 
 def test_service_account_matches(pulumi_service: dict[str, Any], ci_deploy: dict[str, Any]) -> None:
-    account = ci_deploy["--service-account"]
-    assert account == "song-search@nomadkaraoke.iam.gserviceaccount.com"
-    assert "song_search_sa.email" == ast.unparse(pulumi_service["template"]["service_account"])
+    assert ast.unparse(pulumi_service["template"]["service_account"]) == "song_search_sa.email"
+    tree = _pulumi_tree()
+    account = _kwargs(_resource_call(tree, "Account", "song-search-sa"), _module_constants(tree))
+    project = yaml.safe_load(PULUMI_STACK.read_text())["config"]["gcp:project"]
+    assert ci_deploy["--service-account"] == f"{account['account_id']}@{project}.iam.gserviceaccount.com"
 
 
 def test_plain_env_vars_match(pulumi_service: dict[str, Any], ci_deploy: dict[str, Any]) -> None:
@@ -273,6 +276,8 @@ def test_pulumi_leaves_song_index_run_to_the_job(pulumi_service: dict[str, Any])
     assert JOB_OWNED_ENV not in names  # the job appends it; empty → latest.json
     assert "template.containers[0].envs" in pulumi_service["_ignore_changes"]
     assert "template.containers[0].image" in pulumi_service["_ignore_changes"]
+    # A rollback pins traffic; a later `pulumi up` must not move it back to LATEST.
+    assert "traffics" in pulumi_service["_ignore_changes"]
 
 
 def test_ci_never_mentions_song_index_run() -> None:

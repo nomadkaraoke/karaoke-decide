@@ -699,10 +699,9 @@ song_index_public_bucket = gcp.storage.Bucket(
     location="US-CENTRAL1",
     uniform_bucket_level_access=True,
     public_access_prevention="inherited",
-    # The job keeps the newest runs (plus any still served) and prunes the rest;
-    # this catches anything pruning missed. A run only lives past 30 days if the
-    # source stops changing for that long (see docs/ARCHITECTURE.md ops notes).
-    lifecycle_rules=[{"action": {"type": "Delete"}, "condition": {"age": 30}}],
+    # No age-based lifecycle: the served offline.db.gz may be any age (a stalled
+    # KN sync means no new run), and the manifest keeps advertising it. The job
+    # prunes to the live runs + the previous 3.
     soft_delete_policy={"retention_duration_seconds": 0},
 )
 gcp.storage.BucketIAMMember(
@@ -772,7 +771,10 @@ gcp.storage.BucketIAMMember(
     role="roles/storage.objectAdmin",
     member=song_index_build_member,
 )
-# Read revisions (pruning keeps every run a live revision serves) and services.
+# Read revisions: pruning keeps every run a live revision serves, via
+# RevisionsClient.get_revision. Revisions are separate IAM-checked resources and
+# Cloud Run documents no service-to-revision inheritance of a service-level grant,
+# so run.developer on the service alone isn't relied on; run.viewer is read-only.
 gcp.projects.IAMMember(
     "song-index-build-run-viewer",
     project=project,
@@ -916,12 +918,14 @@ if search_service_enabled:
         opts=pulumi.ResourceOptions(
             depends_on=[song_search_index_reader, song_search_secret_access],
             # CI owns the image (pinned to the commit SHA) and, after creation, the env
-            # (--update-env-vars); the build job owns SONG_INDEX_RUN. Run
+            # (--update-env-vars); the build job owns SONG_INDEX_RUN; operators own
+            # traffic (a rollback pins it; Pulumi must never un-pin it). Run
             # `pulumi refresh` before an `up` that changes this service, so the
             # template Pulumi sends carries the live SONG_INDEX_RUN.
             ignore_changes=[
                 "template.containers[0].image",
                 "template.containers[0].envs",
+                "traffics",
                 "client",
                 "client_version",
             ],

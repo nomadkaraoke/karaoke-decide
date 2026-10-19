@@ -373,7 +373,7 @@ jobs:
         # § Song search); until then this step is skipped.
         run: |
           if ! out=$(gcloud run services describe karaoke-decide-search --region ${{ env.REGION }} 2>&1); then
-            if echo "$out" | grep -qiE "cannot find|not found"; then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
               echo "::warning::karaoke-decide-search does not exist yet (created by Pulumi); skipping its deploy"
               exit 0
             fi
@@ -403,7 +403,7 @@ jobs:
         # Same as mb-refresh: pin the daily index build job to the deployed image.
         run: |
           if ! out=$(gcloud run jobs describe song-index-build --region ${{ env.REGION }} 2>&1); then
-            if echo "$out" | grep -qiE "cannot find|not found"; then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
               echo "::warning::song-index-build does not exist yet (created by Pulumi); skipping"
               exit 0
             fi
