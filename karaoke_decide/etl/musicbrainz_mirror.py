@@ -48,6 +48,8 @@ MAX_BYTES_TABLE = 80 * GIB
 # alert every week forever.
 MIN_ROW_RATIO = 0.9
 MIN_ROWS_FOR_RATIO = 1000
+# Below that, only a table of this size emptying entirely counts as a broken load.
+MIN_ROWS_FOR_EMPTY_CHECK = 100
 # Bounds on the run summary so one ERROR stays readable.
 SUMMARY_MAX_TABLES = 25
 SUMMARY_MAX_ERROR_CHARS = 300
@@ -148,6 +150,8 @@ def check_rows(new: int | None, old: int | None) -> str | None:
         return "staging table missing"
     if old and old >= MIN_ROWS_FOR_RATIO and new < old * MIN_ROW_RATIO:
         return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%})"
+    if old and old >= MIN_ROWS_FOR_EMPTY_CHECK and new == 0:
+        return f"empty vs published {old:,} rows"
     return None
 
 

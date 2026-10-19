@@ -334,7 +334,8 @@ events, genres and tags, cover-art presence, and so on.
   a few times a year), re-run it and commit the result.
 - Best-effort per table: the mirror is built after the app tables are published. A table that fails
   to load, cast or sanity-check (drops below 90% of last week's rows; checked only for tables of
-  1,000+ rows, since tiny ones churn by a few rows a week) keeps last week's copy and logs a WARNING
+  1,000+ rows, since tiny ones churn by a few rows a week; a 100+ row table that empties entirely
+  also counts) keeps last week's copy and logs a WARNING
   with the details. The run then logs ONE ERROR listing every kept table and the first error, so the
   error monitor raises one alert per bad run, not one per table. It never fails the run. `mb_refresh_log.row_counts` records
   `mirror_tables_published` / `mirror_tables_skipped`, and each table carries the `mb_dump` label.

@@ -154,8 +154,12 @@ class TestCheckRows:
             # l_genre_release_group 14 -> 11); a ratio there is noise, not a broken load.
             (3, 6, True),
             (11, 14, True),
-            (0, 999, True),
             (89, 100, True),
+            (0, 6, True),
+            (0, 99, True),
+            # ...but a mid-size table emptying entirely is a broken extract.
+            (0, 100, False),
+            (0, 999, False),
         ],
     )
     def test_bounds(self, new, old, ok):
