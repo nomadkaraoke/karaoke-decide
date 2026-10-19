@@ -3,7 +3,7 @@
 # index, for the mobile app's Maestro E2E flows (run together with gen's local stack).
 #
 # Usage:
-#   scripts/search-local-stack.sh up       build the fixture index (first time) + start on :8020
+#   scripts/search-local-stack.sh up       rebuild the fixture index + start on :8020
 #   scripts/search-local-stack.sh down     stop it
 #   scripts/search-local-stack.sh status   show health / ready
 #   scripts/search-local-stack.sh logs     tail the server log
@@ -33,7 +33,19 @@ if command -v poetry >/dev/null 2>&1; then RUN=(poetry run); else RUN=(); fi
 
 is_healthy() { curl -sf --max-time 2 "$BASE/health" >/dev/null 2>&1; }
 is_ready() { curl -sf --max-time 2 "$BASE/ready" >/dev/null 2>&1; }
-pid_alive() { [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; }
+# True only if the pid file names a live process that is OUR server (a recycled pid
+# belongs to something else); a stale pid file is discarded.
+pid_alive() {
+    [ -f "$PID_FILE" ] || return 1
+    local pid
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null \
+        && ps -p "$pid" -o command= 2>/dev/null | grep -q "backend.search.app"; then
+        return 0
+    fi
+    rm -f "$PID_FILE"
+    return 1
+}
 
 cmd_up() {
     if is_healthy; then
@@ -42,6 +54,11 @@ cmd_up() {
     fi
     if pid_alive; then
         echo "search process $(cat "$PID_FILE") is alive but not healthy; run 'down' first" >&2
+        return 1
+    fi
+    if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        echo "port $PORT is held by another process (not our search server):" >&2
+        lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >&2 || true
         return 1
     fi
     echo "Building fixture index into $INDEX_DIR"
@@ -54,22 +71,23 @@ cmd_up() {
         export SONG_INDEX_OFFLINE_URL_TEMPLATE="$PUBLIC_URL/api/search/_local/offline.db.gz"
         export GEN_API_URL="${GEN_API_URL:-http://127.0.0.1:8010}"
         export DECIDE_GEN_PARTNER_SECRET="${DECIDE_GEN_PARTNER_SECRET:-local-stack-secret}"
-        nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.search.app:search_app --host 0.0.0.0 --port "$PORT" \
+        nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.search.app:search_app --host 127.0.0.1 --port "$PORT" \
             > "$LOG_FILE" 2>&1 &
         echo $! > "$PID_FILE"
     )
     local i=0
-    while [ "$i" -lt 60 ]; do
+    while [ "$i" -lt "${SEARCH_LOCAL_READY_TRIES:-60}" ]; do
+        if ! pid_alive; then break; fi
         if is_ready; then
             echo "search ready: $BASE (GEN_API_URL=${GEN_API_URL:-http://127.0.0.1:8010})"
             return 0
         fi
-        if ! pid_alive; then break; fi
         sleep 1
         i=$((i + 1))
     done
     echo "search did not become ready; last log lines:" >&2
     tail -40 "$LOG_FILE" >&2 || true
+    cmd_down >&2  # never leave a half-started server behind
     return 1
 }
 
