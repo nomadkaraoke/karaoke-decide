@@ -70,7 +70,63 @@ Browser → decide.nomadkaraoke.com/api/* → Cloudflare Worker → Cloud Run
 - Cloud Run URL not exposed to users
 - Can add edge caching/rate limiting in future
 
-**Configuration:** Managed via Pulumi in `infrastructure/__main__.py`. See `infrastructure/cloudflare-worker/README.md` for setup.
+The same Worker also routes `/api/search` and `/api/search/*` to the search service (`SEARCH_BACKEND_URL`), keeping the client's `CF-Connecting-IP` for its per-IP rate limit. It also serves `decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz` as an edge-cached (7-day) passthrough to the public `nomadkaraoke-song-index-public` bucket. Only that exact path shape is fetched; anything else under `/offline-index/` is a 404. See [Song search](#song-search).
+
+**Configuration:** Managed via Pulumi in `infrastructure/__main__.py`, which deploys `infrastructure/cloudflare-worker/api-proxy.js` as-is. Routing tests: `infrastructure/cloudflare-worker/api-proxy.test.mjs`. See `infrastructure/cloudflare-worker/README.md` for setup.
+
+## Song search
+
+The Nomad Karaoke app's song search runs on a separate scale-to-zero Cloud Run service. It uses the same image as the API, with a different command (`uvicorn backend.search.app:search_app`).
+
+```
+App → decide.nomadkaraoke.com/api/search* → Worker → karaoke-decide-search (Cloud Run)
+App → decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz
+                                          → Worker (edge cache) → gs://nomadkaraoke-song-index-public
+song-index-build (Cloud Run Job, daily 13:30 UTC)
+    gs://nomadkaraoke-kn-data/song-id/ + full/ + community/   (written by gen's kn-data-sync)
+    → song_id.db, availability.db → gs://nomadkaraoke-kn-data/song-index/<run>-<token>/
+    → offline.db.gz               → gs://nomadkaraoke-song-index-public/<run>-<token>/
+    → eval gates → sets SONG_INDEX_RUN=<run>-<token> on the service (new revision)
+    → song-index/latest.json → prune (keeps live runs + the previous 3)
+```
+
+| Resource | Settings |
+|----------|----------|
+| `karaoke-decide-search` service | 1 vCPU, 4 GiB, min 0 / max 3 instances, concurrency 80, CPU only during requests (`cpu_idle`), startup CPU boost. Runs as SA `song-search` (objectViewer on kn-data, secretAccessor on `decide-gen-partner-secret`). Unauthenticated. |
+| Startup probe | `GET /api/search/ready` every 10 s, 24 tries (240 s, Cloud Run's maximum). uvicorn listens only once the index has loaded, and `/ready` is 503 if the load failed, so a revision without an index never takes traffic. |
+| `song-index-build` job | 2 vCPU, 8 GiB (the in-memory disk shares it), timeout 1 h, no retries. Runs as SA `song-index-build`: objectViewer on kn-data plus objectAdmin limited to `song-index/` by an IAM condition; objectAdmin on the public bucket; `run.developer` on the search service only; project `run.viewer` (to read revisions); actAs on `song-search`. |
+| `song-index-build-daily` scheduler | `30 13 * * *` UTC. This is after kn-data-sync. A run whose source is unchanged exits after reading two JSON files. |
+| `nomadkaraoke-song-index-public` bucket | UBLA, with `allUsers` → `roles/storage.legacyObjectReader`: objects can be read by exact name but not listed. Run dirs carry an unguessable 16-hex token. Lifecycle deletes objects after 30 days; there is no soft delete. |
+| `search-health-uptime` uptime check | `GET https://decide.nomadkaraoke.com/api/search/health` every 60 s from 3 US locations (the minimum). It keeps an instance warm and exercises the Worker route. There is deliberately no alert policy on it. |
+
+**Who owns what.**
+- The settings live in both Pulumi and the CI deploy step (`gcloud run deploy karaoke-decide-search`). `tests/unit/test_infra_ci_parity.py` fails if the two disagree.
+- `SONG_INDEX_RUN` belongs only to the build job:
+  - Pulumi never declares it and `ignore_changes` the container env and image.
+  - CI uses `--update-env-vars` / `--update-secrets`, which merge into the live env, and never `--set-env-vars`.
+  - When `SONG_INDEX_RUN` is absent or empty, the service loads `song-index/latest.json`.
+- The `decide-gen-partner-secret` secret is created by karaoke-gen's Pulumi. Decide only grants access to it and mounts it as `DECIDE_GEN_PARTNER_SECRET`.
+
+### Search ops notes
+
+- **Alerts.** A failed build, a failed eval gate or a failed rollout logs exactly one ERROR, which pages #alerts through the error monitor. The served index is untouched, and tomorrow's run retries. There are no other alert policies.
+- **Force a rebuild** (same source; for example after a matcher version change that you don't want to wait a day for):
+  `gcloud run jobs execute song-index-build --region us-central1 --args=run,--force`
+- **Manual rollback = pin traffic** to the previous good revision:
+  `gcloud run services update-traffic karaoke-decide-search --region us-central1 --to-revisions=<good-revision>=100`
+  - While traffic is pinned, each daily build still uploads its run and creates a revision, but that revision gets no traffic. The job logs one ERROR ("traffic is pinned") and skips `latest.json` and pruning.
+  - Unserved run dirs therefore accumulate, roughly one per day of pinning, in both buckets. In the public bucket the 30-day lifecycle bounds them.
+  - To undo: `gcloud run services update-traffic karaoke-decide-search --region us-central1 --to-latest`. The next build then prunes.
+- **Stale source.** If kn-data-sync stops producing new runs for over 30 days, the public bucket's lifecycle rule deletes the served `offline.db.gz`. The app then reports "no offline list" and searches in the cloud. Fix the sync, or force a rebuild.
+- **Changing the service's env or settings.** Edit both `infrastructure/__main__.py` and the CI step (the parity test enforces this).
+  - Env changes reach the live service through CI's `--update-env-vars`, because Pulumi ignores env after creation.
+  - Before a `pulumi up` that changes this service, run `pulumi refresh`. Otherwise Pulumi sends the stale env from its state, which drops `SONG_INDEX_RUN`. The service would then fall back to `latest.json`, which is harmless unless traffic was pinned.
+- **First rollout (bootstrap).** The service can't pass `/ready` until an index exists. So:
+  1. Run `pulumi up -c searchServiceEnabled=false`. This creates everything except the service.
+  2. Run the job once with `--no-deploy`. It publishes and writes `latest.json` without a rollout.
+  3. Run `pulumi config rm searchServiceEnabled && pulumi up`.
+
+  Until the service exists, CI skips its search deploy and job-image steps with a warning.
 
 ## Data Flow
 
@@ -204,6 +260,7 @@ Additional tables from comprehensive Spotify metadata ETL:
 ## Deployment
 
 - **API**: Cloud Run (auto-scaling, 0-10 instances)
+- **Search**: Cloud Run `karaoke-decide-search` (0-3 instances) + daily `song-index-build` job (see [Song search](#song-search))
 - **Database**: BigQuery (song catalog), Firestore (user data)
 - **Secrets**: Google Secret Manager
 - **Frontend**: GitHub Pages at decide.nomadkaraoke.com
@@ -227,5 +284,6 @@ gcloud run deploy SERVICE_NAME \
 | `spotipy-client-secret` | `SPOTIFY_CLIENT_SECRET` | Spotify OAuth |
 | `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
 | `postmark-server-token` | `POSTMARK_SERVER_TOKEN` | Email delivery |
+| `decide-gen-partner-secret` | `DECIDE_GEN_PARTNER_SECRET` | Search service only: gen catalog-resolve partner auth (secret owned by karaoke-gen's Pulumi) |
 
 **IAM requirement:** Cloud Run service account needs `roles/secretmanager.secretAccessor` on each secret. Managed via Pulumi in `infrastructure/__main__.py`.

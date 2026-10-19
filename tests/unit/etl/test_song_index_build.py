@@ -662,3 +662,47 @@ def test_packaged_eval_cases_match_the_test_fixtures() -> None:
     """The job reads its eval sets from the package (the image has no tests/)."""
     assert sib.EVAL_CASES.read_bytes() == (FIXTURES / "song_id_eval.jsonl").read_bytes()
     assert sib.DUAL_EVAL_EXTRA_CASES.read_bytes() == (FIXTURES / "song_id_synthetic.jsonl").read_bytes()
+
+
+# ---- bootstrap (--no-deploy): the first index, before the search service exists ------------
+
+
+class NoService(FakeAdmin):
+    def set_env(self, name: str, value: str) -> sib.Rollout:
+        raise AssertionError("--no-deploy must not touch the service")
+
+    def serving_env_values(self, name: str) -> set[str]:
+        raise AssertionError("--no-deploy must not read the service")
+
+
+def test_no_deploy_publishes_and_points_latest_without_a_rollout(store: FakeStore, tmp_path: Path) -> None:
+    out = sib.build_and_publish(storage=store, run_admin=NoService(), workdir=tmp_path, deploy=False)
+    assert out["published"] is True and out["deployed"] is False
+    latest = json.loads(store.objects[(IDX, "song-index/latest.json")])
+    assert f"{latest['run']}-{latest['token']}" == out["index_run"]
+    assert (IDX, f"song-index/{out['index_run']}/manifest.json") in store.objects
+    assert store.deletes == []  # no pruning without knowing what's live
+
+
+def test_no_deploy_then_normal_run_is_skipped(store: FakeStore, tmp_path: Path) -> None:
+    sib.build_and_publish(storage=store, run_admin=NoService(), workdir=tmp_path / "a", deploy=False)
+    admin = FakeAdmin()
+    assert sib.build_and_publish(storage=store, run_admin=admin, workdir=tmp_path / "b")["skipped"] is True
+    assert admin.calls == []
+
+
+def test_main_no_deploy_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, Any] = {}
+
+    def fake_build(**kwargs: Any) -> dict[str, Any]:
+        seen.update(kwargs)
+        return {"published": True}
+
+    monkeypatch.setattr(sib, "build_and_publish", fake_build)
+    monkeypatch.setattr(sib, "GcsStore", lambda *_a, **_k: FakeStore())
+    monkeypatch.setattr(sib, "_storage_client", lambda: None)
+    monkeypatch.setattr(sib.common, "configure_logging", lambda: None)
+    assert sib.main(["run", "--no-deploy", "--workdir", str(tmp_path)]) == 0
+    assert seen["deploy"] is False
+    assert sib.main(["run", "--workdir", str(tmp_path)]) == 0
+    assert seen["deploy"] is True

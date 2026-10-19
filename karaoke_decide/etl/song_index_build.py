@@ -32,7 +32,7 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
              previous ``KEEP_PREVIOUS_RUNS`` in both buckets.
 
 Usage:
-    python -m karaoke_decide.etl.song_index_build run [--force]
+    python -m karaoke_decide.etl.song_index_build run [--force] [--no-deploy]
     python -m karaoke_decide.etl.song_index_build run --dry-run [--workdir DIR]
         [--songs TSV ...] [--kn-full JSON] [--kn-community JSON]   # local build, no GCP
 
@@ -579,11 +579,17 @@ def _prune(storage: Storage, keep: set[str]) -> None:
             logger.warning(f"Pruning gs://{bucket}/{prefix} failed (retried next run): {exc}")
 
 
-def build_and_publish(*, storage: Storage, run_admin: RunAdmin, workdir: Path, force: bool = False) -> dict[str, Any]:
+def build_and_publish(
+    *, storage: Storage, run_admin: RunAdmin, workdir: Path, force: bool = False, deploy: bool = True
+) -> dict[str, Any]:
     """The whole job. → ``{skipped: True, ...}``, ``{published: False, failures, ...}``
     (gate failed: nothing uploaded) or ``{published: True, run, token, index_run, ...}``.
     Raises on source, build, upload or rollout errors (latest.json then still names the
-    previous index, so the next run retries)."""
+    previous index, so the next run retries).
+
+    ``deploy=False`` (``--no-deploy``) is the first-rollout bootstrap: publish and point
+    ``latest.json`` at the new index without touching the search service (which can't
+    exist yet: its startup probe needs an index). No pruning: nothing to prune yet."""
     workdir = Path(workdir)
     workdir.mkdir(parents=True, exist_ok=True)
     run = _source_run(storage)
@@ -623,6 +629,13 @@ def build_and_publish(*, storage: Storage, run_admin: RunAdmin, workdir: Path, f
     )
     logger.info(f"Uploaded {index_run} (offline.db.gz {manifest['files'][OFFLINE_FILE]['bytes']:,} bytes)")
 
+    if not deploy:
+        storage.upload_bytes(
+            INDEX_BUCKET, INDEX_LATEST, json.dumps({"run": run, "token": token}).encode(), content_type=_CT_JSON
+        )
+        logger.info(f"Published song index {index_run} without a rollout (--no-deploy): latest.json points at it")
+        return {"published": True, "deployed": False, "run": run, "token": token, "index_run": index_run}
+
     rollout = run_admin.set_env(INDEX_RUN_ENV, index_run)
     if not rollout.serving:
         pinned = ", ".join(rollout.pinned) or "an older revision"
@@ -647,6 +660,7 @@ def build_and_publish(*, storage: Storage, run_admin: RunAdmin, workdir: Path, f
     logger.info(f"Published song index {index_run} in {time.monotonic() - t0:.0f}s")
     return {
         "published": True,
+        "deployed": True,
         "run": run,
         "token": token,
         "index_run": index_run,
@@ -704,6 +718,11 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="Build + publish (skipped when the source is unchanged)")
     p_run.add_argument("--force", action="store_true", help="Rebuild even if the source run is already published")
     p_run.add_argument("--workdir", type=Path, help="Local build directory (default: a new temp dir)")
+    p_run.add_argument(
+        "--no-deploy",
+        action="store_true",
+        help="First rollout only, before the search service exists: publish + point latest.json, no rollout",
+    )
     p_run.add_argument("--dry-run", action="store_true", help="Build from local files only; no GCS, no deploy")
     p_run.add_argument("--songs", type=Path, nargs="+", help="dry run: song-id TSV(.gz) shard(s)")
     p_run.add_argument("--kn-full", type=Path, help="dry run: KN full export (.json or .json.gz)")
@@ -728,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
                 run_admin=CloudRunAdmin(f"projects/{PROJECT_ID}/locations/{REGION}/services/{SEARCH_SERVICE}"),
                 workdir=workdir,
                 force=args.force,
+                deploy=not args.no_deploy,
             )
     except Exception as exc:
         logger.exception(f"song-index-build failed; search keeps serving its current index: {exc}")

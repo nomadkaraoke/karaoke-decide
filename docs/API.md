@@ -61,6 +61,40 @@ Useful for post-deploy verification and scheduled monitoring.
 
 ---
 
+## Song search ✅ Implemented
+
+Served by the separate `karaoke-decide-search` Cloud Run service (`backend/search/app.py`). The Worker routes `/api/search` and `/api/search/*` there; every other `/api/*` path goes to the main API. No auth. Clients send `X-Device-Id`, which is used for rate limits.
+
+**Rate limits:**
+- Search endpoints: 300 requests per device and 1,500 per IP, per 5 minutes.
+- `/resolve`: 20 per device and 200 per IP, per 5 minutes.
+- Over the limit: `429` with `Retry-After`.
+
+**Index not loaded:** endpoints that need the index return `503`.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/search/health` | Always `{"ok": true}`. Never touches the index. Used for the uptime ping and the app's warm-up. |
+| `GET /api/search/ready` | `{"ok": true}` once both indexes are loaded, else `503`. Used as the Cloud Run startup probe. |
+| `GET /api/search?q=&limit=20&sid=` | Identify the song and list karaoke versions. Returns `{identification: {status, kind, best, candidates}, groups: [SongGroup], index: {run, built_at}, sid}`. A query that cleans up to nothing gives `status: "none"` and `groups: []`. |
+| `GET /api/search/popular?limit=30` | `[SongGroup]`: the most popular songs that have karaoke versions. |
+| `GET /api/search/song?key=<song_key>` | `{song: SongRef, versions: [Version]}`. `404` for an unknown key. |
+| `GET /api/search/resolve?q=&sid=` | Gemini fallback through gen's `POST /api/kjbox/catalog/resolve`, authenticated with `DECIDE_GEN_PARTNER_SECRET`. Returns `{corrected, kind: "cosmetic"\|"content", typed, groups, split, alternatives}`, or `{}` when there is nothing to offer. |
+| `POST /api/search/event` | `{sid, type, data}` → `204`. Client telemetry, written to the logs. |
+| `GET /api/search/offline-index` | Manifest for the app's offline database. Returns `{run, schema, normalizer, url, bytes, sha256, ...}`. `url` is `https://decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz`, from `SONG_INDEX_OFFLINE_URL_TEMPLATE`. `404` if the run has no offline file. |
+
+The models are in `backend/search/models.py`:
+- `SongRef`: `{artist, title, song_key, popularity, karaoke}`
+- `Version`: `{brand_code, brand_name, kind, youtube_url, rank}`
+- `SongGroup`: `{song_key, artist, title, version_count, versions}`
+
+**Offline file download:** `GET https://decide.nomadkaraoke.com/offline-index/<run-token>/offline.db.gz`
+- The Worker passes this through from the public bucket and caches it at the edge for 7 days. `GET` and `HEAD` only.
+- Any other path shape is a `404`.
+- Check the downloaded file against the manifest's `bytes` and `sha256`.
+
+---
+
 ## Auth ✅ Implemented
 
 ### POST /api/auth/guest

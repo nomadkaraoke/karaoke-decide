@@ -15,6 +15,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE (Phases 1-7)** + MLHD+ Import ✅
 
 ### ✅ What's Working
+- **Song search service for the mobile app (2026-10):** `karaoke-decide-search` Cloud Run service (scale-to-zero, `/api/search*` via the Worker) + daily `song-index-build` job (builds song_id/availability/offline indexes from gen's kn-data exports, eval-gated, rolls the service) + public offline-index download. Infra in Pulumi + CI with a parity test; first rollout needs the bootstrap in [ARCHITECTURE.md § Song search](ARCHITECTURE.md#song-search)
 - **MBID-First Architecture COMPLETE (2026-01-15):**
   - **BigQuery MusicBrainz tables:** 3.0M artists, 766K tags, 455K Spotify mappings, plus release groups/releases/tracks (albums + release dates, v0.11.0); full typed mirror of every core+derived dump table in the `musicbrainz` dataset (v0.12.0) — refreshed weekly by the `mb-refresh` Cloud Run Job (see DATA-CATALOG.md)
   - **ListenBrainz popularity (2026-09-28):** current listen counts + listeners per artist/recording MBID across 9 stats ranges, plus per-user top artists for collaborative filtering — refreshed from each ListenBrainz export by the `lb-refresh` Cloud Run Job (see DATA-CATALOG.md)
@@ -53,7 +54,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 - **Data:** 275K karaoke songs + 256M Spotify tracks + 230M audio features + 33.5M audio analysis tracks + 325M sections + **2.78M MusicBrainz artists + 37.5M recordings + 5.5M ISRCs + 693K tags + 1.5M MLHD+ artist similarity pairs**
 - **CI/Testing:** 185 unit tests, 403 backend tests, E2E tests with Playwright
 - **Email Delivery:** Postmark configured for production magic link emails
-- **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS)
+- **API Proxy:** Cloudflare Worker proxies /api/* to Cloud Run (same-origin, no CORS); /api/search* → search service; /offline-index/* → cached public offline DB
 - **Spotify Audio Analysis ETL:** Complete! 33.5M tracks + 325M sections from 3.88TB torrent (backed up to GCS)
 
 ### 🚧 Next Up (Post-MLP)
