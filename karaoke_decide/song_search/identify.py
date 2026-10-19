@@ -168,19 +168,32 @@ def _credits(artist: str | None) -> set[str]:
     return {c for c in (_compact(p) for p in _CREDIT_SPLIT_RE.split(artist or "")) if c}
 
 
-def _same_song(a: Match, b: Match) -> bool:
-    """Same base title — or a near-identical spelling of it by the same artist, as
-    MusicBrainz duplicates often are ("Machu Picchu" / "Machu Piccu") — and a
-    credited artist in common. "Hayloft" vs "Hayloft II" (~82%) stay distinct."""
-    if not (_credits(a.artist) & _credits(b.artist)):
-        return False
-    ta = _compact(_VERSION_SUFFIX_RE.sub("", a.title))
-    tb = _compact(_VERSION_SUFFIX_RE.sub("", b.title))
+def shared_credit(artist_a: str | None, artist_b: str | None) -> bool:
+    """A credited artist in common: "Michael Andrews & Gary Jules" ~ "Michael Andrews
+    feat. Gary Jules" ~ "Gary Jules" ("&", ",", "feat.", "ft", "x", "with" split credits)."""
+    return bool(_credits(artist_a) & _credits(artist_b))
+
+
+def same_title(title_a: str, title_b: str) -> bool:
+    """Same ``base_title`` (version suffixes dropped: "Redneck Woman (Live)" = "Redneck
+    Woman") or a near-identical spelling of it, as MusicBrainz duplicates often are
+    ("Machu Picchu" / "Machu Piccu"). "Hayloft" vs "Hayloft II" (~82%) stay distinct."""
+    ta, tb = base_title(title_a), base_title(title_b)
     if ta == tb:
         return True
     if re.sub(r"\D", "", ta) != re.sub(r"\D", "", tb):
         return False  # numbers differ: a sequel/part, not a misspelling ("Hayloft" vs "Hayloft II")
     return min(len(ta), len(tb)) >= 6 and fuzz.ratio(ta, tb) >= NEAR_DUP_TITLE_RATIO
+
+
+def same_song(artist_a: str | None, title_a: str, artist_b: str | None, title_b: str) -> bool:
+    """The same song as a singer would judge it: ``same_title`` and ``shared_credit``.
+    The matcher's credit-variant dedupe and the dual eval's comparison both use this."""
+    return shared_credit(artist_a, artist_b) and same_title(title_a, title_b)
+
+
+def _same_song(a: Match, b: Match) -> bool:
+    return same_song(a.artist, a.title, b.artist, b.title)
 
 
 def _edit_budget(word: str) -> int:

@@ -285,7 +285,12 @@ def test_dual_eval_counts(sources: tuple[Path, Path], built: tuple[Path, Any]) -
     out = song_eval.dual_eval(cloud, off, cases)
     assert out["total"] == len(cases) == 123
     assert out["confident_disagree"] == 0, out["disagreements"]
-    assert out["offline_downgraded"] == sum(1 for d in out["disagreements"] if d["type"] == "offline_downgraded")
+    assert out["offline_wrong_auto"] <= out["cloud_wrong_auto"], out["wrong_auto_cases"]
+    assert out["labelled"] == len(cases)
+    assert out["cloud_wrong_auto"] == song_eval.run_eval(cloud, cases)["wrong_auto"]
+    assert out["offline_wrong_auto"] == song_eval.run_eval(off, cases)["wrong_auto"]
+    for kind in song_eval.DISAGREEMENT_ORDER:
+        assert out[kind] == sum(1 for d in out["disagreements"] if d["type"] == kind)
     assert out["offline_downgraded"] == out["downgraded_cloud_best_karaoke"] + out["downgraded_cloud_best_non_karaoke"]
 
 
@@ -305,34 +310,149 @@ def _r(status: str, artist: str | None = None, title: str | None = None, karaoke
 def test_dual_eval_classifies_each_pair() -> None:
     cloud = _fake(
         {
-            "a": _r("confident", "X", "One"),  # offline names another song → disagree
-            "b": _r("candidates", "X", "One"),  # offline confident where the cloud asks → disagree
-            "c": _r("confident", "X", "One"),  # offline asks → downgraded
-            "d": _r("confident", "X", "One (feat. Y)"),  # same song → agree
+            "a": _r("confident", "Abba", "One"),  # both sure, different songs → confident_disagree (gated)
+            "b": _r("candidates", "Abba", "One"),  # offline sure on the cloud's own best guess
+            "b2": _r("candidates", "Abba", "Two"),  # offline sure on another song than the cloud's guess
+            "b3": _r("none"),  # cloud has nothing, offline is sure
+            "c": _r("confident", "Abba", "One"),  # offline asks → downgraded
+            "d": _r("confident", "Abba", "One (feat. Yes)"),  # version suffix → same song
+            "d2": _r("confident", "Abba & Yes", "One (Live)"),  # credit + version variant → same song
             "e": _r("none"),
             "f": _r("confident", "N", "Two", karaoke=False),  # non-karaoke cloud answer, offline has none
         }
     )
     off = _fake(
         {
-            "a": _r("confident", "Z", "One"),
-            "b": _r("confident", "X", "One"),
-            "c": _r("candidates", "X", "One"),
-            "d": _r("confident", "x", "One"),
+            "a": _r("confident", "Zed", "One"),
+            "b": _r("confident", "Abba", "One"),
+            "b2": _r("confident", "Abba", "One"),
+            "b3": _r("confident", "Abba", "One"),
+            "c": _r("candidates", "Abba", "One"),
+            "d": _r("confident", "abba", "One"),
+            "d2": _r("confident", "Abba feat. Yes", "One"),
             "e": _r("none"),
             "f": _r("none"),
         }
     )
-    cases = [{"q": q, "artist": None, "title": None} for q in "abcdef"]
-    out = song_eval.dual_eval(cloud, off, cases)
-    assert (out["total"], out["confident_disagree"], out["offline_downgraded"]) == (6, 2, 2)
+    qs = ["a", "b", "b2", "b3", "c", "d", "d2", "e", "f"]
+    out = song_eval.dual_eval(cloud, off, [{"q": q, "artist": None, "title": None} for q in qs])
+    assert out["total"] == 9
+    assert out["confident_disagree"] == 1
+    assert (out["offline_more_confident"], out["offline_confident_cloud_unsure_other"]) == (1, 2)
+    assert out["offline_downgraded"] == 2
     assert (out["downgraded_cloud_best_karaoke"], out["downgraded_cloud_best_non_karaoke"]) == (1, 1)
-    by_q = {d["q"]: d for d in out["disagreements"]}
-    assert set(by_q) == {"a", "b", "c", "f"}
-    assert by_q["a"]["type"] == by_q["b"]["type"] == "confident_disagree"
-    assert by_q["a"]["cloud"] == {"status": "confident", "artist": "X", "title": "One"}
-    assert by_q["a"]["offline"] == {"status": "confident", "artist": "Z", "title": "One"}
-    assert by_q["c"]["type"] == "offline_downgraded"
+    # every case here is a negative (no label): any confident answer is wrong
+    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (9, 5, 6)
+    by_q = {d["q"]: d["type"] for d in out["disagreements"]}
+    assert by_q == {
+        "a": "confident_disagree",
+        "b": "offline_more_confident",
+        "b2": "offline_confident_cloud_unsure_other",
+        "b3": "offline_confident_cloud_unsure_other",
+        "c": "offline_downgraded",
+        "f": "offline_downgraded",
+    }
+    assert [d["q"] for d in out["disagreements"]] == ["a", "b", "b2", "b3", "c", "f"]  # case order
+    a = out["disagreements"][0]
+    assert a["cloud"] == {"status": "confident", "artist": "Abba", "title": "One"}
+    assert a["offline"] == {"status": "confident", "artist": "Zed", "title": "One"}
+
+
+@pytest.mark.parametrize(
+    ("cloud", "offline"),
+    [
+        (("Gretchen Wilson", "Redneck Woman (live)"), ("Gretchen Wilson", "Redneck Woman")),
+        (("Britney Spears", "Hold It Against Me (remix)"), ("Britney Spears", "Hold It Against Me (Jump Smokers)")),
+        (("Michael Andrews & Gary Jules", "Mad World"), ("Michael Andrews feat. Gary Jules", "Mad World")),
+        (("Little Mix & Sean Paul", "Hair (Fsolo)"), ("Little Mix ft Sean Paul", "Hair")),
+        (("Bob Seger & the Silver Bullet Band", "Mainstreet"), ("Bob Seger", "Mainstreet")),
+        (("Shankar Mahadevan", "Dil Chahta Hai(Reprise)"), ("Shankar Mahadevan", "Dil Chahta Hai")),
+        (("Masked Wolf", "Astronaut In The Ocean - Alok Remix"), ("Masked Wolf", "Astronaut In The Ocean")),
+    ],
+)
+def test_classify_pair_version_and_credit_variants_are_the_same_song(
+    cloud: tuple[str, str], offline: tuple[str, str]
+) -> None:
+    """Real A10 prod disagreements that were the same song (old song_key comparison)."""
+    rc, ro = _r("confident", *cloud), _r("confident", *offline)
+    assert song_eval.classify_pair(rc, ro) is None
+    assert song_eval.classify_pair(_r("candidates", *cloud), ro) == "offline_more_confident"
+
+
+def test_classify_pair_both_confident_different_song_is_counted() -> None:
+    rc, ro = _r("confident", "Elephante", "Troubled"), _r("confident", "Cage The Elephant", "Trouble")
+    assert song_eval.classify_pair(rc, ro) == "confident_disagree"
+    # same title, different artist; and a sequel ("Pt. II" vs "Pt. III") are different songs
+    assert song_eval.classify_pair(_r("confident", "Kesha", "Die Young"), _r("confident", "Sylvan Esso", "Die Young"))
+    assert song_eval.classify_pair(
+        _r("confident", "Pink Floyd", "Another Brick in the Wall, Pt. II"),
+        _r("confident", "Pink Floyd", "Another Brick in the Wall, Pt. III"),
+    )
+
+
+def test_classify_pair_cloud_unsure_is_reported_not_gated() -> None:
+    off = _r("confident", "Lana Del Rey", "Dealer")
+    assert (
+        song_eval.classify_pair(_r("candidates", "Lola Young", "Dealer"), off) == "offline_confident_cloud_unsure_other"
+    )
+    assert song_eval.classify_pair(_r("none"), off) == "offline_confident_cloud_unsure_other"
+    assert song_eval.classify_pair(_r("candidates", "Lana Del Rey", "Dealer"), off) == "offline_more_confident"
+    assert song_eval.classify_pair(_r("candidates", "A", "B"), _r("candidates", "C", "D")) is None
+
+
+def test_dual_eval_label_wrong_counts() -> None:
+    """Label correctness is run_eval's (``outcome``/``_is``): version suffixes stripped, no
+    fuzzy titles, and any confident answer on a negative case is wrong."""
+    cloud = _fake(
+        {
+            "right": _r("confident", "Gretchen Wilson", "Redneck Woman (live)"),  # variant of the label: right
+            "cloud_wrong": _r("confident", "Elephante", "Troubled"),
+            "off_wrong": _r("candidates", "Cage The Elephant", "Trouble"),
+            "fuzzy": _r("confident", "Cage The Elephant", "Trouble"),
+            "title_only": _r("confident", "Anyone", "Hurt"),
+            "artist_only": _r("confident", "Muse", "Uprising"),
+            "negative": _r("confident", "Abba", "Waterloo"),
+            "negative_unsure": _r("candidates", "Abba", "Waterloo"),
+        }
+    )
+    off = _fake(
+        {
+            "right": _r("confident", "Gretchen Wilson", "Redneck Woman"),
+            "cloud_wrong": _r("confident", "Cage The Elephant", "Trouble"),
+            "off_wrong": _r("confident", "Elephante", "Troubled"),
+            "fuzzy": _r("confident", "Cage The Elephant", "Troubled"),  # >=92% fuzzy, still not the label
+            "title_only": _r("confident", "Someone", "Hurt (Live)"),
+            "artist_only": _r("confident", "Blur", "Song 2"),
+            "negative": _r("confident", "Abba", "Waterloo"),
+            "negative_unsure": _r("confident", "Abba", "Waterloo"),
+        }
+    )
+    trouble = {"artist": "Cage The Elephant", "title": "Trouble"}
+    cases = [
+        {"q": "right", "artist": "Gretchen Wilson", "title": "Redneck Woman"},
+        {"q": "cloud_wrong", **trouble},
+        {"q": "off_wrong", **trouble},
+        {"q": "fuzzy", **trouble},
+        {"q": "title_only", "artist": None, "title": "Hurt"},
+        {"q": "artist_only", "artist": "Muse", "title": None},
+        {"q": "negative", "artist": None, "title": None, "kind": "negative"},
+        {"q": "negative_unsure", "artist": None, "title": None, "kind": "negative"},
+    ]
+    out = song_eval.dual_eval(cloud, off, cases)
+    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (8, 2, 5)
+    wrong = {w["q"]: (w["cloud_wrong"], w["offline_wrong"]) for w in out["wrong_auto_cases"]}
+    assert wrong == {
+        "cloud_wrong": (True, False),
+        "off_wrong": (False, True),
+        "fuzzy": (False, True),
+        "artist_only": (False, True),
+        "negative": (True, True),
+        "negative_unsure": (False, True),
+    }
+    assert out["wrong_auto_cases"][0]["want"] == trouble
+    # one definition: dual_eval's cloud side agrees with run_eval on the same cases
+    assert out["cloud_wrong_auto"] == song_eval.run_eval(cloud, cases)["wrong_auto"]
+    assert out["offline_wrong_auto"] == song_eval.run_eval(off, cases)["wrong_auto"]
 
 
 # ---- mobile parity fixtures ---------------------------------------------------------
