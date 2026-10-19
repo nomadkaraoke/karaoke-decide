@@ -320,11 +320,13 @@ def _eval(total: int, auto: int, wrong_auto: int) -> dict[str, Any]:
     return {"total": total, "auto": auto, "wrong_auto": wrong_auto, "candidates": 0, "none": 0, "wrong": []}
 
 
-def _dual(total: int, disagree: int, cloud_wrong: int = 0, offline_wrong: int = 0) -> dict[str, Any]:
+def _dual(
+    total: int, disagree: int, cloud_wrong: int = 0, offline_wrong: int = 0, unsure_other: int = 0
+) -> dict[str, Any]:
     return {
         "total": total,
         "confident_disagree": disagree,
-        "offline_confident_cloud_unsure_other": 0,
+        "offline_confident_cloud_unsure_other": unsure_other,
         "offline_more_confident": 0,
         "offline_downgraded": 0,
         "labelled": total,
@@ -369,8 +371,8 @@ def test_gate_offline_wrong_auto_vs_cloud_boundary() -> None:
     assert sib.gate_failures(ev, _dual(100, 0, cloud_wrong=5, offline_wrong=1), prev) == []
     failures = sib.gate_failures(ev, _dual(100, 0, cloud_wrong=3, offline_wrong=6), prev)
     assert len(failures) == 1 and "offline_wrong_auto 6" in failures[0] and "cloud_wrong_auto 3" in failures[0]
-    # both dual gates can fail together
-    assert len(sib.gate_failures(ev, _dual(100, 2, cloud_wrong=0, offline_wrong=3), prev)) == 2
+    # the dual gates can fail together
+    assert len(sib.gate_failures(ev, _dual(100, 2, cloud_wrong=0, offline_wrong=3, unsure_other=3), prev)) == 3
 
 
 def _assert_not_published(store: FakeStore, admin: FakeAdmin, before: dict[tuple[str, str], bytes]) -> None:
@@ -451,6 +453,26 @@ def test_dual_eval_disagreements_logged_capped_and_in_manifest(
     assert logged[30]["type"] == "offline_downgraded"
     assert '"q": "c0"' in rec.getMessage() and "first 100 of 180" in rec.getMessage()
     assert len(_errors(caplog)) == 1
+
+
+def test_gate_unsure_other_backstop_boundary() -> None:
+    """Offline sure where the cloud is unsure on another song: loose 2% backstop;
+    offline_more_confident is never gated."""
+    ev, prev = _eval(100, 90, 0), _eval(100, 90, 0)
+    assert sib.DUAL_EVAL_MAX_UNSURE_OTHER == 0.02
+    assert sib.gate_failures(ev, _dual(100, 0, unsure_other=2), prev) == []
+    failures = sib.gate_failures(ev, _dual(100, 0, unsure_other=3), prev)
+    assert len(failures) == 1 and "offline_confident_cloud_unsure_other 3/100" in failures[0]
+    assert sib.gate_failures(ev, {**_dual(100, 0), "offline_more_confident": 90}, prev) == []
+    assert sib.gate_failures(ev, _dual(0, 0), None) == []  # no cases: no division
+
+
+def test_cap_wrong_auto_cases_offline_wrong_first() -> None:
+    cases = [{"q": f"c{i}", "cloud_wrong": True, "offline_wrong": False} for i in range(120)]
+    cases += [{"q": "o1", "cloud_wrong": False, "offline_wrong": True}, {"q": "o2", "offline_wrong": True}]
+    capped = sib.cap_wrong_auto_cases(cases)
+    assert len(capped) == sib.DUAL_EVAL_DISAGREEMENTS_CAP == 100
+    assert [w["q"] for w in capped[:3]] == ["o1", "o2", "c0"]
 
 
 def test_cap_disagreements_caps_and_orders_confident_first() -> None:

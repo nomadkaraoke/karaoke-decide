@@ -40,7 +40,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Protocol
 
-from karaoke_decide.song_search.identify import SongIdentifier, same_song, same_title, shared_credit
+from karaoke_decide.song_search.identify import SongIdentifier, same_song
 from karaoke_decide.song_search.text_normalize import identity_normalize as normalize  # song identity
 
 
@@ -130,22 +130,14 @@ def _same(a: dict[str, Any] | None, b: dict[str, Any] | None) -> bool:
     return a is not None and b is not None and same_song(a["artist"], a["title"], b["artist"], b["title"])
 
 
-def _labelled(case: dict[str, Any]) -> bool:
-    return bool(case.get("artist") or case.get("title"))
-
-
 def _label_wrong(case: dict[str, Any], r: dict[str, Any]) -> bool:
-    """Confident on a song that is not the case's label (``same_song`` semantics; a
-    label with only a title or only an artist checks just that part)."""
-    if r["status"] != "confident":
-        return False
-    b = r["best"]
-    if case.get("title") and not same_title(case["title"], b["title"]):
-        return True
-    return bool(case.get("artist")) and not shared_credit(case["artist"], b["artist"])
+    """``run_eval``'s confident-WRONG (``outcome``/``_is``): confident on a song that is
+    not the label, or confident at all on a negative (unlabelled) case."""
+    label = {"artist": case.get("artist"), "title": case.get("title")}
+    return outcome(label, r) == "confident-WRONG"
 
 
-# Disagreement types, in report order: the gated one first.
+# Disagreement types, in report order: the gated ones first.
 CONFIDENT_DISAGREE = "confident_disagree"
 OFFLINE_CONFIDENT_CLOUD_UNSURE_OTHER = "offline_confident_cloud_unsure_other"
 OFFLINE_MORE_CONFIDENT = "offline_more_confident"
@@ -186,14 +178,16 @@ def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]
     downgraded_cloud_best_non_karaoke, labelled, cloud_wrong_auto, offline_wrong_auto,
     disagreements, wrong_auto_cases}``.
 
-    Per-query types are ``classify_pair``'s. Only ``confident_disagree`` (both sides sure,
-    different songs) is gated by rate; the two "offline sure, cloud unsure" counts are
-    informational. ``offline_downgraded`` is split by the cloud answer: a karaoke song
+    Per-query types are ``classify_pair``'s. The build gates ``confident_disagree`` (both
+    sides sure, different songs) tightly and ``offline_confident_cloud_unsure_other``
+    loosely (a backstop); ``offline_more_confident`` is informational. ``offline_downgraded`` is split by the cloud answer: a karaoke song
     (offline lost confidence on a song it holds) vs a non-karaoke one (mostly not on the
-    phone at all). Over labelled cases (an artist and/or title), ``cloud_wrong_auto`` /
-    ``offline_wrong_auto`` count confident answers that are not the label; the build gates
-    offline against cloud. ``disagreements`` lists ``{q, type, cloud, offline}`` (each side
-    ``{status, artist, title}``) ordered by ``DISAGREEMENT_ORDER``; ``wrong_auto_cases``
+    phone at all). Over every case (``labelled``; negatives included), ``cloud_wrong_auto`` /
+    ``offline_wrong_auto`` count ``run_eval``'s confident-WRONG answers (a non-label song,
+    or any confident answer on a negative), so ``cloud_wrong_auto`` equals ``run_eval``'s
+    ``wrong_auto`` on the same cases; the build gates offline against cloud.
+    ``disagreements`` lists ``{q, type, cloud, offline}`` (each side ``{status, artist,
+    title}``) in case order (the build orders and caps them); ``wrong_auto_cases``
     lists ``{q, want, cloud_wrong, offline_wrong, cloud, offline}`` where either side is
     wrong. ``offline`` is built with ``margin_bonus=offline.OFFLINE_MARGIN_BONUS``."""
     counts: Counter[str] = Counter()
@@ -202,22 +196,21 @@ def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]
     wrong_cases: list[dict[str, Any]] = []
     for c in cases:
         rc, ro = cloud.identify(c["q"]), offline.identify(c["q"])
-        if _labelled(c):
-            labelled += 1
-            cw, ow = _label_wrong(c, rc), _label_wrong(c, ro)
-            cloud_wrong += cw
-            offline_wrong += ow
-            if cw or ow:
-                wrong_cases.append(
-                    {
-                        "q": c["q"],
-                        "want": {"artist": c.get("artist"), "title": c.get("title")},
-                        "cloud_wrong": cw,
-                        "offline_wrong": ow,
-                        "cloud": _brief(rc),
-                        "offline": _brief(ro),
-                    }
-                )
+        labelled += 1
+        cw, ow = _label_wrong(c, rc), _label_wrong(c, ro)
+        cloud_wrong += cw
+        offline_wrong += ow
+        if cw or ow:
+            wrong_cases.append(
+                {
+                    "q": c["q"],
+                    "want": {"artist": c.get("artist"), "title": c.get("title")},
+                    "cloud_wrong": cw,
+                    "offline_wrong": ow,
+                    "cloud": _brief(rc),
+                    "offline": _brief(ro),
+                }
+            )
         kind = classify_pair(rc, ro)
         if kind is None:
             continue
@@ -225,7 +218,6 @@ def dual_eval(cloud: Identifier, offline: Identifier, cases: list[dict[str, Any]
         if kind == OFFLINE_DOWNGRADED and rc["best"].get("karaoke"):
             downgraded_karaoke += 1
         disagreements.append({"q": c["q"], "type": kind, "cloud": _brief(rc), "offline": _brief(ro)})
-    disagreements.sort(key=lambda d: DISAGREEMENT_ORDER.index(d["type"]))
     return {
         "total": len(cases),
         CONFIDENT_DISAGREE: counts[CONFIDENT_DISAGREE],

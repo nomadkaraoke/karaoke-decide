@@ -15,8 +15,9 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
              at most 1 and the ``auto`` rate drop by at most 2 points vs the previous
              manifest; ``confident_disagree / total`` <= ``DUAL_EVAL_MAX_DISAGREE``
              (both matchers confident on different songs, version/credit variants
-             being the same song); offline confident-wrong vs the labels at most
-             ``DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS`` above the cloud's.
+             being the same song); ``offline_confident_cloud_unsure_other / total``
+             <= ``DUAL_EVAL_MAX_UNSURE_OTHER`` (backstop); offline confident-wrong vs
+             the labels at most ``DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS`` above the cloud's.
              A failed gate publishes nothing and logs one ERROR (the first time
              for that source run + versions; repeats are INFO, recorded in
              ``song-index/reported-failures.json``).
@@ -105,9 +106,13 @@ EVAL_MAX_AUTO_RATE_DROP = 2.0  # percentage points
 # different songs (``identify.same_song``: "Song (live)" / "A & B" vs "A feat. B" are the
 # same song). Offline being sure where the cloud is unsure is reported, not gated.
 DUAL_EVAL_MAX_DISAGREE = 0.01
-# Offline may auto-apply a non-label song on at most this many more labelled dual-eval
-# cases than the cloud does (absolute).
+# Offline may auto-apply a wrong song (run_eval's confident-WRONG, negatives included) on
+# at most this many more dual-eval cases than the cloud does (absolute).
 DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS = 2
+# Backstop: max share of dual-eval queries where offline is confident but the cloud is
+# unsure and its best guess (if any) is another song. Loose on purpose (prod A10: 9/1023
+# = 0.9%); it catches offline turning confident wholesale on queries the cloud can't place.
+DUAL_EVAL_MAX_UNSURE_OTHER = 0.02
 DEPLOY_TIMEOUT_S = 900
 
 SCHEMA_VERSION = song_id_builder.SCHEMA_VERSION
@@ -395,6 +400,11 @@ def cap_disagreements(
     return sorted(disagreements, key=rank)[:cap]
 
 
+def cap_wrong_auto_cases(cases: list[dict[str, Any]], cap: int = DUAL_EVAL_DISAGREEMENTS_CAP) -> list[dict[str, Any]]:
+    """First ``cap`` label misses, offline-wrong ones first (what the label gate is about)."""
+    return sorted(cases, key=lambda w: not w.get("offline_wrong"))[:cap]
+
+
 def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _Stats | None = None) -> dict[str, Any]:
     """Build the three indexes into ``workdir`` from local inputs (deleted once used),
     evaluate them, and return the manifest (``files`` hashed from the built files).
@@ -436,7 +446,7 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
     dual = {
         **dual,
         "disagreements": cap_disagreements(all_disagreements),
-        "wrong_auto_cases": dual.get("wrong_auto_cases", [])[:DUAL_EVAL_DISAGREEMENTS_CAP],
+        "wrong_auto_cases": cap_wrong_auto_cases(dual.get("wrong_auto_cases", [])),
         "disagree_rate": round(dual["confident_disagree"] / dual["total"], 6) if dual["total"] else 0.0,
         "max_disagree": DUAL_EVAL_MAX_DISAGREE,
     }
@@ -497,11 +507,17 @@ def gate_failures(ev: dict[str, Any], dual: dict[str, Any], prev_eval: dict[str,
             f"dual_eval confident_disagree {dual['confident_disagree']}/{total} = {rate:.2%} "
             f"(max {DUAL_EVAL_MAX_DISAGREE:.2%})"
         )
+    unsure_other = dual.get("offline_confident_cloud_unsure_other", 0)
+    if total and unsure_other / total > DUAL_EVAL_MAX_UNSURE_OTHER:
+        failures.append(
+            f"dual_eval offline_confident_cloud_unsure_other {unsure_other}/{total} = "
+            f"{unsure_other / total:.2%} (max {DUAL_EVAL_MAX_UNSURE_OTHER:.2%})"
+        )
     offline_wrong, cloud_wrong = dual.get("offline_wrong_auto", 0), dual.get("cloud_wrong_auto", 0)
     if offline_wrong > cloud_wrong + DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS:
         failures.append(
             f"dual_eval offline_wrong_auto {offline_wrong} vs cloud_wrong_auto {cloud_wrong} "
-            f"of {dual.get('labelled', total)} labelled (max excess {DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS})"
+            f"of {dual.get('labelled', total)} cases (max excess {DUAL_EVAL_MAX_OFFLINE_WRONG_EXCESS})"
         )
     return failures
 

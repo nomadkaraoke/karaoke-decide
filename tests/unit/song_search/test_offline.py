@@ -286,6 +286,9 @@ def test_dual_eval_counts(sources: tuple[Path, Path], built: tuple[Path, Any]) -
     assert out["total"] == len(cases) == 123
     assert out["confident_disagree"] == 0, out["disagreements"]
     assert out["offline_wrong_auto"] <= out["cloud_wrong_auto"], out["wrong_auto_cases"]
+    assert out["labelled"] == len(cases)
+    assert out["cloud_wrong_auto"] == song_eval.run_eval(cloud, cases)["wrong_auto"]
+    assert out["offline_wrong_auto"] == song_eval.run_eval(off, cases)["wrong_auto"]
     for kind in song_eval.DISAGREEMENT_ORDER:
         assert out[kind] == sum(1 for d in out["disagreements"] if d["type"] == kind)
     assert out["offline_downgraded"] == out["downgraded_cloud_best_karaoke"] + out["downgraded_cloud_best_non_karaoke"]
@@ -338,7 +341,8 @@ def test_dual_eval_classifies_each_pair() -> None:
     assert (out["offline_more_confident"], out["offline_confident_cloud_unsure_other"]) == (1, 2)
     assert out["offline_downgraded"] == 2
     assert (out["downgraded_cloud_best_karaoke"], out["downgraded_cloud_best_non_karaoke"]) == (1, 1)
-    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (0, 0, 0)
+    # every case here is a negative (no label): any confident answer is wrong
+    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (9, 5, 6)
     by_q = {d["q"]: d["type"] for d in out["disagreements"]}
     assert by_q == {
         "a": "confident_disagree",
@@ -348,8 +352,7 @@ def test_dual_eval_classifies_each_pair() -> None:
         "c": "offline_downgraded",
         "f": "offline_downgraded",
     }
-    # gated class first, then the informational ones, downgrades last
-    assert [d["q"] for d in out["disagreements"]] == ["a", "b2", "b3", "b", "c", "f"]
+    assert [d["q"] for d in out["disagreements"]] == ["a", "b", "b2", "b3", "c", "f"]  # case order
     a = out["disagreements"][0]
     assert a["cloud"] == {"status": "confident", "artist": "Abba", "title": "One"}
     assert a["offline"] == {"status": "confident", "artist": "Zed", "title": "One"}
@@ -398,14 +401,18 @@ def test_classify_pair_cloud_unsure_is_reported_not_gated() -> None:
 
 
 def test_dual_eval_label_wrong_counts() -> None:
+    """Label correctness is run_eval's (``outcome``/``_is``): version suffixes stripped, no
+    fuzzy titles, and any confident answer on a negative case is wrong."""
     cloud = _fake(
         {
             "right": _r("confident", "Gretchen Wilson", "Redneck Woman (live)"),  # variant of the label: right
             "cloud_wrong": _r("confident", "Elephante", "Troubled"),
             "off_wrong": _r("candidates", "Cage The Elephant", "Trouble"),
+            "fuzzy": _r("confident", "Cage The Elephant", "Trouble"),
             "title_only": _r("confident", "Anyone", "Hurt"),
             "artist_only": _r("confident", "Muse", "Uprising"),
-            "negative": _r("confident", "X", "Y"),  # no label: not counted
+            "negative": _r("confident", "Abba", "Waterloo"),
+            "negative_unsure": _r("candidates", "Abba", "Waterloo"),
         }
     )
     off = _fake(
@@ -413,24 +420,39 @@ def test_dual_eval_label_wrong_counts() -> None:
             "right": _r("confident", "Gretchen Wilson", "Redneck Woman"),
             "cloud_wrong": _r("confident", "Cage The Elephant", "Trouble"),
             "off_wrong": _r("confident", "Elephante", "Troubled"),
+            "fuzzy": _r("confident", "Cage The Elephant", "Troubled"),  # >=92% fuzzy, still not the label
             "title_only": _r("confident", "Someone", "Hurt (Live)"),
             "artist_only": _r("confident", "Blur", "Song 2"),
-            "negative": _r("confident", "X", "Y"),
+            "negative": _r("confident", "Abba", "Waterloo"),
+            "negative_unsure": _r("confident", "Abba", "Waterloo"),
         }
     )
+    trouble = {"artist": "Cage The Elephant", "title": "Trouble"}
     cases = [
         {"q": "right", "artist": "Gretchen Wilson", "title": "Redneck Woman"},
-        {"q": "cloud_wrong", "artist": "Cage The Elephant", "title": "Trouble"},
-        {"q": "off_wrong", "artist": "Cage The Elephant", "title": "Trouble"},
+        {"q": "cloud_wrong", **trouble},
+        {"q": "off_wrong", **trouble},
+        {"q": "fuzzy", **trouble},
         {"q": "title_only", "artist": None, "title": "Hurt"},
         {"q": "artist_only", "artist": "Muse", "title": None},
-        {"q": "negative", "artist": None, "title": None},
+        {"q": "negative", "artist": None, "title": None, "kind": "negative"},
+        {"q": "negative_unsure", "artist": None, "title": None, "kind": "negative"},
     ]
     out = song_eval.dual_eval(cloud, off, cases)
-    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (5, 1, 2)
+    assert (out["labelled"], out["cloud_wrong_auto"], out["offline_wrong_auto"]) == (8, 2, 5)
     wrong = {w["q"]: (w["cloud_wrong"], w["offline_wrong"]) for w in out["wrong_auto_cases"]}
-    assert wrong == {"cloud_wrong": (True, False), "off_wrong": (False, True), "artist_only": (False, True)}
-    assert out["wrong_auto_cases"][0]["want"] == {"artist": "Cage The Elephant", "title": "Trouble"}
+    assert wrong == {
+        "cloud_wrong": (True, False),
+        "off_wrong": (False, True),
+        "fuzzy": (False, True),
+        "artist_only": (False, True),
+        "negative": (True, True),
+        "negative_unsure": (False, True),
+    }
+    assert out["wrong_auto_cases"][0]["want"] == trouble
+    # one definition: dual_eval's cloud side agrees with run_eval on the same cases
+    assert out["cloud_wrong_auto"] == song_eval.run_eval(cloud, cases)["wrong_auto"]
+    assert out["offline_wrong_auto"] == song_eval.run_eval(off, cases)["wrong_auto"]
 
 
 # ---- mobile parity fixtures ---------------------------------------------------------
