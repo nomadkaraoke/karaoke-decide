@@ -32,7 +32,12 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_GEN_API_URL = "https://api.nomadkaraoke.com"
 RESOLVE_PATH = "/api/kjbox/catalog/resolve"
-GEN_TIMEOUT_S = 12.0
+# Above gen's worst case for a first-time description (~20 s: two 7 s Gemini attempts +
+# a 4 s catalog tidy). At 12 s, a cold gen path (Gemini ~2 s, then a ~10 s catalog
+# search) ran past this, so the first ask answered {} ("we couldn't work out…") while
+# gen finished and cached the song for the second ask. The app has no fetch timeout
+# and shows "Figuring it out…" meanwhile.
+GEN_TIMEOUT_S = 25.0
 CACHE_MAX = 500
 MIN_QUERY_CHARS = 2
 # R: tighter than search; each call may cost a Gemini request.
@@ -103,9 +108,13 @@ class GenResolver:
 
     async def _call_gen(self, q: str) -> dict[str, Any] | None:
         try:
-            r = await self._client.post(self._url, json={"query": q}, headers={"X-Partner-Secret": self._secret})
-        except httpx.HTTPError as exc:
-            logger.warning("gen resolve unreachable: %s", type(exc).__name__)
+            # httpx's timeout is per phase (a trickling body could outlast it); this bounds the whole call.
+            r = await asyncio.wait_for(
+                self._client.post(self._url, json={"query": q}, headers={"X-Partner-Secret": self._secret}),
+                self.timeout_s,
+            )
+        except (TimeoutError, httpx.HTTPError) as exc:
+            logger.warning("gen resolve unreachable after %gs: %s", self.timeout_s, type(exc).__name__)
             return None
         if r.status_code != 200:
             logger.warning("gen resolve answered HTTP %s", r.status_code)
