@@ -352,6 +352,45 @@ def test_client_timeout_is_the_constant(rclient: TestClient) -> None:
     assert resolver._client.timeout == httpx.Timeout(GEN_TIMEOUT_S)
 
 
+def test_gen_timeout_covers_gens_resolve_budget() -> None:
+    """gen bounds a free-text resolve at ~20 s (2 x 7 s Gemini + 4 s catalog tidy). A
+    shorter wait here turns a slow-but-successful first ask into {} (prod 2026-10-20)."""
+    from backend.search.resolve import GEN_TIMEOUT_S
+
+    assert GEN_TIMEOUT_S >= 2 * 7 + 4 + 3
+
+
+@pytest.mark.parametrize("delay_s,answered", [(0.05, True), (0.5, False)])
+def test_gen_answer_is_used_iff_it_lands_inside_the_timeout(
+    monkeypatch: pytest.MonkeyPatch, delay_s: float, answered: bool
+) -> None:
+    """The resolver waits GEN_TIMEOUT_S for gen (scaled down here): a slow answer inside it is
+    mapped; past it the request answers {} and is not cached."""
+    import asyncio
+
+    from backend.search import resolve as resolve_mod
+
+    monkeypatch.setattr(resolve_mod, "GEN_TIMEOUT_S", 0.2)
+    verdict = {"kind": "none", "confident": False, "typed_artist": "Celine Dion", "typed_title": "My Heart"}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(delay_s)
+        return httpx.Response(200, json=verdict)
+
+    async def run() -> tuple[object, str]:
+        resolver = resolve_mod.GenResolver(object(), secret="s", transport=httpx.MockTransport(handler))  # type: ignore[arg-type]
+        try:
+            return await resolver.resolve("my heart celine")
+        finally:
+            await resolver.aclose()
+
+    response, kind = asyncio.run(run())
+    if answered:
+        assert kind == "none" and response.split is not None and response.split.title == "My Heart"  # type: ignore[attr-defined]
+    else:
+        assert kind == "error" and response == resolve_mod.ResolveResponse()
+
+
 def test_cache_hit_echoes_this_requests_typed_text(rclient: TestClient, gen: Gen) -> None:
     gen.answer(kind="content", confident=True, canonical_artist="Muse", canonical_title="Starlight")
     assert _get(rclient, "Muse Starlite").json()["typed"] == "Muse Starlite"
