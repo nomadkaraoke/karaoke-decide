@@ -5,7 +5,9 @@ gen has no parity table of its own (backlog item in A4); keep this in step
 with gen's validation order if gen changes.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -23,7 +25,7 @@ TOKEN = "tok_ABC-123_abcdefghijklmnopqrstuvwxyz0123456789"
 EMAIL = "ann@x.com"
 
 
-def _session(**overrides):
+def _session(**overrides: Any) -> dict[str, Any]:
     doc = {
         "token": TOKEN,
         "user_email": EMAIL,
@@ -35,7 +37,7 @@ def _session(**overrides):
     return doc
 
 
-def _user(**overrides):
+def _user(**overrides: Any) -> dict[str, Any]:
     doc = {"email": EMAIL, "is_active": True}
     doc.update(overrides)
     return doc
@@ -75,15 +77,15 @@ CASES = [
 ]
 
 
-def _make(session_doc, user_doc, fs):
-    async def get_document(collection, doc_id):
+def _make(session_doc: Any, user_doc: Any, fs: MagicMock) -> None:
+    async def get_document(collection: str, doc_id: str) -> Any:
         if collection == "sessions":
             return session_doc
         if collection == "gen_users":
             return user_doc if isinstance(user_doc, dict) and doc_id == EMAIL else None
         return None
 
-    async def query_documents(collection, filters=None, **kwargs):
+    async def query_documents(collection: str, filters: Any = None, **kwargs: Any) -> list[dict[str, Any]]:
         assert collection == "gen_users"
         assert filters == [("email", "==", EMAIL)]
         if user_doc == "hash":
@@ -94,19 +96,23 @@ def _make(session_doc, user_doc, fs):
     fs.query_documents = AsyncMock(side_effect=query_documents)
 
 
+class Clock:
+    def __init__(self) -> None:
+        self.state: dict[str, datetime] = {"now": NOW}
+
+    def __call__(self) -> datetime:
+        return self.state["now"]
+
+
 @pytest.fixture
-def clock():
-    state = {"now": NOW}
-
-    def now():
-        return state["now"]
-
-    now.state = state
-    return now
+def clock() -> Clock:
+    return Clock()
 
 
 @pytest.mark.parametrize("name,session_doc,user_doc,reason", CASES, ids=[c[0] for c in CASES])
-async def test_parity_table(mock_firestore_service, clock, name, session_doc, user_doc, reason):
+async def test_parity_table(
+    mock_firestore_service: MagicMock, clock: Clock, name: str, session_doc: Any, user_doc: Any, reason: Any
+) -> None:
     _make(session_doc, user_doc, mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     if reason is None:
@@ -128,7 +134,9 @@ async def test_parity_table(mock_firestore_service, clock, name, session_doc, us
     ],
     ids=["iso_aware", "iso_naive", "naive_dt", "aware_dt"],
 )
-async def test_timestamp_shapes(mock_firestore_service, clock, make_value):
+async def test_timestamp_shapes(
+    mock_firestore_service: MagicMock, clock: Clock, make_value: Callable[[datetime], Any]
+) -> None:
     future = _session(expires_at=make_value(NOW + timedelta(hours=1)))
     _make(future, _user(), mock_firestore_service)
     assert await GenSessionValidator(mock_firestore_service, now=clock).validate(TOKEN) == GenIdentity(EMAIL)
@@ -140,7 +148,7 @@ async def test_timestamp_shapes(mock_firestore_service, clock, make_value):
     assert exc.value.reason == "expired"
 
 
-async def test_slides_idle_window_hourly(mock_firestore_service, clock):
+async def test_slides_idle_window_hourly(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(last_activity_at=NOW - timedelta(hours=2)), _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     await validator.validate(TOKEN)
@@ -152,13 +160,13 @@ async def test_slides_idle_window_hourly(mock_firestore_service, clock):
     assert mock_firestore_service.update_document.await_count == 1
 
 
-async def test_recent_activity_not_written(mock_firestore_service, clock):
+async def test_recent_activity_not_written(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(last_activity_at=NOW - timedelta(minutes=30)), _user(), mock_firestore_service)
     await GenSessionValidator(mock_firestore_service, now=clock).validate(TOKEN)
     mock_firestore_service.update_document.assert_not_awaited()
 
 
-async def test_positive_cache_60s(mock_firestore_service, clock):
+async def test_positive_cache_60s(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(), _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     await validator.validate(TOKEN)
@@ -171,7 +179,7 @@ async def test_positive_cache_60s(mock_firestore_service, clock):
     assert len(session_reads()) == 2
 
 
-async def test_negative_cache_10s(mock_firestore_service, clock):
+async def test_negative_cache_10s(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(None, _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     for offset, expected_reads in ((0, 1), (9, 1), (11, 2)):
@@ -182,7 +190,7 @@ async def test_negative_cache_10s(mock_firestore_service, clock):
         assert mock_firestore_service.get_document.await_count == expected_reads
 
 
-async def test_firestore_error_is_error_reason_and_not_cached(mock_firestore_service, clock):
+async def test_firestore_error_is_error_reason_and_not_cached(mock_firestore_service: MagicMock, clock: Clock) -> None:
     mock_firestore_service.get_document = AsyncMock(side_effect=RuntimeError("boom"))
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     for expected_reads in (1, 2):
@@ -192,7 +200,7 @@ async def test_firestore_error_is_error_reason_and_not_cached(mock_firestore_ser
         assert mock_firestore_service.get_document.await_count == expected_reads
 
 
-async def test_clear_cache(mock_firestore_service, clock):
+async def test_clear_cache(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(), _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     await validator.validate(TOKEN)
@@ -201,25 +209,25 @@ async def test_clear_cache(mock_firestore_service, clock):
     assert mock_firestore_service.get_document.await_count == 4  # session + user, twice
 
 
-async def test_raw_token_not_stored_in_cache(mock_firestore_service, clock):
+async def test_raw_token_not_stored_in_cache(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(), _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     await validator.validate(TOKEN)
     assert TOKEN not in validator._cache  # noqa: SLF001
 
 
-def test_is_gen_token():
+def test_is_gen_token() -> None:
     assert is_gen_token("abc_DEF-123")
     assert not is_gen_token("a.b.c")
 
 
-def test_as_utc():
+def test_as_utc() -> None:
     assert _as_utc(None) is None
     assert _as_utc("garbage") is None
     assert _as_utc("2026-01-01T00:00:00Z") == datetime(2026, 1, 1, tzinfo=UTC)
 
 
-def test_get_gen_session_validator_singleton(monkeypatch):
+def test_get_gen_session_validator_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
     from backend.services import gen_session
 
     monkeypatch.setattr(gen_session, "_validator", None)
@@ -228,7 +236,7 @@ def test_get_gen_session_validator_singleton(monkeypatch):
     assert gen_session.get_gen_session_validator() is gen_session.get_gen_session_validator()
 
 
-async def test_second_slide_write_after_an_hour(mock_firestore_service, clock):
+async def test_second_slide_write_after_an_hour(mock_firestore_service: MagicMock, clock: Clock) -> None:
     _make(_session(last_activity_at=NOW - timedelta(hours=2)), _user(), mock_firestore_service)
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     await validator.validate(TOKEN)
@@ -240,7 +248,7 @@ async def test_second_slide_write_after_an_hour(mock_firestore_service, clock):
 @pytest.mark.parametrize(
     "bad", ["", "a/b/c", "x//y", "a b", "tok\n", "a" * 2000, "__abc__", "x" * 10, "__" + "a" * 30 + "__"]
 )
-async def test_malformed_token_never_hits_firestore(mock_firestore_service, clock, bad):
+async def test_malformed_token_never_hits_firestore(mock_firestore_service: MagicMock, clock: Clock, bad: str) -> None:
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     for _ in range(2):
         with pytest.raises(GenSessionError) as exc:
@@ -250,7 +258,9 @@ async def test_malformed_token_never_hits_firestore(mock_firestore_service, cloc
     mock_firestore_service.query_documents.assert_not_awaited()
 
 
-async def test_cache_is_bounded(mock_firestore_service, clock, monkeypatch):
+async def test_cache_is_bounded(
+    mock_firestore_service: MagicMock, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from backend.services import gen_session
 
     monkeypatch.setattr(gen_session, "MAX_CACHE_ENTRIES", 50)
@@ -268,14 +278,16 @@ async def test_cache_is_bounded(mock_firestore_service, clock, monkeypatch):
     assert len(validator._cache) <= 50  # noqa: SLF001
 
 
-async def test_malformed_token_negatively_cached(mock_firestore_service, clock, monkeypatch):
+async def test_malformed_token_negatively_cached(
+    mock_firestore_service: MagicMock, clock: Clock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     from backend.services import gen_session
 
-    calls = []
+    calls: list[str] = []
     real = gen_session._TOKEN_RE  # noqa: SLF001
 
     class Spy:
-        def fullmatch(self, value):
+        def fullmatch(self, value: str) -> Any:
             calls.append(value)
             return real.fullmatch(value)
 

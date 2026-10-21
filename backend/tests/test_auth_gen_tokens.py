@@ -28,6 +28,7 @@ def firestore() -> MagicMock:
     fs = MagicMock()
     fs.get_document = AsyncMock(return_value=None)
     fs.set_document = AsyncMock(return_value=None)
+    fs.create_document = AsyncMock(return_value=True)
     fs.update_document = AsyncMock(return_value=None)
     fs.query_documents = AsyncMock(return_value=[])
     return fs
@@ -79,8 +80,8 @@ def test_gen_token_new_user_creates_profile(real_auth_client: TestClient, firest
     assert body["is_guest"] is False
     assert body["email"] == EMAIL
     assert body["id"].startswith("user_")
-    firestore.set_document.assert_awaited_once()
-    coll, doc_id, data = firestore.set_document.await_args.args
+    firestore.create_document.assert_awaited_once()
+    coll, doc_id, data = firestore.create_document.await_args.args
     assert (coll, doc_id) == ("decide_users", EMAIL_HASH)
     assert data["gen_linked_at"] and data["is_guest"] is False and data["user_id"] == body["id"]
 
@@ -100,7 +101,7 @@ def test_gen_token_existing_decide_user_keeps_id(real_auth_client: TestClient, f
     resp = real_auth_client.get("/api/auth/me", headers=_bearer(GEN_TOKEN))
     assert resp.status_code == 200
     assert resp.json()["id"] == "user_abc"
-    firestore.set_document.assert_not_awaited()
+    firestore.create_document.assert_not_called()
     firestore.update_document.assert_awaited_once()
     assert firestore.update_document.await_args.args[:2] == ("decide_users", EMAIL_HASH)
     assert "gen_linked_at" in firestore.update_document.await_args.args[2]
@@ -123,17 +124,20 @@ def test_gen_token_invalid_401(real_auth_client: TestClient, validator: MagicMoc
     assert resp.json()["detail"] == "gen_session_expired"
 
 
-def _legacy_token(client: TestClient) -> str:
-    from backend.api.deps import get_auth_service
-
-    auth = get_auth_service  # patched callable returns the real AuthService
-    service = auth(MagicMock(), MagicMock())
-    token, _ = service.generate_jwt(MagicMock(id="user_abc", email=EMAIL))
+def _legacy_token() -> str:
+    settings = BackendSettings(
+        environment="development",
+        google_cloud_project="test-project",
+        jwt_secret="test-jwt-secret-key-for-testing-only",
+    )
+    token, _ = AuthService(settings, MagicMock(), email_service=MagicMock()).generate_jwt(
+        MagicMock(id="user_abc", email=EMAIL)
+    )
     return str(token)
 
 
 def test_legacy_jwt_still_valid_before_sunset(real_auth_client: TestClient, firestore: MagicMock) -> None:
-    token = _legacy_token(real_auth_client)
+    token = _legacy_token()
     assert "." in token
     firestore.query_documents.return_value = [_decide_doc()]
     with patch("backend.api.deps._today", return_value=date(2026, 11, 30)):
@@ -143,7 +147,7 @@ def test_legacy_jwt_still_valid_before_sunset(real_auth_client: TestClient, fire
 
 
 def test_legacy_jwt_rejected_after_sunset(real_auth_client: TestClient, firestore: MagicMock) -> None:
-    token = _legacy_token(real_auth_client)
+    token = _legacy_token()
     firestore.query_documents.return_value = [_decide_doc()]
     with patch("backend.api.deps._today", return_value=date(2026, 12, 1)):
         resp = real_auth_client.get("/api/auth/me", headers=_bearer(token))
@@ -159,5 +163,39 @@ def test_gen_token_still_valid_after_sunset(real_auth_client: TestClient) -> Non
 
 def test_gen_user_passes_verified_user_dep(real_auth_client: TestClient, firestore: MagicMock) -> None:
     resp = real_auth_client.get("/api/services", headers=_bearer(GEN_TOKEN))
-    assert resp.status_code != 403
-    assert resp.status_code != 401
+    assert resp.status_code == 200
+
+
+def test_gen_first_sign_in_race_returns_same_user_id(real_auth_client: TestClient, firestore: MagicMock) -> None:
+    stored: dict[str, dict[str, object]] = {}
+
+    async def create_document(collection: str, doc_id: str, data: dict[str, object]) -> bool:
+        if stored:
+            return False
+        stored["doc"] = data
+        return True
+
+    # Both requests read "absent" first (stale); only the first create wins.
+    stale_reads = 2
+
+    async def racing_get(collection: str, doc_id: str) -> dict[str, object] | None:
+        nonlocal stale_reads
+        if stale_reads > 0:
+            stale_reads -= 1
+            return None
+        return stored.get("doc")
+
+    firestore.get_document.side_effect = racing_get
+    firestore.create_document.side_effect = create_document
+
+    first = real_auth_client.get("/api/auth/me", headers=_bearer(GEN_TOKEN)).json()["id"]
+    second = real_auth_client.get("/api/auth/me", headers=_bearer(GEN_TOKEN)).json()["id"]
+    assert first == second
+    assert firestore.create_document.await_count == 2
+
+
+def test_legacy_doc_without_timestamps_does_not_raise(real_auth_client: TestClient, firestore: MagicMock) -> None:
+    firestore.get_document.return_value = {"user_id": "user_old", "email": EMAIL, "gen_linked_at": DOC_TS}
+    resp = real_auth_client.get("/api/auth/me", headers=_bearer(GEN_TOKEN))
+    assert resp.status_code == 200
+    assert resp.json()["id"] == "user_old"

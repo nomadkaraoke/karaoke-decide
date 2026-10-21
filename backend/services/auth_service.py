@@ -187,6 +187,7 @@ class AuthService:
         email_hash = self._hash_email(email)
         doc = await self.firestore.get_document(self.USERS_COLLECTION, email_hash)
         now = datetime.now(UTC)
+        now_iso = now.isoformat()
 
         if doc is None:
             user_id = self._generate_user_id()
@@ -202,7 +203,12 @@ class AuthService:
                 "total_songs_sung": 0,
                 "last_sync_at": None,
             }
-            await self.firestore.set_document(self.USERS_COLLECTION, email_hash, doc)
+            created = await self.firestore.create_document(self.USERS_COLLECTION, email_hash, doc)
+            if not created:
+                # Lost a first-sign-in race: adopt the winner's profile (and its user_id).
+                existing = await self.firestore.get_document(self.USERS_COLLECTION, email_hash)
+                if existing is not None:
+                    doc = existing
         elif not doc.get("gen_linked_at"):
             await self.firestore.update_document(self.USERS_COLLECTION, email_hash, {"gen_linked_at": now.isoformat()})
 
@@ -212,8 +218,8 @@ class AuthService:
             display_name=doc.get("display_name"),
             is_guest=False,
             is_admin=doc.get("is_admin", False),
-            created_at=datetime.fromisoformat(doc["created_at"]),
-            updated_at=datetime.fromisoformat(doc["updated_at"]),
+            created_at=datetime.fromisoformat(doc.get("created_at") or now_iso),
+            updated_at=datetime.fromisoformat(doc.get("updated_at") or now_iso),
             total_songs_known=doc.get("total_songs_known", 0),
             total_songs_sung=doc.get("total_songs_sung", 0),
             last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),

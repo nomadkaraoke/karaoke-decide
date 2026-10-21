@@ -77,7 +77,7 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"gen_session_{e.reason}",
                 headers={"WWW-Authenticate": "Bearer"},
-            )
+            ) from e
         return await auth_service.resolve_gen_user(identity.email)
 
     if _today() > settings.legacy_jwt_sunset:

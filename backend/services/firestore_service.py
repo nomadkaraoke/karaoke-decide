@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any
 
+from google.api_core.exceptions import AlreadyExists
 from google.cloud import firestore
 
 from backend.config import BackendSettings
@@ -48,6 +49,15 @@ class FirestoreService:
         """Set a document (create or overwrite)."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.set(data, merge=merge)
+
+    async def create_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> bool:
+        """Create a document only if absent. Returns False if it already exists."""
+        doc_ref = self.collection(collection).document(doc_id)
+        try:
+            await doc_ref.create(data)
+        except AlreadyExists:
+            return False
+        return True
 
     async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         """Update specific fields in a document."""
