@@ -59,6 +59,28 @@ class FirestoreService:
             return False
         return True
 
+    async def batch_set(
+        self,
+        collection: str,
+        docs: dict[str, dict[str, Any]],
+        merge: bool = False,
+    ) -> None:
+        """Write many documents, committing in batches of at most 400."""
+        items = list(docs.items())
+        for i in range(0, len(items), 400):
+            batch = self.client.batch()
+            for doc_id, data in items[i : i + 400]:
+                batch.set(self.collection(collection).document(doc_id), data, merge=merge)
+            await batch.commit()
+
+    async def batch_delete(self, collection: str, doc_ids: list[str]) -> None:
+        """Delete many documents, committing in batches of at most 400."""
+        for i in range(0, len(doc_ids), 400):
+            batch = self.client.batch()
+            for doc_id in doc_ids[i : i + 400]:
+                batch.delete(self.collection(collection).document(doc_id))
+            await batch.commit()
+
     async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         """Update specific fields in a document."""
         doc_ref = self.collection(collection).document(doc_id)

@@ -10,6 +10,7 @@ from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
 from backend.services.firestore_service import FirestoreService
 from backend.services.gen_session import GenSessionError, get_gen_session_validator, is_gen_token
+from backend.services.guest_claim_service import GuestClaimService
 from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
@@ -214,6 +215,14 @@ async def get_known_songs_service_dep(
     return get_known_songs_service(settings, firestore)
 
 
+async def get_guest_claim_service_dep(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service_dep)],
+) -> GuestClaimService:
+    """Get guest claim service instance."""
+    return GuestClaimService(firestore, auth_service)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -255,3 +264,4 @@ RecommendationServiceDep = Annotated[RecommendationService, Depends(get_recommen
 PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service_dep)]
 KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_service_dep)]
 UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]
+GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
