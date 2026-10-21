@@ -162,7 +162,16 @@ def test_gen_token_still_valid_after_sunset(real_auth_client: TestClient) -> Non
 
 
 def test_gen_user_passes_verified_user_dep(real_auth_client: TestClient, firestore: MagicMock) -> None:
-    resp = real_auth_client.get("/api/services", headers=_bearer(GEN_TOKEN))
+    from backend.api.deps import get_music_service_service_dep
+    from backend.main import app
+
+    music = MagicMock()
+    music.get_user_services = AsyncMock(return_value=[])
+    app.dependency_overrides[get_music_service_service_dep] = lambda: music
+    try:
+        resp = real_auth_client.get("/api/services", headers=_bearer(GEN_TOKEN))
+    finally:
+        app.dependency_overrides.pop(get_music_service_service_dep, None)
     assert resp.status_code == 200
 
 
