@@ -19,7 +19,7 @@ from backend.services.gen_session import (
 )
 
 NOW = datetime(2026, 10, 21, 12, 0, 0, tzinfo=UTC)
-TOKEN = "tok_ABC-123"
+TOKEN = "tok_ABC-123_abcdefghijklmnopqrstuvwxyz0123456789"
 EMAIL = "ann@x.com"
 
 
@@ -53,6 +53,12 @@ CASES = [
         _session(last_activity_at=NOW - timedelta(days=7, seconds=1)),
         _user(),
         "idle",
+    ),
+    (
+        "idle_exact_boundary_valid",
+        _session(last_activity_at=NOW - timedelta(days=7)),
+        _user(),
+        None,
     ),
     (
         "idle_boundary",
@@ -231,7 +237,9 @@ async def test_second_slide_write_after_an_hour(mock_firestore_service, clock):
     assert mock_firestore_service.update_document.await_count == 2
 
 
-@pytest.mark.parametrize("bad", ["", "a/b/c", "x//y", "a b", "tok\n"])
+@pytest.mark.parametrize(
+    "bad", ["", "a/b/c", "x//y", "a b", "tok\n", "a" * 2000, "__abc__", "x" * 10, "__" + "a" * 30 + "__"]
+)
 async def test_malformed_token_never_hits_firestore(mock_firestore_service, clock, bad):
     validator = GenSessionValidator(mock_firestore_service, now=clock)
     for _ in range(2):
@@ -258,3 +266,27 @@ async def test_cache_is_bounded(mock_firestore_service, clock, monkeypatch):
         with pytest.raises(GenSessionError):
             await validator.validate(f"fresh{i}")
     assert len(validator._cache) <= 50  # noqa: SLF001
+
+
+async def test_malformed_token_negatively_cached(mock_firestore_service, clock, monkeypatch):
+    from backend.services import gen_session
+
+    calls = []
+    real = gen_session._TOKEN_RE  # noqa: SLF001
+
+    class Spy:
+        def fullmatch(self, value):
+            calls.append(value)
+            return real.fullmatch(value)
+
+    monkeypatch.setattr(gen_session, "_TOKEN_RE", Spy())
+    validator = GenSessionValidator(mock_firestore_service, now=clock)
+    for offset in (0, 5):
+        clock.state["now"] = NOW + timedelta(seconds=offset)
+        with pytest.raises(GenSessionError):
+            await validator.validate("a/b/c")
+    assert len(calls) == 1
+    clock.state["now"] = NOW + timedelta(seconds=11)
+    with pytest.raises(GenSessionError):
+        await validator.validate("a/b/c")
+    assert len(calls) == 2

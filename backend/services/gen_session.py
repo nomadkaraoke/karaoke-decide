@@ -25,7 +25,9 @@ SLIDE_INTERVAL_S = 3600
 POSITIVE_TTL_S = 60
 NEGATIVE_TTL_S = 10
 MAX_CACHE_ENTRIES = 10_000
-_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+")
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,128}")
+# Firestore reserves ids of the form __.*__
+_RESERVED_ID_RE = re.compile(r"__.*__")
 
 Reason = Literal["invalid", "revoked", "expired", "idle", "tenant", "user_not_found", "user_disabled", "error"]
 
@@ -120,7 +122,7 @@ class GenSessionValidator:
 
     async def _validate_uncached(self, token: str, key: str, now: datetime) -> GenIdentity:
         # Never let a malformed token reach Firestore as a document path.
-        if not _TOKEN_RE.fullmatch(token):
+        if not _TOKEN_RE.fullmatch(token) or _RESERVED_ID_RE.fullmatch(token):
             raise GenSessionError("invalid")
         doc = await self._fs.get_document(GEN_SESSIONS_COLLECTION, token)
         if not doc:
