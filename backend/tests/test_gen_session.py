@@ -220,3 +220,41 @@ def test_get_gen_session_validator_singleton(monkeypatch):
     monkeypatch.setattr(gen_session, "FirestoreService", MagicMock())
     monkeypatch.setattr(gen_session, "get_backend_settings", MagicMock())
     assert gen_session.get_gen_session_validator() is gen_session.get_gen_session_validator()
+
+
+async def test_second_slide_write_after_an_hour(mock_firestore_service, clock):
+    _make(_session(last_activity_at=NOW - timedelta(hours=2)), _user(), mock_firestore_service)
+    validator = GenSessionValidator(mock_firestore_service, now=clock)
+    await validator.validate(TOKEN)
+    clock.state["now"] = NOW + timedelta(hours=1, seconds=1)
+    await validator.validate(TOKEN)
+    assert mock_firestore_service.update_document.await_count == 2
+
+
+@pytest.mark.parametrize("bad", ["", "a/b/c", "x//y", "a b", "tok\n"])
+async def test_malformed_token_never_hits_firestore(mock_firestore_service, clock, bad):
+    validator = GenSessionValidator(mock_firestore_service, now=clock)
+    for _ in range(2):
+        with pytest.raises(GenSessionError) as exc:
+            await validator.validate(bad)
+        assert exc.value.reason == "invalid"
+    mock_firestore_service.get_document.assert_not_awaited()
+    mock_firestore_service.query_documents.assert_not_awaited()
+
+
+async def test_cache_is_bounded(mock_firestore_service, clock, monkeypatch):
+    from backend.services import gen_session
+
+    monkeypatch.setattr(gen_session, "MAX_CACHE_ENTRIES", 50)
+    _make(None, _user(), mock_firestore_service)
+    validator = GenSessionValidator(mock_firestore_service, now=clock)
+    for i in range(200):
+        with pytest.raises(GenSessionError):
+            await validator.validate(f"tok{i}")
+        clock.state["now"] += timedelta(seconds=1)  # entries expire after 10 s
+    assert len(validator._cache) <= 50  # noqa: SLF001
+    # Even with nothing expired, the cap holds.
+    for i in range(200):
+        with pytest.raises(GenSessionError):
+            await validator.validate(f"fresh{i}")
+    assert len(validator._cache) <= 50  # noqa: SLF001

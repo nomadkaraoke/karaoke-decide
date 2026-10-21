@@ -7,6 +7,7 @@ rejected. gen tokens contain no dots; decide JWTs always do.
 
 import hashlib
 import logging
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -23,6 +24,8 @@ GEN_SESSION_IDLE_DAYS = 7
 SLIDE_INTERVAL_S = 3600
 POSITIVE_TTL_S = 60
 NEGATIVE_TTL_S = 10
+MAX_CACHE_ENTRIES = 10_000
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]+")
 
 Reason = Literal["invalid", "revoked", "expired", "idle", "tenant", "user_not_found", "user_disabled", "error"]
 
@@ -91,16 +94,34 @@ class GenSessionValidator:
         try:
             identity = await self._validate_uncached(token, key, now)
         except GenSessionError as err:
-            self._cache[key] = (now + timedelta(seconds=NEGATIVE_TTL_S), err)
+            self._store(key, now + timedelta(seconds=NEGATIVE_TTL_S), err, now)
             raise
         except Exception as exc:
             logger.exception("gen session validation failed")
             raise GenSessionError("error") from exc
 
-        self._cache[key] = (now + timedelta(seconds=POSITIVE_TTL_S), identity)
+        self._store(key, now + timedelta(seconds=POSITIVE_TTL_S), identity, now)
         return identity
 
+    def _store(self, key: str, expires: datetime, result: GenIdentity | GenSessionError, now: datetime) -> None:
+        if len(self._cache) >= MAX_CACHE_ENTRIES or len(self._last_write) >= MAX_CACHE_ENTRIES:
+            self._sweep(now)
+        self._cache[key] = (expires, result)
+
+    def _sweep(self, now: datetime) -> None:
+        """Drop expired entries; if still over the cap, drop everything (it is only a cache)."""
+        self._cache = {k: v for k, v in self._cache.items() if v[0] > now}
+        cutoff = now - timedelta(seconds=SLIDE_INTERVAL_S)
+        self._last_write = {k: t for k, t in self._last_write.items() if t > cutoff}
+        if len(self._cache) >= MAX_CACHE_ENTRIES:
+            self._cache.clear()
+        if len(self._last_write) >= MAX_CACHE_ENTRIES:
+            self._last_write.clear()
+
     async def _validate_uncached(self, token: str, key: str, now: datetime) -> GenIdentity:
+        # Never let a malformed token reach Firestore as a document path.
+        if not _TOKEN_RE.fullmatch(token):
+            raise GenSessionError("invalid")
         doc = await self._fs.get_document(GEN_SESSIONS_COLLECTION, token)
         if not doc:
             raise GenSessionError("invalid")
