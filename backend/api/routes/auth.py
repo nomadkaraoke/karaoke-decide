@@ -1,12 +1,17 @@
 """Authentication routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from starlette.requests import Request
 
-from backend.api.deps import AuthServiceDep, CurrentUser
+from backend.api import deps
+from backend.api.deps import AuthServiceDep, CurrentUser, GuestClaimServiceDep
 from backend.i18n import get_locale_from_request, t
 from backend.services.auth_service import AuthenticationError
+from backend.services.guest_claim_service import GuestClaimError
 
 router = APIRouter()
 
@@ -377,3 +382,36 @@ async def delete_account(
         message=t(locale, "auth.accountDeleted"),
         deleted_user_id=user.id,
     )
+
+
+class ClaimGuestRequest(BaseModel):
+    """Request to claim a guest profile."""
+
+    guest_token: str
+
+
+class ClaimGuestResponse(BaseModel):
+    """What a guest claim moved onto the signed-in profile."""
+
+    songs_moved: int
+    artists_moved: int
+    services_moved: int
+    playlists_moved: int
+    quiz_copied: bool
+
+
+@router.post("/claim-guest", response_model=ClaimGuestResponse)
+async def claim_guest(
+    body: ClaimGuestRequest,
+    user: CurrentUser,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(deps.security)],
+    claim_service: GuestClaimServiceDep,
+) -> ClaimGuestResponse:
+    """Migrate a guest profile's data onto the gen-signed-in user, then delete the guest."""
+    if credentials is None or not deps.is_gen_token(credentials.credentials):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="requires_gen_session")
+    try:
+        result = await claim_service.claim(user, body.guest_token)
+    except GuestClaimError as e:
+        raise HTTPException(status_code=e.status, detail=e.detail) from e
+    return ClaimGuestResponse(**vars(result))

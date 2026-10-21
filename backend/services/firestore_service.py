@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import Any
 
+from google.api_core.exceptions import AlreadyExists
 from google.cloud import firestore
 
 from backend.config import BackendSettings
@@ -48,6 +49,37 @@ class FirestoreService:
         """Set a document (create or overwrite)."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.set(data, merge=merge)
+
+    async def create_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> bool:
+        """Create a document only if absent. Returns False if it already exists."""
+        doc_ref = self.collection(collection).document(doc_id)
+        try:
+            await doc_ref.create(data)
+        except AlreadyExists:
+            return False
+        return True
+
+    async def batch_set(
+        self,
+        collection: str,
+        docs: dict[str, dict[str, Any]],
+        merge: bool = False,
+    ) -> None:
+        """Write many documents, committing in batches of at most 400."""
+        items = list(docs.items())
+        for i in range(0, len(items), 400):
+            batch = self.client.batch()
+            for doc_id, data in items[i : i + 400]:
+                batch.set(self.collection(collection).document(doc_id), data, merge=merge)
+            await batch.commit()
+
+    async def batch_delete(self, collection: str, doc_ids: list[str]) -> None:
+        """Delete many documents, committing in batches of at most 400."""
+        for i in range(0, len(doc_ids), 400):
+            batch = self.client.batch()
+            for doc_id in doc_ids[i : i + 400]:
+                batch.delete(self.collection(collection).document(doc_id))
+            await batch.commit()
 
     async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         """Update specific fields in a document."""

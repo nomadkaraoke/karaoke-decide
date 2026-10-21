@@ -1,5 +1,6 @@
 """Configuration management for Karaoke Decide."""
 
+from datetime import date
 from functools import lru_cache
 from typing import Literal
 
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
     google_cloud_project_number: str = ""  # Required for service account references
     gcs_bucket_name: str = "karaoke-decide-storage"
     firestore_database: str = "(default)"
+
+    # Legacy decide JWTs are accepted through this date (inclusive); gen sessions replace them.
+    legacy_jwt_sunset: date = date(2026, 11, 30)
 
     # API Server
     api_host: str = "0.0.0.0"

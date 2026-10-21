@@ -21,6 +21,16 @@ from backend.services.quiz_service import QuizStatus, QuizSubmitResult  # noqa: 
 from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def legacy_jwt_token_path() -> Generator[None, None, None]:
+    """Route test bearer tokens (e.g. "test-token", dot-less) down the legacy JWT path.
+
+    Real dot-less tokens are gen sessions; test_auth_gen_tokens.py overrides this fixture.
+    """
+    with patch("backend.api.deps.is_gen_token", return_value=False):
+        yield
+
+
 @pytest.fixture
 def mock_backend_settings() -> BackendSettings:
     """Create mock backend settings for testing."""
