@@ -29,7 +29,7 @@ Nomad Karaoke Decide is a system that helps users discover karaoke songs based o
 │                    (FastAPI on Cloud Run)                           │
 ├─────────────────────────────────────────────────────────────────────┤
 │  /api/catalog/*   - Karaoke song catalog (BigQuery)        ✅ LIVE  │
-│  /api/auth/*      - Magic link authentication              ✅ LIVE  │
+│  /api/auth/*      - Gen session + legacy JWT auth                ✅ LIVE  │
 │  /api/services/*  - Music service OAuth & sync             ✅ LIVE  │
 │  /api/my/*        - User data, recommendations             ✅ LIVE  │
 │  /api/playlists/* - Playlist management                    ✅ LIVE  │
@@ -145,6 +145,8 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
 User → CLI/Web → POST /api/auth/magic-link → Postmark → Email
 User → Click Link → POST /api/auth/verify → JWT Token → Authenticated
 ```
+
+That magic-link/JWT flow is legacy (JWTs accepted until 2026-11-30). There is now one Nomad account: gen is the identity of record. Clients send gen's session token as the Bearer token; decide validates it against gen's `sessions` collection (shared Firestore project, tenant sessions rejected) and resolves the decide profile `decide_users/{sha256(email)}` on the first request via create-if-absent. Guests migrate with `POST /api/auth/claim-guest`.
 
 ### 2. Music Service Connection
 

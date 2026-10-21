@@ -11,6 +11,11 @@ Most endpoints require a Bearer token in the Authorization header:
 Authorization: Bearer <token>
 ```
 
+Two token types are accepted:
+
+- **Gen session tokens** (dot-less): validated against gen's `sessions` collection (same Firestore project) with gen's rules (exists, not revoked, not expired, `last_activity_at` within 7 days, user exists and enabled) plus one decide-only rule: tenant sessions (`tenant_id` set) are rejected. Results are cached in-process (60s valid, 10s invalid) and `last_activity_at` is slid at most hourly. Failures return `401` with `detail` = `gen_session_<reason>`, where reason is `invalid`, `revoked`, `expired`, `idle`, `tenant`, `user_not_found`, `user_disabled` or `error`. The decide profile (`decide_users/{sha256(email)}`) is created on the first request if absent.
+- **Legacy decide JWTs** (contain dots): accepted through 2026-11-30 inclusive; afterwards `401` with `detail: "legacy_token_expired"`.
+
 ---
 
 ## Health
@@ -222,6 +227,36 @@ Use `null` to clear the display name:
 
 **Error Responses:**
 - `404` - User not found
+
+### POST /api/auth/claim-guest
+
+Move a guest profile's data (songs, artists, connected services, playlists, quiz answers) onto the signed-in gen user's profile, then delete the guest. Lists are unioned; the target's values win on conflict.
+
+**Requires:** gen session Bearer token (legacy JWTs get `403 requires_gen_session`)
+
+**Request:**
+```json
+{
+  "guest_token": "<legacy guest jwt>"
+}
+```
+
+**Response:**
+```json
+{
+  "songs_moved": 12,
+  "artists_moved": 8,
+  "services_moved": 0,
+  "playlists_moved": 1,
+  "quiz_copied": true
+}
+```
+
+**Error Responses:**
+- `400 not_a_guest_token` - `guest_token` is not a valid guest JWT
+- `403 requires_gen_session` - caller did not authenticate with a gen session token
+- `404 guest_not_found` - guest profile does not exist (already claimed or deleted)
+- `404 target_not_found` - the signed-in user's profile does not exist
 
 ### POST /api/auth/logout
 
