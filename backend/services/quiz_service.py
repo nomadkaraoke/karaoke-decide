@@ -15,6 +15,7 @@ from google.cloud import bigquery
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from backend.services.listenbrainz_service import ListenBrainzService
+from karaoke_decide.catalog.genres import map_genres
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 from karaoke_decide.services.bq_limits import make_client
@@ -901,44 +902,7 @@ class QuizService:
         Returns:
             List of our genre IDs (e.g., 'classic-rock').
         """
-        # Reverse mapping from Spotify genre patterns to our IDs
-        genre_keywords = {
-            "pop": "pop",
-            "rock": "rock",
-            "hip hop": "hiphop",
-            "r&b": "rnb",
-            "country": "country",
-            "electro": "electronic",
-            "dance": "electronic",
-            "metal": "metal",
-            "jazz": "jazz",
-            "latin": "latin",
-            "reggaeton": "latin",
-            "indie": "indie",
-            "alternative": "indie",
-            "k-pop": "kpop",
-            "disco": "disco",
-            "funk": "disco",
-            "soul": "rnb",
-            "classic rock": "classic-rock",
-            "broadway": "musical",
-            "reggae": "reggae",
-            "punk": "punk",
-            "emo": "emo",
-            "grunge": "grunge",
-            "folk": "folk",
-            "blues": "blues",
-            "ska": "ska",
-        }
-
-        matched_ids: set[str] = set()
-        for spotify_genre in spotify_genres:
-            for keyword, genre_id in genre_keywords.items():
-                if keyword in spotify_genre:
-                    matched_ids.add(genre_id)
-                    break
-
-        return list(matched_ids)
+        return map_genres(spotify_genres)
 
     async def get_decade_artists(self, artists_per_decade: int = 5) -> dict[str, list[dict]]:
         """Get example artists for each decade.

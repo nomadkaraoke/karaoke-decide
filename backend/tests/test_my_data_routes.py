@@ -176,3 +176,42 @@ class TestUpdatePreferences:
         )
 
         assert response.status_code == 422  # Validation error
+
+
+class TestPreferencesDecades:
+    """decades round-trip through the preferences routes."""
+
+    def test_put_passes_genres_and_decades_to_service(
+        self,
+        my_data_client: TestClient,
+        mock_user_data_service: MagicMock,
+    ) -> None:
+        response = my_data_client.put(
+            "/api/my/data/preferences",
+            headers={"Authorization": "Bearer test-token"},
+            json={"genres": ["rock"], "decades": ["1990s"]},
+        )
+
+        assert response.status_code == 200
+        kwargs = mock_user_data_service.update_preferences.call_args.kwargs
+        assert kwargs["genres"] == ["rock"]
+        assert kwargs["decades"] == ["1990s"]
+
+    def test_get_returns_decades(
+        self,
+        my_data_client: TestClient,
+        mock_user_data_service: MagicMock,
+    ) -> None:
+        mock_user_data_service.get_preferences.return_value = {
+            "decade_preference": None,
+            "energy_preference": None,
+            "genres": ["rock"],
+            "decades": ["1990s"],
+        }
+        response = my_data_client.get(
+            "/api/my/data/preferences",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["decades"] == ["1990s"]

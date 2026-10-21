@@ -151,7 +151,7 @@ class UserDataService:
         quiz_preferences = {
             "decade": user_data.get("quiz_decade_pref"),
             "energy": user_data.get("quiz_energy_pref"),
-            "genres": user_data.get("quiz_genres_pref", []),
+            "genres": user_data.get("quiz_genres") or user_data.get("quiz_genres_pref") or [],
         }
 
         return {
@@ -179,12 +179,15 @@ class UserDataService:
                 "decade_preference": None,
                 "energy_preference": None,
                 "genres": [],
+                "decades": [],
             }
 
         return {
             "decade_preference": user_doc.get("quiz_decade_pref"),
             "energy_preference": user_doc.get("quiz_energy_pref"),
-            "genres": user_doc.get("quiz_genres_pref", []),
+            # quiz_genres is canonical (what recommendations read); quiz_genres_pref is legacy.
+            "genres": user_doc.get("quiz_genres") or user_doc.get("quiz_genres_pref") or [],
+            "decades": user_doc.get("quiz_decades") or [],
         }
 
     async def update_preferences(
@@ -193,6 +196,7 @@ class UserDataService:
         decade_preference: str | None = None,
         energy_preference: str | None = None,
         genres: list[str] | None = None,
+        decades: list[str] | None = None,
     ) -> dict[str, Any]:
         """Update user's quiz preferences.
 
@@ -212,7 +216,10 @@ class UserDataService:
             update_data["quiz_energy_pref"] = energy_preference
 
         if genres is not None:
-            update_data["quiz_genres_pref"] = genres
+            update_data["quiz_genres"] = genres
+
+        if decades is not None:
+            update_data["quiz_decades"] = decades
 
         if doc_id:
             # Update existing user document

@@ -5,10 +5,11 @@ enabling O(1) lookups instead of BigQuery queries during sync.
 """
 
 import logging
-import re
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from karaoke_decide.catalog.keys import match_key, normalize_artist, normalize_text, normalize_title
 
 if TYPE_CHECKING:
     from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
@@ -16,68 +17,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Patterns to remove from track titles (must match TrackMatcher)
-TITLE_REMOVE_PATTERNS = [
-    r"\s*\(feat\.?\s+[^)]+\)",  # (feat. Artist)
-    r"\s*\(ft\.?\s+[^)]+\)",  # (ft. Artist)
-    r"\s*\(featuring\s+[^)]+\)",  # (featuring Artist)
-    r"\s*\(with\s+[^)]+\)",  # (with Artist)
-    r"\s*\[feat\.?\s+[^]]+\]",  # [feat. Artist]
-    r"\s*\[ft\.?\s+[^]]+\]",  # [ft. Artist]
-    r"\s*-\s*remaster(ed)?\s*\d*",  # - Remastered 2011
-    r"\s*\(remaster(ed)?\s*\d*\)",  # (Remastered 2011)
-    r"\s*\[remaster(ed)?\s*\d*\]",  # [Remastered 2011]
-    r"\s*\(live[^)]*\)",  # (Live)
-    r"\s*\[live[^]]*\]",  # [Live]
-    r"\s*\(radio\s*(edit|mix)\)",  # (Radio Edit)
-    r"\s*\(single\s*version\)",  # (Single Version)
-    r"\s*\(album\s*version\)",  # (Album Version)
-    r"\s*\(original\s*mix\)",  # (Original Mix)
-    r"\s*\(explicit\)",  # (Explicit)
-    r"\s*\(clean\)",  # (Clean)
-]
-
-# Patterns to remove from artist names (must match TrackMatcher)
-ARTIST_REMOVE_PATTERNS = [
-    r"\s*feat\.?\s+.*$",  # feat. Another Artist
-    r"\s*ft\.?\s+.*$",  # ft. Another Artist
-    r"\s*featuring\s+.*$",  # featuring Another Artist
-    r"\s*\bwith\b\s+.*$",  # with Another Artist
-]
-
-# Compiled patterns
-_compiled_title_patterns = [re.compile(p, re.IGNORECASE) for p in TITLE_REMOVE_PATTERNS]
-_compiled_artist_patterns = [re.compile(p, re.IGNORECASE) for p in ARTIST_REMOVE_PATTERNS]
-
-
-def _normalize_text(text: str) -> str:
-    """Normalize text for matching (same as TrackMatcher)."""
-    if not text:
-        return ""
-    result = text.lower()
-    result = re.sub(r"[^a-z0-9 ]", " ", result)
-    result = re.sub(r"\s+", " ", result)
-    return result.strip()
-
-
-def _normalize_title(title: str) -> str:
-    """Normalize a track title for matching."""
-    if not title:
-        return ""
-    result = title
-    for pattern in _compiled_title_patterns:
-        result = pattern.sub("", result)
-    return _normalize_text(result)
-
-
-def _normalize_artist(artist: str) -> str:
-    """Normalize an artist name for matching."""
-    if not artist:
-        return ""
-    result = artist
-    for pattern in _compiled_artist_patterns:
-        result = pattern.sub("", result)
-    return _normalize_text(result)
+# Normalization lives in karaoke_decide.catalog.keys (shared with the catalog.db builder).
+_normalize_text = normalize_text
+_normalize_title = normalize_title
+_normalize_artist = normalize_artist
 
 
 @dataclass
@@ -168,9 +111,7 @@ class CatalogLookup:
 
     def _make_key(self, artist: str, title: str) -> str:
         """Create normalized lookup key from artist and title."""
-        norm_artist = _normalize_artist(artist)
-        norm_title = _normalize_title(title)
-        return f"{norm_artist}:{norm_title}"
+        return match_key(artist, title)
 
 
 # Global singleton instance
