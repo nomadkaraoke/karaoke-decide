@@ -32,6 +32,10 @@ MAX_BYTES_RECOMMENDATION = 5 * GIB
 # spotify_audio_features (estimate ~32 GiB, run once per candidates batch).
 MAX_BYTES_BATCH = 50 * GIB
 
+# Offline catalog.db build (karaoke_decide/catalog/bq_source.py); largest query is the
+# song-facets join (dry run 2026-10-21: all six queries total 42.9 GiB, largest 32.1 GiB; cap = 1.5x total).
+MAX_BYTES_CATALOG = 65 * GIB
+
 
 def default_query_job_config() -> bigquery.QueryJobConfig:
     """Client-wide default job config (merged into every query's config)."""
