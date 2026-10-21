@@ -2,6 +2,7 @@
 
 import hashlib
 from collections.abc import Generator
+from datetime import date
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -237,7 +238,9 @@ def test_claim_twice_404(api: TestClient, auth: AuthService) -> None:
 
 def test_claim_requires_gen_bearer(api: TestClient, fs: FakeFirestore, auth: AuthService) -> None:
     jwt_bearer = guest_jwt(auth, user_id=TARGET, guest=False)
-    resp = claim(api, guest_jwt(auth), bearer=jwt_bearer)
+    # Pin the date: after the legacy JWT sunset this would be 401, not 403.
+    with patch("backend.api.deps._today", return_value=date(2026, 11, 30)):
+        resp = claim(api, guest_jwt(auth), bearer=jwt_bearer)
     assert resp.status_code == 403
     assert resp.json()["detail"] == "requires_gen_session"
     assert GUEST in fs.cols["decide_users"]
