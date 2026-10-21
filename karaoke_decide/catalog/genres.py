@@ -1,5 +1,6 @@
 """Genre ids and the Spotify/MusicBrainz genre-string to quiz-genre-id map."""
 
+import re
 from collections.abc import Iterable
 
 # The 21 quiz genres plus "other" ("Something else"); matches decide web quiz/page.tsx.
@@ -64,17 +65,37 @@ _KEYWORDS_LONGEST_FIRST: tuple[tuple[str, str], ...] = tuple(
 )
 
 
+def _is_compound(keyword: str) -> bool:
+    return " " in keyword or "-" in keyword
+
+
 def map_genres(raw: Iterable[str]) -> list[str]:
     """Map raw genre strings to quiz genre ids.
 
     Every matching keyword contributes its id (``"classic rock"`` gives
-    ``["classic-rock", "rock"]``). Result is de-duplicated, ordered by first
-    match (longest keyword first within each input string).
+    ``["classic-rock", "rock"]``, ``"k-pop"`` gives ``["kpop", "pop"]``).
+    Compound keywords (containing a space or hyphen) decompose into their
+    parts, but a single-word keyword is atomic: a shorter keyword found only
+    inside it is ignored (``"reggaeton"`` gives ``["latin"]``, not reggae).
+    Result is de-duplicated, ordered by first match (longest keyword first).
     """
     result: list[str] = []
     for genre in raw:
         text = genre.lower()
+        atomic_spans = [
+            m.span()
+            for keyword, _ in _KEYWORDS_LONGEST_FIRST
+            if not _is_compound(keyword)
+            for m in re.finditer(re.escape(keyword), text)
+        ]
         for keyword, genre_id in _KEYWORDS_LONGEST_FIRST:
-            if keyword in text and genre_id not in result:
-                result.append(genre_id)
+            for m in re.finditer(re.escape(keyword), text):
+                start, end = m.span()
+                swallowed = any(
+                    (s, e) != (start, end) and s <= start and end <= e and e - s > end - start for s, e in atomic_spans
+                )
+                if not swallowed:
+                    if genre_id not in result:
+                        result.append(genre_id)
+                    break
     return result

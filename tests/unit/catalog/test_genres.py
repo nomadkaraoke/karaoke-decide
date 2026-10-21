@@ -30,3 +30,20 @@ def test_all_mapped_ids_are_valid() -> None:
 
 def test_empty_input() -> None:
     assert map_genres([]) == []
+
+
+def test_reggaeton_is_latin_only() -> None:
+    assert map_genres(["reggaeton"]) == ["latin"]
+
+
+def test_reggae_still_maps() -> None:
+    assert map_genres(["roots reggae"]) == ["reggae"]
+
+
+def test_dance_pop_and_ska_punk_exact() -> None:
+    assert map_genres(["dance pop"]) == ["electronic", "pop"]
+    assert map_genres(["ska punk"]) == ["punk", "ska"]
+
+
+def test_lowercases_input() -> None:
+    assert map_genres(["Classic Rock"]) == ["classic-rock", "rock"]

@@ -20,6 +20,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _quiz_genres(doc: dict[str, Any]) -> list[str]:
+    """Canonical quiz_genres; legacy quiz_genres_pref only when quiz_genres is absent/None.
+
+    An explicit empty list means the user cleared their genres, so it must not
+    fall back to stale legacy values.
+    """
+    genres = doc.get("quiz_genres")
+    if genres is None:
+        genres = doc.get("quiz_genres_pref")
+    return list(genres or [])
+
+
 class UserDataService:
     """Service for managing user data and preferences."""
 
@@ -151,7 +163,7 @@ class UserDataService:
         quiz_preferences = {
             "decade": user_data.get("quiz_decade_pref"),
             "energy": user_data.get("quiz_energy_pref"),
-            "genres": user_data.get("quiz_genres") or user_data.get("quiz_genres_pref") or [],
+            "genres": _quiz_genres(user_data),
         }
 
         return {
@@ -186,7 +198,7 @@ class UserDataService:
             "decade_preference": user_doc.get("quiz_decade_pref"),
             "energy_preference": user_doc.get("quiz_energy_pref"),
             # quiz_genres is canonical (what recommendations read); quiz_genres_pref is legacy.
-            "genres": user_doc.get("quiz_genres") or user_doc.get("quiz_genres_pref") or [],
+            "genres": _quiz_genres(user_doc),
             "decades": user_doc.get("quiz_decades") or [],
         }
 
