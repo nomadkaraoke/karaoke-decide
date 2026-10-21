@@ -1,5 +1,6 @@
 """Dependency injection for API routes."""
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -8,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.gen_session import GenSessionError, get_gen_session_validator, is_gen_token
 from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
@@ -42,12 +44,19 @@ async def get_auth_service_dep(
     return get_auth_service(settings, firestore)
 
 
+def _today() -> date:
+    return date.today()
+
+
 async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     settings: Annotated[BackendSettings, Depends(get_settings)],
     auth_service: Annotated[AuthService, Depends(get_auth_service_dep)],
 ) -> User:
-    """Get the current authenticated user from the JWT token.
+    """Get the current authenticated user from a gen session token or a legacy decide JWT.
+
+    Tokens without dots are gen session tokens (resolved to a decide profile);
+    dotted tokens are legacy decide JWTs, accepted until settings.legacy_jwt_sunset.
 
     Raises:
         HTTPException: If not authenticated or token is invalid.
@@ -56,6 +65,25 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = credentials.credentials
+    if is_gen_token(token):
+        try:
+            identity = await get_gen_session_validator().validate(token)
+        except GenSessionError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"gen_session_{e.reason}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return await auth_service.resolve_gen_user(identity.email)
+
+    if _today() > settings.legacy_jwt_sunset:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="legacy_token_expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

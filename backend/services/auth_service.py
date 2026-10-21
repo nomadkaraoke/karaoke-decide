@@ -175,6 +175,50 @@ class AuthService:
             last_sync_at=None,
         )
 
+    async def resolve_gen_user(self, email: str) -> User:
+        """Resolve a validated gen session email to its decide profile.
+
+        The profile lives at decide_users/{sha256(lowercase email)}, the same key
+        verified decide website users already use. Creates it on first sight and
+        stamps gen_linked_at once on existing profiles. is_admin comes from the
+        decide doc only (gen admin status is never imported).
+        """
+        email = email.lower()
+        email_hash = self._hash_email(email)
+        doc = await self.firestore.get_document(self.USERS_COLLECTION, email_hash)
+        now = datetime.now(UTC)
+
+        if doc is None:
+            user_id = self._generate_user_id()
+            doc = {
+                "user_id": user_id,
+                "email": email,
+                "display_name": None,
+                "is_guest": False,
+                "gen_linked_at": now.isoformat(),
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "total_songs_known": 0,
+                "total_songs_sung": 0,
+                "last_sync_at": None,
+            }
+            await self.firestore.set_document(self.USERS_COLLECTION, email_hash, doc)
+        elif not doc.get("gen_linked_at"):
+            await self.firestore.update_document(self.USERS_COLLECTION, email_hash, {"gen_linked_at": now.isoformat()})
+
+        return User(
+            id=doc["user_id"],
+            email=doc.get("email") or email,
+            display_name=doc.get("display_name"),
+            is_guest=False,
+            is_admin=doc.get("is_admin", False),
+            created_at=datetime.fromisoformat(doc["created_at"]),
+            updated_at=datetime.fromisoformat(doc["updated_at"]),
+            total_songs_known=doc.get("total_songs_known", 0),
+            total_songs_sung=doc.get("total_songs_sung", 0),
+            last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
+        )
+
     async def get_user_by_id(self, user_id: str) -> User | None:
         """Get a user by their user ID.
 
