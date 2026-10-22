@@ -1,6 +1,7 @@
 """Karaoke log: every song a Nomad Karaoke user sings, plus the optional post-song survey.
 
-Records live in ``karaoke_log/{id}``:
+Records live in ``karaoke_log/{user_id}:{id}`` (namespaced per user, so a guessed ``kj_`` id
+can never block or touch another singer's record); the API exposes ``id`` alone:
 
 * ``kj_…`` ids come from kjbox (server to server, ``upsert_partner`` / ``delete_partner``).
   kjbox owns the facts (state, artist/title, times, night, media); the user may set only
@@ -13,7 +14,7 @@ Counters. A record "counts" while its state is ``sung``/``sung_unplayed``, it is
 and it has artist + title. A counting record with a resolved ``song_key`` adds one to
 ``user_songs.times_sung``: the row ``{user_id}:{kn_id}`` when catalog.db maps the key to a
 KaraokeNerds id and that row exists, else ``loved_doc_id(user_id, song_key)`` (created with
-``source: karaoke_log`` when missing). Unresolved and ambiguous records count in
+``source: karaoke_log`` when missing). Unresolved records count in
 ``user_karaoke_unresolved/{user_id}:{sha1(song_key(artist, title))[:24]}`` instead, so
 nothing a singer sang goes missing. The log doc remembers which counter doc it added to
 (``counted``) and every change runs in one Firestore transaction, so a transition counts
@@ -113,6 +114,12 @@ def unresolved_doc_id(user_id: str, artist: str, title: str) -> str:
     """``user_karaoke_unresolved`` doc id: spelling variants of one song share it. Never has ``/``."""
     digest = hashlib.sha1(make_song_key(artist, title).encode()).hexdigest()[:24]  # noqa: S324  (id, not security)
     return f"{user_id}:{digest}"
+
+
+def log_doc_id(user_id: str, entry_id: str) -> str:
+    """``karaoke_log`` doc id: namespaced by user, so ids (guessable ``kj_`` ones included) never
+    collide across users. The API still exposes ``id = entry_id``."""
+    return f"{user_id}:{entry_id}"
 
 
 def email_hash(email: str) -> str:
@@ -325,10 +332,9 @@ class KaraokeLogService:
         if hit is not None:
             kn_key = reader.kn_song_keys([hit.id]).get(hit.id)
         direct = make_song_key(artist, title)
-        direct_ok = reader.has_karaoke_key(direct)
-        if kn_key and direct_ok and kn_key != direct:
-            return None, "ambiguous"  # two catalog songs compete; counted separately, retried later
-        key = kn_key or (direct if direct_ok else None)
+        # The exact identity key is the most precise answer ("Song (Live)" stays the live song even
+        # though the looser KaraokeNerds match_key lands on the studio row), so it wins.
+        key = direct if reader.has_karaoke_key(direct) else kn_key
         return (key, "resolved") if key else (None, "unresolved")
 
     async def resolve(self, artist: str, title: str, budget_s: float | None = None) -> tuple[str | None, str]:
@@ -376,19 +382,19 @@ class KaraokeLogService:
 
     # ------------------------------------------------------------ the transaction
 
-    async def _transact(self, entry_id: str, build: Callable[[dict[str, Any] | None], dict[str, Any] | None]) -> Any:
+    async def _transact(self, doc_id: str, build: Callable[[dict[str, Any] | None], dict[str, Any] | None]) -> Any:
         """Read the log doc, ``build`` its new contents (None = no change), move counters, write.
 
         ``build`` must be pure: Firestore may run this more than once."""
         kn_cache: dict[str, int | None] = {}
 
-        def kn_for(key: str) -> int | None:
-            if key not in kn_cache:
-                kn_cache[key] = self._kn_id(key)
+        async def kn_for(key: str) -> int | None:
+            if key not in kn_cache:  # SQLite: off the event loop
+                kn_cache[key] = await asyncio.to_thread(self._kn_id, key)
             return kn_cache[key]
 
         async def body(txn: Transaction) -> dict[str, Any] | None:
-            cur = await txn.get(LOG_COLLECTION, entry_id)
+            cur = await txn.get(LOG_COLLECTION, doc_id)
             new = build(cur)
             if new is None:
                 return cur
@@ -398,7 +404,7 @@ class KaraokeLogService:
             if _counts(new):
                 user_id = new["user_id"]
                 if new.get("song_key_status") == "resolved" and new.get("song_key"):
-                    kn = kn_for(new["song_key"])
+                    kn = await kn_for(new["song_key"])
                     if kn is not None:
                         kn_target = (USER_SONGS_COLLECTION, f"{user_id}:{kn}")
                         reads[kn_target] = await txn.get(*kn_target)
@@ -424,7 +430,7 @@ class KaraokeLogService:
                 if new_target is not None:
                     txn.set(*new_target, _inc(reads[new_target], new_target, new, now))
             new["counted"] = {"collection": new_target[0], "doc_id": new_target[1]} if new_target else None
-            txn.set(LOG_COLLECTION, entry_id, new)
+            txn.set(LOG_COLLECTION, doc_id, new)
             return new
 
         return await self.db.run_transaction(body)
@@ -485,16 +491,15 @@ class KaraokeLogService:
         ``app_`` ids: every field. ``kj_`` ids: ``survey`` and ``deleted`` only (else ``NotOwnerError``)."""
         _check_id(entry_id)
         patch = _user_patch(entry_id, patch)
+        if "deleted" in patch and not isinstance(patch["deleted"], bool):
+            raise KaraokeLogInvalidError("deleted must be true or false")
         is_kj = entry_id.startswith("kj_")
-        pre = await self.db.get_document(LOG_COLLECTION, entry_id)
-        if pre is not None and pre.get("user_id") != user_id:
-            raise NotOwnerError(entry_id)
+        doc_id = log_doc_id(user_id, entry_id)
+        pre = await self.db.get_document(LOG_COLLECTION, doc_id)
         resolution = None if is_kj else await self._resolution(pre, patch, "user")
 
         def build(cur: dict[str, Any] | None) -> dict[str, Any]:
             now = _now()
-            if cur is not None and cur.get("user_id") != user_id:
-                raise NotOwnerError(entry_id)
             if cur is None:
                 if not is_kj and not (patch.get("state") and patch.get("artist") and patch.get("title")):
                     raise KaraokeLogInvalidError("a new app entry needs state, artist and title")
@@ -514,12 +519,15 @@ class KaraokeLogService:
             cur = dict(cur)
             if email and not cur.get("email_hash"):
                 cur["email_hash"] = email_hash(email)
-            if "deleted" in patch:
-                cur["deleted"] = bool(patch["deleted"])
-                cur["deleted_by"] = "user" if cur["deleted"] else None
+            if patch.get("deleted") is True:
+                cur["deleted"], cur["deleted_by"] = True, "user"
+            elif patch.get("deleted") is False and cur.get("deleted_by") != "partner":
+                # Only the user's own delete is undone here: the host's undo (partner delete) wins
+                # over a stale outbox replay or a full-record save that carries deleted: false.
+                cur["deleted"], cur["deleted_by"] = False, None
             return self._apply_facts(cur, {k: v for k, v in patch.items() if k != "deleted"}, resolution, now)
 
-        return self._entry(await self._transact(entry_id, build), entry_id)
+        return self._entry(await self._transact(doc_id, build), entry_id)
 
     async def delete(self, user_id: str, entry_id: str) -> KaraokeLogEntry:
         """Soft delete by the user (``DELETE /api/my/karaoke-log/{id}``); reverses its count."""
@@ -528,11 +536,9 @@ class KaraokeLogService:
         def build(cur: dict[str, Any] | None) -> dict[str, Any]:
             if cur is None:
                 raise KaraokeLogNotFoundError(entry_id)
-            if cur.get("user_id") != user_id:
-                raise NotOwnerError(entry_id)
             return {**cur, "deleted": True, "deleted_by": "user", "updated_at": _now()}
 
-        return self._entry(await self._transact(entry_id, build), entry_id)
+        return self._entry(await self._transact(log_doc_id(user_id, entry_id), build), entry_id)
 
     # ------------------------------------------------------------ kjbox (partner) writes
 
@@ -552,16 +558,12 @@ class KaraokeLogService:
         user_id = await self._partner_user(email)
         ehash = email_hash(email)
         facts = _partner_patch(patch)
-        pre = await self.db.get_document(LOG_COLLECTION, entry_id)
-        if pre is not None and pre.get("user_id") != user_id:
-            pre = None  # a placeholder someone else wrote; kjbox's attribution wins
+        doc_id = log_doc_id(user_id, entry_id)
+        pre = await self.db.get_document(LOG_COLLECTION, doc_id)
         resolution = await self._resolution(pre, facts, "partner")
 
         def build(cur: dict[str, Any] | None) -> dict[str, Any]:
             now = _now()
-            if cur is not None and cur.get("user_id") != user_id:
-                logger.warning("karaoke-log %s: replacing a placeholder written by another user", entry_id)
-                cur = {**cur, "user_id": user_id, "survey": None, "deleted": False, "deleted_by": None}
             if cur is None:
                 cur = {
                     "id": entry_id,
@@ -580,7 +582,7 @@ class KaraokeLogService:
                 cur["deleted"], cur["deleted_by"] = False, None
             return self._apply_facts(cur, facts, resolution, now)
 
-        return self._entry(await self._transact(entry_id, build), entry_id)
+        return self._entry(await self._transact(doc_id, build), entry_id)
 
     async def delete_partner(self, email: str, entry_id: str) -> KaraokeLogEntry | None:
         """kjbox un-done (``DELETE /api/partner/kjbox/karaoke-log/{id}``). Idempotent; None if unknown."""
@@ -590,17 +592,17 @@ class KaraokeLogService:
         user_id = await self._partner_user(email)
 
         def build(cur: dict[str, Any] | None) -> dict[str, Any] | None:
-            if cur is None or cur.get("user_id") != user_id or cur.get("deleted"):
+            if cur is None or cur.get("deleted"):
                 return None
             return {**cur, "deleted": True, "deleted_by": "partner", "updated_at": _now()}
 
-        doc = await self._transact(entry_id, build)
+        doc = await self._transact(log_doc_id(user_id, entry_id), build)
         return self._entry(doc, entry_id) if doc is not None else None
 
     # ------------------------------------------------------------ retry + listing
 
     async def retry_unresolved(self, user_id: str) -> int:
-        """Re-resolve the user's unresolved/ambiguous records (call after a catalog refresh or on
+        """Re-resolve the user's unresolved records (call after a catalog refresh or on
         the user's next sync). Moves their counts to ``user_songs``. Returns how many resolved."""
         docs = await self.db.query_documents(LOG_COLLECTION, filters=[("user_id", "==", user_id)])
         resolved = 0
@@ -622,7 +624,7 @@ class KaraokeLogService:
                     return None
                 return {**cur, "song_key": k, "song_key_status": "resolved", "updated_at": _now()}
 
-            after = await self._transact(doc["id"], build)
+            after = await self._transact(log_doc_id(user_id, doc["id"]), build)
             if after is not None and after.get("song_key") == key:
                 resolved += 1
         return resolved

@@ -19,6 +19,7 @@ from backend.services.karaoke_log_service import (
     KaraokeLogNotFoundError,
     KaraokeLogService,
     NotOwnerError,
+    log_doc_id,
     unresolved_doc_id,
 )
 from backend.services.song_feedback_service import loved_doc_id
@@ -100,8 +101,8 @@ class MemoryFirestore:
         txn.commit()
         return result
 
-    def log(self, doc_id: str) -> dict[str, Any]:
-        return self.cols[LOG_COLLECTION][doc_id]
+    def log(self, entry_id: str, user_id: str = USER) -> dict[str, Any]:
+        return self.cols[LOG_COLLECTION][log_doc_id(user_id, entry_id)]
 
     def user_songs(self) -> dict[str, dict[str, Any]]:
         return self.cols.get("user_songs", {})
@@ -353,14 +354,15 @@ async def test_resolve_catalog_warming_up(fs: MemoryFirestore) -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_direct_key_and_ambiguous(svc: KaraokeLogService, reader: FakeReader) -> None:
+async def test_resolve_direct_key_wins(svc: KaraokeLogService, reader: FakeReader) -> None:
     assert await svc.resolve("The Lanterns", "Paper Harbour") == (HELLO_KEY, "resolved")
     reader.karaoke_keys.add(make_song_key("Solo Act", "Only Here"))
     assert await svc.resolve("Solo Act", "Only Here") == (make_song_key("Solo Act", "Only Here"), "resolved")
-    # The KaraokeNerds match and the direct key name two different catalog songs.
+    # The KaraokeNerds match and the exact key name two different catalog songs: the exact key wins.
     reader.add_kn(9, "Twin", "Mirror", "twin|mirror (other)")
+    assert await svc.resolve("Twin", "Mirror") == ("twin|mirror (other)", "resolved")
     reader.karaoke_keys.add(make_song_key("Twin", "Mirror"))
-    assert await svc.resolve("Twin", "Mirror") == (None, "ambiguous")
+    assert await svc.resolve("Twin", "Mirror") == (make_song_key("Twin", "Mirror"), "resolved")
     assert await svc.resolve("", "Mirror") == (None, "unresolved")
 
 
@@ -430,10 +432,9 @@ async def test_user_cannot_overwrite_kjbox_facts(svc: KaraokeLogService, fs: Mem
     assert (doc["state"], doc["artist"], doc["title"]) == ("sung", "The Lanterns", "Paper Harbour")
     assert doc.get("survey") is None
     # another user can't touch this record at all
-    with pytest.raises(NotOwnerError):
-        await svc.upsert_user("user_b", KJ_ID, {"survey": {"feel": "bad"}})
-    with pytest.raises(NotOwnerError):
+    with pytest.raises(KaraokeLogNotFoundError):
         await svc.delete("user_b", KJ_ID)
+    assert fs.log(KJ_ID)["deleted"] is False
     # the owner may set survey and deleted
     entry = await svc.upsert_user(USER, KJ_ID, {"survey": {"feel": "ok"}, "deleted": True})
     assert entry.deleted is True and entry.survey is not None and entry.survey.feel == "ok"
@@ -507,3 +508,54 @@ async def test_list_for_user_filters_and_pages(svc: KaraokeLogService, fs: Memor
 
     with pytest.raises(KaraokeLogInvalidError):
         await svc.list_for_user(USER, cursor="garbage")
+
+
+@pytest.mark.asyncio
+async def test_user_undelete_does_not_revive_host_undo(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    await svc.delete_partner(EMAIL, KJ_ID)  # host un-does Done
+    assert row_id not in fs.user_songs()
+    # a stale outbox replay / full-record survey save carrying deleted: false
+    entry = await svc.upsert_user(USER, KJ_ID, {"survey": {"feel": "great"}, "deleted": False})
+    assert entry.deleted is True and fs.log(KJ_ID)["deleted_by"] == "partner"
+    assert row_id not in fs.user_songs()
+    assert fs.cols.get(UNRESOLVED_COLLECTION, {}) == {}
+    # the user's own delete can still be undone by the user
+    await svc.upsert_user(USER, APP_ID, _app_entry())
+    await svc.delete(USER, APP_ID)
+    assert row_id not in fs.user_songs()
+    assert (await svc.upsert_user(USER, APP_ID, {"deleted": False})).deleted is False
+    assert fs.user_songs()[row_id]["times_sung"] == 1
+
+
+@pytest.mark.asyncio
+async def test_deleted_must_be_bool(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    await svc.upsert_user(USER, APP_ID, _app_entry())
+    for bad in ("false", 0, 1, None):
+        with pytest.raises(KaraokeLogInvalidError):
+            await svc.upsert_user(USER, APP_ID, {"deleted": bad})
+    assert fs.log(APP_ID)["deleted"] is False
+
+
+@pytest.mark.asyncio
+async def test_other_user_cannot_squat_a_kj_id(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    # user B writes first to A's (guessable) kj_ id
+    squat = await svc.upsert_user("user_b", KJ_ID, {"survey": {"feel": "bad", "notes": "mine now"}, "deleted": True})
+    assert squat.user_id == "user_b"
+    # then kjbox delivers A's song
+    a = await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    assert a.id == KJ_ID and a.user_id == USER
+    assert a.state == "sung" and a.deleted is False and a.survey is None
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["times_sung"] == 1
+    # B's writes and deletes only ever reach B's own (never-listed) placeholder
+    await svc.upsert_user("user_b", KJ_ID, {"survey": {"feel": "ok"}, "deleted": False})
+    await svc.delete("user_b", KJ_ID)
+    doc = fs.log(KJ_ID)
+    assert doc["user_id"] == USER and doc["deleted"] is False and doc.get("survey") is None
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["times_sung"] == 1
+    assert (await svc.list_for_user("user_b")) == ([], None)
+    assert [e.id for e in (await svc.list_for_user(USER))[0]] == [KJ_ID]
+    # A's own survey lands on A's record
+    mine = await svc.upsert_user(USER, KJ_ID, {"survey": {"feel": "great"}})
+    assert mine.survey is not None and mine.survey.feel == "great"
