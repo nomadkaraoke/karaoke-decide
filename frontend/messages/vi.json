@@ -17,16 +17,11 @@
     "signIn": "Đăng nhập",
     "createAccount": "Tạo tài khoản",
     "logOut": "Đăng xuất",
-    "clearSession": "Xóa phiên",
-    "guest": "Khách",
-    "guestSession": "Phiên khách",
-    "createAccountToSaveProgress": "Tạo tài khoản để lưu tiến trình",
     "theme": "Giao diện",
     "backToApp": "Quay lại ứng dụng",
     "openMenu": "Mở menu",
     "closeMenu": "Đóng menu",
-    "profileSettings": "Cài đặt hồ sơ",
-    "clearSessionTitle": "Xóa phiên"
+    "profileSettings": "Cài đặt hồ sơ"
   },
   "home": {
     "heroTitle": "Dễ dàng chọn",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "để hát",
     "heroSubtitle": "Tìm những bài hát bạn biết, thực sự có thể hát và mọi người sẽ thích. Đề xuất được cá nhân hóa trong 30 giây.",
     "findYourSong": "Tìm bài hát của bạn",
-    "trustSignal": "Miễn phí • Không cần đăng ký • Mất 30 giây",
-    "failedToStart": "Không thể bắt đầu. Vui lòng thử lại.",
+    "trustSignal": "Miễn phí • Chỉ mất 30 giây",
     "soundFamiliar": "Nghe quen không?",
     "soundFamiliarSubtitle": "Bạn đang đi hát karaoke, lật qua cuốn danh sách bài hát, và...",
     "problemNothingTitle": "Không có gì nổi bật",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Chào mừng trở lại",
-    "signInSubtitle": "Đăng nhập để truy cập các bài hát và đề xuất của bạn",
     "emailLabel": "Địa chỉ email",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "Gửi Magic Link",
-    "noPasswordNeeded": "Không cần mật khẩu. Chúng tôi sẽ gửi cho bạn một liên kết an toàn để đăng nhập.",
     "or": "hoặc",
     "justWantToBrowse": "Chỉ muốn xem qua? Không cần tài khoản.",
     "browseSongs": "Duyệt bài hát",
-    "failedToSendMagicLink": "Không thể gửi magic link. Vui lòng thử lại.",
-    "checkYourEmail": "Kiểm tra email của bạn!",
-    "magicLinkSentTo": "Chúng tôi đã gửi một magic link đến",
-    "linkExpiresIn15": "Nhấp vào liên kết trong email của bạn để đăng nhập. Liên kết sẽ hết hạn sau 15 phút.",
     "useDifferentEmail": "Sử dụng email khác",
     "backToHome": "Quay lại trang chủ",
-    "verifyingLink": "Đang xác minh liên kết của bạn...",
-    "pleaseWait": "Vui lòng đợi một lát",
-    "youreSignedIn": "Bạn đã đăng nhập!",
-    "redirectingToSongs": "Đang chuyển hướng bạn đến các bài hát của bạn...",
-    "connectionError": "Lỗi kết nối",
-    "verificationFailed": "Xác minh thất bại",
-    "noTokenFound": "Không tìm thấy mã thông báo xác minh. Vui lòng yêu cầu một magic link mới.",
-    "linkExpired": "Magic link này đã hết hạn. Vui lòng yêu cầu một liên kết mới.",
-    "linkAlreadyUsed": "Magic link này đã được sử dụng. Vui lòng yêu cầu một liên kết mới.",
-    "failedToVerify": "Không thể xác minh mã thông báo. Nó có thể đã hết hạn hoặc đã được sử dụng.",
-    "troubleshootingTips": "Mẹo khắc phục sự cố:",
-    "tipMobileData": "Thử sử dụng dữ liệu di động thay vì WiFi",
-    "tipDisableVpn": "Tắt VPN hoặc tiện ích chặn quảng cáo",
-    "tipIncognito": "Thử mở trong chế độ ẩn danh/riêng tư",
-    "tipCorporateNetwork": "Kiểm tra xem bạn có đang sử dụng mạng công ty hoặc trường học không",
-    "retryAgainCount": "Thử lại ({count})",
-    "requestNewLink": "Yêu cầu liên kết mới",
-    "backToHomeCaps": "Quay lại trang chủ"
+    "codeExpired": "Mã xác nhận đã hết hạn. Vui lòng yêu cầu mã mới.",
+    "codeLabel": "Mã gồm 6 chữ số",
+    "codeResent": "Mã mới đang được gửi đến bạn.",
+    "codeSentTo": "Chúng tôi đã gửi mã 6 chữ số đến email",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "enterCode": "Nhập mã của bạn",
+    "failedToSendCode": "Không thể gửi mã. Vui lòng thử lại.",
+    "failedToVerifyCode": "Không thể xác minh mã. Vui lòng thử lại.",
+    "googleSignInFailed": "Đăng nhập bằng Google không thành công. Vui lòng thử lại.",
+    "invalidCode": "Mã không chính xác. Vui lòng kiểm tra lại.",
+    "resendCode": "Gửi mã mới",
+    "sendCode": "Gửi mã qua email cho tôi",
+    "signInHint": "Không cần mật khẩu. Chúng tôi sẽ gửi mã 6 chữ số qua email để bạn đăng nhập vào tài khoản Nomad Karaoke.",
+    "signInToGetPicks": "Đăng nhập để nhận gợi ý bài hát karaoke dành riêng cho bạn",
+    "tooManyAttempts": "Bạn đã thử quá nhiều lần. Vui lòng yêu cầu mã mới.",
+    "verifyCode": "Xác minh và đăng nhập",
+    "importedGuestData": "Chúng tôi đã chuyển các câu trả lời câu đố và bài hát vào tài khoản của bạn."
   },
   "quiz": {
     "startingQuiz": "Đang bắt đầu trắc nghiệm...",
@@ -182,28 +168,8 @@
     "selected": "Đã chọn {count}",
     "findingMoreArtists": "Đang tìm thêm nghệ sĩ bạn có thể biết...",
     "noMoreArtists": "Không còn nghệ sĩ nào để hiển thị",
-    "almostThere": "Sắp xong rồi!",
-    "enterEmailToSave": "Nhập email của bạn để lưu các đề xuất.",
-    "generatingRecs": "Đang tạo đề xuất của bạn...",
-    "analyzingTaste": "Đang phân tích gu âm nhạc của bạn",
-    "recsReady": "Đề xuất đã sẵn sàng!",
-    "personalizedListWaiting": "Danh sách bài hát được cá nhân hóa của bạn đang chờ",
-    "waitingToGenerate": "Đang chờ để tạo...",
-    "startShortly": "Quá trình này sẽ bắt đầu ngay",
-    "yourEmail": "Email của bạn",
     "emailSaved": "Đã lưu email!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "Lưu",
-    "pleaseEnterEmail": "Vui lòng nhập email của bạn",
-    "pleaseEnterValidEmail": "Vui lòng nhập một email hợp lệ",
-    "failedToSaveEmail": "Không thể lưu email",
     "skipForNow": "Bỏ qua lúc này",
-    "emailSavedSuccess": "Đã lưu email thành công!",
-    "viewRecommendations": "Xem đề xuất của tôi",
-    "emailUpdatesHint": "Chúng tôi sẽ gửi cho bạn thông tin cập nhật về các đề xuất của bạn. Cam kết không có thư rác.",
-    "generatingRecommendationsButton": "Đang tạo đề xuất...",
-    "enterEmailToContinue": "Nhập email của bạn để tiếp tục",
-    "pleaseEnterEmailAbove": "Vui lòng nhập email của bạn ở trên để xem các đề xuất",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Không có bài hát được yêu thích nào khớp với bộ lọc hiện tại",
     "viewMySongs": "Xem bài hát của tôi",
     "syncMoreMusic": "Đồng bộ thêm nhạc",
-    "tryAgain": "Thử lại"
+    "tryAgain": "Thử lại",
+    "libraryAny": "Mọi thư viện",
+    "libraryCommunity": "Phiên bản cộng đồng",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Danh mục KaraFun / Karaoke Version",
+    "libraryLabel": "Thư viện karaoke",
+    "loadMore": "Tải thêm",
+    "loadingMore": "Đang tải…",
+    "noMatchDescription": "Hãy thử bỏ bớt một hoặc hai bộ lọc để xem thêm bài hát.",
+    "noMatchTitle": "Không có gợi ý nào khớp với các bộ lọc này",
+    "sortAz": "A đến Z",
+    "sortBest": "Phù hợp nhất với bạn",
+    "sortLabel": "Sắp xếp theo",
+    "sortNewest": "Mới nhất",
+    "sortOldest": "Cũ nhất",
+    "sortPopular": "Phổ biến nhất",
+    "sortShortest": "Ngắn nhất",
+    "warmingDescription": "Chúng tôi đang khởi động hệ thống. Quá trình này thường mất chưa tới một phút và hệ thống sẽ tự động thử lại.",
+    "warmingTitle": "Đang chuẩn bị gợi ý cho bạn…"
   },
   "myData": {
     "title": "Dữ liệu của tôi",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Phản hồi & Tinh chỉnh",
     "feedbackDesc": "Sắp ra mắt: Yêu thích/ẩn bài hát, quãng giọng, và hơn thế nữa!",
     "dataPowersRecs": "Dữ liệu này cung cấp sức mạnh cho các đề xuất karaoke được cá nhân hóa của bạn.",
-    "createAccountToSync": "Tạo tài khoản",
-    "toSyncServices": "để đồng bộ các dịch vụ âm nhạc của bạn.",
     "moreDataBetterRecs": "Thêm dữ liệu = đề xuất tốt hơn.",
     "takeTheQuiz": "Làm trắc nghiệm",
     "orConnectMore": "hoặc kết nối thêm dịch vụ.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Tìm kiếm bài hát để thêm...",
     "noSongsYet": "Chưa có bài hát nào",
     "noSongsYetDesc": "Tìm kiếm ở trên để thêm những bài hát bạn biết và thích hát!",
-    "connectYourServices": "Kết nối các dịch vụ âm nhạc của bạn",
-    "connectServicesGuestDesc": "Tạo tài khoản để kết nối Spotify và Last.fm nhằm nhận đề xuất được cá nhân hóa dựa trên lịch sử nghe nhạc của bạn.",
-    "createAccount": "Tạo tài khoản",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Đã kết nối",
@@ -465,7 +444,6 @@
     "profileSection": "Hồ sơ",
     "yourAccountInfo": "Thông tin tài khoản của bạn",
     "emailLabel": "Email",
-    "guestSession": "Phiên khách",
     "displayNameLabel": "Tên hiển thị",
     "displayNamePlaceholder": "Chúng tôi nên gọi bạn là gì?",
     "profileUpdated": "Đã cập nhật hồ sơ!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Chưa kết nối dịch vụ nào",
     "servicesConnectedCount": "Đã kết nối {count} dịch vụ",
     "logOutSection": "Đăng xuất",
-    "clearGuestSession": "Xóa phiên khách của bạn",
     "signOutOfAccount": "Đăng xuất khỏi tài khoản của bạn",
     "dangerZone": "Khu vực nguy hiểm",
     "irreversibleActions": "Các hành động không thể hoàn tác",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Bạn có chắc không? Thao tác này sẽ xóa vĩnh viễn tài khoản và tất cả dữ liệu của bạn. Hành động này không thể hoàn tác.",
     "yesDeleteAccount": "Có, Xóa tài khoản của tôi",
     "deleteNotAvailable": "Tính năng xóa tài khoản hiện chưa khả dụng. Vui lòng liên hệ bộ phận hỗ trợ nếu bạn cần xóa tài khoản.",
-    "clearSession": "Xóa phiên",
     "logOut": "Đăng xuất",
     "accountId": "ID tài khoản: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} thương hiệu",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KINH ĐIỂN"
+      "classic": "KINH ĐIỂN",
+      "community": "Cộng đồng",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Tôi thích hát bài này",
@@ -664,18 +642,6 @@
       "comfortEasy": "Dễ",
       "comfortComfortable": "Thoải mái",
       "comfortChallenging": "Thử thách"
-    },
-    "postQuizEmail": {
-      "almostThere": "Sắp xong rồi!",
-      "enterEmailToSeeRecs": "Nhập email của bạn để xem các đề xuất được cá nhân hóa",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "Địa chỉ email",
-      "invalidEmail": "Vui lòng nhập một địa chỉ email hợp lệ",
-      "failedToSaveEmail": "Không thể lưu email",
-      "saving": "Đang lưu...",
-      "continue": "Tiếp tục",
-      "updateNote": "Chúng tôi sẽ gửi cho bạn thông tin cập nhật về các đề xuất của bạn.",
-      "noSpam": "Chúng tôi cam kết không gửi thư rác."
     },
     "stickyFinish": {
       "artistSelected": "Đã chọn {count} nghệ sĩ",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Kết nối Spotify và Last.fm",
       "syncListeningHistory": "Đồng bộ lịch sử nghe nhạc của bạn",
       "saveProgressAcrossDevices": "Lưu tiến trình của bạn trên các thiết bị",
-      "createAndManagePlaylists": "Tạo và quản lý danh sách phát"
+      "createAndManagePlaylists": "Tạo và quản lý danh sách phát",
+      "createAccount": "Đăng nhập hoặc tạo tài khoản"
     },
     "artistSearch": {
       "placeholder": "Tìm kiếm nghệ sĩ để thêm...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Dịch vụ đã kết nối",
-      "createAccountToConnect": "Tạo tài khoản để kết nối",
-      "connectMusicServicesTitle": "Kết nối các dịch vụ âm nhạc của bạn",
-      "connectMusicServicesDesc": "Tạo tài khoản để kết nối Spotify và Last.fm nhằm nhận đề xuất được cá nhân hóa.",
-      "musicServicesFeature": "Dịch vụ âm nhạc",
       "noServicesConnected": "Chưa kết nối dịch vụ nào",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" không có bài hát nào đọc được. Bạn hãy thử một danh sách phát khác nhé.",
     "errorTooManyImports": "Bạn đang nhập danh sách phát quá nhanh. Vui lòng đợi một phút rồi thử lại nhé.",
     "inputLabel": "Liên kết danh sách phát YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Khuấy động không khí",
+      "decade_match": "Từ thập niên bạn thích",
+      "genre_match": "Hợp thể loại nhạc bạn thích",
+      "known_artist": "Từ nghệ sĩ bạn yêu thích",
+      "known_song": "Bài quen thuộc với bạn",
+      "make_it": "Tạo bản karaoke",
+      "similar_artist": "Tương tự {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tất cả bài hát phù hợp, theo thứ tự bạn đã chọn",
+        "title": "Tất cả gợi ý"
+      },
+      "artists_you_love": {
+        "reason": "Thêm bài hát từ các nghệ sĩ bạn hay nghe",
+        "title": "Từ nghệ sĩ bạn yêu thích"
+      },
+      "because": {
+        "reason": "Các bài hát mà người hâm mộ {artist} hay hát",
+        "title": "Vì bạn thích {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Những bài hát khiến cả phòng cùng hòa giọng",
+        "title": "Khuấy động không khí"
+      },
+      "make_it": {
+        "reason": "Chưa có bản karaoke. Chúng tôi có thể tạo một bản cho bạn",
+        "title": "Tạo bản karaoke"
+      },
+      "songs_you_know": {
+        "reason": "Bản karaoke của các bài hát trong thư viện của bạn",
+        "title": "Bài hát bạn đã biết"
+      }
+    }
   }
 }

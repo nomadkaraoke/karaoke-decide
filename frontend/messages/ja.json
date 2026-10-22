@@ -17,16 +17,11 @@
     "signIn": "ログイン",
     "createAccount": "アカウント作成",
     "logOut": "ログアウト",
-    "clearSession": "セッションをクリア",
-    "guest": "ゲスト",
-    "guestSession": "ゲストセッション",
-    "createAccountToSaveProgress": "アカウントを作成して進行状況を保存",
     "theme": "テーマ",
     "backToApp": "アプリに戻る",
     "openMenu": "メニューを開く",
     "closeMenu": "メニューを閉じる",
-    "profileSettings": "プロフィール設定",
-    "clearSessionTitle": "セッションをクリア"
+    "profileSettings": "プロフィール設定"
   },
   "home": {
     "heroTitle": "次に歌う",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "を簡単に見つけよう",
     "heroSubtitle": "あなたが知っていて、実際に歌えて、みんなが盛り上がる曲を見つけましょう。たった30秒であなたにぴったりのおすすめをご提案します。",
     "findYourSong": "曲を見つける",
-    "trustSignal": "無料 • 登録不要 • たった30秒",
-    "failedToStart": "開始できませんでした。もう一度お試しください。",
+    "trustSignal": "無料 • 所要時間はたったの30秒",
     "soundFamiliar": "こんな経験ありませんか？",
     "soundFamiliarSubtitle": "カラオケで選曲本をめくりながら、こんな風に悩んでいませんか...",
     "problemNothingTitle": "ピンとくる曲がない",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "おかえりなさい",
-    "signInSubtitle": "ログインして、あなたの曲やおすすめにアクセスしましょう",
     "emailLabel": "メールアドレス",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "マジックリンクを送信",
-    "noPasswordNeeded": "パスワードは不要です。安全なログインリンクをお送りします。",
     "or": "または",
     "justWantToBrowse": "見るだけにしますか？アカウントは不要です。",
     "browseSongs": "曲を探す",
-    "failedToSendMagicLink": "マジックリンクの送信に失敗しました。もう一度お試しください。",
-    "checkYourEmail": "メールをご確認ください！",
-    "magicLinkSentTo": "マジックリンクを送信しました: ",
-    "linkExpiresIn15": "メール内のリンクをクリックしてログインしてください。リンクの有効期限は15分です。",
     "useDifferentEmail": "別のメールアドレスを使用する",
     "backToHome": "ホームに戻る",
-    "verifyingLink": "リンクを検証しています...",
-    "pleaseWait": "少々お待ちください",
-    "youreSignedIn": "ログインしました！",
-    "redirectingToSongs": "あなたの曲のページへリダイレクトしています...",
-    "connectionError": "接続エラー",
-    "verificationFailed": "検証に失敗しました",
-    "noTokenFound": "検証トークンが見つかりません。新しいマジックリンクをリクエストしてください。",
-    "linkExpired": "このマジックリンクは期限切れです。新しいリンクをリクエストしてください。",
-    "linkAlreadyUsed": "このマジックリンクはすでに使用されています。新しいリンクをリクエストしてください。",
-    "failedToVerify": "トークンの検証に失敗しました。期限切れか、すでに使用されている可能性があります。",
-    "troubleshootingTips": "トラブルシューティング:",
-    "tipMobileData": "Wi-Fiの代わりにモバイルデータ通信を使用してみてください",
-    "tipDisableVpn": "VPNや広告ブロック拡張機能を無効にしてください",
-    "tipIncognito": "シークレット/プライベートモードで開いてみてください",
-    "tipCorporateNetwork": "企業や学校のネットワークに接続していないか確認してください",
-    "retryAgainCount": "再試行 ({count})",
-    "requestNewLink": "新しいリンクをリクエスト",
-    "backToHomeCaps": "ホームに戻る"
+    "codeExpired": "認証コードの有効期限が切れています。新しいコードをリクエストしてください。",
+    "codeLabel": "6桁のコード",
+    "codeResent": "新しいコードを送信しました。",
+    "codeSentTo": "次のアドレスに6桁のコードをメールで送信しました：",
+    "continueWithGoogle": "Googleで続ける",
+    "enterCode": "コードを入力",
+    "failedToSendCode": "コードを送信できませんでした。もう一度お試しください。",
+    "failedToVerifyCode": "コードを確認できませんでした。もう一度お試しください。",
+    "googleSignInFailed": "Googleサインインに失敗しました。もう一度お試しください。",
+    "invalidCode": "コードが正しくありません。確認の上、もう一度お試しください。",
+    "resendCode": "新しいコードを送信",
+    "sendCode": "メールでコードを受け取る",
+    "signInHint": "パスワードは不要です。Nomad Karaokeアカウントにサインインするための6桁のコードをメールでお送りします。",
+    "signInToGetPicks": "サインインして、あなたへのおすすめ曲をチェック",
+    "tooManyAttempts": "試行回数が上限を超えました。新しいコードをリクエストしてください。",
+    "verifyCode": "認証してサインイン",
+    "importedGuestData": "クイズの回答と曲のデータをアカウントに移行しました。"
   },
   "quiz": {
     "startingQuiz": "クイズを開始しています...",
@@ -182,28 +168,8 @@
     "selected": "{count}個選択済み",
     "findingMoreArtists": "あなたが知っていそうなアーティストをさらに探しています...",
     "noMoreArtists": "表示するアーティストはもうありません",
-    "almostThere": "あと少しです！",
-    "enterEmailToSave": "おすすめを保存するためにメールアドレスを入力してください。",
-    "generatingRecs": "おすすめを生成しています...",
-    "analyzingTaste": "あなたの音楽の好みを分析しています",
-    "recsReady": "おすすめの準備ができました！",
-    "personalizedListWaiting": "あなた専用の曲リストが待っています",
-    "waitingToGenerate": "生成待機中...",
-    "startShortly": "まもなく開始されます",
-    "yourEmail": "メールアドレス",
     "emailSaved": "メールアドレスを保存しました！",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "保存",
-    "pleaseEnterEmail": "メールアドレスを入力してください",
-    "pleaseEnterValidEmail": "有効なメールアドレスを入力してください",
-    "failedToSaveEmail": "メールアドレスの保存に失敗しました",
     "skipForNow": "今はスキップする",
-    "emailSavedSuccess": "メールアドレスを保存しました！",
-    "viewRecommendations": "おすすめを見る",
-    "emailUpdatesHint": "おすすめに関する最新情報をお送りします。スパムメールは一切お送りしません。",
-    "generatingRecommendationsButton": "おすすめを生成中...",
-    "enterEmailToContinue": "続けるにはメールアドレスを入力してください",
-    "pleaseEnterEmailAbove": "おすすめを見るには、上にメールアドレスを入力してください",
     "genres": {
       "pop": "ポップス",
       "rock": "ロック",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "現在の絞り込み条件に一致する定番曲はありません",
     "viewMySongs": "自分の曲を見る",
     "syncMoreMusic": "さらに音楽を同期",
-    "tryAgain": "もう一度試す"
+    "tryAgain": "もう一度試す",
+    "libraryAny": "すべてのライブラリ",
+    "libraryCommunity": "コミュニティ版",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version カタログ",
+    "libraryLabel": "カラオケライブラリ",
+    "loadMore": "さらに読み込む",
+    "loadingMore": "読み込み中…",
+    "noMatchDescription": "フィルターを1〜2個緩めて、他の曲を探してみてください。",
+    "noMatchTitle": "条件に一致するおすすめ曲が見つかりません",
+    "sortAz": "五十音・アルファベット順",
+    "sortBest": "おすすめ順",
+    "sortLabel": "並び替え",
+    "sortNewest": "新しい順",
+    "sortOldest": "古い順",
+    "sortPopular": "人気順",
+    "sortShortest": "曲が短い順",
+    "warmingDescription": "準備を進めています。通常1分以内に完了し、自動的に再試行されます。",
+    "warmingTitle": "おすすめ曲を準備中…"
   },
   "myData": {
     "title": "マイデータ",
@@ -299,8 +283,6 @@
     "feedbackTitle": "フィードバックと調整",
     "feedbackDesc": "近日公開: 曲の「好き/隠す」、音域の設定など！",
     "dataPowersRecs": "このデータは、あなたにパーソナライズされたカラオケのおすすめを提供するために使用されます。",
-    "createAccountToSync": "アカウントを作成",
-    "toSyncServices": "して音楽サービスを同期しましょう。",
     "moreDataBetterRecs": "データが多いほど、おすすめの精度が上がります。",
     "takeTheQuiz": "クイズに答える",
     "orConnectMore": "または、さらにサービスを連携します。",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "追加する曲を検索...",
     "noSongsYet": "曲はまだありません",
     "noSongsYetDesc": "上で検索して、知っていて歌うのが好きな曲を追加しましょう！",
-    "connectYourServices": "音楽サービスを連携",
-    "connectServicesGuestDesc": "アカウントを作成してSpotifyやLast.fmを連携すると、再生履歴に基づいたパーソナライズされたおすすめを受け取れます。",
-    "createAccount": "アカウント作成",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "連携済み",
@@ -465,7 +444,6 @@
     "profileSection": "プロフィール",
     "yourAccountInfo": "アカウント情報",
     "emailLabel": "メールアドレス",
-    "guestSession": "ゲストセッション",
     "displayNameLabel": "表示名",
     "displayNamePlaceholder": "何とお呼びしましょうか？",
     "profileUpdated": "プロフィールを更新しました！",
@@ -480,7 +458,6 @@
     "noServicesConnected": "連携されているサービスはありません",
     "servicesConnectedCount": "{count}個のサービスを連携中",
     "logOutSection": "ログアウト",
-    "clearGuestSession": "ゲストセッションをクリア",
     "signOutOfAccount": "アカウントからサインアウト",
     "dangerZone": "危険な操作",
     "irreversibleActions": "元に戻せない操作",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "本当によろしいですか？アカウントとすべてのデータが完全に削除されます。この操作は元に戻せません。",
     "yesDeleteAccount": "はい、アカウントを削除します",
     "deleteNotAvailable": "アカウントの削除はまだ利用できません。アカウントを削除する必要がある場合は、サポートにお問い合わせください。",
-    "clearSession": "セッションをクリア",
     "logOut": "ログアウト",
     "accountId": "アカウントID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count}種類の音源",
       "pop": "人気度: {value}",
       "explicit": "E",
-      "classic": "名曲"
+      "classic": "名曲",
+      "community": "コミュニティ",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "この曲を歌うのが好き",
@@ -664,18 +642,6 @@
       "comfortEasy": "簡単",
       "comfortComfortable": "歌いやすい",
       "comfortChallenging": "難しい"
-    },
-    "postQuizEmail": {
-      "almostThere": "あと少しです！",
-      "enterEmailToSeeRecs": "パーソナライズされたおすすめを見るには、メールアドレスを入力してください",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "メールアドレス",
-      "invalidEmail": "有効なメールアドレスを入力してください",
-      "failedToSaveEmail": "メールアドレスの保存に失敗しました",
-      "saving": "保存中...",
-      "continue": "続ける",
-      "updateNote": "おすすめに関する最新情報をお送りします。",
-      "noSpam": "スパムメールは一切お送りしません。"
     },
     "stickyFinish": {
       "artistSelected": "{count}組のアーティストを選択中",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "SpotifyとLast.fmを連携",
       "syncListeningHistory": "再生履歴を同期",
       "saveProgressAcrossDevices": "複数のデバイス間で進行状況を保存",
-      "createAndManagePlaylists": "プレイリストの作成と管理"
+      "createAndManagePlaylists": "プレイリストの作成と管理",
+      "createAccount": "サインインまたはアカウント作成"
     },
     "artistSearch": {
       "placeholder": "追加するアーティストを検索...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "連携サービス",
-      "createAccountToConnect": "アカウントを作成して連携",
-      "connectMusicServicesTitle": "音楽サービスを連携",
-      "connectMusicServicesDesc": "アカウントを作成してSpotifyやLast.fmを連携すると、パーソナライズされたおすすめを受け取れます。",
-      "musicServicesFeature": "音楽サービス",
       "noServicesConnected": "連携されているサービスはありません",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "「{title}」から読み込める曲が見つかりませんでした。別のプレイリストをお試しください。",
     "errorTooManyImports": "プレイリストのインポートの間隔が短すぎます。少し時間をおいてからもう一度お試しください。",
     "inputLabel": "YouTube Musicプレイリストのリンク"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "みんなで盛り上がる曲",
+      "decade_match": "お好みの年代の曲",
+      "genre_match": "お好みのジャンルに一致",
+      "known_artist": "大好きなアーティストの曲",
+      "known_song": "おなじみの曲",
+      "make_it": "カラオケを作成",
+      "similar_artist": "{artist} が好きな方へ"
+    },
+    "section": {
+      "all": {
+        "reason": "条件に一致するすべての曲（選択した並び順）",
+        "title": "すべてのおすすめ"
+      },
+      "artists_you_love": {
+        "reason": "よく聴くアーティストの他の曲",
+        "title": "大好きなアーティストから"
+      },
+      "because": {
+        "reason": "{artist} のファンがよく歌う曲",
+        "title": "{artist} が好きなあなたへ"
+      },
+      "crowd_pleasers": {
+        "reason": "会場全体で大合唱できる盛り上げ曲",
+        "title": "定番の盛り上げソング"
+      },
+      "make_it": {
+        "reason": "まだカラオケ版がありません。新しく作成できます",
+        "title": "カラオケを作成"
+      },
+      "songs_you_know": {
+        "reason": "あなたのライブラリにある曲のカラオケ版",
+        "title": "おなじみの曲"
+      }
+    }
   }
 }

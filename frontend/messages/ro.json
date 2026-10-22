@@ -17,16 +17,11 @@
     "signIn": "Conectare",
     "createAccount": "Creare cont",
     "logOut": "Deconectare",
-    "clearSession": "Șterge sesiunea",
-    "guest": "Vizitator",
-    "guestSession": "Sesiune vizitator",
-    "createAccountToSaveProgress": "Creează un cont pentru a salva progresul",
     "theme": "Temă",
     "backToApp": "Înapoi la aplicație",
     "openMenu": "Deschide meniul",
     "closeMenu": "Închide meniul",
-    "profileSettings": "Setări profil",
-    "clearSessionTitle": "Șterge sesiunea"
+    "profileSettings": "Setări profil"
   },
   "home": {
     "heroTitle": "Alege ușor",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "de cântat",
     "heroSubtitle": "Găsește melodii pe care le știi, pe care chiar le poți cânta și pe care publicul le va adora. Recomandări personalizate în 30 de secunde.",
     "findYourSong": "Găsește-ți melodia",
-    "trustSignal": "Gratuit • Nu necesită cont • Durează 30 de secunde",
-    "failedToStart": "Pornirea a eșuat. Încearcă din nou.",
+    "trustSignal": "Gratuit • Durează 30 de secunde",
     "soundFamiliar": "Îți sună cunoscut?",
     "soundFamiliarSubtitle": "Ești la karaoke, răsfoiești catalogul de melodii și...",
     "problemNothingTitle": "Nimic nu-ți atrage atenția",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Bine ai revenit",
-    "signInSubtitle": "Conectează-te pentru a-ți accesa melodiile și recomandările",
     "emailLabel": "Adresă de email",
     "emailPlaceholder": "tu@exemplu.com",
-    "sendMagicLink": "Trimite linkul magic",
-    "noPasswordNeeded": "Nu este nevoie de parolă. Îți vom trimite un link securizat pentru a te conecta.",
     "or": "sau",
     "justWantToBrowse": "Vrei doar să explorezi? Nu ai nevoie de cont.",
     "browseSongs": "Răsfoiește melodii",
-    "failedToSendMagicLink": "Trimiterea linkului magic a eșuat. Încearcă din nou.",
-    "checkYourEmail": "Verifică-ți emailul!",
-    "magicLinkSentTo": "Am trimis un link magic către",
-    "linkExpiresIn15": "Fă clic pe linkul din email pentru a te conecta. Linkul expiră în 15 minute.",
     "useDifferentEmail": "Folosește un alt email",
     "backToHome": "Înapoi acasă",
-    "verifyingLink": "Verificăm linkul tău...",
-    "pleaseWait": "Te rugăm să aștepți un moment",
-    "youreSignedIn": "Te-ai conectat!",
-    "redirectingToSongs": "Te redirecționăm către melodiile tale...",
-    "connectionError": "Eroare de conexiune",
-    "verificationFailed": "Verificarea a eșuat",
-    "noTokenFound": "Nu s-a găsit niciun token de verificare. Solicită un nou link magic.",
-    "linkExpired": "Acest link magic a expirat. Solicită unul nou.",
-    "linkAlreadyUsed": "Acest link magic a fost deja folosit. Solicită unul nou.",
-    "failedToVerify": "Verificarea tokenului a eșuat. S-ar putea să fi expirat sau să fi fost deja folosit.",
-    "troubleshootingTips": "Sfaturi pentru remedierea problemelor:",
-    "tipMobileData": "Încearcă să folosești datele mobile în loc de WiFi",
-    "tipDisableVpn": "Dezactivează VPN-ul sau extensiile de blocare a reclamelor",
-    "tipIncognito": "Încearcă să deschizi în modul incognito/privat",
-    "tipCorporateNetwork": "Verifică dacă ești pe o rețea de companie sau de școală",
-    "retryAgainCount": "Încearcă din nou ({count})",
-    "requestNewLink": "Solicită un link nou",
-    "backToHomeCaps": "Înapoi Acasă"
+    "codeExpired": "Acel cod a expirat. Te rugăm să soliciți unul nou.",
+    "codeLabel": "Cod din 6 cifre",
+    "codeResent": "Un nou cod este pe drum.",
+    "codeSentTo": "Am trimis un cod din 6 cifre prin e-mail la",
+    "continueWithGoogle": "Continuă cu Google",
+    "enterCode": "Introdu codul",
+    "failedToSendCode": "Nu am putut trimite codul. Te rugăm să încerci din nou.",
+    "failedToVerifyCode": "Nu am putut verifica codul. Te rugăm să încerci din nou.",
+    "googleSignInFailed": "Conectarea cu Google a eșuat. Te rugăm să încerci din nou.",
+    "invalidCode": "Codul nu este corect. Verifică-l și încearcă din nou.",
+    "resendCode": "Trimite un cod nou",
+    "sendCode": "Trimite-mi un cod pe e-mail",
+    "signInHint": "Nu este nevoie de parolă. Îți vom trimite un cod din 6 cifre pe e-mail pentru a te conecta la contul tău Nomad Karaoke.",
+    "signInToGetPicks": "Conectează-te pentru a primi recomandările tale personalizate de karaoke",
+    "tooManyAttempts": "Prea multe încercări. Te rugăm să soliciți un cod nou.",
+    "verifyCode": "Verifică și conectează-te",
+    "importedGuestData": "Ți-am mutat răspunsurile la chestionar și melodiile în contul tău."
   },
   "quiz": {
     "startingQuiz": "Începem testul...",
@@ -182,28 +168,8 @@
     "selected": "{count} selectat(e)",
     "findingMoreArtists": "Căutăm mai mulți artiști pe care s-ar putea să-i știi...",
     "noMoreArtists": "Nu mai sunt artiști de afișat",
-    "almostThere": "Aproape gata!",
-    "enterEmailToSave": "Introdu adresa de email pentru a-ți salva recomandările.",
-    "generatingRecs": "Generăm recomandările tale...",
-    "analyzingTaste": "Îți analizăm gusturile muzicale",
-    "recsReady": "Recomandările sunt gata!",
-    "personalizedListWaiting": "Lista ta personalizată de melodii te așteaptă",
-    "waitingToGenerate": "Așteptăm să generăm...",
-    "startShortly": "Acest proces va începe în scurt timp",
-    "yourEmail": "Emailul tău",
     "emailSaved": "Email salvat!",
-    "emailPlaceholder": "tu@exemplu.com",
-    "saveEmail": "Salvează",
-    "pleaseEnterEmail": "Introdu adresa ta de email",
-    "pleaseEnterValidEmail": "Introdu o adresă de email validă",
-    "failedToSaveEmail": "Salvarea emailului a eșuat",
     "skipForNow": "Sari pentru moment",
-    "emailSavedSuccess": "Email salvat!",
-    "viewRecommendations": "Vezi recomandările mele",
-    "emailUpdatesHint": "Îți vom trimite actualizări despre recomandările tale. Fără spam, niciodată.",
-    "generatingRecommendationsButton": "Generăm recomandările...",
-    "enterEmailToContinue": "Introdu adresa de email pentru a continua",
-    "pleaseEnterEmailAbove": "Introdu adresa de email mai sus pentru a-ți vedea recomandările",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Nicio melodie preferată de public nu se potrivește cu filtrele actuale",
     "viewMySongs": "Vezi melodiile mele",
     "syncMoreMusic": "Sincronizează mai multă muzică",
-    "tryAgain": "Încearcă din nou"
+    "tryAgain": "Încearcă din nou",
+    "libraryAny": "Orice bibliotecă",
+    "libraryCommunity": "Versiuni din comunitate",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catalogul KaraFun / Karaoke Version",
+    "libraryLabel": "Bibliotecă de karaoke",
+    "loadMore": "Încarcă mai multe",
+    "loadingMore": "Se încarcă…",
+    "noMatchDescription": "Încearcă să relaxezi un filtru sau două pentru a vedea mai multe melodii.",
+    "noMatchTitle": "Nicio sugestie nu corespunde acestor filtre",
+    "sortAz": "De la A la Z",
+    "sortBest": "Cele mai potrivite pentru tine",
+    "sortLabel": "Sortează după",
+    "sortNewest": "Cele mai noi",
+    "sortOldest": "Cele mai vechi",
+    "sortPopular": "Cele mai populare",
+    "sortShortest": "Cele mai scurte",
+    "warmingDescription": "Pregătim totul. De obicei durează mai puțin de un minut și vom reîncerca automat.",
+    "warmingTitle": "Îți pregătim sugestiile…"
   },
   "myData": {
     "title": "Datele mele",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Feedback & Rafinări",
     "feedbackDesc": "În curând: Iubește/ascunde melodii, gamă vocală, și altele!",
     "dataPowersRecs": "Aceste date alimentează recomandările tale personalizate de karaoke.",
-    "createAccountToSync": "Creează un cont",
-    "toSyncServices": "pentru a-ți sincroniza serviciile muzicale.",
     "moreDataBetterRecs": "Mai multe date = recomandări mai bune.",
     "takeTheQuiz": "Fă testul",
     "orConnectMore": "sau conectează mai multe servicii.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Caută melodii de adăugat...",
     "noSongsYet": "Nicio melodie încă",
     "noSongsYetDesc": "Caută mai sus pentru a adăuga melodii pe care le știi și pe care adori să le cânți!",
-    "connectYourServices": "Conectează-ți serviciile muzicale",
-    "connectServicesGuestDesc": "Creează un cont pentru a conecta Spotify și Last.fm pentru recomandări personalizate bazate pe istoricul tău de ascultare.",
-    "createAccount": "Creează cont",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Conectat",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Informațiile contului tău",
     "emailLabel": "Email",
-    "guestSession": "Sesiune vizitator",
     "displayNameLabel": "Nume afișat",
     "displayNamePlaceholder": "Cum ar trebui să-ți spunem?",
     "profileUpdated": "Profil actualizat!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Niciun serviciu conectat",
     "servicesConnectedCount": "{count} servici{count, plural, one {u} other {i}} conectat{count, plural, one {} other {e}}",
     "logOutSection": "Deconectare",
-    "clearGuestSession": "Șterge-ți sesiunea de vizitator",
     "signOutOfAccount": "Deconectează-te din contul tău",
     "dangerZone": "Zonă periculoasă",
     "irreversibleActions": "Acțiuni ireversibile",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Ești sigur? Aceasta îți va șterge definitiv contul și toate datele. Această acțiune nu poate fi anulată.",
     "yesDeleteAccount": "Da, șterge-mi contul",
     "deleteNotAvailable": "Ștergerea contului nu este încă disponibilă. Te rog să contactezi suportul dacă trebuie să-ți ștergi contul.",
-    "clearSession": "Șterge sesiunea",
     "logOut": "Deconectare",
     "accountId": "ID Cont: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} branduri",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASIC"
+      "classic": "CLASIC",
+      "community": "Comunitate",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Îmi place să cânt asta",
@@ -664,18 +642,6 @@
       "comfortEasy": "Ușoară",
       "comfortComfortable": "Confortabilă",
       "comfortChallenging": "Provocatoare"
-    },
-    "postQuizEmail": {
-      "almostThere": "Aproape gata!",
-      "enterEmailToSeeRecs": "Introdu adresa de email pentru a-ți vedea recomandările personalizate",
-      "emailPlaceholder": "emailul@tău.com",
-      "emailLabel": "Adresă de email",
-      "invalidEmail": "Te rugăm să introduci o adresă de email validă",
-      "failedToSaveEmail": "Salvarea emailului a eșuat",
-      "saving": "Se salvează...",
-      "continue": "Continuă",
-      "updateNote": "Îți vom trimite actualizări despre recomandările tale.",
-      "noSpam": "Fără spam, promitem."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artist selectat} other {artiști selectați}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Conecta Spotify și Last.fm",
       "syncListeningHistory": "Sincroniza istoricul tău de ascultare",
       "saveProgressAcrossDevices": "Salva progresul pe toate dispozitivele",
-      "createAndManagePlaylists": "Crea și gestiona playlisturi"
+      "createAndManagePlaylists": "Crea și gestiona playlisturi",
+      "createAccount": "Conectează-te sau creează un cont"
     },
     "artistSearch": {
       "placeholder": "Caută artiști de adăugat...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Servicii conectate",
-      "createAccountToConnect": "Creează un cont pentru a te conecta",
-      "connectMusicServicesTitle": "Conectează-ți serviciile muzicale",
-      "connectMusicServicesDesc": "Creează un cont pentru a conecta Spotify și Last.fm pentru recomandări personalizate.",
-      "musicServicesFeature": "Servicii muzicale",
       "noServicesConnected": "Niciun serviciu conectat",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" nu conține nicio melodie care să poată fi citită. Încearcă o altă listă de redare.",
     "errorTooManyImports": "Imporți liste de redare prea rapid. Te rugăm să aștepți un minut și să încerci din nou.",
     "inputLabel": "Link către lista de redare YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Pe placul tuturor",
+      "decade_match": "Dintr-un deceniu care îți place",
+      "genre_match": "Se potrivește cu genurile tale",
+      "known_artist": "De la un artist care îți place la nebunie",
+      "known_song": "O știi deja",
+      "make_it": "Creează piesa",
+      "similar_artist": "În stilul {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tot ce se potrivește, în ordinea aleasă de tine",
+        "title": "Toate sugestiile"
+      },
+      "artists_you_love": {
+        "reason": "Mai multe melodii de la artiști pe care îi asculți",
+        "title": "De la artiști pe care îi adori"
+      },
+      "because": {
+        "reason": "Melodii pe care fanii {artist} le cântă de obicei",
+        "title": "Pentru că îți place {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Melodii care pun toată sala pe cântat",
+        "title": "Pe placul tuturor"
+      },
+      "make_it": {
+        "reason": "Nu există încă o versiune karaoke. Putem crea una pentru tine",
+        "title": "Creează piesa"
+      },
+      "songs_you_know": {
+        "reason": "Versiuni karaoke ale melodiilor din biblioteca ta",
+        "title": "Melodii pe care le știi"
+      }
+    }
   }
 }

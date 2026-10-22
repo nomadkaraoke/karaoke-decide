@@ -224,3 +224,32 @@ def test_no_karaoke_drops_interludes_and_skits():
     ]
     out = src._no_karaoke_songs(iter(rows), set(), {})
     assert sorted(s.title for s in out) == ["Introspection", "Real Hit", "Skitter"]
+
+
+def test_no_karaoke_skips_songs_whose_loose_key_matches_a_kn_song():
+    # Prod bug (run 20261022-015849): spelling variants that song_key keeps apart ("U.S.A." vs
+    # "Usa", "I M Good" vs "I'm Good", a two-artist credit vs the primary artist) leaked into
+    # "make it" although KN has the song. Genuinely absent songs still come through.
+    kn = [
+        _kn_row(1, "Miley Cyrus", "Party In The Usa"),
+        _kn_row(2, "David Guetta & Bebe Rexha", "I M Good (Blue)"),
+        _kn_row(3, "Maroon 5", "One More Night"),
+    ]
+    rows = [
+        {"recording_mbid": "a", "title": "Party In The U.S.A.", "artist": "Miley Cyrus", "listeners": 900},
+        {"recording_mbid": "b", "title": "I'm Good (Blue)", "artist": "David Guetta", "listeners": 800},
+        {"recording_mbid": "c", "title": "I'm Good (Blue)", "artist": "David Guetta, Bebe Rexha", "listeners": 790},
+        {"recording_mbid": "d", "title": "One More Night", "artist": "BTS", "listeners": 700},
+    ]
+    known = frozenset({"miley cyrus", "david guetta", "bebe rexha", "maroon 5", "bts"})
+    out = src._no_karaoke_songs(iter(rows), src._kn_title_keys(kn, known), {}, known)
+    assert [(s.artist, s.title) for s in out] == [("BTS", "One More Night")]
+
+
+def test_no_karaoke_dedupes_loose_variants_of_one_candidate():
+    rows = [
+        {"recording_mbid": "a", "title": "Brand New Day", "artist": "Alpha Band", "listeners": 900},
+        {"recording_mbid": "b", "title": "Brand New Day!", "artist": "Alpha Band", "listeners": 800},
+    ]
+    out = src._no_karaoke_songs(iter(rows), set(), {})
+    assert [s.title for s in out] == ["Brand New Day"]

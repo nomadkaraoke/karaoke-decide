@@ -3,11 +3,15 @@
  */
 
 import { API_BASE_URL, AUTH_TOKEN_KEY } from "./constants";
+import { routing } from "@/i18n/routing";
+import type { RecV2Params, RecommendationsV2 } from "@/types";
 
-function getCurrentLocale(): string {
+export function getCurrentLocale(): string {
   if (typeof window === 'undefined') return 'en';
-  const match = window.location.pathname.match(/^\/(en|es|de)\//);
-  return match ? match[1] : 'en';
+  const match = window.location.pathname.match(/^\/([a-z]{2})(?:\/|$)/);
+  return match && (routing.locales as readonly string[]).includes(match[1])
+    ? match[1]
+    : 'en';
 }
 
 export class ApiError extends Error {
@@ -157,25 +161,50 @@ export const api = {
   // ============================================================================
 
   auth: {
-    requestMagicLink: (email: string) =>
-      api.post<{ message: string }>("/api/auth/magic-link", { email }),
+    /**
+     * Is `token` a legacy decide guest session? Probes with that token
+     * directly and never touches the stored one (no 401 redirect).
+     * "unknown" (network error or 5xx) must be treated as possibly a guest.
+     */
+    probeGuestToken: async (token: string): Promise<"guest" | "not_guest" | "unknown"> => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.status === 401) return "not_guest";
+        if (!response.ok) return "unknown";
+        const me = (await response.json()) as { is_guest?: boolean };
+        return me.is_guest === true ? "guest" : "not_guest";
+      } catch {
+        return "unknown";
+      }
+    },
 
-    verifyToken: (token: string) =>
-      api.post<{ access_token: string; token_type: string; expires_in: number }>(
-        "/api/auth/verify",
-        { token }
-      ),
-
-    createGuestSession: () =>
-      api.post<{ access_token: string; token_type: string; expires_in: number }>(
-        "/api/auth/guest"
-      ),
-
-    upgradeGuest: (email: string) =>
-      api.post<{ message: string }>("/api/auth/upgrade", { email }),
-
-    collectEmail: (email: string) =>
-      api.post<{ message: string; user_id: string }>("/api/auth/collect-email", { email }),
+    /**
+     * Merge a legacy guest profile into the signed-in (gen) account.
+     * Authenticated by the stored gen token; the body carries the guest JWT.
+     * Uses fetch directly so a failure never triggers the 401 sign-out redirect.
+     */
+    claimGuest: async (guestToken: string): Promise<void> => {
+      const token = getAuthToken();
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/auth/claim-guest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ guest_token: guestToken }),
+        });
+      } catch (error) {
+        const originalError = error instanceof Error ? error : new Error(String(error));
+        throw new NetworkError(NetworkError.getHelpfulMessage(originalError), originalError);
+      }
+      if (!response.ok) {
+        throw new ApiError(response.status, `API error: ${response.status}`);
+      }
+    },
 
     getMe: () =>
       api.get<{
@@ -197,7 +226,6 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    logout: () => api.post<{ message: string }>("/api/auth/logout"),
   },
 
   // ============================================================================
@@ -440,6 +468,19 @@ export const api = {
           explicit: boolean;
         }>;
       }>(`/api/my/recommendations?${params.toString()}`);
+    },
+
+    getRecommendationsV2: (params: RecV2Params = {}) => {
+      const qs = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) value.forEach((v) => qs.append(key, v));
+        else qs.append(key, String(value));
+      }
+      const query = qs.toString();
+      return apiRequest<RecommendationsV2>(
+        `/api/my/recommendations/v2${query ? `?${query}` : ""}`
+      );
     },
 
     getCategorizedRecommendations: (filters?: {

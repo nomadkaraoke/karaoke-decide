@@ -17,16 +17,11 @@
     "signIn": "Prihlásiť sa",
     "createAccount": "Vytvoriť účet",
     "logOut": "Odhlásiť sa",
-    "clearSession": "Vymazať reláciu",
-    "guest": "Hosť",
-    "guestSession": "Relácia hosťa",
-    "createAccountToSaveProgress": "Vytvor si účet na uloženie postupu",
     "theme": "Téma",
     "backToApp": "Späť do aplikácie",
     "openMenu": "Otvoriť menu",
     "closeMenu": "Zatvoriť menu",
-    "profileSettings": "Nastavenia profilu",
-    "clearSessionTitle": "Vymazať reláciu"
+    "profileSettings": "Nastavenia profilu"
   },
   "home": {
     "heroTitle": "Jednoducho si vyber",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "na spievanie",
     "heroSubtitle": "Nájdi piesne, ktoré poznáš, dokážeš ich zaspievať a publikum ich bude milovať. Personalizované odporúčania za 30 sekúnd.",
     "findYourSong": "Nájdi svoju pieseň",
-    "trustSignal": "Zadarmo • Bez registrácie • Zaberie to 30 sekúnd",
-    "failedToStart": "Nepodarilo sa spustiť. Skús to prosím znova.",
+    "trustSignal": "Zadarmo • Trvá to 30 sekúnd",
     "soundFamiliar": "Znie to povedome?",
     "soundFamiliarSubtitle": "Si na karaoke, listuješ v spevníku a...",
     "problemNothingTitle": "Nič ťa nezaujalo",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Vitaj späť",
-    "signInSubtitle": "Prihlás sa pre prístup k svojim piesňam a odporúčaniam",
     "emailLabel": "E-mailová adresa",
     "emailPlaceholder": "ty@priklad.sk",
-    "sendMagicLink": "Poslať magický odkaz",
-    "noPasswordNeeded": "Nepotrebuješ heslo. Pošleme ti bezpečný odkaz na prihlásenie.",
     "or": "alebo",
     "justWantToBrowse": "Chceš si len prezerať? Účet nepotrebuješ.",
     "browseSongs": "Prehľadávať piesne",
-    "failedToSendMagicLink": "Nepodarilo sa poslať magický odkaz. Skús to prosím znova.",
-    "checkYourEmail": "Skontroluj si e-mail!",
-    "magicLinkSentTo": "Poslali sme magický odkaz na",
-    "linkExpiresIn15": "Klikni na odkaz v e-maile na prihlásenie. Platnosť odkazu vyprší o 15 minút.",
     "useDifferentEmail": "Použiť iný e-mail",
     "backToHome": "Späť domov",
-    "verifyingLink": "Overujeme tvoj odkaz...",
-    "pleaseWait": "Prosím, chvíľu počkaj",
-    "youreSignedIn": "Si prihlásený!",
-    "redirectingToSongs": "Presmerovávame ťa na tvoje piesne...",
-    "connectionError": "Chyba pripojenia",
-    "verificationFailed": "Overenie zlyhalo",
-    "noTokenFound": "Nenašiel sa žiadny overovací token. Vyžiadaj si prosím nový magický odkaz.",
-    "linkExpired": "Platnosť tohto magického odkazu vypršala. Vyžiadaj si prosím nový.",
-    "linkAlreadyUsed": "Tento magický odkaz už bol použitý. Vyžiadaj si prosím nový.",
-    "failedToVerify": "Nepodarilo sa overiť token. Možno vypršala jeho platnosť alebo už bol použitý.",
-    "troubleshootingTips": "Tipy na riešenie problémov:",
-    "tipMobileData": "Skús použiť mobilné dáta namiesto WiFi",
-    "tipDisableVpn": "Vypni VPN alebo rozšírenia na blokovanie reklám",
-    "tipIncognito": "Skús to otvoriť v inkognito/súkromnom režime",
-    "tipCorporateNetwork": "Skontroluj, či nie si na firemnej alebo školskej sieti",
-    "retryAgainCount": "Skúsiť znova ({count})",
-    "requestNewLink": "Vyžiadať nový odkaz",
-    "backToHomeCaps": "Späť domov"
+    "codeExpired": "Platnosť tohto kódu vypršala. Požiadaj o nový.",
+    "codeLabel": "6-miestny kód",
+    "codeResent": "Nový kód je na ceste.",
+    "codeSentTo": "6-miestny kód sme poslali na",
+    "continueWithGoogle": "Pokračovať cez Google",
+    "enterCode": "Zadaj svoj kód",
+    "failedToSendCode": "Kód sa nepodarilo odoslať. Skús to znova.",
+    "failedToVerifyCode": "Kód sa nepodarilo overiť. Skús to znova.",
+    "googleSignInFailed": "Prihlásenie cez Google zlyhalo. Skús to znova.",
+    "invalidCode": "Tento kód nie je správny. Skontroluj ho a skús to znova.",
+    "resendCode": "Odoslať nový kód",
+    "sendCode": "Poslať kód na e-mail",
+    "signInHint": "Heslo nie je potrebné. Na prihlásenie do účtu Nomad Karaoke ti e-mailom pošleme 6-miestny kód.",
+    "signInToGetPicks": "Prihlás sa a získaj karaoke tipy na mieru",
+    "tooManyAttempts": "Príliš veľa pokusov. Požiadaj o nový kód.",
+    "verifyCode": "Overiť a prihlásiť sa",
+    "importedGuestData": "Tvoje odpovede z kvízu a pesničky sme presunuli do tvojho účtu."
   },
   "quiz": {
     "startingQuiz": "Spúšťame kvíz...",
@@ -182,28 +168,8 @@
     "selected": "{count} vybraných",
     "findingMoreArtists": "Hľadáme ďalších interpretov, ktorých by si mohol poznať...",
     "noMoreArtists": "Žiadni ďalší interpreti na zobrazenie",
-    "almostThere": "Už sme skoro tam!",
-    "enterEmailToSave": "Zadaj svoj e-mail na uloženie svojich odporúčaní.",
-    "generatingRecs": "Generujeme tvoje odporúčania...",
-    "analyzingTaste": "Analyzujeme tvoj hudobný vkus",
-    "recsReady": "Odporúčania sú pripravené!",
-    "personalizedListWaiting": "Tvoj personalizovaný zoznam piesní čaká",
-    "waitingToGenerate": "Čakáme na generovanie...",
-    "startShortly": "Toto sa čoskoro spustí",
-    "yourEmail": "Tvoj e-mail",
     "emailSaved": "E-mail uložený!",
-    "emailPlaceholder": "ty@priklad.sk",
-    "saveEmail": "Uložiť",
-    "pleaseEnterEmail": "Prosím, zadaj svoj e-mail",
-    "pleaseEnterValidEmail": "Prosím, zadaj platný e-mail",
-    "failedToSaveEmail": "Nepodarilo sa uložiť e-mail",
     "skipForNow": "Zatiaľ preskočiť",
-    "emailSavedSuccess": "E-mail uložený!",
-    "viewRecommendations": "Zobraziť moje odporúčania",
-    "emailUpdatesHint": "Budeme ti posielať aktualizácie o tvojich odporúčaniach. Žiadny spam, nikdy.",
-    "generatingRecommendationsButton": "Generujeme odporúčania...",
-    "enterEmailToContinue": "Zadaj svoj e-mail pre pokračovanie",
-    "pleaseEnterEmailAbove": "Prosím, zadaj svoj e-mail vyššie, aby si videl svoje odporúčania",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Žiadne obľúbené hity nezodpovedajú aktuálnym filtrom",
     "viewMySongs": "Zobraziť moje piesne",
     "syncMoreMusic": "Synchronizovať viac hudby",
-    "tryAgain": "Skúsiť znova"
+    "tryAgain": "Skúsiť znova",
+    "libraryAny": "Akákoľvek knižnica",
+    "libraryCommunity": "Komunitné verzie",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalóg KaraFun / Karaoke Version",
+    "libraryLabel": "Knižnica karaoke",
+    "loadMore": "Načítať ďalšie",
+    "loadingMore": "Načítava sa…",
+    "noMatchDescription": "Skús uvoľniť filter alebo dva a uvidíš viac skladieb.",
+    "noMatchTitle": "Týmto filtrom nezodpovedajú žiadne tipy",
+    "sortAz": "Od A po Z",
+    "sortBest": "Najlepšie pre teba",
+    "sortLabel": "Zoradiť podľa",
+    "sortNewest": "Najnovšie",
+    "sortOldest": "Najstaršie",
+    "sortPopular": "Najpopulárnejšie",
+    "sortShortest": "Najkratšie",
+    "warmingDescription": "Už to chystáme. Zvyčajne to trvá necelú minútu a pokus zopakujeme automaticky.",
+    "warmingTitle": "Pripravujeme tvoje tipy…"
   },
   "myData": {
     "title": "Moje dáta",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Spätná väzba a vylepšenia",
     "feedbackDesc": "Už čoskoro: Milovať/skryť piesne, hlasový rozsah a ďalšie!",
     "dataPowersRecs": "Tieto dáta poháňajú tvoje personalizované karaoke odporúčania.",
-    "createAccountToSync": "Vytvor si účet",
-    "toSyncServices": "na synchronizáciu svojich hudobných služieb.",
     "moreDataBetterRecs": "Viac dát = lepšie odporúčania.",
     "takeTheQuiz": "Urob si kvíz",
     "orConnectMore": "alebo prepoj ďalšie služby.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Hľadaj piesne na pridanie...",
     "noSongsYet": "Zatiaľ žiadne piesne",
     "noSongsYetDesc": "Hľadaj vyššie a pridaj piesne, ktoré poznáš a rád spievaš!",
-    "connectYourServices": "Prepoj svoje hudobné služby",
-    "connectServicesGuestDesc": "Vytvor si účet a prepoj Spotify a Last.fm pre personalizované odporúčania na základe svojej histórie počúvania.",
-    "createAccount": "Vytvoriť účet",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Pripojené",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Informácie o tvojom účte",
     "emailLabel": "E-mail",
-    "guestSession": "Relácia hosťa",
     "displayNameLabel": "Zobrazované meno",
     "displayNamePlaceholder": "Ako ťa máme volať?",
     "profileUpdated": "Profil aktualizovaný!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Žiadne pripojené služby",
     "servicesConnectedCount": "Pripojené služby: {count}",
     "logOutSection": "Odhlásiť sa",
-    "clearGuestSession": "Vymazať tvoju reláciu hosťa",
     "signOutOfAccount": "Odhlásiť sa z účtu",
     "dangerZone": "Nebezpečná zóna",
     "irreversibleActions": "Nezvratné akcie",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Si si istý? Týmto sa natrvalo vymaže tvoj účet a všetky tvoje dáta. Táto akcia sa nedá vrátiť späť.",
     "yesDeleteAccount": "Áno, vymazať môj účet",
     "deleteNotAvailable": "Vymazanie účtu zatiaľ nie je k dispozícii. Ak potrebuješ vymazať svoj účet, kontaktuj prosím podporu.",
-    "clearSession": "Vymazať reláciu",
     "logOut": "Odhlásiť sa",
     "accountId": "ID účtu: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} značiek",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIKA"
+      "classic": "KLASIKA",
+      "community": "Komunita",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Túto pieseň rád spievam",
@@ -664,18 +642,6 @@
       "comfortEasy": "Ľahká",
       "comfortComfortable": "Pohodlná",
       "comfortChallenging": "Náročná"
-    },
-    "postQuizEmail": {
-      "almostThere": "Už sme skoro tam!",
-      "enterEmailToSeeRecs": "Zadaj svoj e-mail, aby si videl svoje personalizované odporúčania",
-      "emailPlaceholder": "tvoj@email.sk",
-      "emailLabel": "E-mailová adresa",
-      "invalidEmail": "Prosím, zadaj platnú e-mailovú adresu",
-      "failedToSaveEmail": "Nepodarilo sa uložiť e-mail",
-      "saving": "Ukladám...",
-      "continue": "Pokračovať",
-      "updateNote": "Budeme ti posielať aktualizácie o tvojich odporúčaniach.",
-      "noSpam": "Žiadny spam, sľubujeme."
     },
     "stickyFinish": {
       "artistSelected": "Vybraní interpreti: {count}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Prepojiť Spotify a Last.fm",
       "syncListeningHistory": "Synchronizovať svoju históriu počúvania",
       "saveProgressAcrossDevices": "Uložiť si postup naprieč zariadeniami",
-      "createAndManagePlaylists": "Vytvárať a spravovať playlisty"
+      "createAndManagePlaylists": "Vytvárať a spravovať playlisty",
+      "createAccount": "Prihlásiť sa alebo vytvoriť účet"
     },
     "artistSearch": {
       "placeholder": "Hľadaj interpretov na pridanie...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Pripojené služby",
-      "createAccountToConnect": "Vytvor si účet pre pripojenie",
-      "connectMusicServicesTitle": "Prepoj svoje hudobné služby",
-      "connectMusicServicesDesc": "Vytvor si účet a prepoj Spotify a Last.fm pre personalizované odporúčania.",
-      "musicServicesFeature": "Hudobné služby",
       "noServicesConnected": "Žiadne pripojené služby",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" neobsahuje žiadne skladby, ktoré by sme vedeli načítať. Skús iný playlist.",
     "errorTooManyImports": "Importuješ playlisty príliš rýchlo. Počkaj chvíľu a skús to znova.",
     "inputLabel": "Odkaz na playlist v YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Hit pre každého",
+      "decade_match": "Z dekády, ktorú máš rád",
+      "genre_match": "Sedí k tvojim žánrom",
+      "known_artist": "Od interpreta, ktorého máš rád",
+      "known_song": "Toto poznáš",
+      "make_it": "Vytvoriť",
+      "similar_artist": "Podobné ako {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Všetko, čo vyhovuje, v tebou zvolenom poradí",
+        "title": "Všetky tipy"
+      },
+      "artists_you_love": {
+        "reason": "Ďalšie skladby od interpretov, ktorých počúvaš",
+        "title": "Od tvojich obľúbených interpretov"
+      },
+      "because": {
+        "reason": "Skladby, ktoré zvyknú spievať fanúšikovia {artist}",
+        "title": "Pretože sa ti páči {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Skladby, ktoré rozospievajú celú miestnosť",
+        "title": "Hity pre každého"
+      },
+      "make_it": {
+        "reason": "Zatiaľ neexistuje karaoke verzia. Môžeme ju pre teba vytvoriť",
+        "title": "Vytvoriť"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verzie skladieb z tvojej knižnice",
+        "title": "Skladby, ktoré poznáš"
+      }
+    }
   }
 }

@@ -20,7 +20,7 @@ test.describe("Authentication", () => {
     await expect(page.getByLabel(/email/i)).toBeVisible();
 
     // Check submit button
-    await expect(page.getByRole("button", { name: /send magic link/i })).toBeVisible();
+    await expect(page.getByTestId("login-send-code")).toBeVisible();
 
     // Check alternative action
     await expect(page.getByRole("button", { name: /browse songs/i })).toBeVisible();
@@ -39,32 +39,14 @@ test.describe("Authentication", () => {
     await page.goto("/login");
 
     const emailInput = page.getByLabel(/email/i);
-    const submitButton = page.getByRole("button", { name: /send magic link/i });
+    const submitButton = page.getByTestId("login-send-code");
 
     // Try to submit with invalid email - HTML5 validation should prevent
     await emailInput.fill("not-an-email");
     await submitButton.click();
 
-    // The form should not have been submitted (no success message)
-    await expect(page.getByText("Check your email")).not.toBeVisible();
-  });
-
-  test("verify page shows loading state without token", async ({ page }) => {
-    await page.goto("/auth/verify");
-
-    // Should show error message about missing token
-    await expect(page.getByText(/verification failed/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/no verification token/i)).toBeVisible();
-  });
-
-  test("verify page has request new link button", async ({ page }) => {
-    await page.goto("/auth/verify");
-
-    // Wait for error state
-    await expect(page.getByText(/verification failed/i)).toBeVisible({ timeout: 5000 });
-
-    // Check for retry button
-    await expect(page.getByRole("link", { name: /request new link/i })).toBeVisible();
+    // The form should not have been submitted (still on the email step)
+    await expect(page.getByTestId("login-code")).not.toBeVisible();
   });
 
   test("protected routes redirect to login when not authenticated", async ({ page }) => {
@@ -72,7 +54,7 @@ test.describe("Authentication", () => {
     await page.goto("/my-songs");
 
     // Should redirect to login
-    await expect(page).toHaveURL("/login", { timeout: 10000 });
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
   });
 
   test("navigation shows sign in button when not authenticated", async ({ page }) => {

@@ -1,4 +1,4 @@
-.PHONY: search-stack-up search-stack-down install dev test test-unit test-backend test-e2e lint format clean help
+.PHONY: stack-up stack-down search-stack-up search-stack-down install dev test test-unit test-backend test-e2e lint format clean help
 
 # Default target
 help:
@@ -37,7 +37,14 @@ dev:
 cli:
 	poetry run karaoke-decide $(ARGS)
 
-# Search local stack (fixture index on :8020; see docs/TESTING.md)
+# Local stack: main API :8030 + search :8020 on gen's Firestore emulator (see docs/TESTING.md)
+stack-up:
+	./scripts/local-stack.sh up
+
+stack-down:
+	./scripts/local-stack.sh down
+
+# Search service alone
 search-stack-up:
 	./scripts/search-local-stack.sh up
 

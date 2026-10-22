@@ -53,6 +53,11 @@ def _in(col: str, values: list[str], params: list[object]) -> str:
     return f"{col} IN ({','.join('?' * len(values))})"
 
 
+# catalog.db (BigQuery KN) and availability.db (KN exports) can spell a title differently, so a song
+# has a karaoke version when catalog.db says it came from KN (cheap column first) OR availability.db has its key.
+HAS_KARAOKE_SQL = "COALESCE({a}.in_kn, 0) = 1 OR EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)"
+
+
 def where_sql(f: RecFilters, alias: str = "s", *, has_availability: bool = True) -> tuple[str, list[object]]:
     """``(condition, params)`` for ``WHERE``; ``"1"`` when no filter is active.
 
@@ -104,9 +109,9 @@ def where_sql(f: RecFilters, alias: str = "s", *, has_availability: bool = True)
 
     if has_availability:
         if f.has_karaoke == "yes":
-            conds.append(f"EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)")
+            conds.append(HAS_KARAOKE_SQL.format(a=a))
         elif f.has_karaoke == "make":
-            conds.append(f"NOT EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)")
+            conds.append(f"NOT ({HAS_KARAOKE_SQL.format(a=a)})")
         if f.library != "any":
             clause, lib_params = library_clause(f.library, f"{a}.song_key", schema="av")
             conds.append(clause)

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from backend.services.recs_v2.context import UserContextV2
-from backend.services.recs_v2.filters import RecFilters, where_sql
+from backend.services.recs_v2.filters import HAS_KARAOKE_SQL, RecFilters, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
 from karaoke_decide.catalog.reader import CatalogReader
@@ -115,7 +115,7 @@ class _Gatherer:
 
     def no_karaoke_cond(self) -> str:
         if self.has_av:
-            return "NOT EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = s.song_key)"
+            return f"NOT ({HAS_KARAOKE_SQL.format(a='s')})"
         return "COALESCE(s.in_kn, 0) = 0"
 
     def availability(self) -> dict[str, tuple[bool, bool, bool]]:
@@ -136,6 +136,9 @@ class _Gatherer:
             """
             for r in self.conn.execute(sql, (*community_params, *karafun_params, *chunk)):
                 out[r[0]] = (bool(r[1]), bool(r[2]), bool(r[3]))
+        for k in keys:  # in KN but under another spelling than availability.db's: commercial only
+            if k not in out and self.rows[k]["in_kn"]:
+                out[k] = (False, True, False)
         return out
 
 

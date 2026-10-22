@@ -171,7 +171,15 @@ test.describe("Frontend-API Integration", () => {
     await expect(page.getByText("Queen").first()).toBeVisible();
   });
 
-  test("login page can submit to real API", async ({ page }) => {
+  // The gen send-code endpoint is mocked: hitting it would send a real login
+  // email (to e2e-integration-test@example.com) from production gen.
+  test("login page submits the email to gen's send-code endpoint", async ({ page }) => {
+    let sentTo: string | undefined;
+    await page.route("**/api/users/auth/send-code", async (route) => {
+      sentTo = route.request().postDataJSON().email;
+      await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    });
+
     await page.goto("/login");
     await page.waitForLoadState("networkidle");
 
@@ -183,14 +191,15 @@ test.describe("Frontend-API Integration", () => {
     await expect(emailInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill("e2e-integration-test@example.com");
 
-    // Submit the form - use the specific "Send Magic Link" button
-    const submitButton = page.getByRole("button", { name: /send magic link/i });
+    // Submit the form - use the "Email me a code" button
+    const submitButton = page.getByTestId("login-send-code");
     await expect(submitButton).toBeVisible();
     await submitButton.click();
 
     // Should show success message (API is working)
-    await expect(page.getByRole("heading", { name: /check your email/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /enter your code/i })).toBeVisible({
       timeout: 10000,
     });
+    expect(sentTo).toBe("e2e-integration-test@example.com");
   });
 });

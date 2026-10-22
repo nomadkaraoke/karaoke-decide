@@ -72,7 +72,7 @@ Useful for post-deploy verification and scheduled monitoring.
 
 ### GET /api/my/recommendations/v2
 
-Catalog-backed, explained recommendations (auth: decide JWT or gen session token). Query params (all optional):
+Catalog-backed, explained recommendations (auth: decide JWT or gen session token). The web recommendations page uses this endpoint (all filters, sort and library). Query params (all optional):
 `genre` (multi), `mood` (multi), `energy` (low|mid|high), `decade` (multi), `popularity` (min 0-100), `popularity_max` (0-100), `lead_gender` (male|female|mixed), `duration` (short|medium|long), `classic` (bool), `explicit` (exclude|include), `has_karaoke` (yes|make|any), `library` (any|community|karafun), `sort` (best|popular|newest|oldest|shortest|az), `cursor`.
 
 `sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
@@ -95,6 +95,16 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 ### Library filter on search
 
 `GET /api/search` and `GET /api/search/popular` accept `library=any|community|karafun`. `karafun` means KaraokeNerds brand `KV` (KaraFun / Karaoke Version catalogue); `community` means a version of kind `community`.
+
+## Test API (local stack only)
+
+`/api/test/*` is mounted only when `DECIDE_TEST_API=1` **and** the environment is not production (`backend.main._mount_test_support`); in production the routes do not exist (404). No auth, so never expose it. `scripts/local-stack.sh` enables it. Users are gen users; the profile is `decide_users/{sha256(lowercase email)}`.
+
+| Route | Purpose |
+|-------|---------|
+| `POST /api/test/profile/reset` | `{email}` → 204; deletes the user's decide data |
+| `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
+| `GET /api/test/profile?email=` | Reads the profile back |
 
 ## Song search ✅ Implemented
 
@@ -133,6 +143,8 @@ The models are in `backend/search/models.py`:
 ## Auth ✅ Implemented
 
 ### POST /api/auth/guest
+
+> The web app no longer creates guests (sign-in with a gen email code is required); the endpoint remains for legacy clients. Guests move to the signed-in user via `POST /api/auth/claim-guest`.
 
 Create a guest/anonymous user session. Allows users to try the app (quiz, recommendations) without email verification.
 

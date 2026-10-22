@@ -19,7 +19,7 @@ from google.cloud import bigquery
 
 from karaoke_decide.catalog.build import ArtistRow, CatalogRows, KnRow, SimilarRow, SongRow
 from karaoke_decide.catalog.genres import map_genres
-from karaoke_decide.catalog.keys import artist_key, match_key, song_key
+from karaoke_decide.catalog.keys import artist_key, loose_keys, match_key, song_key
 from karaoke_decide.catalog.moods import mood_for
 from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
 
@@ -295,9 +295,19 @@ def _base_key(artist: str, title: str) -> str:
     return song_key(artist, _BRACKETED_RE.sub("", title).strip() or title)
 
 
-def _kn_title_keys(kn: list[KnRow]) -> set[str]:
-    """Exact and bracket-free song keys of every KN song (what counts as "has a karaoke version")."""
-    return {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
+def _known_artist_keys(kn: list[KnRow], artists: dict[str, ArtistRow]) -> frozenset[str]:
+    """``artist_key`` of every KN artist credit and catalog artist (what makes a credit "real")."""
+    return frozenset({artist_key(k.artist) for k in kn} | set(artists)) - {""}
+
+
+def _kn_title_keys(kn: list[KnRow], known_artists: frozenset[str] = frozenset()) -> set[str]:
+    """Every key a KN song answers to (what counts as "has a karaoke version"): exact and
+    bracket-free ``song_key`` plus its ``loose_keys`` (punctuation/spacing-insensitive, primary
+    artist). A candidate whose keys hit any of these already has a karaoke version."""
+    keys = {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
+    for k in kn:
+        keys |= loose_keys(k.artist, k.title, known_artists)
+    return keys
 
 
 # Album filler that nobody sings at karaoke (whole-word match, so "Introspection" survives).
@@ -305,7 +315,10 @@ _NON_SONG_TITLE_RE = re.compile(r"\b(interlude|prelude|intro|outro|skit)\b", re.
 
 
 def _no_karaoke_songs(
-    rows: Iterator[dict[str, Any]], kn_keys: set[str], artists: dict[str, ArtistRow]
+    rows: Iterator[dict[str, Any]],
+    kn_keys: set[str],
+    artists: dict[str, ArtistRow],
+    known_artists: frozenset[str] = frozenset(),
 ) -> list[SongRow]:
     """Top listened songs per KN artist that have no KN version (in_kn = 0).
 
@@ -320,11 +333,14 @@ def _no_karaoke_songs(
         key = song_key(r["artist"], r["title"])
         base = _base_key(r["artist"], r["title"])
         a_key = artist_key(r["artist"])
-        if key in kn_keys or base in kn_keys or len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
+        loose = loose_keys(r["artist"], r["title"], known_artists)
+        if key in kn_keys or base in kn_keys or not kn_keys.isdisjoint(loose):
             continue
-        if key in seen or base in seen:
+        if len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
             continue
-        seen.update((key, base))
+        if key in seen or base in seen or not seen.isdisjoint(loose):
+            continue
+        seen.update((key, base, *loose))
         artist = artists.get(a_key)
         year = _as_int(r.get("year"))
         candidates[a_key].append(
@@ -385,7 +401,8 @@ def fetch_catalog_rows(bq: bigquery.Client, *, dry_run: bool = False) -> Catalog
     }  # best listened wins
 
     kn_songs = _kn_songs(kn, facets, artists)
-    extra = _no_karaoke_songs(_run(bq, NO_KARAOKE_SQL, dry_run=dry_run), _kn_title_keys(kn), artists)
+    known = _known_artist_keys(kn, artists)
+    extra = _no_karaoke_songs(_run(bq, NO_KARAOKE_SQL, dry_run=dry_run), _kn_title_keys(kn, known), artists, known)
     songs = [*kn_songs, *extra]
 
     wanted = {s.artist_key for s in songs}

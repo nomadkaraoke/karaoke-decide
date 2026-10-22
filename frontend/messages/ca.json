@@ -17,16 +17,11 @@
     "signIn": "Inicia sessió",
     "createAccount": "Crea un compte",
     "logOut": "Tanca la sessió",
-    "clearSession": "Neteja la sessió",
-    "guest": "Convidat",
-    "guestSession": "Sessió de convidat",
-    "createAccountToSaveProgress": "Crea un compte per desar el progrés",
     "theme": "Tema",
     "backToApp": "Torna a l'aplicació",
     "openMenu": "Obre el menú",
     "closeMenu": "Tanca el menú",
-    "profileSettings": "Configuració del perfil",
-    "clearSessionTitle": "Neteja la sessió"
+    "profileSettings": "Configuració del perfil"
   },
   "home": {
     "heroTitle": "Tria fàcilment",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "per cantar",
     "heroSubtitle": "Troba cançons que coneixes, que realment pots cantar i que encantaran al públic. Recomanacions personalitzades en 30 segons.",
     "findYourSong": "Troba la teva cançó",
-    "trustSignal": "Gratuït • No cal registrar-se • Triga 30 segons",
-    "failedToStart": "No s'ha pogut iniciar. Si us plau, torna-ho a provar.",
+    "trustSignal": "Gratis • Triga només 30 segons",
     "soundFamiliar": "Et sona familiar?",
     "soundFamiliarSubtitle": "Estàs al karaoke, fullejant el catàleg de cançons, i...",
     "problemNothingTitle": "Res et crida l'atenció",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Benvingut de nou",
-    "signInSubtitle": "Inicia sessió per accedir a les teves cançons i recomanacions",
     "emailLabel": "Adreça electrònica",
     "emailPlaceholder": "tu@exemple.com",
-    "sendMagicLink": "Envia l'enllaç màgic",
-    "noPasswordNeeded": "No cal contrasenya. T'enviarem un enllaç segur per iniciar sessió.",
     "or": "o",
     "justWantToBrowse": "Només vols fer un cop d'ull? No cal compte.",
     "browseSongs": "Explora les cançons",
-    "failedToSendMagicLink": "No s'ha pogut enviar l'enllaç màgic. Si us plau, torna-ho a provar.",
-    "checkYourEmail": "Revisa el teu correu!",
-    "magicLinkSentTo": "Hem enviat un enllaç màgic a",
-    "linkExpiresIn15": "Fes clic a l'enllaç del teu correu per iniciar sessió. L'enllaç caduca en 15 minuts.",
     "useDifferentEmail": "Utilitza un correu electrònic diferent",
     "backToHome": "Torna a l'inici",
-    "verifyingLink": "Verificant el teu enllaç...",
-    "pleaseWait": "Si us plau, espera un moment",
-    "youreSignedIn": "Has iniciat sessió!",
-    "redirectingToSongs": "Redirigint-te a les teves cançons...",
-    "connectionError": "Error de connexió",
-    "verificationFailed": "La verificació ha fallat",
-    "noTokenFound": "No s'ha trobat cap testimoni de verificació. Si us plau, sol·licita un nou enllaç màgic.",
-    "linkExpired": "Aquest enllaç màgic ha caducat. Si us plau, sol·licita'n un de nou.",
-    "linkAlreadyUsed": "Aquest enllaç màgic ja s'ha utilitzat. Si us plau, sol·licita'n un de nou.",
-    "failedToVerify": "No s'ha pogut verificar el testimoni. Pot ser que hagi caducat o ja s'hagi utilitzat.",
-    "troubleshootingTips": "Consells per resoldre problemes:",
-    "tipMobileData": "Prova d'utilitzar dades mòbils en lloc del WiFi",
-    "tipDisableVpn": "Desactiva la VPN o les extensions de bloqueig d'anuncis",
-    "tipIncognito": "Prova d'obrir en mode d'incògnit/privat",
-    "tipCorporateNetwork": "Comprova si estàs en una xarxa corporativa o escolar",
-    "retryAgainCount": "Torna-ho a provar ({count})",
-    "requestNewLink": "Sol·licita un nou enllaç",
-    "backToHomeCaps": "Torna a l'inici"
+    "codeExpired": "Aquest codi ha caducat. Si us plau, demana'n un de nou.",
+    "codeLabel": "Codi de 6 dígits",
+    "codeResent": "Un nou codi ve de camí.",
+    "codeSentTo": "Hem enviat un codi de 6 dígits per correu a",
+    "continueWithGoogle": "Continua amb Google",
+    "enterCode": "Introdueix el teu codi",
+    "failedToSendCode": "No s'ha pogut enviar el codi. Si us plau, torna-ho a provar.",
+    "failedToVerifyCode": "No s'ha pogut verificar el codi. Si us plau, torna-ho a provar.",
+    "googleSignInFailed": "Ha fallat l'inici de sessió amb Google. Si us plau, torna-ho a provar.",
+    "invalidCode": "Aquest codi no és correcte. Comprova'l i torna-ho a provar.",
+    "resendCode": "Envia un codi nou",
+    "sendCode": "Envia'm un codi per correu",
+    "signInHint": "Sense contrasenyes. T'enviarem un codi de 6 dígits per correu electrònic per iniciar la sessió amb el teu compte de Nomad Karaoke.",
+    "signInToGetPicks": "Inicia la sessió per obtenir les teves recomanacions de karaoke personalitzades",
+    "tooManyAttempts": "Massa intents. Si us plau, demana un codi nou.",
+    "verifyCode": "Verifica i inicia la sessió",
+    "importedGuestData": "Hem traslladat les teves respostes del qüestionari i les teves cançons al teu compte."
   },
   "quiz": {
     "startingQuiz": "Iniciant el qüestionari...",
@@ -182,28 +168,8 @@
     "selected": "{count} seleccionats",
     "findingMoreArtists": "Buscant més artistes que potser coneixes...",
     "noMoreArtists": "No hi ha més artistes per mostrar",
-    "almostThere": "Gairebé hi som!",
-    "enterEmailToSave": "Introdueix el teu correu electrònic per desar les teves recomanacions.",
-    "generatingRecs": "Generant les teves recomanacions...",
-    "analyzingTaste": "Analitzant els teus gustos musicals",
-    "recsReady": "Recomanacions a punt!",
-    "personalizedListWaiting": "La teva llista de cançons personalitzada t'espera",
-    "waitingToGenerate": "Esperant per generar...",
-    "startShortly": "Això començarà aviat",
-    "yourEmail": "El teu correu electrònic",
     "emailSaved": "Correu desat!",
-    "emailPlaceholder": "tu@exemple.com",
-    "saveEmail": "Desa",
-    "pleaseEnterEmail": "Si us plau, introdueix el teu correu electrònic",
-    "pleaseEnterValidEmail": "Si us plau, introdueix un correu electrònic vàlid",
-    "failedToSaveEmail": "No s'ha pogut desar el correu electrònic",
     "skipForNow": "Omet-ho per ara",
-    "emailSavedSuccess": "Correu desat!",
-    "viewRecommendations": "Veure les meves recomanacions",
-    "emailUpdatesHint": "T'enviarem actualitzacions sobre les teves recomanacions. Mai enviem correu brossa.",
-    "generatingRecommendationsButton": "Generant recomanacions...",
-    "enterEmailToContinue": "Introdueix el teu correu electrònic per continuar",
-    "pleaseEnterEmailAbove": "Si us plau, introdueix el teu correu electrònic a dalt per veure les teves recomanacions",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Cap èxit coincideix amb els filtres actuals",
     "viewMySongs": "Veure les meves cançons",
     "syncMoreMusic": "Sincronitza més música",
-    "tryAgain": "Torna-ho a provar"
+    "tryAgain": "Torna-ho a provar",
+    "libraryAny": "Qualsevol biblioteca",
+    "libraryCommunity": "Versions de la comunitat",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catàleg de KaraFun / Karaoke Version",
+    "libraryLabel": "Biblioteca de karaoke",
+    "loadMore": "Carrega'n més",
+    "loadingMore": "Carregant…",
+    "noMatchDescription": "Prova de relaxar algun filtre per veure més cançons.",
+    "noMatchTitle": "Cap suggeriment coincideix amb aquests filtres",
+    "sortAz": "De la A a la Z",
+    "sortBest": "Ideals per a tu",
+    "sortLabel": "Ordena per",
+    "sortNewest": "Més recents",
+    "sortOldest": "Més antigues",
+    "sortPopular": "Més populars",
+    "sortShortest": "Més curtes",
+    "warmingDescription": "Ho estem preparant tot. Normalment triga menys d'un minut i ho tornarem a provar automàticament.",
+    "warmingTitle": "Preparant els teus suggeriments…"
   },
   "myData": {
     "title": "Les meves dades",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Comentaris i millores",
     "feedbackDesc": "Aviat: M'encanta/amaga cançons, rang vocal i més!",
     "dataPowersRecs": "Aquestes dades impulsen les teves recomanacions de karaoke personalitzades.",
-    "createAccountToSync": "Crea un compte",
-    "toSyncServices": "per sincronitzar els teus serveis de música.",
     "moreDataBetterRecs": "Més dades = millors recomanacions.",
     "takeTheQuiz": "Fes el qüestionari",
     "orConnectMore": "o connecta més serveis.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Cerca cançons per afegir...",
     "noSongsYet": "Encara no hi ha cançons",
     "noSongsYetDesc": "Cerca a dalt per afegir cançons que coneixes i t'encanta cantar!",
-    "connectYourServices": "Connecta els teus serveis de música",
-    "connectServicesGuestDesc": "Crea un compte per connectar Spotify i Last.fm i obtenir recomanacions personalitzades basades en el teu historial d'escolta.",
-    "createAccount": "Crea un compte",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Connectat",
@@ -465,7 +444,6 @@
     "profileSection": "Perfil",
     "yourAccountInfo": "La informació del teu compte",
     "emailLabel": "Correu electrònic",
-    "guestSession": "Sessió de convidat",
     "displayNameLabel": "Nom visible",
     "displayNamePlaceholder": "Com vols que et diguem?",
     "profileUpdated": "Perfil actualitzat!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Cap servei connectat",
     "servicesConnectedCount": "{count} servei{count, plural, one {} other {s}} connectat{count, plural, one {} other {s}}",
     "logOutSection": "Tanca la sessió",
-    "clearGuestSession": "Neteja la teva sessió de convidat",
     "signOutOfAccount": "Tanca la sessió del teu compte",
     "dangerZone": "Zona de perill",
     "irreversibleActions": "Accions irreversibles",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "N'estàs segur? Això suprimirà permanentment el teu compte i totes les teves dades. Aquesta acció no es pot desfer.",
     "yesDeleteAccount": "Sí, suprimeix el meu compte",
     "deleteNotAvailable": "La supressió del compte encara no està disponible. Si us plau, contacta amb suport si necessites suprimir el teu compte.",
-    "clearSession": "Neteja la sessió",
     "logOut": "Tanca la sessió",
     "accountId": "ID del compte: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} marques",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLÀSSIC"
+      "classic": "CLÀSSIC",
+      "community": "Comunitat",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "M'agrada cantar això",
@@ -664,18 +642,6 @@
       "comfortEasy": "Fàcil",
       "comfortComfortable": "Còmoda",
       "comfortChallenging": "Exigent"
-    },
-    "postQuizEmail": {
-      "almostThere": "Gairebé hi som!",
-      "enterEmailToSeeRecs": "Introdueix el teu correu electrònic per veure les teves recomanacions personalitzades",
-      "emailPlaceholder": "el.teu@correu.com",
-      "emailLabel": "Adreça electrònica",
-      "invalidEmail": "Si us plau, introdueix una adreça de correu electrònic vàlida",
-      "failedToSaveEmail": "No s'ha pogut desar el correu electrònic",
-      "saving": "Desant...",
-      "continue": "Continua",
-      "updateNote": "T'enviarem actualitzacions sobre les teves recomanacions.",
-      "noSpam": "Gens de correu brossa, ho prometem."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artista} other {artistes}} seleccionat{count, plural, one {} other {s}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Connectar Spotify i Last.fm",
       "syncListeningHistory": "Sincronitzar el teu historial d'escolta",
       "saveProgressAcrossDevices": "Desar el teu progrés en diferents dispositius",
-      "createAndManagePlaylists": "Crear i gestionar llistes de reproducció"
+      "createAndManagePlaylists": "Crear i gestionar llistes de reproducció",
+      "createAccount": "Inicia la sessió o crea un compte"
     },
     "artistSearch": {
       "placeholder": "Cerca artistes per afegir...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Serveis connectats",
-      "createAccountToConnect": "Crea un compte per connectar",
-      "connectMusicServicesTitle": "Connecta els teus serveis de música",
-      "connectMusicServicesDesc": "Crea un compte per connectar Spotify i Last.fm per obtenir recomanacions personalitzades.",
-      "musicServicesFeature": "Serveis de música",
       "noServicesConnected": "Cap servei connectat",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" no té cap cançó que puguem llegir. Prova amb una altra llista de reproducció.",
     "errorTooManyImports": "Estàs important llistes de reproducció massa ràpidament. Espera un minut i torna-ho a provar.",
     "inputLabel": "Enllaç a la llista de reproducció de YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Èxit assegurat",
+      "decade_match": "D'una dècada que t'agrada",
+      "genre_match": "Coincideix amb els teus gèneres",
+      "known_artist": "D'un artista que t'encanta",
+      "known_song": "Aquesta te la saps",
+      "make_it": "Crea-la",
+      "similar_artist": "A l'estil de {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tot el que coincideix, en l'ordre que has triat",
+        "title": "Tots els suggeriments"
+      },
+      "artists_you_love": {
+        "reason": "Més cançons d'artistes que escoltes",
+        "title": "D'artistes que t'encanten"
+      },
+      "because": {
+        "reason": "Cançons que els fans de {artist} solen cantar",
+        "title": "Perquè t'agrada {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Cançons que fan cantar tothom",
+        "title": "Èxits assegurats"
+      },
+      "make_it": {
+        "reason": "Encara no hi ha versió de karaoke. En podem crear una per a tu",
+        "title": "Crea-la"
+      },
+      "songs_you_know": {
+        "reason": "Versions de karaoke de cançons de la teva biblioteca",
+        "title": "Cançons que coneixes"
+      }
+    }
   }
 }

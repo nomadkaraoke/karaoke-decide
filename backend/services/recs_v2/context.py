@@ -102,7 +102,7 @@ def _map_songs(
             if not artist or not title:
                 continue
             key = song_key(artist, title)
-            has_karaoke = reader.match_kn(artist, title) is not None
+            has_karaoke = reader.match_kn(artist, title) is not None or reader.has_karaoke_key(key)
         known[key] = max(known.get(key, 0.0), w.song_weight(d))
         if not has_karaoke:
             no_karaoke.setdefault(key, (key, artist, title))

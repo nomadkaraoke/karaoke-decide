@@ -17,16 +17,11 @@
     "signIn": "Logg inn",
     "createAccount": "Opprett konto",
     "logOut": "Logg ut",
-    "clearSession": "Tøm økt",
-    "guest": "Gjest",
-    "guestSession": "Gjesteøkt",
-    "createAccountToSaveProgress": "Opprett en konto for å lagre fremdriften",
     "theme": "Tema",
     "backToApp": "Tilbake til appen",
     "openMenu": "Åpne meny",
     "closeMenu": "Lukk meny",
-    "profileSettings": "Profilinnstillinger",
-    "clearSessionTitle": "Tøm økt"
+    "profileSettings": "Profilinnstillinger"
   },
   "home": {
     "heroTitle": "Velg enkelt",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "å synge",
     "heroSubtitle": "Finn sanger du kan, som du faktisk klarer å synge, og som publikum vil elske. Personlige anbefalinger på 30 sekunder.",
     "findYourSong": "Finn din sang",
-    "trustSignal": "Gratis • Ingen registrering kreves • Tar 30 sekunder",
-    "failedToStart": "Kunne ikke starte. Vennligst prøv igjen.",
+    "trustSignal": "Gratis • Tar 30 sekunder",
     "soundFamiliar": "Høres det kjent ut?",
     "soundFamiliarSubtitle": "Du er på karaoke, blar gjennom sangboka, og...",
     "problemNothingTitle": "Ingenting skiller seg ut",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Velkommen tilbake",
-    "signInSubtitle": "Logg inn for å få tilgang til sangene og anbefalingene dine",
     "emailLabel": "E-postadresse",
     "emailPlaceholder": "du@eksempel.com",
-    "sendMagicLink": "Send magisk lenke",
-    "noPasswordNeeded": "Ingen passord nødvendig. Vi sender deg en sikker lenke for å logge inn.",
     "or": "eller",
     "justWantToBrowse": "Vil du bare kikke? Ingen konto nødvendig.",
     "browseSongs": "Bla gjennom sanger",
-    "failedToSendMagicLink": "Kunne ikke sende magisk lenke. Vennligst prøv igjen.",
-    "checkYourEmail": "Sjekk e-posten din!",
-    "magicLinkSentTo": "Vi sendte en magisk lenke til",
-    "linkExpiresIn15": "Klikk på lenken i e-posten din for å logge inn. Lenken utløper om 15 minutter.",
     "useDifferentEmail": "Bruk en annen e-post",
     "backToHome": "Tilbake til forsiden",
-    "verifyingLink": "Bekrefter lenken din...",
-    "pleaseWait": "Vennligst vent et øyeblikk",
-    "youreSignedIn": "Du er logget inn!",
-    "redirectingToSongs": "Omdirigerer deg til sangene dine...",
-    "connectionError": "Tilkoblingsfeil",
-    "verificationFailed": "Bekreftelse mislyktes",
-    "noTokenFound": "Ingen bekreftelseskode funnet. Vennligst be om en ny magisk lenke.",
-    "linkExpired": "Denne magiske lenken har utløpt. Vennligst be om en ny.",
-    "linkAlreadyUsed": "Denne magiske lenken er allerede brukt. Vennligst be om en ny.",
-    "failedToVerify": "Kunne ikke bekrefte koden. Den kan ha utløpt eller allerede vært brukt.",
-    "troubleshootingTips": "Feilsøkingstips:",
-    "tipMobileData": "Prøv å bruke mobildata i stedet for WiFi",
-    "tipDisableVpn": "Deaktiver VPN eller annonseblokkerere",
-    "tipIncognito": "Prøv å åpne i inkognito/privat modus",
-    "tipCorporateNetwork": "Sjekk om du er på et bedrifts- eller skolenettverk",
-    "retryAgainCount": "Prøv igjen ({count})",
-    "requestNewLink": "Be om ny lenke",
-    "backToHomeCaps": "Tilbake til forsiden"
+    "codeExpired": "Koden har utløpt. Be om en ny.",
+    "codeLabel": "Sekssifret kode",
+    "codeResent": "En ny kode er på vei.",
+    "codeSentTo": "Vi har sendt en sekssifret kode til",
+    "continueWithGoogle": "Fortsett med Google",
+    "enterCode": "Skriv inn koden",
+    "failedToSendCode": "Kunne ikke sende koden. Prøv igjen.",
+    "failedToVerifyCode": "Kunne ikke bekrefte koden. Prøv igjen.",
+    "googleSignInFailed": "Innlogging med Google mislyktes. Prøv igjen.",
+    "invalidCode": "Koden er feil. Sjekk den og prøv igjen.",
+    "resendCode": "Send en ny kode",
+    "sendCode": "Send meg en kode på e-post",
+    "signInHint": "Passord er ikke nødvendig. Vi sender deg en sekssifret kode på e-post for å logge inn på Nomad Karaoke-kontoen din.",
+    "signInToGetPicks": "Logg inn for å få dine personlige karaoke-anbefalinger",
+    "tooManyAttempts": "For mange forsøk. Be om en ny kode.",
+    "verifyCode": "Bekreft og logg inn",
+    "importedGuestData": "Vi har flyttet quizsvarene og sangene dine til kontoen din."
   },
   "quiz": {
     "startingQuiz": "Starter quiz...",
@@ -182,28 +168,8 @@
     "selected": "{count} valgt",
     "findingMoreArtists": "Finner flere artister du kanskje kjenner...",
     "noMoreArtists": "Ingen flere artister å vise",
-    "almostThere": "Nesten der!",
-    "enterEmailToSave": "Skriv inn e-posten din for å lagre anbefalingene dine.",
-    "generatingRecs": "Genererer anbefalingene dine...",
-    "analyzingTaste": "Analyserer musikksmaken din",
-    "recsReady": "Anbefalinger klare!",
-    "personalizedListWaiting": "Din personlige sangliste venter",
-    "waitingToGenerate": "Venter på å generere...",
-    "startShortly": "Dette vil starte snart",
-    "yourEmail": "Din e-post",
     "emailSaved": "E-post lagret!",
-    "emailPlaceholder": "du@eksempel.com",
-    "saveEmail": "Lagre",
-    "pleaseEnterEmail": "Vennligst skriv inn e-posten din",
-    "pleaseEnterValidEmail": "Vennligst skriv inn en gyldig e-postadresse",
-    "failedToSaveEmail": "Kunne ikke lagre e-post",
     "skipForNow": "Hopp over for nå",
-    "emailSavedSuccess": "E-post lagret!",
-    "viewRecommendations": "Se mine anbefalinger",
-    "emailUpdatesHint": "Vi sender deg oppdateringer om anbefalingene dine. Ingen spam, noensinne.",
-    "generatingRecommendationsButton": "Genererer anbefalinger...",
-    "enterEmailToContinue": "Skriv inn e-posten din for å fortsette",
-    "pleaseEnterEmailAbove": "Vennligst skriv inn e-posten din ovenfor for å se anbefalingene dine",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Ingen publikumsfavoritter matcher de nåværende filtrene",
     "viewMySongs": "Se mine sanger",
     "syncMoreMusic": "Synkroniser mer musikk",
-    "tryAgain": "Prøv igjen"
+    "tryAgain": "Prøv igjen",
+    "libraryAny": "Alle biblioteker",
+    "libraryCommunity": "Fellesskapsversjoner",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun- / Karaoke Version-katalogen",
+    "libraryLabel": "Karaokebibliotek",
+    "loadMore": "Last inn mer",
+    "loadingMore": "Laster inn…",
+    "noMatchDescription": "Prøv å fjerne eller justere et filter eller to for å se flere sanger.",
+    "noMatchTitle": "Ingen anbefalinger passer til disse filtrene",
+    "sortAz": "A til Å",
+    "sortBest": "Beste for deg",
+    "sortLabel": "Sorter etter",
+    "sortNewest": "Nyeste",
+    "sortOldest": "Eldste",
+    "sortPopular": "Mest populære",
+    "sortShortest": "Korteste",
+    "warmingDescription": "Vi gjør alt klart. Dette tar vanligvis under ett minutt, og vi prøver automatisk på nytt.",
+    "warmingTitle": "Gjør klar anbefalingene dine…"
   },
   "myData": {
     "title": "Mine data",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Tilbakemelding og justeringer",
     "feedbackDesc": "Kommer snart: Elsk/skjul sanger, stemmeregister, mer!",
     "dataPowersRecs": "Disse dataene driver dine personlige karaokeanbefalinger.",
-    "createAccountToSync": "Opprett en konto",
-    "toSyncServices": "for å synkronisere musikktjenestene dine.",
     "moreDataBetterRecs": "Mer data = bedre anbefalinger.",
     "takeTheQuiz": "Ta quizen",
     "orConnectMore": "eller koble til flere tjenester.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Søk etter sanger å legge til...",
     "noSongsYet": "Ingen sanger ennå",
     "noSongsYetDesc": "Søk ovenfor for å legge til sanger du kan og elsker å synge!",
-    "connectYourServices": "Koble til musikktjenestene dine",
-    "connectServicesGuestDesc": "Opprett en konto for å koble til Spotify og Last.fm for personlige anbefalinger basert på lyttehistorikken din.",
-    "createAccount": "Opprett konto",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Tilkoblet",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Din kontoinformasjon",
     "emailLabel": "E-post",
-    "guestSession": "Gjesteøkt",
     "displayNameLabel": "Visningsnavn",
     "displayNamePlaceholder": "Hva skal vi kalle deg?",
     "profileUpdated": "Profil oppdatert!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Ingen tjenester tilkoblet",
     "servicesConnectedCount": "{count} tjeneste{count, plural, one {} other {r}} tilkoblet",
     "logOutSection": "Logg ut",
-    "clearGuestSession": "Tøm gjesteøkten din",
     "signOutOfAccount": "Logg ut av kontoen din",
     "dangerZone": "Faresone",
     "irreversibleActions": "Handlinger som ikke kan angres",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Er du sikker? Dette vil slette kontoen din og alle dataene dine permanent. Denne handlingen kan ikke angres.",
     "yesDeleteAccount": "Ja, slett kontoen min",
     "deleteNotAvailable": "Sletting av konto er foreløpig ikke tilgjengelig. Vennligst kontakt support hvis du trenger å slette kontoen din.",
-    "clearSession": "Tøm økt",
     "logOut": "Logg ut",
     "accountId": "Konto-ID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} merker",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIKER"
+      "classic": "KLASSIKER",
+      "community": "Fellesskap",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Jeg liker å synge denne",
@@ -664,18 +642,6 @@
       "comfortEasy": "Enkel",
       "comfortComfortable": "Komfortabel",
       "comfortChallenging": "Utfordrende"
-    },
-    "postQuizEmail": {
-      "almostThere": "Nesten der!",
-      "enterEmailToSeeRecs": "Skriv inn e-posten din for å se dine personlige anbefalinger",
-      "emailPlaceholder": "din@epost.no",
-      "emailLabel": "E-postadresse",
-      "invalidEmail": "Vennligst skriv inn en gyldig e-postadresse",
-      "failedToSaveEmail": "Kunne ikke lagre e-post",
-      "saving": "Lagrer...",
-      "continue": "Fortsett",
-      "updateNote": "Vi sender deg oppdateringer om anbefalingene dine.",
-      "noSpam": "Ingen spam, vi lover."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artist} other {artister}} valgt",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Koble til Spotify og Last.fm",
       "syncListeningHistory": "Synkronisere lyttehistorikken din",
       "saveProgressAcrossDevices": "Lagre fremdriften din på tvers av enheter",
-      "createAndManagePlaylists": "Opprette og administrere spillelister"
+      "createAndManagePlaylists": "Opprette og administrere spillelister",
+      "createAccount": "Logg inn eller opprett konto"
     },
     "artistSearch": {
       "placeholder": "Søk etter artister å legge til...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Tilkoblede tjenester",
-      "createAccountToConnect": "Opprett en konto for å koble til",
-      "connectMusicServicesTitle": "Koble til musikktjenestene dine",
-      "connectMusicServicesDesc": "Opprett en konto for å koble til Spotify og Last.fm for personlige anbefalinger.",
-      "musicServicesFeature": "Musikktjenester",
       "noServicesConnected": "Ingen tjenester tilkoblet",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" har ingen sanger vi kunne lese. Prøv en annen spilleliste.",
     "errorTooManyImports": "Du importerer spillelister for raskt. Vent et minutt og prøv igjen.",
     "inputLabel": "Lenke til YouTube Music-spilleliste"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publikumsfavoritt",
+      "decade_match": "Fra et tiår du liker",
+      "genre_match": "Matcher sjangrene dine",
+      "known_artist": "Fra en artist du elsker",
+      "known_song": "Denne kan du",
+      "make_it": "Lag den",
+      "similar_artist": "Ligner på {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Alt som matcher, i den rekkefølgen du har valgt",
+        "title": "Alle anbefalinger"
+      },
+      "artists_you_love": {
+        "reason": "Flere sanger av artister du lytter til",
+        "title": "Fra artister du elsker"
+      },
+      "because": {
+        "reason": "Sanger som fans av {artist} pleier å synge",
+        "title": "Fordi du liker {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Sanger som får hele rommet til å synge med",
+        "title": "Publikumsfavoritter"
+      },
+      "make_it": {
+        "reason": "Ingen karaokeversjon ennå. Vi kan lage en til deg",
+        "title": "Lag den"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversjoner av sanger fra biblioteket ditt",
+        "title": "Sanger du kjenner"
+      }
+    }
   }
 }

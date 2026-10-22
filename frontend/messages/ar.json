@@ -17,16 +17,11 @@
     "signIn": "تسجيل الدخول",
     "createAccount": "إنشاء حساب",
     "logOut": "تسجيل الخروج",
-    "clearSession": "مسح الجلسة",
-    "guest": "ضيف",
-    "guestSession": "جلسة الضيف",
-    "createAccountToSaveProgress": "أنشئ حساباً لحفظ تقدمك",
     "theme": "المظهر",
     "backToApp": "العودة للتطبيق",
     "openMenu": "فتح القائمة",
     "closeMenu": "إغلاق القائمة",
-    "profileSettings": "إعدادات الملف الشخصي",
-    "clearSessionTitle": "مسح الجلسة"
+    "profileSettings": "إعدادات الملف الشخصي"
   },
   "home": {
     "heroTitle": "اختر بسهولة",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "لتغنيها",
     "heroSubtitle": "ابحث عن الأغاني التي تعرفها، وتستطيع غناءها فعلاً، وسيحبها الجمهور. توصيات مخصصة في 30 ثانية.",
     "findYourSong": "ابحث عن أغنيتك",
-    "trustSignal": "مجاني • لا يتطلب التسجيل • يستغرق 30 ثانية",
-    "failedToStart": "فشل البدء. يرجى المحاولة مرة أخرى.",
+    "trustSignal": "مجاني • يستغرق 30 ثانية",
     "soundFamiliar": "هل يبدو هذا مألوفاً؟",
     "soundFamiliarSubtitle": "أنت في الكاريوكي، تتصفح كتاب الأغاني، و...",
     "problemNothingTitle": "لا شيء يلفت انتباهك",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "مرحباً بعودتك",
-    "signInSubtitle": "سجل الدخول للوصول إلى أغانيك وتوصياتك",
     "emailLabel": "عنوان البريد الإلكتروني",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "إرسال الرابط السحري",
-    "noPasswordNeeded": "لا حاجة لكلمة مرور. سنرسل لك رابطاً آمناً لتسجيل الدخول.",
     "or": "أو",
     "justWantToBrowse": "هل تريد التصفح فقط؟ لا حاجة لحساب.",
     "browseSongs": "تصفح الأغاني",
-    "failedToSendMagicLink": "فشل إرسال الرابط السحري. يرجى المحاولة مرة أخرى.",
-    "checkYourEmail": "تحقق من بريدك الإلكتروني!",
-    "magicLinkSentTo": "لقد أرسلنا رابطاً سحرياً إلى",
-    "linkExpiresIn15": "انقر على الرابط في بريدك الإلكتروني لتسجيل الدخول. تنتهي صلاحية الرابط خلال 15 دقيقة.",
     "useDifferentEmail": "استخدم بريداً إلكترونياً مختلفاً",
     "backToHome": "العودة للرئيسية",
-    "verifyingLink": "جاري التحقق من الرابط...",
-    "pleaseWait": "يرجى الانتظار لحظة",
-    "youreSignedIn": "لقد قمت بتسجيل الدخول!",
-    "redirectingToSongs": "جاري توجيهك إلى أغانيك...",
-    "connectionError": "خطأ في الاتصال",
-    "verificationFailed": "فشل التحقق",
-    "noTokenFound": "لم يتم العثور على رمز التحقق. يرجى طلب رابط سحري جديد.",
-    "linkExpired": "انتهت صلاحية هذا الرابط السحري. يرجى طلب رابط جديد.",
-    "linkAlreadyUsed": "تم استخدام هذا الرابط السحري بالفعل. يرجى طلب رابط جديد.",
-    "failedToVerify": "فشل التحقق من الرمز. قد يكون منتهي الصلاحية أو تم استخدامه بالفعل.",
-    "troubleshootingTips": "نصائح استكشاف الأخطاء وإصلاحها:",
-    "tipMobileData": "جرب استخدام بيانات الهاتف المحمول بدلاً من شبكة WiFi",
-    "tipDisableVpn": "قم بتعطيل VPN أو إضافات حظر الإعلانات",
-    "tipIncognito": "جرب الفتح في وضع التصفح المتخفي/الخاص",
-    "tipCorporateNetwork": "تحقق مما إذا كنت على شبكة شركة أو مدرسة",
-    "retryAgainCount": "حاول مرة أخرى ({count})",
-    "requestNewLink": "طلب رابط جديد",
-    "backToHomeCaps": "العودة للرئيسية"
+    "codeExpired": "انتهت صلاحية هذا الرمز. يُرجى طلب رمز جديد.",
+    "codeLabel": "رمز من 6 أرقام",
+    "codeResent": "تم إرسال رمز جديد وهو في طريقه إليك.",
+    "codeSentTo": "أرسلنا رمزًا مكونًا من 6 أرقام عبر البريد الإلكتروني إلى",
+    "continueWithGoogle": "المتابعة باستخدام Google",
+    "enterCode": "أدخل الرمز",
+    "failedToSendCode": "تعذر إرسال الرمز. يُرجى المحاولة مرة أخرى.",
+    "failedToVerifyCode": "تعذر التحقق من الرمز. يُرجى المحاولة مرة أخرى.",
+    "googleSignInFailed": "فشل تسجيل الدخول باستخدام Google. يُرجى المحاولة مرة أخرى.",
+    "invalidCode": "هذا الرمز غير صحيح. يُرجى التحقق منه والمحاولة مرة أخرى.",
+    "resendCode": "إرسال رمز جديد",
+    "sendCode": "أرسل لي رمزًا عبر البريد الإلكتروني",
+    "signInHint": "لا حاجة لكلمة مرور. سنرسل إليك رمزًا مكونًا من 6 أرقام عبر البريد الإلكتروني لتسجيل الدخول إلى حسابك في Nomad Karaoke.",
+    "signInToGetPicks": "سجّل الدخول للحصول على ترشيحات الكاريوكي المخصصة لك",
+    "tooManyAttempts": "محاولات كثيرة جدًا. يُرجى طلب رمز جديد.",
+    "verifyCode": "التحقق وتسجيل الدخول",
+    "importedGuestData": "لقد نقلنا إجابات الاختبار وأغانيك إلى حسابك."
   },
   "quiz": {
     "startingQuiz": "جاري بدء الاختبار...",
@@ -182,28 +168,8 @@
     "selected": "تم تحديد {count}",
     "findingMoreArtists": "جاري العثور على المزيد من الفنانين الذين قد تعرفهم...",
     "noMoreArtists": "لا يوجد المزيد من الفنانين لعرضهم",
-    "almostThere": "أوشكنا على الانتهاء!",
-    "enterEmailToSave": "أدخل بريدك الإلكتروني لحفظ توصياتك.",
-    "generatingRecs": "جاري إنشاء توصياتك...",
-    "analyzingTaste": "جاري تحليل ذوقك الموسيقي",
-    "recsReady": "التوصيات جاهزة!",
-    "personalizedListWaiting": "قائمة أغانيك المخصصة في انتظارك",
-    "waitingToGenerate": "في انتظار الإنشاء...",
-    "startShortly": "سيبدأ هذا قريباً",
-    "yourEmail": "بريدك الإلكتروني",
     "emailSaved": "تم حفظ البريد الإلكتروني!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "حفظ",
-    "pleaseEnterEmail": "يرجى إدخال بريدك الإلكتروني",
-    "pleaseEnterValidEmail": "يرجى إدخال بريد إلكتروني صحيح",
-    "failedToSaveEmail": "فشل حفظ البريد الإلكتروني",
     "skipForNow": "تخطي الآن",
-    "emailSavedSuccess": "تم حفظ البريد الإلكتروني!",
-    "viewRecommendations": "عرض توصياتي",
-    "emailUpdatesHint": "سنرسل لك تحديثات حول توصياتك. لا رسائل مزعجة، أبداً.",
-    "generatingRecommendationsButton": "جاري إنشاء التوصيات...",
-    "enterEmailToContinue": "أدخل بريدك الإلكتروني للمتابعة",
-    "pleaseEnterEmailAbove": "يرجى إدخال بريدك الإلكتروني أعلاه لرؤية توصياتك",
     "genres": {
       "pop": "بوب",
       "rock": "روك",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "لا توجد أغاني جماهيرية تطابق عوامل التصفية الحالية",
     "viewMySongs": "عرض أغنياتي",
     "syncMoreMusic": "مزامنة المزيد من الموسيقى",
-    "tryAgain": "حاول مرة أخرى"
+    "tryAgain": "حاول مرة أخرى",
+    "libraryAny": "أي مكتبة",
+    "libraryCommunity": "إصدارات المجتمع",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "دليل KaraFun / Karaoke Version",
+    "libraryLabel": "مكتبة الكاريوكي",
+    "loadMore": "عرض المزيد",
+    "loadingMore": "جارٍ التحميل…",
+    "noMatchDescription": "جرّب تخفيف فلتر أو اثنين لرؤية المزيد من الأغاني.",
+    "noMatchTitle": "لا توجد اختيارات تطابق هذه الفلاتر",
+    "sortAz": "أبجديًا (أ - ي)",
+    "sortBest": "الأفضل لك",
+    "sortLabel": "ترتيب حسب",
+    "sortNewest": "الأحدث",
+    "sortOldest": "الأقدم",
+    "sortPopular": "الأكثر رواجًا",
+    "sortShortest": "الأقصر مدة",
+    "warmingDescription": "نعمل على تجهيز كل شيء. يستغرق هذا عادةً أقل من دقيقة، وسنعاود المحاولة تلقائيًا.",
+    "warmingTitle": "جارٍ تحضير اختياراتك…"
   },
   "myData": {
     "title": "بياناتي",
@@ -299,8 +283,6 @@
     "feedbackTitle": "الملاحظات والتحسينات",
     "feedbackDesc": "قريباً: إبداء الإعجاب/إخفاء الأغاني، النطاق الصوتي، والمزيد!",
     "dataPowersRecs": "هذه البيانات تدعم توصيات الكاريوكي المخصصة لك.",
-    "createAccountToSync": "إنشاء حساب",
-    "toSyncServices": "لمزامنة خدماتك الموسيقية.",
     "moreDataBetterRecs": "بيانات أكثر = توصيات أفضل.",
     "takeTheQuiz": "إجراء الاختبار",
     "orConnectMore": "أو اربط المزيد من الخدمات.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "ابحث عن أغانٍ لإضافتها...",
     "noSongsYet": "لا توجد أغانٍ بعد",
     "noSongsYetDesc": "ابحث أعلاه لإضافة الأغاني التي تعرفها وتحب غناءها!",
-    "connectYourServices": "اربط خدماتك الموسيقية",
-    "connectServicesGuestDesc": "أنشئ حساباً لربط Spotify و Last.fm للحصول على توصيات مخصصة بناءً على سجل استماعك.",
-    "createAccount": "إنشاء حساب",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "متصل",
@@ -465,7 +444,6 @@
     "profileSection": "الملف الشخصي",
     "yourAccountInfo": "معلومات حسابك",
     "emailLabel": "البريد الإلكتروني",
-    "guestSession": "جلسة ضيف",
     "displayNameLabel": "اسم العرض",
     "displayNamePlaceholder": "كيف يجب أن نناديك؟",
     "profileUpdated": "تم تحديث الملف الشخصي!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "لا توجد خدمات متصلة",
     "servicesConnectedCount": "تم ربط {count} {count, plural, one {خدمة} other {خدمات}}",
     "logOutSection": "تسجيل الخروج",
-    "clearGuestSession": "مسح جلسة الضيف الخاصة بك",
     "signOutOfAccount": "تسجيل الخروج من حسابك",
     "dangerZone": "منطقة الخطر",
     "irreversibleActions": "إجراءات لا يمكن التراجع عنها",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "هل أنت متأكد؟ سيؤدي هذا إلى حذف حسابك وجميع بياناتك بشكل دائم. لا يمكن التراجع عن هذا الإجراء.",
     "yesDeleteAccount": "نعم، احذف حسابي",
     "deleteNotAvailable": "حذف الحساب غير متاح بعد. يرجى الاتصال بالدعم إذا كنت بحاجة إلى حذف حسابك.",
-    "clearSession": "مسح الجلسة",
     "logOut": "تسجيل الخروج",
     "accountId": "معرف الحساب: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} علامات تجارية",
       "pop": "بوب: {value}",
       "explicit": "E",
-      "classic": "كلاسيكي"
+      "classic": "كلاسيكي",
+      "community": "المجتمع",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "أستمتع بغناء هذه",
@@ -664,18 +642,6 @@
       "comfortEasy": "سهلة",
       "comfortComfortable": "مريحة",
       "comfortChallenging": "صعبة"
-    },
-    "postQuizEmail": {
-      "almostThere": "أوشكنا على الانتهاء!",
-      "enterEmailToSeeRecs": "أدخل بريدك الإلكتروني لرؤية توصياتك المخصصة",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "عنوان البريد الإلكتروني",
-      "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صحيح",
-      "failedToSaveEmail": "فشل حفظ البريد الإلكتروني",
-      "saving": "جاري الحفظ...",
-      "continue": "متابعة",
-      "updateNote": "سنرسل لك تحديثات حول توصياتك.",
-      "noSpam": "لا رسائل مزعجة، نعدك بذلك."
     },
     "stickyFinish": {
       "artistSelected": "تم تحديد {count, plural, one {فنان واحد} other {# فنانين}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "ربط Spotify و Last.fm",
       "syncListeningHistory": "مزامنة سجل استماعك",
       "saveProgressAcrossDevices": "حفظ تقدمك عبر الأجهزة",
-      "createAndManagePlaylists": "إنشاء وإدارة قوائم التشغيل"
+      "createAndManagePlaylists": "إنشاء وإدارة قوائم التشغيل",
+      "createAccount": "تسجيل الدخول أو إنشاء حساب"
     },
     "artistSearch": {
       "placeholder": "ابحث عن فنانين لإضافتهم...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "الخدمات المتصلة",
-      "createAccountToConnect": "أنشئ حساباً للربط",
-      "connectMusicServicesTitle": "اربط خدماتك الموسيقية",
-      "connectMusicServicesDesc": "أنشئ حساباً لربط Spotify و Last.fm للحصول على توصيات مخصصة.",
-      "musicServicesFeature": "الخدمات الموسيقية",
       "noServicesConnected": "لا توجد خدمات متصلة",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "لا تحتوي \"{title}\" على أي أغانٍ يمكننا قراءتها. يُرجى تجربة قائمة تشغيل أخرى.",
     "errorTooManyImports": "أنت تستورد قوائم التشغيل بسرعة كبيرة. يُرجى الانتظار لمدة دقيقة والمحاولة مرة أخرى.",
     "inputLabel": "رابط قائمة تشغيل YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "المفضلة لدى الجميع",
+      "decade_match": "من حقبة تفضلها",
+      "genre_match": "تناسب الأنواع المفضلة لديك",
+      "known_artist": "لفنان تحبه",
+      "known_song": "أنت تعرف هذه الأغنية",
+      "make_it": "أنشئها",
+      "similar_artist": "شبيه بأعمال {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "كل ما يتطابق، بالترتيب الذي اخترته",
+        "title": "جميع الاختيارات"
+      },
+      "artists_you_love": {
+        "reason": "المزيد من الأغاني لفنانين تستمع إليهم",
+        "title": "لفنانين تحبهم"
+      },
+      "because": {
+        "reason": "أغانٍ يميل عشاق {artist} إلى غنائها",
+        "title": "لأنك تحب {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "أغانٍ تجعل الجميع يشاركون في الغناء",
+        "title": "المفضلة لدى الجماهير"
+      },
+      "make_it": {
+        "reason": "لا تتوفر نسخة كاريوكي بعد. يمكننا إنشاء واحدة لك",
+        "title": "أنشئها"
+      },
+      "songs_you_know": {
+        "reason": "نسخ كاريوكي لأغانٍ من مكتبتك",
+        "title": "أغانٍ تعرفها"
+      }
+    }
   }
 }

@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from "react";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import {
   ConnectedServicesSection,
@@ -42,7 +41,6 @@ interface DataSummary {
 }
 
 export default function MyDataPage() {
-  const { isGuest } = useAuth();
   const t = useTranslations("myData");
   const [summary, setSummary] = useState<DataSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -217,14 +215,6 @@ export default function MyDataPage() {
                   {t("dataPowersRecs")}
                 </p>
                 <p className="mt-1">
-                  {isGuest ? (
-                    <>
-                      <Link href="/login" className="text-[var(--brand-blue)] hover:underline">
-                        {t("createAccountToSync")}
-                      </Link>{" "}
-                      {t("toSyncServices")}
-                    </>
-                  ) : (
                     <>
                       {t("moreDataBetterRecs")}{" "}
                       <Link href="/quiz" className="text-[var(--brand-blue)] hover:underline">
@@ -232,7 +222,6 @@ export default function MyDataPage() {
                       </Link>{" "}
                       {t("orConnectMore")}
                     </>
-                  )}
                 </p>
               </div>
             </>

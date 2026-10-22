@@ -17,16 +17,11 @@
     "signIn": "Mag-sign In",
     "createAccount": "Gumawa ng Account",
     "logOut": "Mag-log out",
-    "clearSession": "I-clear ang Session",
-    "guest": "Guest",
-    "guestSession": "Guest Session",
-    "createAccountToSaveProgress": "Gumawa ng account para ma-save ang progress",
     "theme": "Tema",
     "backToApp": "Bumalik sa App",
     "openMenu": "Buksan ang menu",
     "closeMenu": "Isara ang menu",
-    "profileSettings": "Mga setting ng profile",
-    "clearSessionTitle": "I-clear ang session"
+    "profileSettings": "Mga setting ng profile"
   },
   "home": {
     "heroTitle": "Madaling Pumili ng",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "na Kakantahin",
     "heroSubtitle": "Humanap ng mga kantang alam mo, kaya mong kantahin, at magugustuhan ng mga tao. Mga personal na rekomendasyon sa loob ng 30 segundo.",
     "findYourSong": "Hanapin ang Iyong Kanta",
-    "trustSignal": "Libre • Walang sign-up na kailangan • Tumatagal ng 30 segundo",
-    "failedToStart": "Nabigong magsimula. Pakisubukan muli.",
+    "trustSignal": "Libre • Aabutin lang ng 30 segundo",
     "soundFamiliar": "Pamilyar ba?",
     "soundFamiliarSubtitle": "Nasa karaoke ka, naghahanap sa songbook, at...",
     "problemNothingTitle": "Walang pumukaw ng atensyon",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Maligayang pagbabalik",
-    "signInSubtitle": "Mag-sign in para ma-access ang iyong mga kanta at rekomendasyon",
     "emailLabel": "Email address",
     "emailPlaceholder": "ikaw@example.com",
-    "sendMagicLink": "Ipadala ang Magic Link",
-    "noPasswordNeeded": "Hindi kailangan ng password. Padadalhan ka namin ng secure link para mag-sign in.",
     "or": "o",
     "justWantToBrowse": "Gusto lang mag-browse? Hindi kailangan ng account.",
     "browseSongs": "Mag-browse ng mga Kanta",
-    "failedToSendMagicLink": "Nabigong ipadala ang magic link. Pakisubukan muli.",
-    "checkYourEmail": "Tingnan ang iyong email!",
-    "magicLinkSentTo": "Nagpadala kami ng magic link sa",
-    "linkExpiresIn15": "I-click ang link sa iyong email para mag-sign in. Mag-e-expire ang link sa loob ng 15 minuto.",
     "useDifferentEmail": "Gumamit ng ibang email",
     "backToHome": "Bumalik sa home",
-    "verifyingLink": "Bini-verify ang iyong link...",
-    "pleaseWait": "Maghintay sandali",
-    "youreSignedIn": "Naka-sign in ka na!",
-    "redirectingToSongs": "Nire-redirect ka sa iyong mga kanta...",
-    "connectionError": "Error sa Koneksyon",
-    "verificationFailed": "Nabigo ang Pag-verify",
-    "noTokenFound": "Walang nakitang verification token. Mangyaring humiling ng bagong magic link.",
-    "linkExpired": "Nag-expire na ang magic link na ito. Mangyaring humiling ng bago.",
-    "linkAlreadyUsed": "Nagamit na ang magic link na ito. Mangyaring humiling ng bago.",
-    "failedToVerify": "Nabigong i-verify ang token. Maaaring nag-expire na ito o nagamit na.",
-    "troubleshootingTips": "Mga tip sa pag-troubleshoot:",
-    "tipMobileData": "Subukang gumamit ng mobile data sa halip na WiFi",
-    "tipDisableVpn": "I-disable ang VPN o mga ad-blocker extension",
-    "tipIncognito": "Subukang buksan sa incognito/private mode",
-    "tipCorporateNetwork": "Tingnan kung nasa corporate o school network ka",
-    "retryAgainCount": "Subukan Muli ({count})",
-    "requestNewLink": "Humiling ng Bagong Link",
-    "backToHomeCaps": "Bumalik sa Home"
+    "codeExpired": "Nag-expire na ang code na 'yan. Pakihiling muli ng bago.",
+    "codeLabel": "6-digit na code",
+    "codeResent": "Papadating na ang bagong code.",
+    "codeSentTo": "Nag-email kami ng 6-digit na code sa",
+    "continueWithGoogle": "Magpatuloy gamit ang Google",
+    "enterCode": "Ilagay ang iyong code",
+    "failedToSendCode": "Hindi maipadala ang code. Pakisubukan muli.",
+    "failedToVerifyCode": "Hindi ma-verify ang code. Pakisubukan muli.",
+    "googleSignInFailed": "Hindi nagtagumpay ang pag-sign in gamit ang Google. Pakisubukan muli.",
+    "invalidCode": "Mali ang code na 'yan. I-check ito at subukang muli.",
+    "resendCode": "Magpadala ng bagong code",
+    "sendCode": "I-email sa akin ang code",
+    "signInHint": "Walang password na kailangan. Mag-e-email kami sa iyo ng 6-digit na code para makapag-sign in sa iyong Nomad Karaoke account.",
+    "signInToGetPicks": "Mag-sign in para makuha ang iyong personalized na mga karaoke pick",
+    "tooManyAttempts": "Masyadong maraming pagtatangka. Pakihiling muli ng bagong code.",
+    "verifyCode": "I-verify at mag-sign in",
+    "importedGuestData": "Inilipat namin ang iyong mga sagot sa quiz at mga kanta sa iyong account."
   },
   "quiz": {
     "startingQuiz": "Sinisimulan ang quiz...",
@@ -182,28 +168,8 @@
     "selected": "{count} ang napili",
     "findingMoreArtists": "Naghahanap ng higit pang mga artist na baka kilala mo...",
     "noMoreArtists": "Wala nang artist na ipapakita",
-    "almostThere": "Malapit na!",
-    "enterEmailToSave": "Ilagay ang iyong email para i-save ang iyong mga rekomendasyon.",
-    "generatingRecs": "Binubuo ang iyong mga rekomendasyon...",
-    "analyzingTaste": "Sinusuri ang iyong panlasa sa musika",
-    "recsReady": "Handa na ang mga rekomendasyon!",
-    "personalizedListWaiting": "Naghihintay na ang iyong personal na listahan ng kanta",
-    "waitingToGenerate": "Naghihintay na mabuo...",
-    "startShortly": "Magsisimula na ito maya-maya",
-    "yourEmail": "Iyong Email",
     "emailSaved": "Na-save na ang email!",
-    "emailPlaceholder": "ikaw@example.com",
-    "saveEmail": "I-save",
-    "pleaseEnterEmail": "Pakilagay ang iyong email",
-    "pleaseEnterValidEmail": "Pakilagay ang isang valid na email",
-    "failedToSaveEmail": "Nabigong i-save ang email",
     "skipForNow": "I-skip muna",
-    "emailSavedSuccess": "Na-save na ang email!",
-    "viewRecommendations": "Tingnan ang Aking Mga Rekomendasyon",
-    "emailUpdatesHint": "Padadalhan ka namin ng mga update tungkol sa iyong mga rekomendasyon. Walang spam, pangako.",
-    "generatingRecommendationsButton": "Binubuo ang mga rekomendasyon...",
-    "enterEmailToContinue": "Ilagay ang iyong email para magpatuloy",
-    "pleaseEnterEmailAbove": "Pakilagay ang iyong email sa itaas para makita ang iyong mga rekomendasyon",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Walang mga crowd pleaser ang tumutugma sa mga kasalukuyang filter",
     "viewMySongs": "Tingnan ang aking mga kanta",
     "syncMoreMusic": "Mag-sync ng higit pang musika",
-    "tryAgain": "Subukan muli"
+    "tryAgain": "Subukan muli",
+    "libraryAny": "Kahit aling library",
+    "libraryCommunity": "Mga bersyon ng komunidad",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalogo ng KaraFun / Karaoke Version",
+    "libraryLabel": "Karaoke library",
+    "loadMore": "Mag-load pa",
+    "loadingMore": "Naglo-load…",
+    "noMatchDescription": "Subukang magbawas ng isa o dalawang filter para makakita ng mas maraming kanta.",
+    "noMatchTitle": "Walang tugma sa mga filter na ito",
+    "sortAz": "A hanggang Z",
+    "sortBest": "Pinakamaganda para sa iyo",
+    "sortLabel": "I-sort ayon sa",
+    "sortNewest": "Pinakabago",
+    "sortOldest": "Pinakaluma",
+    "sortPopular": "Pinakasikat",
+    "sortShortest": "Pinakamaikli",
+    "warmingDescription": "Inihahanda pa namin ang mga ito. Karaniwang tumatagal ito nang wala pang isang minuto, at awtomatiko kaming susubok muli.",
+    "warmingTitle": "Inihahanda ang iyong mga rekomendasyon…"
   },
   "myData": {
     "title": "Aking Data",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Feedback at Mga Pagpapabuti",
     "feedbackDesc": "Malapit na: I-love/itago ang mga kanta, vocal range, at iba pa!",
     "dataPowersRecs": "Ang data na ito ang nagpapagana sa iyong mga personal na rekomendasyon sa karaoke.",
-    "createAccountToSync": "Gumawa ng account",
-    "toSyncServices": "para i-sync ang iyong mga music service.",
     "moreDataBetterRecs": "Mas maraming data = mas magandang rekomendasyon.",
     "takeTheQuiz": "Kumuha ng quiz",
     "orConnectMore": "o mag-connect ng higit pang mga serbisyo.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Maghanap ng mga kanta na idadagdag...",
     "noSongsYet": "Wala pang mga kanta",
     "noSongsYetDesc": "Maghanap sa itaas para magdagdag ng mga kantang alam mo at gustong-gusto mong kantahin!",
-    "connectYourServices": "I-connect ang Iyong Mga Music Service",
-    "connectServicesGuestDesc": "Gumawa ng account para i-connect ang Spotify at Last.fm para sa mga personal na rekomendasyon base sa iyong listening history.",
-    "createAccount": "Gumawa ng Account",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Konektado na",
@@ -465,7 +444,6 @@
     "profileSection": "Profile",
     "yourAccountInfo": "Impormasyon ng iyong account",
     "emailLabel": "Email",
-    "guestSession": "Guest session",
     "displayNameLabel": "Display Name",
     "displayNamePlaceholder": "Ano ang itatawag namin sa iyo?",
     "profileUpdated": "Na-update na ang profile!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Walang nakakonektang mga serbisyo",
     "servicesConnectedCount": "{count} na serbisyo ang nakakonekta",
     "logOutSection": "Mag-log Out",
-    "clearGuestSession": "I-clear ang iyong guest session",
     "signOutOfAccount": "Mag-sign out sa iyong account",
     "dangerZone": "Danger Zone",
     "irreversibleActions": "Mga aksyong hindi na maibabalik",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Sigurado ka ba? Tuluyan nitong buburahin ang iyong account at lahat ng iyong data. Hindi na ito maibabalik.",
     "yesDeleteAccount": "Oo, Burahin ang Aking Account",
     "deleteNotAvailable": "Hindi pa available ang pagbura ng account. Mangyaring makipag-ugnayan sa support kung kailangan mong burahin ang iyong account.",
-    "clearSession": "I-clear ang Session",
     "logOut": "Mag-log Out",
     "accountId": "Account ID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} na mga brand",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASSIC"
+      "classic": "CLASSIC",
+      "community": "Komunidad",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Gusto Kong Kantahin Ito",
@@ -664,18 +642,6 @@
       "comfortEasy": "Madali",
       "comfortComfortable": "Komportable",
       "comfortChallenging": "Challenging"
-    },
-    "postQuizEmail": {
-      "almostThere": "Malapit na!",
-      "enterEmailToSeeRecs": "Ilagay ang iyong email para makita ang iyong mga personal na rekomendasyon",
-      "emailPlaceholder": "iyong@email.com",
-      "emailLabel": "Email address",
-      "invalidEmail": "Pakilagay ang isang valid na email address",
-      "failedToSaveEmail": "Nabigong i-save ang email",
-      "saving": "Sini-save...",
-      "continue": "Magpatuloy",
-      "updateNote": "Padadalhan ka namin ng mga update tungkol sa iyong mga rekomendasyon.",
-      "noSpam": "Walang spam, pangako namin."
     },
     "stickyFinish": {
       "artistSelected": "{count} na artist ang napili",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "I-connect ang Spotify at Last.fm",
       "syncListeningHistory": "I-sync ang iyong listening history",
       "saveProgressAcrossDevices": "I-save ang iyong progress sa iba't ibang device",
-      "createAndManagePlaylists": "Gumawa at mamahala ng mga playlist"
+      "createAndManagePlaylists": "Gumawa at mamahala ng mga playlist",
+      "createAccount": "Mag-sign in o gumawa ng account"
     },
     "artistSearch": {
       "placeholder": "Maghanap ng mga artist na idadagdag...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Mga Nakakonektang Serbisyo",
-      "createAccountToConnect": "Gumawa ng account para mag-connect",
-      "connectMusicServicesTitle": "I-connect ang Iyong Mga Music Service",
-      "connectMusicServicesDesc": "Gumawa ng account para i-connect ang Spotify at Last.fm para sa mga personal na rekomendasyon.",
-      "musicServicesFeature": "Mga Music Service",
       "noServicesConnected": "Walang nakakonektang mga serbisyo",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "Walang makitang kanta sa \"{title}\". Sumubok ng ibang playlist.",
     "errorTooManyImports": "Masyadong mabilis ang pag-import mo ng mga playlist. Maghintay muna ng isang minuto bago subukan ulit.",
     "inputLabel": "Link ng YouTube Music playlist"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Paborito ng marami",
+      "decade_match": "Mula sa dekadang gusto mo",
+      "genre_match": "Tugma sa iyong mga genre",
+      "known_artist": "Mula sa artist na gusto mo",
+      "known_song": "Alam mo ito",
+      "make_it": "Gawin ito",
+      "similar_artist": "Tulad ni {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Lahat ng tumutugma, ayon sa napili mong pagkakasunod-sunod",
+        "title": "Lahat ng rekomendasyon"
+      },
+      "artists_you_love": {
+        "reason": "Higit pang mga kanta mula sa mga artist na pinakikinggan mo",
+        "title": "Mula sa mga artist na gusto mo"
+      },
+      "because": {
+        "reason": "Mga kantang madalas kantahin ng mga fan ni {artist}",
+        "title": "Dahil gusto mo si {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Mga kantang nagpapasabay sa lahat",
+        "title": "Paborito ng marami"
+      },
+      "make_it": {
+        "reason": "Wala pang karaoke version. Puwede kaming gumawa para sa iyo",
+        "title": "Gawin ito"
+      },
+      "songs_you_know": {
+        "reason": "Mga karaoke version ng mga kanta mula sa iyong library",
+        "title": "Mga kantang alam mo"
+      }
+    }
   }
 }

@@ -178,9 +178,43 @@ test.describe('Smoke Tests', () => {
 });
 ```
 
+## Local stack
+
+The main API (`:8030`) plus the search service (`:8020`) on fixture data, for the mobile app's Maestro E2E flows. The main API uses **gen's local-stack Firestore emulator** (`127.0.0.1:8080`, project `test-project`), so gen sessions minted by gen's local stack (`:8010`) validate in decide. No BigQuery, no GCS.
+
+```bash
+# 1. gen first (karaoke-gen); the secret lets search /resolve call gen
+DECIDE_GEN_PARTNER_SECRET=local-stack-secret scripts/local-stack.sh up
+# 2. decide
+make stack-up                       # or scripts/local-stack.sh up   (idempotent)
+scripts/local-stack.sh status | down | logs [api|search] | env
+```
+
+- `up` builds the fixture index (`.local-stack/song-index/`) and fixture catalog (`.local-stack/catalog/catalog.db`, `python -m karaoke_decide.catalog.fixtures build`), starts search, then `uvicorn backend.main:app` on :8030 with `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, `GOOGLE_CLOUD_PROJECT=test-project`, `ENVIRONMENT=development`, `JWT_SECRET=local-stack-jwt`, `DECIDE_TEST_API=1`, `BIGQUERY_DISABLED=1`, `CATALOG_LOCAL_DIR`, `SONG_INDEX_LOCAL_DIR`. It waits for `/api/ready` to report `catalog:true` (60 tries). If nothing listens on :8080 it runs `scripts/start-emulators.sh` itself. State: `.local-stack/{api,search}.{pid,log}`. `down` stops only decide's two servers; the docker emulators (gen's stack) keep running. The stack refuses a non-loopback `GEN_API_URL` and always uses the partner secret `local-stack-secret` (the caller's `DECIDE_GEN_PARTNER_SECRET` is ignored; override with `LOCAL_STACK_PARTNER_SECRET`).
+- `env` prints `EXPO_PUBLIC_DECIDE_API_URL` and `EXPO_PUBLIC_DECIDE_SEARCH_URL` for the mobile app (`DECIDE_LOCAL_PUBLIC_URL` / `SEARCH_LOCAL_PUBLIC_URL=http://10.0.2.2:...` for an Android emulator). Ports: `DECIDE_LOCAL_PORT`, `SEARCH_LOCAL_PORT`.
+- Smoke test:
+
+  ```bash
+  T=$(curl -s -XPOST 127.0.0.1:8010/api/users/auth/google -H 'content-type: application/json' \
+      -d '{"id_token":"fake:me@example.com"}' | jq -r .session_token)      # gen session token (no dots)
+  curl -H "Authorization: Bearer $T" 127.0.0.1:8030/api/auth/me                   # 200
+  curl -XPOST 127.0.0.1:8030/api/test/profile/seed -H 'content-type: application/json' \
+      -d '{"email":"me@example.com","artists":[{"name":"ABBA","affinity":"love"}]}'
+  curl -H "Authorization: Bearer $T" 127.0.0.1:8030/api/my/recommendations/v2   # sections
+  ```
+
+### Playwright against the local stacks
+
+Drive the web app in a real browser against gen's local stack (:8010) and decide's (:8030/:8020), with profiles seeded via `/api/test/profile/seed`.
+
+- Run the dev server on **`localhost:3000`** (`cd frontend && npm run dev`): the local APIs only allow that origin in CORS, so another port or `127.0.0.1` fails with CORS errors.
+- Use locale-prefixed paths (`http://localhost:3000/en/recommendations`); bare paths redirect and lose the dev context.
+- Sign in with gen's local email code (gen's stack returns/logs the code) or mint a session via gen's `/api/users/auth/google` fake id token (see smoke test above) and put it in `localStorage`.
+- **Don't run `npm run build` while `next dev` is running**: both write `.next/` and the dev server breaks (500s, missing chunks). Stop dev first, or restart it after the build.
+
 ## Search local stack
 
-The search service (`backend/search`) on a small fixture index, for the mobile app's Maestro E2E flows. Run it together with gen's local stack (`scripts/local-stack.sh` in karaoke-gen, API on :8010).
+`scripts/search-local-stack.sh` is a thin wrapper for `scripts/local-stack.sh <cmd> --search-only`: just the search service on :8020 (no Firestore, no catalog, gen not required except for `/resolve`). Everything below applies to it and to the full stack's search half.
 
 ```bash
 make search-stack-up            # or scripts/search-local-stack.sh up   (idempotent)

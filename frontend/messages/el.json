@@ -17,16 +17,11 @@
     "signIn": "Σύνδεση",
     "createAccount": "Δημιουργία Λογαριασμού",
     "logOut": "Αποσύνδεση",
-    "clearSession": "Εκκαθάριση Συνεδρίας",
-    "guest": "Επισκέπτης",
-    "guestSession": "Συνεδρία Επισκέπτη",
-    "createAccountToSaveProgress": "Δημιούργησε λογαριασμό για να αποθηκεύσεις την πρόοδό σου",
     "theme": "Θέμα",
     "backToApp": "Πίσω στην Εφαρμογή",
     "openMenu": "Άνοιγμα μενού",
     "closeMenu": "Κλείσιμο μενού",
-    "profileSettings": "Ρυθμίσεις προφίλ",
-    "clearSessionTitle": "Εκκαθάριση συνεδρίας"
+    "profileSettings": "Ρυθμίσεις προφίλ"
   },
   "home": {
     "heroTitle": "Επίλεξε εύκολα",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "για να τραγουδήσεις",
     "heroSubtitle": "Βρες τραγούδια που ξέρεις, που μπορείς όντως να τραγουδήσεις και που θα λατρέψει το κοινό. Εξατομικευμένες προτάσεις σε 30 δευτερόλεπτα.",
     "findYourSong": "Βρες το Τραγούδι σου",
-    "trustSignal": "Δωρεάν • Χωρίς εγγραφή • Παίρνει 30 δευτερόλεπτα",
-    "failedToStart": "Αποτυχία εκκίνησης. Παρακαλώ προσπάθησε ξανά.",
+    "trustSignal": "Δωρεάν • Παίρνει 30 δευτερόλεπτα",
     "soundFamiliar": "Σου φαίνεται γνώριμο;",
     "soundFamiliarSubtitle": "Είσαι σε καραόκε, ξεφυλλίζεις τον κατάλογο τραγουδιών, και...",
     "problemNothingTitle": "Τίποτα δεν σου κάνει κλικ",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Καλώς ήρθες ξανά",
-    "signInSubtitle": "Συνδέσου για να αποκτήσεις πρόσβαση στα τραγούδια και τις προτάσεις σου",
     "emailLabel": "Διεύθυνση email",
     "emailPlaceholder": "onoma@example.com",
-    "sendMagicLink": "Αποστολή Magic Link",
-    "noPasswordNeeded": "Δεν χρειάζεται κωδικός. Θα σου στείλουμε έναν ασφαλή σύνδεσμο για να συνδεθείς.",
     "or": "ή",
     "justWantToBrowse": "Θέλεις απλώς να ρίξεις μια ματιά; Δεν χρειάζεται λογαριασμός.",
     "browseSongs": "Περιήγηση στα Τραγούδια",
-    "failedToSendMagicLink": "Αποτυχία αποστολής magic link. Παρακαλώ προσπάθησε ξανά.",
-    "checkYourEmail": "Έλεγξε το email σου!",
-    "magicLinkSentTo": "Στείλαμε ένα magic link στο",
-    "linkExpiresIn15": "Κάνε κλικ στον σύνδεσμο στο email σου για να συνδεθείς. Ο σύνδεσμος λήγει σε 15 λεπτά.",
     "useDifferentEmail": "Χρησιμοποίησε διαφορετικό email",
     "backToHome": "Πίσω στην αρχική",
-    "verifyingLink": "Επαλήθευση του συνδέσμου σου...",
-    "pleaseWait": "Παρακαλώ περίμενε μια στιγμή",
-    "youreSignedIn": "Συνδέθηκες!",
-    "redirectingToSongs": "Ανακατεύθυνση στα τραγούδια σου...",
-    "connectionError": "Σφάλμα Σύνδεσης",
-    "verificationFailed": "Η Επαλήθευση Απέτυχε",
-    "noTokenFound": "Δεν βρέθηκε διακριτικό επαλήθευσης. Παρακαλώ ζήτησε ένα νέο magic link.",
-    "linkExpired": "Αυτό το magic link έχει λήξει. Παρακαλώ ζήτησε ένα νέο.",
-    "linkAlreadyUsed": "Αυτό το magic link έχει ήδη χρησιμοποιηθεί. Παρακαλώ ζήτησε ένα νέο.",
-    "failedToVerify": "Αποτυχία επαλήθευσης διακριτικού. Μπορεί να έχει λήξει ή να έχει ήδη χρησιμοποιηθεί.",
-    "troubleshootingTips": "Συμβουλές αντιμετώπισης προβλημάτων:",
-    "tipMobileData": "Δοκίμασε να χρησιμοποιήσεις δεδομένα κινητής αντί για WiFi",
-    "tipDisableVpn": "Απενεργοποίησε το VPN ή τις επεκτάσεις ad-blocker",
-    "tipIncognito": "Δοκίμασε να ανοίξεις σε κατάσταση ανώνυμης περιήγησης",
-    "tipCorporateNetwork": "Έλεγξε αν βρίσκεσαι σε εταιρικό ή σχολικό δίκτυο",
-    "retryAgainCount": "Δοκίμασε Ξανά ({count})",
-    "requestNewLink": "Ζήτησε Νέο Σύνδεσμο",
-    "backToHomeCaps": "Πίσω στην Αρχική"
+    "codeExpired": "Αυτός ο κωδικός έχει λήξει. Ζήτησε έναν νέο.",
+    "codeLabel": "6ψήφιος κωδικός",
+    "codeResent": "Ένας νέος κωδικός είναι καθ' οδόν.",
+    "codeSentTo": "Στείλαμε έναν 6ψήφιο κωδικό μέσω email στο",
+    "continueWithGoogle": "Συνέχεια με Google",
+    "enterCode": "Εισήγαγε τον κωδικό σου",
+    "failedToSendCode": "Δεν ήταν δυνατή η αποστολή του κωδικού. Δοκίμασε ξανά.",
+    "failedToVerifyCode": "Δεν ήταν δυνατή η επαλήθευση του κωδικού. Δοκίμασε ξανά.",
+    "googleSignInFailed": "Η σύνδεση μέσω Google απέτυχε. Δοκίμασε ξανά.",
+    "invalidCode": "Αυτός ο κωδικός δεν είναι σωστός. Έλεγξέ τον και δοκίμασε ξανά.",
+    "resendCode": "Αποστολή νέου κωδικού",
+    "sendCode": "Στείλε μου έναν κωδικό με email",
+    "signInHint": "Δεν χρειάζεται κωδικός πρόσβασης. Θα σου στείλουμε έναν 6ψήφιο κωδικό μέσω email για να συνδεθείς στον λογαριασμό σου στο Nomad Karaoke.",
+    "signInToGetPicks": "Συνδέσου για να δεις τις εξατομικευμένες προτάσεις καραόκε για εσένα",
+    "tooManyAttempts": "Πάρα πολλές προσπάθειες. Ζήτησε έναν νέο κωδικό.",
+    "verifyCode": "Επαλήθευση και σύνδεση",
+    "importedGuestData": "Μεταφέραμε τις απαντήσεις του κουίζ και τα τραγούδια σου στον λογαριασμό σου."
   },
   "quiz": {
     "startingQuiz": "Εκκίνηση κουίζ...",
@@ -182,28 +168,8 @@
     "selected": "{count} επιλέχθηκαν",
     "findingMoreArtists": "Βρίσκουμε περισσότερους καλλιτέχνες που ίσως ξέρεις...",
     "noMoreArtists": "Δεν υπάρχουν άλλοι καλλιτέχνες για εμφάνιση",
-    "almostThere": "Σχεδόν τελειώσαμε!",
-    "enterEmailToSave": "Βάλε το email σου για να αποθηκεύσεις τις προτάσεις σου.",
-    "generatingRecs": "Δημιουργία των προτάσεών σου...",
-    "analyzingTaste": "Αναλύουμε τα μουσικά σου γούστα",
-    "recsReady": "Οι προτάσεις είναι έτοιμες!",
-    "personalizedListWaiting": "Η εξατομικευμένη λίστα τραγουδιών σου σε περιμένει",
-    "waitingToGenerate": "Αναμονή για δημιουργία...",
-    "startShortly": "Αυτό θα ξεκινήσει σύντομα",
-    "yourEmail": "Το Email σου",
     "emailSaved": "Το email αποθηκεύτηκε!",
-    "emailPlaceholder": "onoma@example.com",
-    "saveEmail": "Αποθήκευση",
-    "pleaseEnterEmail": "Παρακαλώ βάλε το email σου",
-    "pleaseEnterValidEmail": "Παρακαλώ βάλε ένα έγκυρο email",
-    "failedToSaveEmail": "Αποτυχία αποθήκευσης email",
     "skipForNow": "Παράλειψη προς το παρόν",
-    "emailSavedSuccess": "Το email αποθηκεύτηκε!",
-    "viewRecommendations": "Προβολή των Προτάσεών μου",
-    "emailUpdatesHint": "Θα σου στέλνουμε ενημερώσεις για τις προτάσεις σου. Ποτέ spam.",
-    "generatingRecommendationsButton": "Δημιουργία προτάσεων...",
-    "enterEmailToContinue": "Βάλε το email σου για να συνεχίσεις",
-    "pleaseEnterEmailAbove": "Παρακαλώ βάλε το email σου παραπάνω για να δεις τις προτάσεις σου",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Κανένα αγαπημένο του κοινού δεν ταιριάζει με τα τρέχοντα φίλτρα",
     "viewMySongs": "Προβολή των τραγουδιών μου",
     "syncMoreMusic": "Συγχρονισμός περισσότερης μουσικής",
-    "tryAgain": "Προσπάθησε ξανά"
+    "tryAgain": "Προσπάθησε ξανά",
+    "libraryAny": "Οποιαδήποτε βιβλιοθήκη",
+    "libraryCommunity": "Εκδόσεις κοινότητας",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Κατάλογος KaraFun / Karaoke Version",
+    "libraryLabel": "Βιβλιοθήκη καραόκε",
+    "loadMore": "Φόρτωσε περισσότερα",
+    "loadingMore": "Φόρτωση…",
+    "noMatchDescription": "Δοκίμασε να χαλαρώσεις ένα-δυο φίλτρα για να δεις περισσότερα τραγούδια.",
+    "noMatchTitle": "Δεν βρέθηκαν προτάσεις με αυτά τα φίλτρα",
+    "sortAz": "Α έως Ω",
+    "sortBest": "Καλύτερα για εσένα",
+    "sortLabel": "Ταξινόμηση κατά",
+    "sortNewest": "Νεότερα",
+    "sortOldest": "Παλαιότερα",
+    "sortPopular": "Πιο δημοφιλή",
+    "sortShortest": "Μικρότερη διάρκεια",
+    "warmingDescription": "Προετοιμάζουμε τα πάντα. Αυτό συνήθως διαρκεί λιγότερο από ένα λεπτό και θα ξαναδοκιμάσουμε αυτόματα.",
+    "warmingTitle": "Ετοιμάζουμε τις προτάσεις σου…"
   },
   "myData": {
     "title": "Τα Δεδομένα μου",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Σχόλια & Βελτιώσεις",
     "feedbackDesc": "Σύντομα: Αγαπημένα/απόκρυψη τραγουδιών, φωνητικό εύρος, και άλλα!",
     "dataPowersRecs": "Αυτά τα δεδομένα τροφοδοτούν τις εξατομικευμένες προτάσεις καραόκε σου.",
-    "createAccountToSync": "Δημιούργησε λογαριασμό",
-    "toSyncServices": "για να συγχρονίσεις τις μουσικές σου υπηρεσίες.",
     "moreDataBetterRecs": "Περισσότερα δεδομένα = καλύτερες προτάσεις.",
     "takeTheQuiz": "Κάνε το κουίζ",
     "orConnectMore": "ή σύνδεσε περισσότερες υπηρεσίες.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Αναζήτηση τραγουδιών για προσθήκη...",
     "noSongsYet": "Δεν υπάρχουν τραγούδια ακόμα",
     "noSongsYetDesc": "Ψάξε παραπάνω για να προσθέσεις τραγούδια που ξέρεις και λατρεύεις να τραγουδάς!",
-    "connectYourServices": "Σύνδεσε τις Μουσικές σου Υπηρεσίες",
-    "connectServicesGuestDesc": "Δημιούργησε λογαριασμό για να συνδέσεις το Spotify και το Last.fm για εξατομικευμένες προτάσεις με βάση το ιστορικό ακρόασής σου.",
-    "createAccount": "Δημιουργία Λογαριασμού",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Συνδέθηκε",
@@ -465,7 +444,6 @@
     "profileSection": "Προφίλ",
     "yourAccountInfo": "Οι πληροφορίες του λογαριασμού σου",
     "emailLabel": "Email",
-    "guestSession": "Συνεδρία επισκέπτη",
     "displayNameLabel": "Όνομα Εμφάνισης",
     "displayNamePlaceholder": "Πώς να σε φωνάζουμε;",
     "profileUpdated": "Το προφίλ ενημερώθηκε!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Καμία υπηρεσία συνδεδεμένη",
     "servicesConnectedCount": "{count} {count, plural, one {υπηρεσία συνδέθηκε} other {υπηρεσίες συνδέθηκαν}}",
     "logOutSection": "Αποσύνδεση",
-    "clearGuestSession": "Εκκαθάριση της συνεδρίας επισκέπτη σου",
     "signOutOfAccount": "Αποσύνδεση από τον λογαριασμό σου",
     "dangerZone": "Επικίνδυνη Ζώνη",
     "irreversibleActions": "Μη αναστρέψιμες ενέργειες",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Είσαι σίγουρος; Αυτό θα διαγράψει οριστικά τον λογαριασμό σου και όλα τα δεδομένα σου. Αυτή η ενέργεια δεν μπορεί να αναιρεθεί.",
     "yesDeleteAccount": "Ναι, Διαγραφή του Λογαριασμού μου",
     "deleteNotAvailable": "Η διαγραφή λογαριασμού δεν είναι ακόμα διαθέσιμη. Παρακαλώ επικοινώνησε με την υποστήριξη αν χρειάζεται να διαγράψεις τον λογαριασμό σου.",
-    "clearSession": "Εκκαθάριση Συνεδρίας",
     "logOut": "Αποσύνδεση",
     "accountId": "ID Λογαριασμού: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} μάρκες",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "ΚΛΑΣΙΚΟ"
+      "classic": "ΚΛΑΣΙΚΟ",
+      "community": "Κοινότητα",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Απολαμβάνω να το Τραγουδάω",
@@ -664,18 +642,6 @@
       "comfortEasy": "Εύκολο",
       "comfortComfortable": "Άνετο",
       "comfortChallenging": "Προκλητικό"
-    },
-    "postQuizEmail": {
-      "almostThere": "Σχεδόν τελειώσαμε!",
-      "enterEmailToSeeRecs": "Βάλε το email σου για να δεις τις εξατομικευμένες προτάσεις σου",
-      "emailPlaceholder": "onoma@example.com",
-      "emailLabel": "Διεύθυνση email",
-      "invalidEmail": "Παρακαλώ βάλε μια έγκυρη διεύθυνση email",
-      "failedToSaveEmail": "Αποτυχία αποθήκευσης email",
-      "saving": "Αποθήκευση...",
-      "continue": "Συνέχεια",
-      "updateNote": "Θα σου στέλνουμε ενημερώσεις για τις προτάσεις σου.",
-      "noSpam": "Χωρίς spam, το υποσχόμαστε."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {καλλιτέχνης επιλέχθηκε} other {καλλιτέχνες επιλέχθηκαν}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Συνδέσεις Spotify και Last.fm",
       "syncListeningHistory": "Συγχρονίσεις το ιστορικό ακρόασής σου",
       "saveProgressAcrossDevices": "Αποθηκεύσεις την πρόοδό σου σε όλες τις συσκευές",
-      "createAndManagePlaylists": "Δημιουργείς και να διαχειρίζεσαι playlists"
+      "createAndManagePlaylists": "Δημιουργείς και να διαχειρίζεσαι playlists",
+      "createAccount": "Συνδέσου ή δημιούργησε λογαριασμό"
     },
     "artistSearch": {
       "placeholder": "Αναζήτηση καλλιτεχνών για προσθήκη...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Συνδεδεμένες Υπηρεσίες",
-      "createAccountToConnect": "Δημιούργησε λογαριασμό για να συνδεθείς",
-      "connectMusicServicesTitle": "Σύνδεσε τις Μουσικές σου Υπηρεσίες",
-      "connectMusicServicesDesc": "Δημιούργησε λογαριασμό για να συνδέσεις το Spotify και το Last.fm για εξατομικευμένες προτάσεις.",
-      "musicServicesFeature": "Μουσικές Υπηρεσίες",
       "noServicesConnected": "Καμία υπηρεσία συνδεδεμένη",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "Το «{title}» δεν έχει τραγούδια που μπορέσαμε να διαβάσουμε. Δοκίμασε άλλη λίστα αναπαραγωγής.",
     "errorTooManyImports": "Εισάγεις λίστες αναπαραγωγής πολύ γρήγορα. Περίμενε ένα λεπτό και δοκίμασε ξανά.",
     "inputLabel": "Σύνδεσμος λίστας αναπαραγωγής YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Αγαπημένο του κοινού",
+      "decade_match": "Από δεκαετία που σου αρέσει",
+      "genre_match": "Ταιριάζει με τα είδη σου",
+      "known_artist": "Από καλλιτέχνη που λατρεύεις",
+      "known_song": "Το ξέρεις αυτό",
+      "make_it": "Φτιάξ’ το",
+      "similar_artist": "Όπως {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Όλα όσα ταιριάζουν, με τη σειρά που επέλεξες",
+        "title": "Όλες οι προτάσεις"
+      },
+      "artists_you_love": {
+        "reason": "Περισσότερα τραγούδια από καλλιτέχνες που ακούς",
+        "title": "Από καλλιτέχνες που λατρεύεις"
+      },
+      "because": {
+        "reason": "Τραγούδια που συνήθως τραγουδούν όσοι ακούν {artist}",
+        "title": "Επειδή σου αρέσει ο/η {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Τραγούδια που κάνουν όλη την παρέα να τραγουδά",
+        "title": "Αγαπημένα του κοινού"
+      },
+      "make_it": {
+        "reason": "Δεν υπάρχει ακόμα έκδοση καραόκε. Μπορούμε να δημιουργήσουμε μία για εσένα",
+        "title": "Φτιάξ’ το"
+      },
+      "songs_you_know": {
+        "reason": "Εκδόσεις καραόκε από τραγούδια της βιβλιοθήκης σου",
+        "title": "Τραγούδια που ξέρεις"
+      }
+    }
   }
 }

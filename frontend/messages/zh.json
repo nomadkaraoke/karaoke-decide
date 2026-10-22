@@ -17,16 +17,11 @@
     "signIn": "登录",
     "createAccount": "创建账号",
     "logOut": "登出",
-    "clearSession": "清除会话",
-    "guest": "访客",
-    "guestSession": "访客会话",
-    "createAccountToSaveProgress": "创建账号以保存进度",
     "theme": "主题",
     "backToApp": "返回应用",
     "openMenu": "打开菜单",
     "closeMenu": "关闭菜单",
-    "profileSettings": "个人资料设置",
-    "clearSessionTitle": "清除会话"
+    "profileSettings": "个人资料设置"
   },
   "home": {
     "heroTitle": "轻松选择",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "来唱",
     "heroSubtitle": "找到你熟悉的、能唱好的、并且能引爆全场的歌曲。30秒内获得个性化推荐。",
     "findYourSong": "寻找你的歌曲",
-    "trustSignal": "免费 • 无需注册 • 只需30秒",
-    "failedToStart": "启动失败。请重试。",
+    "trustSignal": "免费 • 仅需 30 秒",
     "soundFamiliar": "听起来很熟悉？",
     "soundFamiliarSubtitle": "你在KTV，翻着点歌本，然后...",
     "problemNothingTitle": "毫无头绪",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "欢迎回来",
-    "signInSubtitle": "登录以访问你的歌曲和推荐",
     "emailLabel": "电子邮件地址",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "发送魔法链接",
-    "noPasswordNeeded": "无需密码。我们将向你发送一个安全的登录链接。",
     "or": "或",
     "justWantToBrowse": "只想随便看看？无需账号。",
     "browseSongs": "浏览歌曲",
-    "failedToSendMagicLink": "发送魔法链接失败。请重试。",
-    "checkYourEmail": "请查收邮件！",
-    "magicLinkSentTo": "我们已将魔法链接发送至",
-    "linkExpiresIn15": "点击邮件中的链接即可登录。链接将在15分钟后失效。",
     "useDifferentEmail": "使用其他电子邮件",
     "backToHome": "返回首页",
-    "verifyingLink": "正在验证你的链接...",
-    "pleaseWait": "请稍候",
-    "youreSignedIn": "你已登录！",
-    "redirectingToSongs": "正在重定向到你的歌曲...",
-    "connectionError": "连接错误",
-    "verificationFailed": "验证失败",
-    "noTokenFound": "未找到验证令牌。请请求新的魔法链接。",
-    "linkExpired": "此魔法链接已过期。请请求一个新的。",
-    "linkAlreadyUsed": "此魔法链接已被使用。请请求一个新的。",
-    "failedToVerify": "验证令牌失败。它可能已过期或已被使用。",
-    "troubleshootingTips": "故障排除提示：",
-    "tipMobileData": "尝试使用移动数据而不是WiFi",
-    "tipDisableVpn": "禁用VPN或广告拦截扩展",
-    "tipIncognito": "尝试在无痕/隐私模式下打开",
-    "tipCorporateNetwork": "检查你是否在公司或学校网络上",
-    "retryAgainCount": "重试 ({count})",
-    "requestNewLink": "请求新链接",
-    "backToHomeCaps": "返回首页"
+    "codeExpired": "该验证码已过期，请获取新验证码。",
+    "codeLabel": "6 位数验证码",
+    "codeResent": "新的验证码正在发送中。",
+    "codeSentTo": "我们已向以下邮箱发送了 6 位数验证码：",
+    "continueWithGoogle": "使用 Google 账号继续",
+    "enterCode": "输入验证码",
+    "failedToSendCode": "验证码发送失败，请重试。",
+    "failedToVerifyCode": "验证码校验失败，请重试。",
+    "googleSignInFailed": "Google 登录失败，请重试。",
+    "invalidCode": "验证码不正确，请核对后重试。",
+    "resendCode": "重新发送验证码",
+    "sendCode": "发送验证码至邮箱",
+    "signInHint": "无需密码。我们将向您的邮箱发送一个 6 位数验证码，用于登录您的 Nomad Karaoke 账户。",
+    "signInToGetPicks": "登录以获取为您量身定制的卡拉OK推荐曲目",
+    "tooManyAttempts": "尝试次数过多，请重新获取验证码。",
+    "verifyCode": "验证并登录",
+    "importedGuestData": "我们已将你的测验答案和歌曲同步至你的账户。"
   },
   "quiz": {
     "startingQuiz": "正在开始测试...",
@@ -182,28 +168,8 @@
     "selected": "已选择 {count} 个",
     "findingMoreArtists": "正在寻找更多你可能认识的歌手...",
     "noMoreArtists": "没有更多歌手可显示",
-    "almostThere": "马上就好！",
-    "enterEmailToSave": "输入你的电子邮件以保存你的推荐。",
-    "generatingRecs": "正在生成你的推荐...",
-    "analyzingTaste": "正在分析你的音乐品味",
-    "recsReady": "推荐已生成！",
-    "personalizedListWaiting": "你的个性化歌单正在等你",
-    "waitingToGenerate": "等待生成...",
-    "startShortly": "即将开始",
-    "yourEmail": "你的电子邮件",
     "emailSaved": "电子邮件已保存！",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "保存",
-    "pleaseEnterEmail": "请输入你的电子邮件",
-    "pleaseEnterValidEmail": "请输入有效的电子邮件",
-    "failedToSaveEmail": "保存电子邮件失败",
     "skipForNow": "暂不保存",
-    "emailSavedSuccess": "电子邮件已保存！",
-    "viewRecommendations": "查看我的推荐",
-    "emailUpdatesHint": "我们会向你发送推荐更新。绝无垃圾邮件。",
-    "generatingRecommendationsButton": "正在生成推荐...",
-    "enterEmailToContinue": "输入你的电子邮件以继续",
-    "pleaseEnterEmailAbove": "请在上方输入你的电子邮件以查看推荐",
     "genres": {
       "pop": "流行",
       "rock": "摇滚",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "没有符合当前筛选条件的大众最爱歌曲",
     "viewMySongs": "查看我的歌曲",
     "syncMoreMusic": "同步更多音乐",
-    "tryAgain": "重试"
+    "tryAgain": "重试",
+    "libraryAny": "任意曲库",
+    "libraryCommunity": "社区版本",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version 目录",
+    "libraryLabel": "卡拉OK曲库",
+    "loadMore": "加载更多",
+    "loadingMore": "正在加载…",
+    "noMatchDescription": "尝试放宽一两个筛选条件以查看更多歌曲。",
+    "noMatchTitle": "没有符合这些筛选条件的精选歌曲",
+    "sortAz": "A 到 Z",
+    "sortBest": "最适合你",
+    "sortLabel": "排序方式",
+    "sortNewest": "最新",
+    "sortOldest": "最旧",
+    "sortPopular": "最热门",
+    "sortShortest": "时长最短",
+    "warmingDescription": "正在加紧准备中。通常不需要一分钟，我们会自动重试。",
+    "warmingTitle": "正在准备你的精选推荐…"
   },
   "myData": {
     "title": "我的数据",
@@ -299,8 +283,6 @@
     "feedbackTitle": "反馈与优化",
     "feedbackDesc": "即将推出：喜爱/隐藏歌曲、音域等！",
     "dataPowersRecs": "这些数据为你提供个性化的K歌推荐。",
-    "createAccountToSync": "创建账号",
-    "toSyncServices": "以同步你的音乐服务。",
     "moreDataBetterRecs": "数据越多 = 推荐越好。",
     "takeTheQuiz": "参加测试",
     "orConnectMore": "或连接更多服务。",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "搜索要添加的歌曲...",
     "noSongsYet": "暂无歌曲",
     "noSongsYetDesc": "在上方搜索以添加你熟悉并喜欢唱的歌！",
-    "connectYourServices": "连接你的音乐服务",
-    "connectServicesGuestDesc": "创建账号以连接 Spotify 和 Last.fm，根据你的听歌记录获取个性化推荐。",
-    "createAccount": "创建账号",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "已连接",
@@ -465,7 +444,6 @@
     "profileSection": "个人资料",
     "yourAccountInfo": "你的账号信息",
     "emailLabel": "电子邮件",
-    "guestSession": "访客会话",
     "displayNameLabel": "显示名称",
     "displayNamePlaceholder": "我们该怎么称呼你？",
     "profileUpdated": "个人资料已更新！",
@@ -480,7 +458,6 @@
     "noServicesConnected": "未连接任何服务",
     "servicesConnectedCount": "已连接 {count} 个服务{count, plural, one {} other {}}",
     "logOutSection": "登出",
-    "clearGuestSession": "清除你的访客会话",
     "signOutOfAccount": "登出你的账号",
     "dangerZone": "危险操作",
     "irreversibleActions": "不可逆操作",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "你确定吗？这将永久删除你的账号和所有数据。此操作无法撤销。",
     "yesDeleteAccount": "是的，删除我的账号",
     "deleteNotAvailable": "账号删除功能暂不可用。如果需要删除账号，请联系客服。",
-    "clearSession": "清除会话",
     "logOut": "登出",
     "accountId": "账号 ID：{id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} 个品牌",
       "pop": "流行：{value}",
       "explicit": "E",
-      "classic": "经典"
+      "classic": "经典",
+      "community": "社区",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "我喜欢唱这首",
@@ -664,18 +642,6 @@
       "comfortEasy": "简单",
       "comfortComfortable": "舒适",
       "comfortChallenging": "有挑战性"
-    },
-    "postQuizEmail": {
-      "almostThere": "马上就好！",
-      "enterEmailToSeeRecs": "输入你的电子邮件以查看你的个性化推荐",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "电子邮件地址",
-      "invalidEmail": "请输入有效的电子邮件地址",
-      "failedToSaveEmail": "保存电子邮件失败",
-      "saving": "保存中...",
-      "continue": "继续",
-      "updateNote": "我们将向你发送有关推荐的更新。",
-      "noSpam": "我们保证，绝无垃圾邮件。"
     },
     "stickyFinish": {
       "artistSelected": "已选择 {count} 位歌手{count, plural, one {} other {}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "连接 Spotify 和 Last.fm",
       "syncListeningHistory": "同步你的听歌记录",
       "saveProgressAcrossDevices": "跨设备保存你的进度",
-      "createAndManagePlaylists": "创建和管理播放列表"
+      "createAndManagePlaylists": "创建和管理播放列表",
+      "createAccount": "登录或创建账户"
     },
     "artistSearch": {
       "placeholder": "搜索要添加的歌手...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "已连接的服务",
-      "createAccountToConnect": "创建账号以连接",
-      "connectMusicServicesTitle": "连接你的音乐服务",
-      "connectMusicServicesDesc": "创建账号以连接 Spotify 和 Last.fm，获取个性化推荐。",
-      "musicServicesFeature": "音乐服务",
       "noServicesConnected": "未连接任何服务",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "“{title}”中没有我们可以读取的歌曲。请尝试其他播放列表。",
     "errorTooManyImports": "您导入播放列表的操作过于频繁。请稍等一分钟后再试。",
     "inputLabel": "YouTube Music 播放列表链接"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "全场大合唱金曲",
+      "decade_match": "来自你喜欢的年代",
+      "genre_match": "符合你的曲风偏好",
+      "known_artist": "来自你喜爱的歌手",
+      "known_song": "耳熟能详的旋律",
+      "make_it": "制作伴奏",
+      "similar_artist": "风格类似 {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "所有匹配歌曲，按你选择的顺序排列",
+        "title": "所有精选"
+      },
+      "artists_you_love": {
+        "reason": "来自你常听歌手的更多歌曲",
+        "title": "来自你喜爱的歌手"
+      },
+      "because": {
+        "reason": "{artist} 的粉丝常唱的歌曲",
+        "title": "因为你喜欢 {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "能点燃全场大合唱的歌曲",
+        "title": "全场大合唱"
+      },
+      "make_it": {
+        "reason": "暂无卡拉OK版本，我们可以为你制作",
+        "title": "制作伴奏"
+      },
+      "songs_you_know": {
+        "reason": "来自你个人曲库歌曲的卡拉OK版本",
+        "title": "你熟悉的歌曲"
+      }
+    }
   }
 }

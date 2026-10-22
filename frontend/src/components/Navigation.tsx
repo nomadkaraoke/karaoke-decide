@@ -28,7 +28,7 @@ const navLinks = [
 ];
 
 export function Navigation() {
-  const { user, isAuthenticated, isLoading, isGuest, isAdmin, logout } = useAuth();
+  const { user, isAuthenticated, isLoading, isAdmin, logout } = useAuth();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const t = useTranslations('nav');
@@ -106,24 +106,6 @@ export function Navigation() {
             <ThemeToggle />
             {isLoading ? (
               <div className="w-20 h-8 rounded-lg bg-[var(--secondary)] animate-pulse" />
-            ) : isGuest ? (
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 text-xs font-medium rounded-full bg-[var(--warning)]/20 text-[var(--warning)]">
-                  {t('guest')}
-                </span>
-                <Link href="/login">
-                  <Button variant="primary" size="sm">
-                    {t('createAccount')}
-                  </Button>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--secondary)] transition-colors"
-                  title={t('clearSessionTitle')}
-                >
-                  <LogOutIcon className="w-4 h-4" />
-                </button>
-              </div>
             ) : isAuthenticated ? (
               <div className="flex items-center gap-2">
                 <Link
@@ -234,33 +216,6 @@ export function Navigation() {
             <div className="pt-2 border-t border-[var(--card-border)]">
               {isLoading ? (
                 <div className="w-full h-12 rounded-xl bg-[var(--secondary)] animate-pulse" />
-              ) : isGuest ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[var(--warning)]/10">
-                    <UserIcon className="w-5 h-5 text-[var(--warning)]" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-[var(--text)]">{t('guestSession')}</p>
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[var(--warning)]/20 text-[var(--warning)]">
-                          {t('guest')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[var(--text-subtle)]">{t('createAccountToSaveProgress')}</p>
-                    </div>
-                  </div>
-                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                    <Button variant="primary" className="w-full">
-                      {t('createAccount')}
-                    </Button>
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-[var(--text-subtle)] hover:bg-[var(--secondary)] transition-colors"
-                  >
-                    <LogOutIcon className="w-5 h-5" />
-                    <span className="text-sm font-medium">{t('clearSession')}</span>
-                  </button>
-                </div>
               ) : isAuthenticated ? (
                 <div className="space-y-2">
                   <Link

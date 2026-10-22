@@ -17,16 +17,11 @@
     "signIn": "Prijavi se",
     "createAccount": "Izradi račun",
     "logOut": "Odjavi se",
-    "clearSession": "Očisti sesiju",
-    "guest": "Gost",
-    "guestSession": "Gostujuća sesija",
-    "createAccountToSaveProgress": "Izradi račun za spremanje napretka",
     "theme": "Tema",
     "backToApp": "Natrag u aplikaciju",
     "openMenu": "Otvori izbornik",
     "closeMenu": "Zatvori izbornik",
-    "profileSettings": "Postavke profila",
-    "clearSessionTitle": "Očisti sesiju"
+    "profileSettings": "Postavke profila"
   },
   "home": {
     "heroTitle": "Jednostavno odaberi",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "za pjevanje",
     "heroSubtitle": "Pronađi pjesme koje znaš, koje zapravo možeš pjevati i koje će publika obožavati. Personalizirane preporuke u 30 sekundi.",
     "findYourSong": "Pronađi svoju pjesmu",
-    "trustSignal": "Besplatno • Nije potrebna prijava • Traje 30 sekundi",
-    "failedToStart": "Pokretanje nije uspjelo. Molimo pokušaj ponovno.",
+    "trustSignal": "Besplatno • Traje samo 30 sekundi",
     "soundFamiliar": "Zvuči poznato?",
     "soundFamiliarSubtitle": "Na karaokama si, listaš pjesmaricu i...",
     "problemNothingTitle": "Ništa se ne ističe",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Dobrodošli natrag",
-    "signInSubtitle": "Prijavi se za pristup svojim pjesmama i preporukama",
     "emailLabel": "Email adresa",
     "emailPlaceholder": "tvoj@email.com",
-    "sendMagicLink": "Pošalji Magic Link",
-    "noPasswordNeeded": "Lozinka nije potrebna. Poslat ćemo ti sigurnu poveznicu za prijavu.",
     "or": "ili",
     "justWantToBrowse": "Samo želiš pregledavati? Račun nije potreban.",
     "browseSongs": "Pregledaj pjesme",
-    "failedToSendMagicLink": "Slanje Magic Linka nije uspjelo. Molimo pokušaj ponovno.",
-    "checkYourEmail": "Provjeri svoj email!",
-    "magicLinkSentTo": "Poslali smo Magic Link na",
-    "linkExpiresIn15": "Klikni na poveznicu u svom emailu za prijavu. Poveznica istječe za 15 minuta.",
     "useDifferentEmail": "Koristi drugi email",
     "backToHome": "Natrag na početnu",
-    "verifyingLink": "Provjeravamo tvoju poveznicu...",
-    "pleaseWait": "Molimo pričekaj trenutak",
-    "youreSignedIn": "Prijava je uspjela!",
-    "redirectingToSongs": "Preusmjeravamo te na tvoje pjesme...",
-    "connectionError": "Greška u povezivanju",
-    "verificationFailed": "Provjera nije uspjela",
-    "noTokenFound": "Token za provjeru nije pronađen. Molimo zatraži novi Magic Link.",
-    "linkExpired": "Ovaj Magic Link je istekao. Molimo zatraži novi.",
-    "linkAlreadyUsed": "Ovaj Magic Link je već iskorišten. Molimo zatraži novi.",
-    "failedToVerify": "Provjera tokena nije uspjela. Možda je istekao ili je već iskorišten.",
-    "troubleshootingTips": "Savjeti za rješavanje problema:",
-    "tipMobileData": "Pokušaj koristiti mobilne podatke umjesto WiFi-ja",
-    "tipDisableVpn": "Onemogući VPN ili proširenja za blokiranje oglasa",
-    "tipIncognito": "Pokušaj otvoriti u inkognito/privatnom načinu",
-    "tipCorporateNetwork": "Provjeri jesi li na korporativnoj ili školskoj mreži",
-    "retryAgainCount": "Pokušaj ponovno ({count})",
-    "requestNewLink": "Zatraži novi link",
-    "backToHomeCaps": "Natrag na početnu"
+    "codeExpired": "Taj je kod istekao. Zatraži novi.",
+    "codeLabel": "Šesteroznamenkasti kod",
+    "codeResent": "Novi kod je na putu.",
+    "codeSentTo": "Poslali smo šesteroznamenkasti kod na",
+    "continueWithGoogle": "Nastavi putem Googlea",
+    "enterCode": "Unesi svoj kod",
+    "failedToSendCode": "Slanje koda nije uspjelo. Pokušaj ponovno.",
+    "failedToVerifyCode": "Provjera koda nije uspjela. Pokušaj ponovno.",
+    "googleSignInFailed": "Prijava putem Googlea nije uspjela. Pokušaj ponovno.",
+    "invalidCode": "Taj kod nije točan. Provjeri ga i pokušaj ponovno.",
+    "resendCode": "Pošalji novi kod",
+    "sendCode": "Pošalji mi kod e-poštom",
+    "signInHint": "Lozinka nije potrebna. Poslat ćemo ti šesteroznamenkasti kod e-poštom za prijavu na tvoj Nomad Karaoke račun.",
+    "signInToGetPicks": "Prijavi se za svoje personalizirane karaoke preporuke",
+    "tooManyAttempts": "Previše pokušaja. Zatraži novi kod.",
+    "verifyCode": "Potvrdi i prijavi se",
+    "importedGuestData": "Premjestili smo tvoje odgovore iz kviza i pjesme na tvoj račun."
   },
   "quiz": {
     "startingQuiz": "Pokrećemo kviz...",
@@ -182,28 +168,8 @@
     "selected": "{count} odabrano",
     "findingMoreArtists": "Tražimo još izvođača koje možda znaš...",
     "noMoreArtists": "Nema više izvođača za prikaz",
-    "almostThere": "Skoro smo gotovi!",
-    "enterEmailToSave": "Unesi svoj email za spremanje preporuka.",
-    "generatingRecs": "Generiramo tvoje preporuke...",
-    "analyzingTaste": "Analiziramo tvoj glazbeni ukus",
-    "recsReady": "Preporuke su spremne!",
-    "personalizedListWaiting": "Tvoj personalizirani popis pjesama te čeka",
-    "waitingToGenerate": "Priprema za generiranje...",
-    "startShortly": "Uskoro počinje",
-    "yourEmail": "Tvoj Email",
     "emailSaved": "Email spremljen!",
-    "emailPlaceholder": "tvoj@email.com",
-    "saveEmail": "Spremi",
-    "pleaseEnterEmail": "Molimo unesi svoj email",
-    "pleaseEnterValidEmail": "Molimo unesi važeći email",
-    "failedToSaveEmail": "Spremanje emaila nije uspjelo",
     "skipForNow": "Preskoči za sada",
-    "emailSavedSuccess": "Email spremljen!",
-    "viewRecommendations": "Pogledaj moje preporuke",
-    "emailUpdatesHint": "Slat ćemo ti obavijesti o tvojim preporukama. Obećavamo, bez spama.",
-    "generatingRecommendationsButton": "Generiranje preporuka...",
-    "enterEmailToContinue": "Unesi svoj email za nastavak",
-    "pleaseEnterEmailAbove": "Molimo unesi svoj email iznad kako bi vidio/la svoje preporuke",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Nijedan hit za publiku ne odgovara trenutnim filterima",
     "viewMySongs": "Pogledaj moje pjesme",
     "syncMoreMusic": "Sinkroniziraj više glazbe",
-    "tryAgain": "Pokušaj ponovno"
+    "tryAgain": "Pokušaj ponovno",
+    "libraryAny": "Bilo koja zbirka",
+    "libraryCommunity": "Verzije zajednice",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version katalog",
+    "libraryLabel": "Karaoke zbirka",
+    "loadMore": "Učitaj više",
+    "loadingMore": "Učitavanje…",
+    "noMatchDescription": "Pokušaj ublažiti koji filter da vidiš više pjesama.",
+    "noMatchTitle": "Nijedan odabir ne odgovara ovim filterima",
+    "sortAz": "Od A do Z",
+    "sortBest": "Najbolje za tebe",
+    "sortLabel": "Poredaj po",
+    "sortNewest": "Najnovije",
+    "sortOldest": "Najstarije",
+    "sortPopular": "Najpopularnije",
+    "sortShortest": "Najkraće",
+    "warmingDescription": "Zagrijavamo sustav. Ovo obično traje manje od minute i automatski ćemo pokušati ponovno.",
+    "warmingTitle": "Pripremamo tvoje preporuke…"
   },
   "myData": {
     "title": "Moji podaci",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Povratne informacije i poboljšanja",
     "feedbackDesc": "Uskoro: Sviđa mi se / sakrij pjesme, vokalni raspon i više!",
     "dataPowersRecs": "Ovi podaci pokreću tvoje personalizirane karaoke preporuke.",
-    "createAccountToSync": "Izradi račun",
-    "toSyncServices": "za sinkronizaciju tvojih glazbenih usluga.",
     "moreDataBetterRecs": "Više podataka = bolje preporuke.",
     "takeTheQuiz": "Riješi kviz",
     "orConnectMore": "ili poveži više usluga.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Traži pjesme za dodavanje...",
     "noSongsYet": "Još nema pjesama",
     "noSongsYetDesc": "Pretraži iznad kako bi dodao/la pjesme koje znaš i voliš pjevati!",
-    "connectYourServices": "Poveži svoje glazbene usluge",
-    "connectServicesGuestDesc": "Izradi račun kako bi povezao/la Spotify i Last.fm za personalizirane preporuke na temelju tvoje povijesti slušanja.",
-    "createAccount": "Izradi račun",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Povezano",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Informacije o tvom računu",
     "emailLabel": "Email",
-    "guestSession": "Gostujuća sesija",
     "displayNameLabel": "Ime za prikaz",
     "displayNamePlaceholder": "Kako da te zovemo?",
     "profileUpdated": "Profil ažuriran!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Nema povezanih usluga",
     "servicesConnectedCount": "{count} povezan{count, plural, one {a usluga} few {e usluge} other {ih usluga}}",
     "logOutSection": "Odjavi se",
-    "clearGuestSession": "Očisti svoju gostujuću sesiju",
     "signOutOfAccount": "Odjavi se sa svog računa",
     "dangerZone": "Opasna zona",
     "irreversibleActions": "Nepovratne radnje",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Sigurno želiš nastaviti? Ovo će trajno obrisati tvoj račun i sve tvoje podatke. Ova radnja se ne može poništiti.",
     "yesDeleteAccount": "Da, obriši moj račun",
     "deleteNotAvailable": "Brisanje računa još nije dostupno. Molimo kontaktiraj podršku ako trebaš obrisati svoj račun.",
-    "clearSession": "Očisti sesiju",
     "logOut": "Odjavi se",
     "accountId": "ID računa: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} brendova",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIK"
+      "classic": "KLASIK",
+      "community": "Zajednica",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Uživam pjevati ovo",
@@ -664,18 +642,6 @@
       "comfortEasy": "Lako",
       "comfortComfortable": "Udobno",
       "comfortChallenging": "Izazovno"
-    },
-    "postQuizEmail": {
-      "almostThere": "Skoro smo gotovi!",
-      "enterEmailToSeeRecs": "Unesi svoj email kako bi vidio/la svoje personalizirane preporuke",
-      "emailPlaceholder": "tvoj@email.com",
-      "emailLabel": "Email adresa",
-      "invalidEmail": "Molimo unesi važeću email adresu",
-      "failedToSaveEmail": "Spremanje emaila nije uspjelo",
-      "saving": "Spremanje...",
-      "continue": "Nastavi",
-      "updateNote": "Slat ćemo ti obavijesti o tvojim preporukama.",
-      "noSpam": "Bez spama, obećavamo."
     },
     "stickyFinish": {
       "artistSelected": "{count} {count, plural, one {odabrani izvođač} few {odabrana izvođača} other {odabranih izvođača}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Povezati Spotify i Last.fm",
       "syncListeningHistory": "Sinkronizirati svoju povijest slušanja",
       "saveProgressAcrossDevices": "Spremiti svoj napredak na svim uređajima",
-      "createAndManagePlaylists": "Izrađivati i upravljati playlistama"
+      "createAndManagePlaylists": "Izrađivati i upravljati playlistama",
+      "createAccount": "Prijavi se ili stvori račun"
     },
     "artistSearch": {
       "placeholder": "Traži izvođače za dodavanje...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Povezane usluge",
-      "createAccountToConnect": "Izradi račun za povezivanje",
-      "connectMusicServicesTitle": "Poveži svoje glazbene usluge",
-      "connectMusicServicesDesc": "Izradi račun kako bi povezao/la Spotify i Last.fm za personalizirane preporuke.",
-      "musicServicesFeature": "Glazbene usluge",
       "noServicesConnected": "Nema povezanih usluga",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" nema pjesama koje bismo mogli učitati. Isprobaj drugu playlistu.",
     "errorTooManyImports": "Prebrzo uvoziš playliste. Pričekaj minutu pa pokušaj ponovno.",
     "inputLabel": "Poveznica na YouTube Music playlistu"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Hit za publiku",
+      "decade_match": "Iz desetljeća koje voliš",
+      "genre_match": "Odgovara tvojim žanrovima",
+      "known_artist": "Od izvođača kojeg voliš",
+      "known_song": "Ovo znaš",
+      "make_it": "Napravi",
+      "similar_artist": "Slično izvođaču {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Sve što odgovara, redoslijedom koji odabereš",
+        "title": "Svi odabiri"
+      },
+      "artists_you_love": {
+        "reason": "Još pjesama izvođača koje slušaš",
+        "title": "Od izvođača koje voliš"
+      },
+      "because": {
+        "reason": "Pjesme koje obožavatelji izvođača {artist} rado pjevaju",
+        "title": "Jer voliš izvođača {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Pjesme uz koje svi pjevaju",
+        "title": "Hitovi za publiku"
+      },
+      "make_it": {
+        "reason": "Još nema karaoke verzije. Možemo je izraditi za tebe",
+        "title": "Napravi"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verzije pjesama iz tvoje zbirke",
+        "title": "Pjesme koje znaš"
+      }
+    }
   }
 }

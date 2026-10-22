@@ -1,11 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link, useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import type { Recommendation } from "@/types";
+import type {
+  Recommendation,
+  RecDuration,
+  RecHasKaraoke,
+  RecLibrary,
+  RecSort,
+  RecV2Params,
+  RecV2Section,
+  RecV2Song,
+} from "@/types";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { SparklesIcon, MusicIcon, LinkIcon } from "@/components/icons";
@@ -14,24 +23,72 @@ import { Button, LoadingPulse, EmptyState } from "@/components/ui";
 // Filter types
 type KaraokeFilter = "all" | "karaoke" | "generate";
 type PopularityFilter = "any" | "hidden-gems" | "somewhat-known" | "popular" | "chart-toppers";
+type DurationFilter = "any" | RecDuration;
 
-// Duration constants (in ms)
-const SHORT_DURATION = 3 * 60 * 1000; // 3 minutes
-const LONG_DURATION = 5 * 60 * 1000; // 5 minutes
+const SORTS: RecSort[] = ["best", "popular", "newest", "oldest", "shortest", "az"];
+const LIBRARIES: RecLibrary[] = ["any", "community", "karafun"];
+const SORT_LABEL_KEY: Record<RecSort, string> = {
+  best: "sortBest",
+  popular: "sortPopular",
+  newest: "sortNewest",
+  oldest: "sortOldest",
+  shortest: "sortShortest",
+  az: "sortAz",
+};
+const LIBRARY_LABEL_KEY: Record<RecLibrary, string> = {
+  any: "libraryAny",
+  community: "libraryCommunity",
+  karafun: "libraryKarafun",
+};
 
-interface CategorizedData {
-  from_artists_you_know: Recommendation[];
-  create_your_own: Recommendation[];
-  crowd_pleasers: Recommendation[];
-  total_count: number;
+// Popularity filter -> v2 params (popularity = min, popularity_max = max; both inclusive)
+const POPULARITY_PARAMS: Record<PopularityFilter, Pick<RecV2Params, "popularity" | "popularity_max">> = {
+  any: {},
+  "hidden-gems": { popularity_max: 29 },
+  "somewhat-known": { popularity: 30, popularity_max: 49 },
+  popular: { popularity: 50, popularity_max: 69 },
+  "chart-toppers": { popularity: 70 },
+};
+
+const KARAOKE_PARAM: Record<KaraokeFilter, RecHasKaraoke> = {
+  all: "any",
+  karaoke: "yes",
+  generate: "make",
+};
+
+// Seconds before a warming_up (503) response is retried automatically
+const WARMING_RETRY_MS = 10000;
+
+function toCardRecommendation(song: RecV2Song): Recommendation {
+  return {
+    song_id: song.song_key,
+    artist: song.artist,
+    title: song.title,
+    score: song.score,
+    reason: song.reason,
+    reason_type: song.reason_type,
+    reason_artist: song.reason_artist,
+    brand_count: song.karaoke.brand_count,
+    popularity: song.facets.popularity ?? 0,
+    has_karaoke_version: song.has_karaoke_version,
+    is_classic: song.facets.is_classic,
+    duration_ms: song.facets.duration_ms,
+    explicit: song.facets.explicit,
+    community: song.karaoke.community,
+    karafun: song.karaoke.karafun,
+  };
 }
 
 export default function RecommendationsPage() {
   const router = useRouter();
   const t = useTranslations("recommendations");
+  const tRoot = useTranslations();
   const { hasCompletedQuiz, quizStatusLoading } = useAuth();
-  const [data, setData] = useState<CategorizedData | null>(null);
+  const [sections, setSections] = useState<RecV2Section[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isWarming, setIsWarming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
@@ -39,18 +96,19 @@ export default function RecommendationsPage() {
   const [popularityFilter, setPopularityFilter] = useState<PopularityFilter>("any");
   const [excludeExplicit, setExcludeExplicit] = useState(false);
   const [classicsOnly, setClassicsOnly] = useState(false);
-  const [durationFilter, setDurationFilter] = useState<"any" | "short" | "medium" | "long">("any");
+  const [durationFilter, setDurationFilter] = useState<DurationFilter>("any");
+  const [sort, setSort] = useState<RecSort>("best");
+  const [library, setLibrary] = useState<RecLibrary>("any");
 
   // Collapsed sections
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  // Popularity filter ranges - use translated labels
-  const POPULARITY_RANGES: Record<PopularityFilter, { min?: number; max?: number; label: string }> = {
-    any: { label: t("anyPopularity") },
-    "hidden-gems": { max: 30, label: t("hiddenGems") },
-    "somewhat-known": { min: 30, max: 50, label: t("somewhatKnown") },
-    popular: { min: 50, max: 70, label: t("popular") },
-    "chart-toppers": { min: 70, label: t("chartToppers") },
+  const POPULARITY_LABELS: Record<PopularityFilter, string> = {
+    any: t("anyPopularity"),
+    "hidden-gems": t("hiddenGems"),
+    "somewhat-known": t("somewhatKnown"),
+    popular: t("popular"),
+    "chart-toppers": t("chartToppers"),
   };
 
   const toggleSection = (section: string) => {
@@ -65,83 +123,88 @@ export default function RecommendationsPage() {
     });
   };
 
+  const buildParams = useCallback((): RecV2Params => {
+    const params: RecV2Params = { sort, ...POPULARITY_PARAMS[popularityFilter] };
+    if (karaokeFilter !== "all") params.has_karaoke = KARAOKE_PARAM[karaokeFilter];
+    if (durationFilter !== "any") params.duration = durationFilter;
+    if (excludeExplicit) params.explicit = "exclude";
+    if (classicsOnly) params.classic = true;
+    if (library !== "any") params.library = library;
+    return params;
+  }, [sort, popularityFilter, karaokeFilter, durationFilter, excludeExplicit, classicsOnly, library]);
+
+  // Guards against out-of-order responses when filters change quickly
+  const requestId = useRef(0);
+
   const loadRecommendations = useCallback(async () => {
+    const id = ++requestId.current;
     try {
       setIsLoading(true);
       setError(null);
-
-      // Build filter params
-      const filters: {
-        has_karaoke?: boolean;
-        min_popularity?: number;
-        max_popularity?: number;
-        exclude_explicit?: boolean;
-        min_duration_ms?: number;
-        max_duration_ms?: number;
-        classics_only?: boolean;
-      } = {};
-
-      // Karaoke filter
-      if (karaokeFilter === "karaoke") {
-        filters.has_karaoke = true;
-      } else if (karaokeFilter === "generate") {
-        filters.has_karaoke = false;
-      }
-
-      // Popularity filter
-      const popRange = POPULARITY_RANGES[popularityFilter];
-      if (popRange.min !== undefined) {
-        filters.min_popularity = popRange.min;
-      }
-      if (popRange.max !== undefined) {
-        filters.max_popularity = popRange.max;
-      }
-
-      // Explicit filter
-      if (excludeExplicit) {
-        filters.exclude_explicit = true;
-      }
-
-      // Classics filter
-      if (classicsOnly) {
-        filters.classics_only = true;
-      }
-
-      // Duration filter
-      if (durationFilter === "short") {
-        filters.max_duration_ms = SHORT_DURATION;
-      } else if (durationFilter === "medium") {
-        filters.min_duration_ms = SHORT_DURATION;
-        filters.max_duration_ms = LONG_DURATION;
-      } else if (durationFilter === "long") {
-        filters.min_duration_ms = LONG_DURATION;
-      }
-
-      const response = await api.my.getCategorizedRecommendations(
-        Object.keys(filters).length > 0 ? filters : undefined
-      );
-
-      setData(response);
+      setIsWarming(false);
+      const response = await api.my.getRecommendationsV2(buildParams());
+      if (id !== requestId.current) return;
+      setSections(response.sections);
+      setNextCursor(response.next_cursor);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t("failedToLoadRecs")
-      );
+      if (id !== requestId.current) return;
+      if (err instanceof ApiError && err.status === 503) {
+        setIsWarming(true);
+      } else {
+        setError(err instanceof Error ? err.message : t("failedToLoadRecs"));
+      }
     } finally {
-      setIsLoading(false);
+      if (id === requestId.current) setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [karaokeFilter, popularityFilter, excludeExplicit, classicsOnly, durationFilter]);
+  }, [buildParams]);
 
   useEffect(() => {
     loadRecommendations();
   }, [loadRecommendations]);
+
+  // Auto-retry while the catalog is warming up
+  useEffect(() => {
+    if (!isWarming) return;
+    const timer = setTimeout(loadRecommendations, WARMING_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [isWarming, loadRecommendations]);
+
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    const id = requestId.current;
+    try {
+      setIsLoadingMore(true);
+      const response = await api.my.getRecommendationsV2({ ...buildParams(), cursor: nextCursor });
+      if (id !== requestId.current) return;
+      setSections((prev) => {
+        const incoming = response.sections;
+        if (prev.length === 0) return incoming;
+        const next = prev.map((sec) => ({ ...sec }));
+        for (const sec of incoming) {
+          const existing = next.find((x) => x.id === sec.id);
+          if (existing) existing.songs = [...existing.songs, ...sec.songs];
+          else next.push(sec);
+        }
+        return next;
+      });
+      setNextCursor(response.next_cursor);
+    } catch (err) {
+      if (id === requestId.current) {
+        setError(err instanceof Error ? err.message : t("failedToLoadRecs"));
+      }
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const hasActiveFilters =
     karaokeFilter !== "all" ||
     popularityFilter !== "any" ||
     excludeExplicit ||
     classicsOnly ||
-    durationFilter !== "any";
+    durationFilter !== "any" ||
+    library !== "any";
 
   const clearFilters = () => {
     setKaraokeFilter("all");
@@ -149,22 +212,21 @@ export default function RecommendationsPage() {
     setExcludeExplicit(false);
     setClassicsOnly(false);
     setDurationFilter("any");
+    setLibrary("any");
   };
 
-  const renderSection = (
-    title: string,
-    subtitle: string,
-    recommendations: Recommendation[],
-    sectionKey: string,
-    emptyMessage: string
-  ) => {
-    const isCollapsed = collapsedSections.has(sectionKey);
-    const count = recommendations.length;
+  const visibleSections = sections.filter((sec) => sec.songs.length > 0);
+
+  const renderSection = (section: RecV2Section) => {
+    const isCollapsed = collapsedSections.has(section.id);
+    const count = section.songs.length;
+    const title = tRoot(section.title_key, section.title_params);
+    const subtitle = tRoot(section.reason_key, section.title_params);
 
     return (
-      <div key={sectionKey} className="mb-8">
+      <div key={section.id} className="mb-8" data-testid={`rec-section-${section.id}`}>
         <button
-          onClick={() => toggleSection(sectionKey)}
+          onClick={() => toggleSection(section.id)}
           className="w-full text-left mb-4 group"
         >
           <div className="flex items-center justify-between">
@@ -191,19 +253,13 @@ export default function RecommendationsPage() {
 
         {!isCollapsed && (
           <div className="flex flex-col gap-3">
-            {count === 0 ? (
-              <p className="text-[var(--text-subtle)] text-sm py-4 text-center">
-                {emptyMessage}
-              </p>
-            ) : (
-              recommendations.map((rec, index) => (
-                <RecommendationCard
-                  key={rec.song_id}
-                  recommendation={rec}
-                  index={index}
-                />
-              ))
-            )}
+            {section.songs.map((song, index) => (
+              <RecommendationCard
+                key={song.song_key}
+                recommendation={toCardRecommendation(song)}
+                index={index}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -284,7 +340,7 @@ export default function RecommendationsPage() {
                   onChange={(e) => setPopularityFilter(e.target.value as PopularityFilter)}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
-                  {Object.entries(POPULARITY_RANGES).map(([key, { label }]) => (
+                  {Object.entries(POPULARITY_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
                     </option>
@@ -297,15 +353,50 @@ export default function RecommendationsPage() {
                 <label className="text-xs text-[var(--text-subtle)] mb-1 block">{t("durationLabel")}</label>
                 <select
                   value={durationFilter}
-                  onChange={(e) =>
-                    setDurationFilter(e.target.value as "any" | "short" | "medium" | "long")
-                  }
+                  onChange={(e) => setDurationFilter(e.target.value as DurationFilter)}
                   className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
                 >
                   <option value="any">{t("anyLength")}</option>
                   <option value="short">{t("shortDuration")}</option>
                   <option value="medium">{t("mediumDuration")}</option>
                   <option value="long">{t("longDuration")}</option>
+                </select>
+              </div>
+
+              {/* Library filter */}
+              <div>
+                <label htmlFor="rec-library" className="text-xs text-[var(--text-subtle)] mb-1 block">{t("libraryLabel")}</label>
+                <select
+                  id="rec-library"
+                  value={library}
+                  onChange={(e) => setLibrary(e.target.value as RecLibrary)}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
+                >
+                  {LIBRARIES.map((value) => (
+                    <option key={value} value={value}>
+                      {t(LIBRARY_LABEL_KEY[value])}
+                    </option>
+                  ))}
+                </select>
+                {library === "karafun" && (
+                  <p className="text-xs text-[var(--text-subtle)] mt-1">{t("libraryKarafunInfo")}</p>
+                )}
+              </div>
+
+              {/* Sort */}
+              <div>
+                <label htmlFor="rec-sort" className="text-xs text-[var(--text-subtle)] mb-1 block">{t("sortLabel")}</label>
+                <select
+                  id="rec-sort"
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as RecSort)}
+                  className="w-full px-3 py-2 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text)] text-sm focus:outline-none focus:border-[var(--card-border)]"
+                >
+                  {SORTS.map((value) => (
+                    <option key={value} value={value}>
+                      {t(SORT_LABEL_KEY[value])}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -346,53 +437,51 @@ export default function RecommendationsPage() {
                 {t("tryAgain")}
               </Button>
             </div>
-          ) : !data || data.total_count === 0 ? (
-            <EmptyState
-              icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
-              title={t("noRecsYet")}
-              description={t("noRecsDescription")}
-              action={{
-                label: t("connectServices"),
-                onClick: () => router.push("/services"),
-              }}
-              secondaryAction={{
-                label: t("takeTheQuiz"),
-                onClick: () => router.push("/quiz"),
-              }}
-            />
+          ) : isWarming ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="recs-warming">
+              <LoadingPulse count={2} />
+              <p className="text-[var(--text)] font-medium mt-6 mb-1">{t("warmingTitle")}</p>
+              <p className="text-[var(--text-muted)] text-sm mb-4">{t("warmingDescription")}</p>
+              <Button onClick={loadRecommendations} variant="secondary">
+                {t("tryAgain")}
+              </Button>
+            </div>
+          ) : visibleSections.length === 0 ? (
+            hasActiveFilters ? (
+              <EmptyState
+                icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
+                title={t("noMatchTitle")}
+                description={t("noMatchDescription")}
+                action={{
+                  label: t("clearAllFilters"),
+                  onClick: clearFilters,
+                }}
+              />
+            ) : (
+              <EmptyState
+                icon={<SparklesIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
+                title={t("noRecsYet")}
+                description={t("noRecsDescription")}
+                action={{
+                  label: t("connectServices"),
+                  onClick: () => router.push("/services"),
+                }}
+                secondaryAction={{
+                  label: t("takeTheQuiz"),
+                  onClick: () => router.push("/quiz"),
+                }}
+              />
+            )
           ) : (
             <>
-              {/* Categorized sections */}
-              {renderSection(
-                t("fromArtistsYouKnow"),
-                t("fromArtistsSubtitle"),
-                data.from_artists_you_know,
-                "artists",
-                !hasCompletedQuiz
-                  ? t("fromArtistsEmptyQuiz")
-                  : hasActiveFilters
-                    ? t("fromArtistsEmptyFilters")
-                    : t("fromArtistsEmptyServices")
-              )}
+              {visibleSections.map(renderSection)}
 
-              {renderSection(
-                t("createYourOwn"),
-                t("createYourOwnSubtitle"),
-                data.create_your_own,
-                "create",
-                !hasCompletedQuiz
-                  ? t("createYourOwnEmptyQuiz")
-                  : hasActiveFilters
-                    ? t("createYourOwnEmptyFilters")
-                    : t("createYourOwnEmptyServices")
-              )}
-
-              {renderSection(
-                t("crowdPleasers"),
-                t("crowdPleasersSubtitle"),
-                data.crowd_pleasers,
-                "crowd",
-                t("crowdPleasersEmpty")
+              {nextCursor && (
+                <div className="flex justify-center mb-8">
+                  <Button variant="secondary" onClick={loadMore} disabled={isLoadingMore}>
+                    {isLoadingMore ? t("loadingMore") : t("loadMore")}
+                  </Button>
+                </div>
               )}
 
               {/* Footer */}

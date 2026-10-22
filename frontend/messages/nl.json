@@ -17,16 +17,11 @@
     "signIn": "Inloggen",
     "createAccount": "Account aanmaken",
     "logOut": "Uitloggen",
-    "clearSession": "Sessie wissen",
-    "guest": "Gast",
-    "guestSession": "Gastsessie",
-    "createAccountToSaveProgress": "Maak een account aan om je voortgang op te slaan",
     "theme": "Thema",
     "backToApp": "Terug naar app",
     "openMenu": "Menu openen",
     "closeMenu": "Menu sluiten",
-    "profileSettings": "Profielinstellingen",
-    "clearSessionTitle": "Sessie wissen"
+    "profileSettings": "Profielinstellingen"
   },
   "home": {
     "heroTitle": "Kies gemakkelijk",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "om te zingen",
     "heroSubtitle": "Vind nummers die je kent, echt kunt zingen, en die het publiek geweldig zal vinden. Persoonlijke aanbevelingen in 30 seconden.",
     "findYourSong": "Vind jouw nummer",
-    "trustSignal": "Gratis • Geen account nodig • Duurt 30 seconden",
-    "failedToStart": "Starten mislukt. Probeer het opnieuw.",
+    "trustSignal": "Gratis • Duurt 30 seconden",
     "soundFamiliar": "Klinkt dit bekend?",
     "soundFamiliarSubtitle": "Je bent bij karaoke, bladert door het songbook, en...",
     "problemNothingTitle": "Niets springt eruit",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Welkom terug",
-    "signInSubtitle": "Log in om toegang te krijgen tot je nummers en aanbevelingen",
     "emailLabel": "E-mailadres",
     "emailPlaceholder": "jij@voorbeeld.nl",
-    "sendMagicLink": "Stuur magische link",
-    "noPasswordNeeded": "Geen wachtwoord nodig. We sturen je een veilige link om in te loggen.",
     "or": "of",
     "justWantToBrowse": "Wil je alleen rondkijken? Geen account nodig.",
     "browseSongs": "Nummers bekijken",
-    "failedToSendMagicLink": "Verzenden van magische link mislukt. Probeer het opnieuw.",
-    "checkYourEmail": "Check je e-mail!",
-    "magicLinkSentTo": "We hebben een magische link gestuurd naar",
-    "linkExpiresIn15": "Klik op de link in je e-mail om in te loggen. De link verloopt over 15 minuten.",
     "useDifferentEmail": "Gebruik een ander e-mailadres",
     "backToHome": "Terug naar home",
-    "verifyingLink": "Je link verifiëren...",
-    "pleaseWait": "Een ogenblik geduld",
-    "youreSignedIn": "Je bent ingelogd!",
-    "redirectingToSongs": "Je wordt doorgestuurd naar je nummers...",
-    "connectionError": "Verbindingsfout",
-    "verificationFailed": "Verificatie mislukt",
-    "noTokenFound": "Geen verificatietoken gevonden. Vraag een nieuwe magische link aan.",
-    "linkExpired": "Deze magische link is verlopen. Vraag een nieuwe aan.",
-    "linkAlreadyUsed": "Deze magische link is al gebruikt. Vraag een nieuwe aan.",
-    "failedToVerify": "Token verifiëren mislukt. Het is mogelijk verlopen of al gebruikt.",
-    "troubleshootingTips": "Tips voor probleemoplossing:",
-    "tipMobileData": "Probeer mobiele data te gebruiken in plaats van WiFi",
-    "tipDisableVpn": "Schakel VPN of ad-blocker extensies uit",
-    "tipIncognito": "Probeer te openen in incognito/privémodus",
-    "tipCorporateNetwork": "Controleer of je op een bedrijfs- of schoolnetwerk zit",
-    "retryAgainCount": "Opnieuw proberen ({count})",
-    "requestNewLink": "Nieuwe link aanvragen",
-    "backToHomeCaps": "Terug naar Home"
+    "codeExpired": "Die code is verlopen. Vraag een nieuwe aan.",
+    "codeLabel": "6-cijferige code",
+    "codeResent": "Er is een nieuwe code onderweg.",
+    "codeSentTo": "We hebben een 6-cijferige code gemaild naar",
+    "continueWithGoogle": "Doorgaan met Google",
+    "enterCode": "Voer je code in",
+    "failedToSendCode": "Kon de code niet versturen. Probeer het opnieuw.",
+    "failedToVerifyCode": "Kon de code niet verifiëren. Probeer het opnieuw.",
+    "googleSignInFailed": "Inloggen met Google mislukt. Probeer het opnieuw.",
+    "invalidCode": "Die code klopt niet. Controleer de code en probeer het opnieuw.",
+    "resendCode": "Stuur een nieuwe code",
+    "sendCode": "E-mail me een code",
+    "signInHint": "Geen wachtwoord nodig. We sturen je een 6-cijferige code per e-mail om in te loggen met je Nomad Karaoke-account.",
+    "signInToGetPicks": "Log in voor je gepersonaliseerde karaoketips",
+    "tooManyAttempts": "Te veel pogingen. Vraag een nieuwe code aan.",
+    "verifyCode": "Verifiëren en inloggen",
+    "importedGuestData": "We hebben je quizantwoorden en nummers overgezet naar je account."
   },
   "quiz": {
     "startingQuiz": "Quiz starten...",
@@ -182,28 +168,8 @@
     "selected": "{count} geselecteerd",
     "findingMoreArtists": "Meer artiesten zoeken die je misschien kent...",
     "noMoreArtists": "Geen artiesten meer om te tonen",
-    "almostThere": "Bijna klaar!",
-    "enterEmailToSave": "Vul je e-mailadres in om je aanbevelingen op te slaan.",
-    "generatingRecs": "Je aanbevelingen genereren...",
-    "analyzingTaste": "Je muzieksmaak analyseren",
-    "recsReady": "Aanbevelingen klaar!",
-    "personalizedListWaiting": "Je persoonlijke lijst met nummers staat klaar",
-    "waitingToGenerate": "Wachten om te genereren...",
-    "startShortly": "Dit begint binnenkort",
-    "yourEmail": "Jouw e-mailadres",
     "emailSaved": "E-mailadres opgeslagen!",
-    "emailPlaceholder": "jij@voorbeeld.nl",
-    "saveEmail": "Opslaan",
-    "pleaseEnterEmail": "Vul je e-mailadres in",
-    "pleaseEnterValidEmail": "Vul een geldig e-mailadres in",
-    "failedToSaveEmail": "E-mailadres opslaan mislukt",
     "skipForNow": "Voor nu overslaan",
-    "emailSavedSuccess": "E-mailadres opgeslagen!",
-    "viewRecommendations": "Mijn aanbevelingen bekijken",
-    "emailUpdatesHint": "We sturen je updates over je aanbevelingen. Geen spam, beloofd.",
-    "generatingRecommendationsButton": "Aanbevelingen genereren...",
-    "enterEmailToContinue": "Vul je e-mailadres in om door te gaan",
-    "pleaseEnterEmailAbove": "Vul hierboven je e-mailadres in om je aanbevelingen te zien",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Geen publiekslievelingen komen overeen met de huidige filters",
     "viewMySongs": "Mijn nummers bekijken",
     "syncMoreMusic": "Meer muziek synchroniseren",
-    "tryAgain": "Probeer opnieuw"
+    "tryAgain": "Probeer opnieuw",
+    "libraryAny": "Elke bibliotheek",
+    "libraryCommunity": "Community-versies",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun- / Karaoke Version-catalogus",
+    "libraryLabel": "Karaokebibliotheek",
+    "loadMore": "Meer laden",
+    "loadingMore": "Laden…",
+    "noMatchDescription": "Probeer een of twee filters te versoepelen om meer nummers te zien.",
+    "noMatchTitle": "Geen suggesties die aan deze filters voldoen",
+    "sortAz": "A tot Z",
+    "sortBest": "Beste match",
+    "sortLabel": "Sorteren op",
+    "sortNewest": "Nieuwste",
+    "sortOldest": "Oudste",
+    "sortPopular": "Populairst",
+    "sortShortest": "Kortste",
+    "warmingDescription": "We warmen de boel even op. Dit duurt meestal minder dan een minuut en we proberen het automatisch opnieuw.",
+    "warmingTitle": "Je suggesties worden klaargezet…"
   },
   "myData": {
     "title": "Mijn gegevens",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Feedback & Verfijningen",
     "feedbackDesc": "Binnenkort: Nummers leuk vinden/verbergen, stembereik, en meer!",
     "dataPowersRecs": "Deze gegevens sturen je persoonlijke karaoke-aanbevelingen aan.",
-    "createAccountToSync": "Maak een account aan",
-    "toSyncServices": "om je muziekservices te synchroniseren.",
     "moreDataBetterRecs": "Meer gegevens = betere aanbevelingen.",
     "takeTheQuiz": "Doe de quiz",
     "orConnectMore": "of koppel meer services.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Zoek nummers om toe te voegen...",
     "noSongsYet": "Nog geen nummers",
     "noSongsYetDesc": "Zoek hierboven om nummers toe te voegen die je kent en graag zingt!",
-    "connectYourServices": "Koppel je muziekservices",
-    "connectServicesGuestDesc": "Maak een account aan om Spotify en Last.fm te koppelen voor persoonlijke aanbevelingen op basis van je luistergeschiedenis.",
-    "createAccount": "Account aanmaken",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Gekoppeld",
@@ -465,7 +444,6 @@
     "profileSection": "Profiel",
     "yourAccountInfo": "Je accountinformatie",
     "emailLabel": "E-mail",
-    "guestSession": "Gastsessie",
     "displayNameLabel": "Weergavenaam",
     "displayNamePlaceholder": "Hoe mogen we je noemen?",
     "profileUpdated": "Profiel bijgewerkt!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Geen services gekoppeld",
     "servicesConnectedCount": "{count} {count, plural, one {service} other {services}} gekoppeld",
     "logOutSection": "Uitloggen",
-    "clearGuestSession": "Wis je gastsessie",
     "signOutOfAccount": "Log uit van je account",
     "dangerZone": "Gevarenzone",
     "irreversibleActions": "Onomkeerbare acties",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Weet je het zeker? Dit zal je account en al je gegevens permanent verwijderen. Deze actie kan niet ongedaan worden gemaakt.",
     "yesDeleteAccount": "Ja, verwijder mijn account",
     "deleteNotAvailable": "Account verwijderen is nog niet beschikbaar. Neem contact op met support als je je account wilt verwijderen.",
-    "clearSession": "Sessie wissen",
     "logOut": "Uitloggen",
     "accountId": "Account ID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} merken",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIEKER"
+      "classic": "KLASSIEKER",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Ik zing dit graag",
@@ -664,18 +642,6 @@
       "comfortEasy": "Makkelijk",
       "comfortComfortable": "Comfortabel",
       "comfortChallenging": "Uitdagend"
-    },
-    "postQuizEmail": {
-      "almostThere": "Bijna klaar!",
-      "enterEmailToSeeRecs": "Vul je e-mailadres in om je persoonlijke aanbevelingen te zien",
-      "emailPlaceholder": "jouw@email.nl",
-      "emailLabel": "E-mailadres",
-      "invalidEmail": "Vul een geldig e-mailadres in",
-      "failedToSaveEmail": "E-mailadres opslaan mislukt",
-      "saving": "Opslaan...",
-      "continue": "Doorgaan",
-      "updateNote": "We sturen je updates over je aanbevelingen.",
-      "noSpam": "Geen spam, dat beloven we."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artiest} other {artiesten}} geselecteerd",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Spotify en Last.fm koppelen",
       "syncListeningHistory": "Je luistergeschiedenis synchroniseren",
       "saveProgressAcrossDevices": "Je voortgang opslaan op verschillende apparaten",
-      "createAndManagePlaylists": "Afspeellijsten maken en beheren"
+      "createAndManagePlaylists": "Afspeellijsten maken en beheren",
+      "createAccount": "Log in of maak een account aan"
     },
     "artistSearch": {
       "placeholder": "Zoek artiesten om toe te voegen...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Gekoppelde services",
-      "createAccountToConnect": "Maak een account aan om te koppelen",
-      "connectMusicServicesTitle": "Koppel je muziekservices",
-      "connectMusicServicesDesc": "Maak een account aan om Spotify en Last.fm te koppelen voor persoonlijke aanbevelingen.",
-      "musicServicesFeature": "Muziekservices",
       "noServicesConnected": "Geen services gekoppeld",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" bevat geen nummers die we konden lezen. Probeer een andere afspeellijst.",
     "errorTooManyImports": "Je importeert afspeellijsten te snel. Wacht een minuutje en probeer het opnieuw.",
     "inputLabel": "Link naar YouTube Music-afspeellijst"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publieksfavoriet",
+      "decade_match": "Uit een decennium dat je leuk vindt",
+      "genre_match": "Past bij je genres",
+      "known_artist": "Van een artiest die je geweldig vindt",
+      "known_song": "Dit nummer ken je",
+      "make_it": "Maak 'm zelf",
+      "similar_artist": "Vergelijkbaar met {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Alles wat overeenkomt, in de door jou gekozen volgorde",
+        "title": "Alle suggesties"
+      },
+      "artists_you_love": {
+        "reason": "Meer nummers van artiesten waar je naar luistert",
+        "title": "Van artiesten die je geweldig vindt"
+      },
+      "because": {
+        "reason": "Nummers die fans van {artist} vaak zingen",
+        "title": "Omdat je van {artist} houdt"
+      },
+      "crowd_pleasers": {
+        "reason": "Nummers waarmee je de hele zaal mee laat zingen",
+        "title": "Publieksfavorieten"
+      },
+      "make_it": {
+        "reason": "Nog geen karaokeversie beschikbaar. We kunnen er een voor je maken",
+        "title": "Maak 'm zelf"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversies van nummers uit je bibliotheek",
+        "title": "Nummers die je kent"
+      }
+    }
   }
 }

@@ -17,16 +17,11 @@
     "signIn": "로그인",
     "createAccount": "계정 만들기",
     "logOut": "로그아웃",
-    "clearSession": "세션 초기화",
-    "guest": "게스트",
-    "guestSession": "게스트 세션",
-    "createAccountToSaveProgress": "진행 상황을 저장하려면 계정을 만드세요",
     "theme": "테마",
     "backToApp": "앱으로 돌아가기",
     "openMenu": "메뉴 열기",
     "closeMenu": "메뉴 닫기",
-    "profileSettings": "프로필 설정",
-    "clearSessionTitle": "세션 초기화"
+    "profileSettings": "프로필 설정"
   },
   "home": {
     "heroTitle": "부를",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "쉽게 고르기",
     "heroSubtitle": "내가 알고, 실제로 부를 수 있으며, 사람들도 좋아할 노래를 찾아보세요. 30초 만에 맞춤형 추천을 받아보세요.",
     "findYourSong": "내 노래 찾기",
-    "trustSignal": "무료 • 가입 불필요 • 30초면 충분해요",
-    "failedToStart": "시작하지 못했습니다. 다시 시도해 주세요.",
+    "trustSignal": "무료 • 30초면 완성",
     "soundFamiliar": "이런 경험 있으신가요?",
     "soundFamiliarSubtitle": "노래방에서 노래책을 뒤적거리다가...",
     "problemNothingTitle": "딱히 부를 곡이 떠오르지 않아요",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "다시 오신 것을 환영합니다",
-    "signInSubtitle": "노래와 추천 항목에 액세스하려면 로그인하세요",
     "emailLabel": "이메일 주소",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "매직 링크 보내기",
-    "noPasswordNeeded": "비밀번호는 필요 없어요. 안전하게 로그인할 수 있는 링크를 보내드릴게요.",
     "or": "또는",
     "justWantToBrowse": "그냥 둘러보고 싶으신가요? 계정 없이도 가능해요.",
     "browseSongs": "노래 둘러보기",
-    "failedToSendMagicLink": "매직 링크를 보내지 못했습니다. 다시 시도해 주세요.",
-    "checkYourEmail": "이메일을 확인해 주세요!",
-    "magicLinkSentTo": "다음 주소로 매직 링크를 보냈어요:",
-    "linkExpiresIn15": "이메일에 있는 링크를 클릭하여 로그인해 주세요. 링크는 15분 후에 만료돼요.",
     "useDifferentEmail": "다른 이메일 사용",
     "backToHome": "홈으로 돌아가기",
-    "verifyingLink": "링크 확인 중...",
-    "pleaseWait": "잠시만 기다려 주세요",
-    "youreSignedIn": "로그인되었습니다!",
-    "redirectingToSongs": "내 노래 목록으로 이동 중...",
-    "connectionError": "연결 오류",
-    "verificationFailed": "확인 실패",
-    "noTokenFound": "확인 토큰을 찾을 수 없습니다. 새 매직 링크를 요청해 주세요.",
-    "linkExpired": "이 매직 링크는 만료되었습니다. 새 링크를 요청해 주세요.",
-    "linkAlreadyUsed": "이 매직 링크는 이미 사용되었습니다. 새 링크를 요청해 주세요.",
-    "failedToVerify": "토큰을 확인하지 못했습니다. 만료되었거나 이미 사용되었을 수 있습니다.",
-    "troubleshootingTips": "문제 해결 팁:",
-    "tipMobileData": "WiFi 대신 모바일 데이터를 사용해 보세요",
-    "tipDisableVpn": "VPN 또는 광고 차단 확장 프로그램을 비활성화하세요",
-    "tipIncognito": "시크릿/프라이빗 모드에서 열어보세요",
-    "tipCorporateNetwork": "회사나 학교 네트워크를 사용 중인지 확인하세요",
-    "retryAgainCount": "다시 시도 ({count})",
-    "requestNewLink": "새 링크 요청",
-    "backToHomeCaps": "홈으로 돌아가기"
+    "codeExpired": "코드가 만료되었습니다. 새 코드를 요청해 주세요.",
+    "codeLabel": "6자리 코드",
+    "codeResent": "새 코드를 발송했습니다.",
+    "codeSentTo": "다음 이메일로 6자리 코드를 보냈습니다:",
+    "continueWithGoogle": "Google로 계속하기",
+    "enterCode": "코드 입력",
+    "failedToSendCode": "코드를 전송하지 못했습니다. 다시 시도해 주세요.",
+    "failedToVerifyCode": "코드를 인증하지 못했습니다. 다시 시도해 주세요.",
+    "googleSignInFailed": "Google 로그인에 실패했습니다. 다시 시도해 주세요.",
+    "invalidCode": "코드가 올바르지 않습니다. 확인 후 다시 시도해 주세요.",
+    "resendCode": "새 코드 전송",
+    "sendCode": "이메일로 코드 받기",
+    "signInHint": "비밀번호가 필요 없습니다. Nomad Karaoke 계정으로 로그인할 수 있는 6자리 코드를 이메일로 보내드립니다.",
+    "signInToGetPicks": "로그인하고 나만을 위한 맞춤 노래방 곡을 추천받아 보세요",
+    "tooManyAttempts": "시도 횟수를 초과했습니다. 새 코드를 요청해 주세요.",
+    "verifyCode": "인증하고 로그인하기",
+    "importedGuestData": "퀴즈 답변과 노래 목록을 회원님의 계정으로 옮겨두었어요."
   },
   "quiz": {
     "startingQuiz": "퀴즈 시작 중...",
@@ -182,28 +168,8 @@
     "selected": "{count}개 선택됨",
     "findingMoreArtists": "알 수도 있는 아티스트를 더 찾는 중...",
     "noMoreArtists": "표시할 아티스트가 더 이상 없습니다",
-    "almostThere": "거의 다 왔어요!",
-    "enterEmailToSave": "추천 결과를 저장하려면 이메일을 입력해 주세요.",
-    "generatingRecs": "추천 생성 중...",
-    "analyzingTaste": "음악 취향 분석 중",
-    "recsReady": "추천 준비 완료!",
-    "personalizedListWaiting": "맞춤형 노래 목록이 준비되었습니다",
-    "waitingToGenerate": "생성 대기 중...",
-    "startShortly": "곧 시작됩니다",
-    "yourEmail": "내 이메일",
     "emailSaved": "이메일이 저장되었습니다!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "저장",
-    "pleaseEnterEmail": "이메일을 입력해 주세요",
-    "pleaseEnterValidEmail": "유효한 이메일을 입력해 주세요",
-    "failedToSaveEmail": "이메일을 저장하지 못했습니다",
     "skipForNow": "일단 건너뛰기",
-    "emailSavedSuccess": "이메일이 저장되었습니다!",
-    "viewRecommendations": "내 추천 보기",
-    "emailUpdatesHint": "추천에 대한 업데이트를 보내드릴게요. 스팸은 절대 보내지 않아요.",
-    "generatingRecommendationsButton": "추천 생성 중...",
-    "enterEmailToContinue": "계속하려면 이메일을 입력해 주세요",
-    "pleaseEnterEmailAbove": "추천 결과를 보려면 위에 이메일을 입력해 주세요",
     "genres": {
       "pop": "팝",
       "rock": "록",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "현재 필터와 일치하는 분위기 띄우는 곡이 없습니다",
     "viewMySongs": "내 노래 보기",
     "syncMoreMusic": "더 많은 음악 동기화",
-    "tryAgain": "다시 시도"
+    "tryAgain": "다시 시도",
+    "libraryAny": "모든 라이브러리",
+    "libraryCommunity": "커뮤니티 버전",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version 카탈로그",
+    "libraryLabel": "노래방 라이브러리",
+    "loadMore": "더 보기",
+    "loadingMore": "불러오는 중…",
+    "noMatchDescription": "필터를 한두 개 조정하여 더 많은 곡을 확인해 보세요.",
+    "noMatchTitle": "필터와 일치하는 추천 곡이 없습니다",
+    "sortAz": "가나다순",
+    "sortBest": "맞춤 추천순",
+    "sortLabel": "정렬 기준",
+    "sortNewest": "최신순",
+    "sortOldest": "오래된순",
+    "sortPopular": "인기순",
+    "sortShortest": "짧은 곡 순",
+    "warmingDescription": "시스템을 준비 중입니다. 보통 1분 이내로 소요되며, 자동으로 다시 시도합니다.",
+    "warmingTitle": "추천 곡을 준비하는 중…"
   },
   "myData": {
     "title": "내 데이터",
@@ -299,8 +283,6 @@
     "feedbackTitle": "피드백 및 개선",
     "feedbackDesc": "출시 예정: 노래 좋아요/숨기기, 음역대 설정 등!",
     "dataPowersRecs": "이 데이터는 맞춤형 노래방 추천을 제공하는 데 사용됩니다.",
-    "createAccountToSync": "계정을 만들어",
-    "toSyncServices": "음악 서비스를 동기화해 보세요.",
     "moreDataBetterRecs": "데이터가 많을수록 추천이 더 정확해져요.",
     "takeTheQuiz": "퀴즈를 풀거나",
     "orConnectMore": "더 많은 서비스를 연결해 보세요.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "추가할 노래 검색...",
     "noSongsYet": "아직 노래가 없습니다",
     "noSongsYetDesc": "위에서 검색하여 평소 즐겨 부르는 노래를 추가해 보세요!",
-    "connectYourServices": "음악 서비스 연결",
-    "connectServicesGuestDesc": "계정을 만들어 Spotify와 Last.fm을 연결하고 청취 기록을 바탕으로 맞춤 추천을 받아보세요.",
-    "createAccount": "계정 만들기",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "연결됨",
@@ -465,7 +444,6 @@
     "profileSection": "프로필",
     "yourAccountInfo": "내 계정 정보",
     "emailLabel": "이메일",
-    "guestSession": "게스트 세션",
     "displayNameLabel": "표시 이름",
     "displayNamePlaceholder": "어떻게 불러드릴까요?",
     "profileUpdated": "프로필이 업데이트되었습니다!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "연결된 서비스 없음",
     "servicesConnectedCount": "{count}개의 서비스가 연결됨",
     "logOutSection": "로그아웃",
-    "clearGuestSession": "게스트 세션 지우기",
     "signOutOfAccount": "계정에서 로그아웃",
     "dangerZone": "주의 요망",
     "irreversibleActions": "되돌릴 수 없는 작업",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "정말 삭제하시겠습니까? 계정과 모든 데이터가 영구적으로 삭제되며, 이 작업은 되돌릴 수 없습니다.",
     "yesDeleteAccount": "네, 내 계정을 삭제합니다",
     "deleteNotAvailable": "계정 삭제 기능은 아직 준비 중입니다. 계정을 삭제해야 하는 경우 지원팀에 문의해 주세요.",
-    "clearSession": "세션 초기화",
     "logOut": "로그아웃",
     "accountId": "계정 ID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count}개의 브랜드",
       "pop": "인기도: {value}",
       "explicit": "E",
-      "classic": "클래식"
+      "classic": "클래식",
+      "community": "커뮤니티",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "이 노래 부르는 것을 좋아해요",
@@ -664,18 +642,6 @@
       "comfortEasy": "쉬움",
       "comfortComfortable": "편안함",
       "comfortChallenging": "도전적임"
-    },
-    "postQuizEmail": {
-      "almostThere": "거의 다 왔어요!",
-      "enterEmailToSeeRecs": "맞춤형 추천을 보려면 이메일을 입력하세요",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "이메일 주소",
-      "invalidEmail": "유효한 이메일 주소를 입력해 주세요",
-      "failedToSaveEmail": "이메일을 저장하지 못했습니다",
-      "saving": "저장 중...",
-      "continue": "계속",
-      "updateNote": "추천에 대한 업데이트를 보내드릴게요.",
-      "noSpam": "스팸은 절대 보내지 않아요."
     },
     "stickyFinish": {
       "artistSelected": "{count}명의 아티스트 선택됨",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Spotify 및 Last.fm 연결",
       "syncListeningHistory": "청취 기록 동기화",
       "saveProgressAcrossDevices": "여러 기기에서 진행 상황 저장",
-      "createAndManagePlaylists": "플레이리스트 생성 및 관리"
+      "createAndManagePlaylists": "플레이리스트 생성 및 관리",
+      "createAccount": "로그인 또는 계정 생성"
     },
     "artistSearch": {
       "placeholder": "추가할 아티스트 검색...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "연결된 서비스",
-      "createAccountToConnect": "연결하려면 계정을 만드세요",
-      "connectMusicServicesTitle": "음악 서비스 연결",
-      "connectMusicServicesDesc": "계정을 만들어 Spotify와 Last.fm을 연결하고 맞춤형 추천을 받아보세요.",
-      "musicServicesFeature": "음악 서비스",
       "noServicesConnected": "연결된 서비스 없음",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\"에서 불러올 수 있는 곡이 없습니다. 다른 재생목록으로 시도해 보세요.",
     "errorTooManyImports": "재생목록을 너무 빠르게 가져오고 있어요. 잠시 후 다시 시도해 주세요.",
     "inputLabel": "YouTube Music 재생목록 링크"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "분위기 띄우기 좋은 곡",
+      "decade_match": "선호하는 시대의 곡",
+      "genre_match": "취향에 맞는 장르",
+      "known_artist": "좋아하는 아티스트의 곡",
+      "known_song": "내가 아는 곡",
+      "make_it": "직접 만들기",
+      "similar_artist": "{artist} 느낌의 곡"
+    },
+    "section": {
+      "all": {
+        "reason": "선택한 정렬 순서대로 보여주는 모든 곡",
+        "title": "전체 추천 곡"
+      },
+      "artists_you_love": {
+        "reason": "자주 듣는 아티스트의 다른 곡",
+        "title": "좋아하는 아티스트의 곡"
+      },
+      "because": {
+        "reason": "{artist} 팬들이 즐겨 부르는 곡",
+        "title": "{artist} 음악을 좋아하셔서 추천해요"
+      },
+      "crowd_pleasers": {
+        "reason": "다 함께 따라 부르기 좋은 곡",
+        "title": "분위기 띄우기 좋은 곡"
+      },
+      "make_it": {
+        "reason": "아직 노래방 버전이 없는 곡이에요. 직접 제작해 드릴 수 있어요",
+        "title": "직접 만들기"
+      },
+      "songs_you_know": {
+        "reason": "내 라이브러리에 있는 곡들의 노래방 버전",
+        "title": "내가 아는 곡"
+      }
+    }
   }
 }

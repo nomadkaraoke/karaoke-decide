@@ -17,16 +17,11 @@
     "signIn": "Masuk",
     "createAccount": "Buat Akun",
     "logOut": "Keluar",
-    "clearSession": "Hapus Sesi",
-    "guest": "Tamu",
-    "guestSession": "Sesi Tamu",
-    "createAccountToSaveProgress": "Buat akun untuk menyimpan progres",
     "theme": "Tema",
     "backToApp": "Kembali ke Aplikasi",
     "openMenu": "Buka menu",
     "closeMenu": "Tutup menu",
-    "profileSettings": "Pengaturan profil",
-    "clearSessionTitle": "Hapus sesi"
+    "profileSettings": "Pengaturan profil"
   },
   "home": {
     "heroTitle": "Pilih dengan Mudah",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "untuk Dinyanyikan",
     "heroSubtitle": "Temukan lagu yang Anda kenal, bisa dinyanyikan, dan akan disukai penonton. Rekomendasi personal dalam 30 detik.",
     "findYourSong": "Temukan Lagu Anda",
-    "trustSignal": "Gratis • Tanpa daftar • Hanya 30 detik",
-    "failedToStart": "Gagal memulai. Silakan coba lagi.",
+    "trustSignal": "Gratis • Hanya 30 detik",
     "soundFamiliar": "Pernah mengalaminya?",
     "soundFamiliarSubtitle": "Anda sedang karaoke, membolak-balik buku lagu, dan...",
     "problemNothingTitle": "Bingung pilih lagu",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Selamat datang kembali",
-    "signInSubtitle": "Masuk untuk mengakses lagu dan rekomendasi Anda",
     "emailLabel": "Alamat email",
     "emailPlaceholder": "anda@contoh.com",
-    "sendMagicLink": "Kirim Magic Link",
-    "noPasswordNeeded": "Tidak perlu kata sandi. Kami akan mengirimkan tautan aman untuk masuk.",
     "or": "atau",
     "justWantToBrowse": "Hanya ingin melihat-lihat? Tidak perlu akun.",
     "browseSongs": "Telusuri Lagu",
-    "failedToSendMagicLink": "Gagal mengirim Magic Link. Silakan coba lagi.",
-    "checkYourEmail": "Periksa email Anda!",
-    "magicLinkSentTo": "Kami telah mengirimkan Magic Link ke",
-    "linkExpiresIn15": "Klik tautan di email Anda untuk masuk. Tautan kedaluwarsa dalam 15 menit.",
     "useDifferentEmail": "Gunakan email lain",
     "backToHome": "Kembali ke beranda",
-    "verifyingLink": "Memverifikasi tautan Anda...",
-    "pleaseWait": "Mohon tunggu sebentar",
-    "youreSignedIn": "Anda sudah masuk!",
-    "redirectingToSongs": "Mengarahkan Anda ke lagu-lagu Anda...",
-    "connectionError": "Kesalahan Koneksi",
-    "verificationFailed": "Verifikasi Gagal",
-    "noTokenFound": "Token verifikasi tidak ditemukan. Silakan minta Magic Link baru.",
-    "linkExpired": "Magic Link ini telah kedaluwarsa. Silakan minta yang baru.",
-    "linkAlreadyUsed": "Magic Link ini sudah digunakan. Silakan minta yang baru.",
-    "failedToVerify": "Gagal memverifikasi token. Mungkin sudah kedaluwarsa atau sudah digunakan.",
-    "troubleshootingTips": "Tips pemecahan masalah:",
-    "tipMobileData": "Coba gunakan data seluler alih-alih WiFi",
-    "tipDisableVpn": "Nonaktifkan ekstensi VPN atau pemblokir iklan",
-    "tipIncognito": "Coba buka di mode incognito/privat",
-    "tipCorporateNetwork": "Periksa apakah Anda berada di jaringan perusahaan atau sekolah",
-    "retryAgainCount": "Coba Lagi ({count})",
-    "requestNewLink": "Minta Tautan Baru",
-    "backToHomeCaps": "Kembali ke Beranda"
+    "codeExpired": "Kode tersebut sudah kedaluwarsa. Silakan minta kode baru.",
+    "codeLabel": "Kode 6 digit",
+    "codeResent": "Kode baru sedang dikirim.",
+    "codeSentTo": "Kami telah mengirimkan kode 6 digit ke",
+    "continueWithGoogle": "Lanjutkan dengan Google",
+    "enterCode": "Masukkan kode Anda",
+    "failedToSendCode": "Gagal mengirim kode. Silakan coba lagi.",
+    "failedToVerifyCode": "Gagal memverifikasi kode. Silakan coba lagi.",
+    "googleSignInFailed": "Gagal masuk dengan Google. Silakan coba lagi.",
+    "invalidCode": "Kode tersebut salah. Periksa kembali dan coba lagi.",
+    "resendCode": "Kirim kode baru",
+    "sendCode": "Kirim kode ke email saya",
+    "signInHint": "Tidak perlu kata sandi. Kami akan mengirimkan kode 6 digit ke email Anda untuk masuk ke akun Nomad Karaoke Anda.",
+    "signInToGetPicks": "Masuk untuk mendapatkan rekomendasi karaoke pilihan Anda",
+    "tooManyAttempts": "Terlalu banyak percobaan. Silakan minta kode baru.",
+    "verifyCode": "Verifikasi dan masuk",
+    "importedGuestData": "Kami telah memindahkan jawaban kuis dan lagu Anda ke akun Anda."
   },
   "quiz": {
     "startingQuiz": "Memulai kuis...",
@@ -182,28 +168,8 @@
     "selected": "{count} terpilih",
     "findingMoreArtists": "Mencari lebih banyak artis yang mungkin Anda kenal...",
     "noMoreArtists": "Tidak ada lagi artis untuk ditampilkan",
-    "almostThere": "Hampir Selesai!",
-    "enterEmailToSave": "Masukkan email Anda untuk menyimpan rekomendasi Anda.",
-    "generatingRecs": "Menyusun rekomendasi Anda...",
-    "analyzingTaste": "Menganalisis selera musik Anda",
-    "recsReady": "Rekomendasi siap!",
-    "personalizedListWaiting": "Daftar lagu personal Anda sudah menunggu",
-    "waitingToGenerate": "Menunggu untuk menyusun...",
-    "startShortly": "Ini akan segera dimulai",
-    "yourEmail": "Email Anda",
     "emailSaved": "Email disimpan!",
-    "emailPlaceholder": "anda@contoh.com",
-    "saveEmail": "Simpan",
-    "pleaseEnterEmail": "Silakan masukkan email Anda",
-    "pleaseEnterValidEmail": "Silakan masukkan email yang valid",
-    "failedToSaveEmail": "Gagal menyimpan email",
     "skipForNow": "Lewati untuk saat ini",
-    "emailSavedSuccess": "Email berhasil disimpan!",
-    "viewRecommendations": "Lihat Rekomendasi Saya",
-    "emailUpdatesHint": "Kami akan mengirimkan pembaruan tentang rekomendasi Anda. Kami jamin tidak ada spam.",
-    "generatingRecommendationsButton": "Menyusun rekomendasi...",
-    "enterEmailToContinue": "Masukkan email Anda untuk melanjutkan",
-    "pleaseEnterEmailAbove": "Silakan masukkan email Anda di atas untuk melihat rekomendasi Anda",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Tidak ada lagu favorit yang cocok dengan filter saat ini",
     "viewMySongs": "Lihat lagu saya",
     "syncMoreMusic": "Sinkronkan lebih banyak musik",
-    "tryAgain": "Coba lagi"
+    "tryAgain": "Coba lagi",
+    "libraryAny": "Semua pustaka",
+    "libraryCommunity": "Versi komunitas",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalog KaraFun / Karaoke Version",
+    "libraryLabel": "Pustaka karaoke",
+    "loadMore": "Muat lebih banyak",
+    "loadingMore": "Memuat…",
+    "noMatchDescription": "Coba longgarkan satu atau dua filter untuk melihat lebih banyak lagu.",
+    "noMatchTitle": "Tidak ada pilihan yang cocok dengan filter ini",
+    "sortAz": "A sampai Z",
+    "sortBest": "Terbaik untukmu",
+    "sortLabel": "Urutkan berdasarkan",
+    "sortNewest": "Terbaru",
+    "sortOldest": "Terlama",
+    "sortPopular": "Paling populer",
+    "sortShortest": "Durasi terpendek",
+    "warmingDescription": "Kami sedang menyiapkan semuanya. Ini biasanya butuh waktu kurang dari semenit, dan kami akan mencoba lagi secara otomatis.",
+    "warmingTitle": "Menyiapkan pilihan rekomendasi untukmu…"
   },
   "myData": {
     "title": "Data Saya",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Umpan Balik & Penyempurnaan",
     "feedbackDesc": "Segera hadir: Suka/sembunyikan lagu, jangkauan vokal, dan lainnya!",
     "dataPowersRecs": "Data ini memberdayakan rekomendasi karaoke personal Anda.",
-    "createAccountToSync": "Buat akun",
-    "toSyncServices": "untuk menyinkronkan layanan musik Anda.",
     "moreDataBetterRecs": "Lebih banyak data = rekomendasi lebih baik.",
     "takeTheQuiz": "Ikuti kuis",
     "orConnectMore": "atau hubungkan lebih banyak layanan.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Cari lagu untuk ditambahkan...",
     "noSongsYet": "Belum ada lagu",
     "noSongsYetDesc": "Cari di atas untuk menambahkan lagu yang Anda kenal dan suka nyanyikan!",
-    "connectYourServices": "Hubungkan Layanan Musik Anda",
-    "connectServicesGuestDesc": "Buat akun untuk menghubungkan Spotify dan Last.fm untuk rekomendasi personal berdasarkan riwayat mendengarkan Anda.",
-    "createAccount": "Buat Akun",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Terhubung",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Informasi akun Anda",
     "emailLabel": "Email",
-    "guestSession": "Sesi tamu",
     "displayNameLabel": "Nama Tampilan",
     "displayNamePlaceholder": "Bagaimana kami harus memanggil Anda?",
     "profileUpdated": "Profil diperbarui!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Tidak ada layanan yang terhubung",
     "servicesConnectedCount": "{count} layanan{count, plural, one {} other {}} terhubung",
     "logOutSection": "Keluar",
-    "clearGuestSession": "Hapus sesi tamu Anda",
     "signOutOfAccount": "Keluar dari akun Anda",
     "dangerZone": "Zona Bahaya",
     "irreversibleActions": "Tindakan yang tidak dapat dibatalkan",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Apakah Anda yakin? Ini akan menghapus akun Anda dan semua data Anda secara permanen. Tindakan ini tidak dapat dibatalkan.",
     "yesDeleteAccount": "Ya, Hapus Akun Saya",
     "deleteNotAvailable": "Penghapusan akun belum tersedia. Silakan hubungi dukungan jika Anda perlu menghapus akun Anda.",
-    "clearSession": "Hapus Sesi",
     "logOut": "Keluar",
     "accountId": "ID Akun: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} merek",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIK"
+      "classic": "KLASIK",
+      "community": "Komunitas",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Saya Suka Menyanyikan Ini",
@@ -664,18 +642,6 @@
       "comfortEasy": "Mudah",
       "comfortComfortable": "Nyaman",
       "comfortChallenging": "Menantang"
-    },
-    "postQuizEmail": {
-      "almostThere": "Hampir selesai!",
-      "enterEmailToSeeRecs": "Masukkan email Anda untuk melihat rekomendasi personal Anda",
-      "emailPlaceholder": "email@anda.com",
-      "emailLabel": "Alamat email",
-      "invalidEmail": "Silakan masukkan alamat email yang valid",
-      "failedToSaveEmail": "Gagal menyimpan email",
-      "saving": "Menyimpan...",
-      "continue": "Lanjutkan",
-      "updateNote": "Kami akan mengirimkan pembaruan tentang rekomendasi Anda.",
-      "noSpam": "Tidak ada spam, kami janji."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artis} other {artis}} terpilih",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Menghubungkan Spotify dan Last.fm",
       "syncListeningHistory": "Menyinkronkan riwayat mendengarkan Anda",
       "saveProgressAcrossDevices": "Menyimpan progres Anda di berbagai perangkat",
-      "createAndManagePlaylists": "Membuat dan mengelola daftar putar"
+      "createAndManagePlaylists": "Membuat dan mengelola daftar putar",
+      "createAccount": "Masuk atau buat akun"
     },
     "artistSearch": {
       "placeholder": "Cari artis untuk ditambahkan...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Layanan Terhubung",
-      "createAccountToConnect": "Buat akun untuk menghubungkan",
-      "connectMusicServicesTitle": "Hubungkan Layanan Musik Anda",
-      "connectMusicServicesDesc": "Buat akun untuk menghubungkan Spotify dan Last.fm untuk rekomendasi personal.",
-      "musicServicesFeature": "Layanan Musik",
       "noServicesConnected": "Tidak ada layanan yang terhubung",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" tidak memiliki lagu yang dapat kami baca. Coba daftar putar lain.",
     "errorTooManyImports": "Anda mengimpor daftar putar terlalu cepat. Harap tunggu sebentar dan coba lagi.",
     "inputLabel": "Tautan daftar putar YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Disukai banyak orang",
+      "decade_match": "Dari dekade yang kamu suka",
+      "genre_match": "Sesuai dengan genremu",
+      "known_artist": "Dari artis yang kamu sukai",
+      "known_song": "Kamu tahu lagu ini",
+      "make_it": "Buat lagunya",
+      "similar_artist": "Mirip {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Semua yang cocok, sesuai urutan pilihanmu",
+        "title": "Semua pilihan"
+      },
+      "artists_you_love": {
+        "reason": "Lebih banyak lagu dari artis yang kamu dengarkan",
+        "title": "Dari artis yang kamu sukai"
+      },
+      "because": {
+        "reason": "Lagu yang sering dinyanyikan penggemar {artist}",
+        "title": "Karena kamu menyukai {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Lagu yang bikin semua orang ikut bernyanyi",
+        "title": "Favorit semua orang"
+      },
+      "make_it": {
+        "reason": "Belum ada versi karaoke. Kami bisa membuatnya untukmu",
+        "title": "Buat lagunya"
+      },
+      "songs_you_know": {
+        "reason": "Versi karaoke dari lagu-lagu di pustakamu",
+        "title": "Lagu yang kamu tahu"
+      }
+    }
   }
 }

@@ -158,7 +158,7 @@ User → CLI/Web → POST /api/auth/magic-link → Postmark → Email
 User → Click Link → POST /api/auth/verify → JWT Token → Authenticated
 ```
 
-That magic-link/JWT flow is legacy (JWTs accepted until 2026-11-30). There is now one Nomad account: gen is the identity of record. Clients send gen's session token as the Bearer token; decide validates it against gen's `sessions` collection (shared Firestore project, tenant sessions rejected) and resolves the decide profile `decide_users/{sha256(email)}` on the first request via create-if-absent. Guests migrate with `POST /api/auth/claim-guest`.
+That magic-link/JWT flow is legacy (JWTs accepted until 2026-11-30). There is now one Nomad account: gen is the identity of record. Clients send gen's session token as the Bearer token; decide validates it against gen's `sessions` collection (shared Firestore project, tenant sessions rejected) and resolves the decide profile `decide_users/{sha256(email)}` on the first request via create-if-absent. The web app signs in the same way as mobile: an email code from gen (optional Google sign-in), stored as the gen session token. Web guests were removed; a leftover guest token is claimed onto the account with `POST /api/auth/claim-guest` right after sign-in and then cleared.
 
 ### 2. Music Service Connection
 

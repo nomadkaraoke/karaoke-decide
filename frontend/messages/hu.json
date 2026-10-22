@@ -17,16 +17,11 @@
     "signIn": "Bejelentkezés",
     "createAccount": "Fiók létrehozása",
     "logOut": "Kijelentkezés",
-    "clearSession": "Munkamenet törlése",
-    "guest": "Vendég",
-    "guestSession": "Vendég munkamenet",
-    "createAccountToSaveProgress": "Hozz létre egy fiókot a haladás mentéséhez",
     "theme": "Téma",
     "backToApp": "Vissza az alkalmazásba",
     "openMenu": "Menü megnyitása",
     "closeMenu": "Menü bezárása",
-    "profileSettings": "Profil beállítások",
-    "clearSessionTitle": "Munkamenet törlése"
+    "profileSettings": "Profil beállítások"
   },
   "home": {
     "heroTitle": "Válaszd ki könnyedén",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "az énekléshez",
     "heroSubtitle": "Találj olyan dalokat, amiket ismersz, tényleg el tudsz énekelni, és a közönség is imádni fog. Személyre szabott ajánlások 30 másodperc alatt.",
     "findYourSong": "Keresd meg a dalodat",
-    "trustSignal": "Ingyenes • Nincs szükség regisztrációra • Csak 30 másodperc",
-    "failedToStart": "Nem sikerült elindítani. Kérlek, próbáld újra.",
+    "trustSignal": "Ingyenes • Csak 30 másodperc",
     "soundFamiliar": "Ismerősen hangzik?",
     "soundFamiliarSubtitle": "Karaokézol, lapozgatod a dalkönyvet, és...",
     "problemNothingTitle": "Semmi sem ugrik be",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Üdv újra",
-    "signInSubtitle": "Jelentkezz be a dalaid és ajánlásaid eléréséhez",
     "emailLabel": "E-mail cím",
     "emailPlaceholder": "te@pelda.hu",
-    "sendMagicLink": "Varázslink küldése",
-    "noPasswordNeeded": "Nincs szükség jelszóra. Küldünk egy biztonságos linket a bejelentkezéshez.",
     "or": "vagy",
     "justWantToBrowse": "Csak böngészni szeretnél? Nincs szükség fiókra.",
     "browseSongs": "Dalok böngészése",
-    "failedToSendMagicLink": "Nem sikerült elküldeni a varázslinket. Kérlek, próbáld újra.",
-    "checkYourEmail": "Ellenőrizd az e-mailjeidet!",
-    "magicLinkSentTo": "Küldtünk egy varázslinket ide:",
-    "linkExpiresIn15": "Kattints az e-mailben található linkre a bejelentkezéshez. A link 15 perc múlva lejár.",
     "useDifferentEmail": "Másik e-mail cím használata",
     "backToHome": "Vissza a kezdőlapra",
-    "verifyingLink": "Link ellenőrzése...",
-    "pleaseWait": "Kérlek, várj egy pillanatot",
-    "youreSignedIn": "Be vagy jelentkezve!",
-    "redirectingToSongs": "Átirányítás a dalaidhoz...",
-    "connectionError": "Kapcsolódási hiba",
-    "verificationFailed": "Az ellenőrzés sikertelen",
-    "noTokenFound": "Nem található ellenőrző token. Kérlek, kérj új varázslinket.",
-    "linkExpired": "Ez a varázslink lejárt. Kérlek, kérj újat.",
-    "linkAlreadyUsed": "Ezt a varázslinket már felhasználták. Kérlek, kérj újat.",
-    "failedToVerify": "Nem sikerült ellenőrizni a tokent. Lehet, hogy lejárt vagy már felhasználták.",
-    "troubleshootingTips": "Hibaelhárítási tippek:",
-    "tipMobileData": "Próbálj mobilinternetet használni WiFi helyett",
-    "tipDisableVpn": "Kapcsold ki a VPN-t vagy a reklámblokkoló bővítményeket",
-    "tipIncognito": "Próbáld meg inkognitó/privát módban megnyitni",
-    "tipCorporateNetwork": "Ellenőrizd, hogy nem vállalati vagy iskolai hálózaton vagy-e",
-    "retryAgainCount": "Újrapróbálkozás ({count})",
-    "requestNewLink": "Új link kérése",
-    "backToHomeCaps": "Vissza a kezdőlapra"
+    "codeExpired": "A kód lejárt. Kérj egy újat.",
+    "codeLabel": "6 jegyű kód",
+    "codeResent": "Az új kód már úton van.",
+    "codeSentTo": "Elküldtünk egy 6 jegyű kódot a következő címre:",
+    "continueWithGoogle": "Folytatás a Google-lal",
+    "enterCode": "Add meg a kódot",
+    "failedToSendCode": "Nem sikerült elküldeni a kódot. Kérjük, próbáld újra.",
+    "failedToVerifyCode": "Nem sikerült ellenőrizni a kódot. Kérjük, próbáld újra.",
+    "googleSignInFailed": "A Google-bejelentkezés sikertelen volt. Kérjük, próbáld újra.",
+    "invalidCode": "A megadott kód helytelen. Ellenőrizd, és próbáld újra.",
+    "resendCode": "Új kód küldése",
+    "sendCode": "Kódot kérek e-mailben",
+    "signInHint": "Nincs szükség jelszóra. E-mailben küldünk egy 6 jegyű kódot, amivel bejelentkezhetsz a Nomad Karaoke fiókodba.",
+    "signInToGetPicks": "Jelentkezz be a személyre szabott karaoke-válogatásodért",
+    "tooManyAttempts": "Túl sok próbálkozás. Kérj új kódot.",
+    "verifyCode": "Ellenőrzés és bejelentkezés",
+    "importedGuestData": "Átmozgattuk a kvízválaszaidat és a dalaidat a fiókodba."
   },
   "quiz": {
     "startingQuiz": "Kvíz indítása...",
@@ -182,28 +168,8 @@
     "selected": "{count} kiválasztva",
     "findingMoreArtists": "További előadók keresése, akiket ismerhetsz...",
     "noMoreArtists": "Nincs több megjeleníthető előadó",
-    "almostThere": "Majdnem kész!",
-    "enterEmailToSave": "Add meg az e-mail címedet az ajánlásaid mentéséhez.",
-    "generatingRecs": "Ajánlások generálása...",
-    "analyzingTaste": "Zenei ízlésed elemzése",
-    "recsReady": "Az ajánlások készen állnak!",
-    "personalizedListWaiting": "A személyre szabott dallistád vár rád",
-    "waitingToGenerate": "Várakozás a generálásra...",
-    "startShortly": "Hamarosan indul",
-    "yourEmail": "Az e-mail címed",
     "emailSaved": "E-mail mentve!",
-    "emailPlaceholder": "te@pelda.hu",
-    "saveEmail": "Mentés",
-    "pleaseEnterEmail": "Kérlek, add meg az e-mail címedet",
-    "pleaseEnterValidEmail": "Kérlek, adj meg egy érvényes e-mail címet",
-    "failedToSaveEmail": "Nem sikerült menteni az e-mailt",
     "skipForNow": "Kihagyás egyelőre",
-    "emailSavedSuccess": "E-mail mentve!",
-    "viewRecommendations": "Ajánlásaim megtekintése",
-    "emailUpdatesHint": "Küldünk majd frissítéseket az ajánlásaidról. Sosem spamelünk.",
-    "generatingRecommendationsButton": "Ajánlások generálása...",
-    "enterEmailToContinue": "Add meg az e-mail címedet a folytatáshoz",
-    "pleaseEnterEmailAbove": "Kérlek, add meg az e-mail címedet fent az ajánlásaid megtekintéséhez",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Nincsenek a jelenlegi szűrőknek megfelelő közönségkedvencek",
     "viewMySongs": "Dalaim megtekintése",
     "syncMoreMusic": "Több zene szinkronizálása",
-    "tryAgain": "Próbáld újra"
+    "tryAgain": "Próbáld újra",
+    "libraryAny": "Bármelyik gyűjtemény",
+    "libraryCommunity": "Közösségi verziók",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version katalógus",
+    "libraryLabel": "Karaokegyűjtemény",
+    "loadMore": "Továbbiak betöltése",
+    "loadingMore": "Betöltés…",
+    "noMatchDescription": "Próbálj meg lazítani a szűrőkön, hogy több dalt láss.",
+    "noMatchTitle": "Nincs a szűrőknek megfelelő találat",
+    "sortAz": "A–Z",
+    "sortBest": "Neked ajánlott",
+    "sortLabel": "Rendezés",
+    "sortNewest": "Legújabb",
+    "sortOldest": "Legrégebbi",
+    "sortPopular": "Legnépszerűbb",
+    "sortShortest": "Legrövidebb",
+    "warmingDescription": "Épp bemelegítjük a rendszert. Ez általában kevesebb mint egy percet vesz igénybe, és automatikusan újrapróbáljuk.",
+    "warmingTitle": "Ajánlataid előkészítése…"
   },
   "myData": {
     "title": "Adataim",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Visszajelzés és finomítások",
     "feedbackDesc": "Hamarosan: Dalok kedvelése/elrejtése, hangterjedelem, és még sok más!",
     "dataPowersRecs": "Ezek az adatok hajtják a személyre szabott karaoke ajánlásaidat.",
-    "createAccountToSync": "Hozz létre egy fiókot",
-    "toSyncServices": "a zenei szolgáltatásaid szinkronizálásához.",
     "moreDataBetterRecs": "Több adat = jobb ajánlások.",
     "takeTheQuiz": "Töltsd ki a kvízt",
     "orConnectMore": "vagy csatlakoztass több szolgáltatást.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Keress dalokat a hozzáadáshoz...",
     "noSongsYet": "Még nincsenek dalok",
     "noSongsYetDesc": "Keress fent, hogy hozzáadj dalokat, amiket ismersz és szeretsz énekelni!",
-    "connectYourServices": "Csatlakoztasd a zenei szolgáltatásaidat",
-    "connectServicesGuestDesc": "Hozz létre egy fiókot a Spotify és a Last.fm csatlakoztatásához, hogy személyre szabott ajánlásokat kapj a hallgatási előzményeid alapján.",
-    "createAccount": "Fiók létrehozása",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Csatlakoztatva",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "A fiókod adatai",
     "emailLabel": "E-mail",
-    "guestSession": "Vendég munkamenet",
     "displayNameLabel": "Megjelenített név",
     "displayNamePlaceholder": "Hogyan szólítsunk?",
     "profileUpdated": "Profil frissítve!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Nincs csatlakoztatott szolgáltatás",
     "servicesConnectedCount": "{count} szolgáltatás csatlakoztatva",
     "logOutSection": "Kijelentkezés",
-    "clearGuestSession": "Vendég munkamenet törlése",
     "signOutOfAccount": "Kijelentkezés a fiókodból",
     "dangerZone": "Veszélyzóna",
     "irreversibleActions": "Visszafordíthatatlan műveletek",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Biztos vagy benne? Ez véglegesen törli a fiókodat és minden adatodat. Ezt a műveletet nem lehet visszavonni.",
     "yesDeleteAccount": "Igen, törlöm a fiókomat",
     "deleteNotAvailable": "A fióktörlés még nem érhető el. Kérlek, lépj kapcsolatba az ügyfélszolgálattal, ha törölni szeretnéd a fiókodat.",
-    "clearSession": "Munkamenet törlése",
     "logOut": "Kijelentkezés",
     "accountId": "Fiók ID: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} márka",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSZIKUS"
+      "classic": "KLASSZIKUS",
+      "community": "Közösségi",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Ezt szeretem énekelni",
@@ -664,18 +642,6 @@
       "comfortEasy": "Könnyű",
       "comfortComfortable": "Kényelmes",
       "comfortChallenging": "Kihívást jelentő"
-    },
-    "postQuizEmail": {
-      "almostThere": "Majdnem kész!",
-      "enterEmailToSeeRecs": "Add meg az e-mail címedet a személyre szabott ajánlásaid megtekintéséhez",
-      "emailPlaceholder": "te@email.hu",
-      "emailLabel": "E-mail cím",
-      "invalidEmail": "Kérlek, adj meg egy érvényes e-mail címet",
-      "failedToSaveEmail": "Nem sikerült menteni az e-mailt",
-      "saving": "Mentés...",
-      "continue": "Folytatás",
-      "updateNote": "Küldünk majd frissítéseket az ajánlásaidról.",
-      "noSpam": "Nincs spam, ígérjük."
     },
     "stickyFinish": {
       "artistSelected": "{count} előadó kiválasztva",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Spotify és Last.fm csatlakoztatása",
       "syncListeningHistory": "Hallgatási előzmények szinkronizálása",
       "saveProgressAcrossDevices": "Haladás mentése az eszközök között",
-      "createAndManagePlaylists": "Lejátszási listák létrehozása és kezelése"
+      "createAndManagePlaylists": "Lejátszási listák létrehozása és kezelése",
+      "createAccount": "Jelentkezz be vagy hozz létre fiókot"
     },
     "artistSearch": {
       "placeholder": "Keress előadókat a hozzáadáshoz...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Csatlakoztatott szolgáltatások",
-      "createAccountToConnect": "Hozz létre egy fiókot a csatlakoztatáshoz",
-      "connectMusicServicesTitle": "Csatlakoztasd a zenei szolgáltatásaidat",
-      "connectMusicServicesDesc": "Hozz létre egy fiókot a Spotify és a Last.fm csatlakoztatásához a személyre szabott ajánlásokért.",
-      "musicServicesFeature": "Zenei szolgáltatások",
       "noServicesConnected": "Nincs csatlakoztatott szolgáltatás",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "A(z) „{title}” lejátszási listában nem találtunk beolvasható dalt. Próbálkozz egy másik lejátszási listával.",
     "errorTooManyImports": "Túl gyorsan importálsz lejátszási listákat. Kérlek, várj egy percet, és próbáld újra.",
     "inputLabel": "YouTube Music lejátszási lista linkje"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Közönségkedvenc",
+      "decade_match": "Egy olyan évtizedből, amit kedvelsz",
+      "genre_match": "Illik a stílusaidhoz",
+      "known_artist": "Egy olyan előadótól, akit imádsz",
+      "known_song": "Ezt ismered",
+      "make_it": "Készítsd el",
+      "similar_artist": "Hasonló, mint {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Minden találat a kiválasztott sorrendben",
+        "title": "Összes ajánlat"
+      },
+      "artists_you_love": {
+        "reason": "Még több dal olyan előadóktól, akiket szívesen hallgatsz",
+        "title": "Kedvenc előadóidtól"
+      },
+      "because": {
+        "reason": "Dalok, amiket {artist} rajongói is szívesen énekelnek",
+        "title": "Mert kedveled: {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Dalok, amiktől az egész terem énekelni kezd",
+        "title": "Közönségkedvencek"
+      },
+      "make_it": {
+        "reason": "Még nincs belőle karaoke verzió. Szívesen elkészítjük neked!",
+        "title": "Készítsd el"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verziók a gyűjteményedben található dalokból",
+        "title": "Dalok, amiket ismersz"
+      }
+    }
   }
 }

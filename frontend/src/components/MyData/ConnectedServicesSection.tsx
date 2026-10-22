@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef, useEffect, FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
 import {
   SpotifyIcon,
   LastfmIcon,
@@ -11,7 +10,6 @@ import {
   ChevronDownIcon,
 } from "@/components/icons";
 import { Button, Input, Badge, LoadingPulse } from "@/components/ui";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
 
 interface ConnectedService {
   service_type: string;
@@ -62,7 +60,6 @@ export function ConnectedServicesSection({
   onToggle,
   onSyncComplete,
 }: Props) {
-  const { isGuest } = useAuth();
   const t = useTranslations('components.myDataServices');
   const [services, setServices] = useState<ConnectedService[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -159,18 +156,14 @@ export function ConnectedServicesSection({
   }, [pollSyncStatus]);
 
   useEffect(() => {
-    if (!isGuest) {
-      loadServices();
-    } else {
-      setIsLoading(false);
-    }
+    loadServices();
 
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [loadServices, isGuest]);
+  }, [loadServices]);
 
   const isConnected = (serviceType: string) =>
     services.some((s) => s.service_type === serviceType);
@@ -255,44 +248,6 @@ export function ConnectedServicesSection({
   };
 
   const connectedCount = services.length;
-
-  // Show upgrade prompt for guests
-  if (isGuest) {
-    return (
-      <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
-        <button
-          onClick={onToggle}
-          aria-expanded={isExpanded}
-          className="w-full p-5 flex items-center justify-between text-left"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--brand-blue)]/20 flex items-center justify-center">
-              <SpotifyIcon className="w-5 h-5 text-[var(--brand-blue)]" />
-            </div>
-            <div>
-              <h2 className="font-semibold text-[var(--text)]">{t('title')}</h2>
-              <p className="text-sm text-[var(--text-muted)]">
-                {t('createAccountToConnect')}
-              </p>
-            </div>
-          </div>
-          <ChevronDownIcon
-            className={`w-5 h-5 text-[var(--text-muted)] transition-transform ${isExpanded ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {isExpanded && (
-          <div className="px-5 pb-5">
-            <UpgradePrompt
-              title={t('connectMusicServicesTitle')}
-              description={t('connectMusicServicesDesc')}
-              featureName={t('musicServicesFeature')}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
 
   const spotifyConnected = isConnected("spotify");
   const lastfmConnected = isConnected("lastfm");

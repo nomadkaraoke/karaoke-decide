@@ -17,16 +17,11 @@
     "signIn": "Kirjaudu sisään",
     "createAccount": "Luo tili",
     "logOut": "Kirjaudu ulos",
-    "clearSession": "Tyhjennä istunto",
-    "guest": "Vieras",
-    "guestSession": "Vierasistunto",
-    "createAccountToSaveProgress": "Luo tili tallentaaksesi edistymisesi",
     "theme": "Teema",
     "backToApp": "Takaisin sovellukseen",
     "openMenu": "Avaa valikko",
     "closeMenu": "Sulje valikko",
-    "profileSettings": "Profiilin asetukset",
-    "clearSessionTitle": "Tyhjennä istunto"
+    "profileSettings": "Profiilin asetukset"
   },
   "home": {
     "heroTitle": "Valitse helposti",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "laulettavaksi",
     "heroSubtitle": "Löydä kappaleita, jotka tiedät, joita osaat oikeasti laulaa ja joita yleisö rakastaa. Henkilökohtaiset suositukset 30 sekunnissa.",
     "findYourSong": "Löydä kappaleesi",
-    "trustSignal": "Ilmainen • Ei vaadi rekisteröitymistä • Kestää 30 sekuntia",
-    "failedToStart": "Aloittaminen epäonnistui. Yritä uudelleen.",
+    "trustSignal": "Ilmainen • Kestää 30 sekuntia",
     "soundFamiliar": "Kuulostaako tutulta?",
     "soundFamiliarSubtitle": "Olet karaokessa, selaat laulukirjaa ja...",
     "problemNothingTitle": "Mikään ei iske",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Tervetuloa takaisin",
-    "signInSubtitle": "Kirjaudu sisään päästäksesi käsiksi kappaleisiisi ja suosituksiisi",
     "emailLabel": "Sähköpostiosoite",
     "emailPlaceholder": "sina@esimerkki.com",
-    "sendMagicLink": "Lähetä taikalinkki",
-    "noPasswordNeeded": "Salasanaa ei tarvita. Lähetämme sinulle turvallisen linkin sisäänkirjautumista varten.",
     "or": "tai",
     "justWantToBrowse": "Haluatko vain selailla? Tiliä ei tarvita.",
     "browseSongs": "Selaa kappaleita",
-    "failedToSendMagicLink": "Taikalinkin lähetys epäonnistui. Yritä uudelleen.",
-    "checkYourEmail": "Tarkista sähköpostisi!",
-    "magicLinkSentTo": "Lähetimme taikalinkin osoitteeseen",
-    "linkExpiresIn15": "Kirjaudu sisään klikkaamalla sähköpostissasi olevaa linkkiä. Linkki vanhenee 15 minuutin kuluttua.",
     "useDifferentEmail": "Käytä toista sähköpostia",
     "backToHome": "Takaisin etusivulle",
-    "verifyingLink": "Vahvistetaan linkkiäsi...",
-    "pleaseWait": "Odota hetki",
-    "youreSignedIn": "Olet kirjautunut sisään!",
-    "redirectingToSongs": "Ohjataan sinut kappaleisiisi...",
-    "connectionError": "Yhteysvirhe",
-    "verificationFailed": "Vahvistus epäonnistui",
-    "noTokenFound": "Vahvistustunnusta ei löytynyt. Pyydä uusi taikalinkki.",
-    "linkExpired": "Tämä taikalinkki on vanhentunut. Pyydä uusi.",
-    "linkAlreadyUsed": "Tämä taikalinkki on jo käytetty. Pyydä uusi.",
-    "failedToVerify": "Tunnuksen vahvistus epäonnistui. Se on saattanut vanhentua tai se on jo käytetty.",
-    "troubleshootingTips": "Vianmääritysvinkkejä:",
-    "tipMobileData": "Kokeile käyttää mobiilidataa WiFin sijaan",
-    "tipDisableVpn": "Poista VPN tai mainostenestolaajennukset käytöstä",
-    "tipIncognito": "Kokeile avata incognito- tai yksityisselaustilassa",
-    "tipCorporateNetwork": "Tarkista, oletko yrityksen tai koulun verkossa",
-    "retryAgainCount": "Yritä uudelleen ({count})",
-    "requestNewLink": "Pyydä uusi linkki",
-    "backToHomeCaps": "Takaisin etusivulle"
+    "codeExpired": "Koodi on vanhentunut. Pyydä uusi koodi.",
+    "codeLabel": "6-numeroinen koodi",
+    "codeResent": "Uusi koodi on matkalla.",
+    "codeSentTo": "Lähetimme 6-numeroisen koodin osoitteeseen",
+    "continueWithGoogle": "Jatka Googlella",
+    "enterCode": "Syötä koodi",
+    "failedToSendCode": "Koodin lähettäminen epäonnistui. Yritä uudelleen.",
+    "failedToVerifyCode": "Koodin vahvistaminen epäonnistui. Yritä uudelleen.",
+    "googleSignInFailed": "Google-kirjautuminen epäonnistui. Yritä uudelleen.",
+    "invalidCode": "Koodi ei täsmää. Tarkista se ja yritä uudelleen.",
+    "resendCode": "Lähetä uusi koodi",
+    "sendCode": "Lähetä koodi sähköpostiini",
+    "signInHint": "Salasanaa ei tarvita. Lähetämme sinulle sähköpostitse 6-numeroisen koodin, jolla voit kirjautua Nomad Karaoke -tilillesi.",
+    "signInToGetPicks": "Kirjaudu sisään saadaksesi henkilökohtaiset karaokesuosituksesi",
+    "tooManyAttempts": "Liian monta yritystä. Pyydä uusi koodi.",
+    "verifyCode": "Vahvista ja kirjaudu sisään",
+    "importedGuestData": "Siirsimme visavastauksesi ja kappaleesi tilillesi."
   },
   "quiz": {
     "startingQuiz": "Aloitetaan visaa...",
@@ -182,28 +168,8 @@
     "selected": "{count} valittu",
     "findingMoreArtists": "Etsitään lisää artisteja, joita saatat tuntea...",
     "noMoreArtists": "Ei enää näytettäviä artisteja",
-    "almostThere": "Melkein valmista!",
-    "enterEmailToSave": "Syötä sähköpostiosoitteesi tallentaaksesi suosituksesi.",
-    "generatingRecs": "Luodaan suosituksiasi...",
-    "analyzingTaste": "Analysoidaan musiikkimakuasi",
-    "recsReady": "Suositukset valmiina!",
-    "personalizedListWaiting": "Henkilökohtainen kappalelistasi odottaa",
-    "waitingToGenerate": "Odotetaan luomista...",
-    "startShortly": "Tämä alkaa pian",
-    "yourEmail": "Sähköpostisi",
     "emailSaved": "Sähköposti tallennettu!",
-    "emailPlaceholder": "sina@esimerkki.com",
-    "saveEmail": "Tallenna",
-    "pleaseEnterEmail": "Syötä sähköpostiosoitteesi",
-    "pleaseEnterValidEmail": "Syötä kelvollinen sähköpostiosoite",
-    "failedToSaveEmail": "Sähköpostin tallennus epäonnistui",
     "skipForNow": "Ohita toistaiseksi",
-    "emailSavedSuccess": "Sähköposti tallennettu!",
-    "viewRecommendations": "Näytä suositukseni",
-    "emailUpdatesHint": "Lähetämme sinulle päivityksiä suosituksistasi. Ei koskaan roskapostia.",
-    "generatingRecommendationsButton": "Luodaan suosituksia...",
-    "enterEmailToContinue": "Syötä sähköpostiosoitteesi jatkaaksesi",
-    "pleaseEnterEmailAbove": "Syötä sähköpostiosoitteesi ylle nähdäksesi suosituksesi",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Yksikään yleisön suosikki ei vastaa nykyisiä suodattimia",
     "viewMySongs": "Näytä kappaleeni",
     "syncMoreMusic": "Synkronoi lisää musiikkia",
-    "tryAgain": "Yritä uudelleen"
+    "tryAgain": "Yritä uudelleen",
+    "libraryAny": "Kaikki kirjastot",
+    "libraryCommunity": "Yhteisöversiot",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun- / Karaoke Version -katalogi",
+    "libraryLabel": "Karaokekirjasto",
+    "loadMore": "Lataa lisää",
+    "loadingMore": "Ladataan…",
+    "noMatchDescription": "Kokeile höllentää suodatinta tai paria nähdäksesi lisää kappaleita.",
+    "noMatchTitle": "Mikään suositus ei vastaa näitä suodattimia",
+    "sortAz": "A–Ö",
+    "sortBest": "Sinulle parhaat",
+    "sortLabel": "Järjestä",
+    "sortNewest": "Uusimmat",
+    "sortOldest": "Vanhimmat",
+    "sortPopular": "Suosituimmat",
+    "sortShortest": "Lyhimmät",
+    "warmingDescription": "Laitamme asioita valmiiksi. Tähän menee yleensä alle minuutti, ja kokeilemme automaattisesti uudelleen.",
+    "warmingTitle": "Valmistellaan suosituksiasi…"
   },
   "myData": {
     "title": "Omat tietoni",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Palaute ja tarkennukset",
     "feedbackDesc": "Tulossa pian: Tykkää/piilota kappaleita, ääniala ja muuta!",
     "dataPowersRecs": "Tämä data ruokkii henkilökohtaisia karaokesuosituksiasi.",
-    "createAccountToSync": "Luo tili",
-    "toSyncServices": "synkronoidaksesi musiikkipalvelusi.",
     "moreDataBetterRecs": "Enemmän dataa = paremmat suositukset.",
     "takeTheQuiz": "Tee visa",
     "orConnectMore": "tai yhdistä lisää palveluita.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Etsi lisättäviä kappaleita...",
     "noSongsYet": "Ei vielä kappaleita",
     "noSongsYetDesc": "Etsi yltä lisätäksesi kappaleita, jotka tunnet ja joita rakastat laulaa!",
-    "connectYourServices": "Yhdistä musiikkipalvelusi",
-    "connectServicesGuestDesc": "Luo tili yhdistääksesi Spotifyn ja Last.fm:n saadaksesi henkilökohtaisia suosituksia kuunteluhistoriasi perusteella.",
-    "createAccount": "Luo tili",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Yhdistetty",
@@ -465,7 +444,6 @@
     "profileSection": "Profiili",
     "yourAccountInfo": "Tilisi tiedot",
     "emailLabel": "Sähköposti",
-    "guestSession": "Vierasistunto",
     "displayNameLabel": "Näyttönimi",
     "displayNamePlaceholder": "Millä nimellä saamme kutsua sinua?",
     "profileUpdated": "Profiili päivitetty!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Ei yhdistettyjä palveluita",
     "servicesConnectedCount": "{count} palvelu{count, plural, one {} other {a}} yhdistetty",
     "logOutSection": "Kirjaudu ulos",
-    "clearGuestSession": "Tyhjennä vierasistuntosi",
     "signOutOfAccount": "Kirjaudu ulos tililtäsi",
     "dangerZone": "Vaara-alue",
     "irreversibleActions": "Peruuttamattomat toiminnot",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Oletko varma? Tämä poistaa tilisi ja kaikki tietosi pysyvästi. Tätä toimintoa ei voi perua.",
     "yesDeleteAccount": "Kyllä, poista tilini",
     "deleteNotAvailable": "Tilin poistaminen ei ole vielä saatavilla. Ota yhteyttä tukeen, jos sinun on poistettava tilisi.",
-    "clearSession": "Tyhjennä istunto",
     "logOut": "Kirjaudu ulos",
     "accountId": "Tilin tunnus: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} brändiä",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIKKO"
+      "classic": "KLASSIKKO",
+      "community": "Yhteisö",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Nautin tämän laulamisesta",
@@ -664,18 +642,6 @@
       "comfortEasy": "Helppo",
       "comfortComfortable": "Mukava",
       "comfortChallenging": "Haastava"
-    },
-    "postQuizEmail": {
-      "almostThere": "Melkein valmista!",
-      "enterEmailToSeeRecs": "Syötä sähköpostiosoitteesi nähdäksesi henkilökohtaiset suosituksesi",
-      "emailPlaceholder": "sina@esimerkki.com",
-      "emailLabel": "Sähköpostiosoite",
-      "invalidEmail": "Syötä kelvollinen sähköpostiosoite",
-      "failedToSaveEmail": "Sähköpostin tallennus epäonnistui",
-      "saving": "Tallennetaan...",
-      "continue": "Jatka",
-      "updateNote": "Lähetämme sinulle päivityksiä suosituksistasi.",
-      "noSpam": "Ei roskapostia, lupaamme."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artisti} other {artistia}} valittu",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Yhdistää Spotifyn ja Last.fm:n",
       "syncListeningHistory": "Synkronoida kuunteluhistoriasi",
       "saveProgressAcrossDevices": "Tallentaa edistymisesi eri laitteilla",
-      "createAndManagePlaylists": "Luoda ja hallita soittolistoja"
+      "createAndManagePlaylists": "Luoda ja hallita soittolistoja",
+      "createAccount": "Kirjaudu sisään tai luo tili"
     },
     "artistSearch": {
       "placeholder": "Etsi lisättäviä artisteja...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Yhdistetyt palvelut",
-      "createAccountToConnect": "Luo tili yhdistääksesi",
-      "connectMusicServicesTitle": "Yhdistä musiikkipalvelusi",
-      "connectMusicServicesDesc": "Luo tili yhdistääksesi Spotifyn ja Last.fm:n saadaksesi henkilökohtaisia suosituksia.",
-      "musicServicesFeature": "Musiikkipalvelut",
       "noServicesConnected": "Ei yhdistettyjä palveluita",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "Soittolistalla \"{title}\" ei ole kappaleita, joita voisimme lukea. Kokeile toista soittolistaa.",
     "errorTooManyImports": "Tuot soittolistoja liian nopeasti. Odota hetki ja yritä uudelleen.",
     "inputLabel": "YouTube Music -soittolistan linkki"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Yleisön suosikki",
+      "decade_match": "Mieluisalta vuosikymmeneltä",
+      "genre_match": "Sopii musiikkimakuusi",
+      "known_artist": "Suosikkiartistiltasi",
+      "known_song": "Sinulle tuttu",
+      "make_it": "Luo versio",
+      "similar_artist": "Kuten {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Kaikki osumat valitsemassasi järjestyksessä",
+        "title": "Kaikki suositukset"
+      },
+      "artists_you_love": {
+        "reason": "Lisää kappaleita kuuntelemiltasi artisteilta",
+        "title": "Suosikkiartisteiltasi"
+      },
+      "because": {
+        "reason": "Kappaleita, joita artistin {artist} fanit yleensä laulavat",
+        "title": "Koska pidät artistista {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Kappaleita, jotka saavat koko tuvan laulamaan mukana",
+        "title": "Yleisön suosikit"
+      },
+      "make_it": {
+        "reason": "Ei vielä karaokeversiota. Voimme luoda sellaisen sinulle",
+        "title": "Luo versio"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversioita kirjastosi kappaleista",
+        "title": "Sinulle tutut kappaleet"
+      }
+    }
   }
 }

@@ -17,16 +17,11 @@
     "signIn": "เข้าสู่ระบบ",
     "createAccount": "สร้างบัญชี",
     "logOut": "ออกจากระบบ",
-    "clearSession": "ล้างเซสชัน",
-    "guest": "ผู้เยี่ยมชม",
-    "guestSession": "เซสชันผู้เยี่ยมชม",
-    "createAccountToSaveProgress": "สร้างบัญชีเพื่อบันทึกข้อมูลของคุณ",
     "theme": "ธีม",
     "backToApp": "กลับไปที่แอป",
     "openMenu": "เปิดเมนู",
     "closeMenu": "ปิดเมนู",
-    "profileSettings": "การตั้งค่าโปรไฟล์",
-    "clearSessionTitle": "ล้างเซสชัน"
+    "profileSettings": "การตั้งค่าโปรไฟล์"
   },
   "home": {
     "heroTitle": "เลือก",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "มาร้องได้อย่างง่ายดาย",
     "heroSubtitle": "ค้นหาเพลงที่คุณรู้จัก ร้องได้จริง และคนดูจะชื่นชอบ รับคำแนะนำที่ปรับแต่งเฉพาะคุณใน 30 วินาที",
     "findYourSong": "ค้นหาเพลงของคุณ",
-    "trustSignal": "ฟรี • ไม่ต้องสมัครสมาชิก • ใช้เวลาแค่ 30 วินาที",
-    "failedToStart": "เริ่มต้นไม่สำเร็จ โปรดลองอีกครั้ง",
+    "trustSignal": "ฟรี • ใช้เวลาเพียง 30 วินาที",
     "soundFamiliar": "ฟังดูคุ้นๆ ไหม?",
     "soundFamiliarSubtitle": "คุณอยู่ที่ร้านคาราโอเกะ กำลังเปิดสมุดเพลง แล้วก็...",
     "problemNothingTitle": "ไม่มีเพลงไหนโดนใจเลย",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "ยินดีต้อนรับกลับมา",
-    "signInSubtitle": "เข้าสู่ระบบเพื่อเข้าถึงเพลงและคำแนะนำของคุณ",
     "emailLabel": "อีเมล",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "ส่ง Magic Link",
-    "noPasswordNeeded": "ไม่ต้องใช้รหัสผ่าน เราจะส่งลิงก์ที่ปลอดภัยให้คุณเข้าสู่ระบบ",
     "or": "หรือ",
     "justWantToBrowse": "แค่อยากดูเฉยๆ ใช่ไหม? ไม่ต้องมีบัญชีก็ดูได้",
     "browseSongs": "เลือกดูเพลง",
-    "failedToSendMagicLink": "ส่ง Magic Link ไม่สำเร็จ โปรดลองอีกครั้ง",
-    "checkYourEmail": "เช็คอีเมลของคุณ!",
-    "magicLinkSentTo": "เราได้ส่ง Magic Link ไปที่",
-    "linkExpiresIn15": "คลิกลิงก์ในอีเมลของคุณเพื่อเข้าสู่ระบบ ลิงก์จะหมดอายุใน 15 นาที",
     "useDifferentEmail": "ใช้อีเมลอื่น",
     "backToHome": "กลับไปหน้าแรก",
-    "verifyingLink": "กำลังยืนยันลิงก์ของคุณ...",
-    "pleaseWait": "โปรดรอสักครู่",
-    "youreSignedIn": "คุณเข้าสู่ระบบแล้ว!",
-    "redirectingToSongs": "กำลังพาคุณไปยังเพลงของคุณ...",
-    "connectionError": "ข้อผิดพลาดในการเชื่อมต่อ",
-    "verificationFailed": "การยืนยันล้มเหลว",
-    "noTokenFound": "ไม่พบโทเค็นการยืนยัน โปรดขอ Magic Link ใหม่",
-    "linkExpired": "Magic Link นี้หมดอายุแล้ว โปรดขอใหม่",
-    "linkAlreadyUsed": "Magic Link นี้ถูกใช้งานไปแล้ว โปรดขอใหม่",
-    "failedToVerify": "ยืนยันโทเค็นไม่สำเร็จ อาจหมดอายุหรือถูกใช้งานไปแล้ว",
-    "troubleshootingTips": "เคล็ดลับการแก้ไขปัญหา:",
-    "tipMobileData": "ลองใช้เน็ตมือถือแทน WiFi",
-    "tipDisableVpn": "ปิด VPN หรือส่วนขยายบล็อกโฆษณา",
-    "tipIncognito": "ลองเปิดในโหมดไม่ระบุตัวตน/ส่วนตัว",
-    "tipCorporateNetwork": "ตรวจสอบว่าคุณอยู่ในเครือข่ายของบริษัทหรือโรงเรียนหรือไม่",
-    "retryAgainCount": "ลองอีกครั้ง ({count})",
-    "requestNewLink": "ขอลิงก์ใหม่",
-    "backToHomeCaps": "กลับไปหน้าแรก"
+    "codeExpired": "รหัสนี้หมดอายุแล้ว โปรดขอรหัสใหม่",
+    "codeLabel": "รหัส 6 หลัก",
+    "codeResent": "เราได้ส่งรหัสใหม่ให้คุณแล้ว",
+    "codeSentTo": "เราได้ส่งรหัส 6 หลักไปที่อีเมล",
+    "continueWithGoogle": "ดำเนินการต่อด้วย Google",
+    "enterCode": "กรอกรหัสของคุณ",
+    "failedToSendCode": "ไม่สามารถส่งรหัสได้ โปรดลองอีกครั้ง",
+    "failedToVerifyCode": "ไม่สามารถยืนยันรหัสได้ โปรดลองอีกครั้ง",
+    "googleSignInFailed": "ลงชื่อเข้าใช้ด้วย Google ไม่สำเร็จ โปรดลองอีกครั้ง",
+    "invalidCode": "รหัสไม่ถูกต้อง โปรดตรวจสอบแล้วลองใหม่อีกครั้ง",
+    "resendCode": "ส่งรหัสใหม่",
+    "sendCode": "ส่งรหัสให้ฉันทางอีเมล",
+    "signInHint": "ไม่ต้องใช้รหัสผ่าน เราจะส่งรหัส 6 หลักไปให้ทางอีเมลเพื่อเข้าสู่ระบบบัญชี Nomad Karaoke ของคุณ",
+    "signInToGetPicks": "ลงชื่อเข้าใช้เพื่อดูเพลงคาราโอเกะที่แนะนำสำหรับคุณโดยเฉพาะ",
+    "tooManyAttempts": "ลองทำรายการหลายครั้งเกินไป โปรดขอรหัสใหม่",
+    "verifyCode": "ยืนยันและลงชื่อเข้าใช้",
+    "importedGuestData": "เราได้ย้ายคำตอบแบบทดสอบและเพลงไปยังบัญชีของคุณเรียบร้อยแล้ว"
   },
   "quiz": {
     "startingQuiz": "กำลังเริ่มควิซ...",
@@ -182,28 +168,8 @@
     "selected": "เลือกแล้ว {count}",
     "findingMoreArtists": "กำลังค้นหาศิลปินเพิ่มเติมที่คุณอาจรู้จัก...",
     "noMoreArtists": "ไม่มีศิลปินให้แสดงเพิ่มเติมแล้ว",
-    "almostThere": "ใกล้เสร็จแล้ว!",
-    "enterEmailToSave": "ใส่อีเมลของคุณเพื่อบันทึกคำแนะนำ",
-    "generatingRecs": "กำลังสร้างคำแนะนำของคุณ...",
-    "analyzingTaste": "กำลังวิเคราะห์รสนิยมทางดนตรีของคุณ",
-    "recsReady": "คำแนะนำพร้อมแล้ว!",
-    "personalizedListWaiting": "รายชื่อเพลงเฉพาะคุณรออยู่",
-    "waitingToGenerate": "กำลังรอสร้าง...",
-    "startShortly": "จะเริ่มในไม่ช้า",
-    "yourEmail": "อีเมลของคุณ",
     "emailSaved": "บันทึกอีเมลแล้ว!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "บันทึก",
-    "pleaseEnterEmail": "โปรดใส่อีเมลของคุณ",
-    "pleaseEnterValidEmail": "โปรดใส่อีเมลที่ถูกต้อง",
-    "failedToSaveEmail": "บันทึกอีเมลไม่สำเร็จ",
     "skipForNow": "ข้ามไปก่อน",
-    "emailSavedSuccess": "บันทึกอีเมลสำเร็จ!",
-    "viewRecommendations": "ดูคำแนะนำของฉัน",
-    "emailUpdatesHint": "เราจะส่งอัปเดตเกี่ยวกับคำแนะนำของคุณให้ ไม่มีสแปมแน่นอน",
-    "generatingRecommendationsButton": "กำลังสร้างคำแนะนำ...",
-    "enterEmailToContinue": "ใส่อีเมลของคุณเพื่อดำเนินการต่อ",
-    "pleaseEnterEmailAbove": "โปรดใส่อีเมลของคุณด้านบนเพื่อดูคำแนะนำ",
     "genres": {
       "pop": "ป็อป",
       "rock": "ร็อก",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "ไม่มีเพลงฮิตโดนใจคนดูที่ตรงกับตัวกรองปัจจุบัน",
     "viewMySongs": "ดูเพลงของฉัน",
     "syncMoreMusic": "ซิงค์เพลงเพิ่มเติม",
-    "tryAgain": "ลองอีกครั้ง"
+    "tryAgain": "ลองอีกครั้ง",
+    "libraryAny": "ทุกคลังเพลง",
+    "libraryCommunity": "เวอร์ชันจากชุมชน",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "แคตตาล็อก KaraFun / Karaoke Version",
+    "libraryLabel": "คลังเพลงคาราโอเกะ",
+    "loadMore": "โหลดเพิ่มเติม",
+    "loadingMore": "กำลังโหลด…",
+    "noMatchDescription": "ลองปรับลดตัวกรองสักรายการหรือสองรายการเพื่อดูเพลงเพิ่มเติม",
+    "noMatchTitle": "ไม่มีเพลงแนะนำที่ตรงกับตัวกรองเหล่านี้",
+    "sortAz": "A ถึง Z",
+    "sortBest": "เหมาะกับคุณที่สุด",
+    "sortLabel": "จัดเรียงตาม",
+    "sortNewest": "ใหม่ที่สุด",
+    "sortOldest": "เก่าที่สุด",
+    "sortPopular": "ยอดนิยมที่สุด",
+    "sortShortest": "สั้นที่สุด",
+    "warmingDescription": "เรากำลังเตรียมระบบให้พร้อม โดยปกติจะใช้เวลาไม่เกินหนึ่งนาที และระบบจะลองใหม่อีกครั้งโดยอัตโนมัติ",
+    "warmingTitle": "กำลังเตรียมเพลงแนะนำสำหรับคุณ…"
   },
   "myData": {
     "title": "ข้อมูลของฉัน",
@@ -299,8 +283,6 @@
     "feedbackTitle": "ข้อเสนอแนะ & การปรับแต่ง",
     "feedbackDesc": "เร็วๆ นี้: ชอบ/ซ่อนเพลง, ช่วงเสียง, และอื่นๆ!",
     "dataPowersRecs": "ข้อมูลนี้เป็นตัวขับเคลื่อนคำแนะนำคาราโอเกะเฉพาะคุณ",
-    "createAccountToSync": "สร้างบัญชี",
-    "toSyncServices": "เพื่อซิงค์บริการเพลงของคุณ",
     "moreDataBetterRecs": "ข้อมูลยิ่งมาก = คำแนะนำยิ่งดี",
     "takeTheQuiz": "ทำควิซ",
     "orConnectMore": "หรือเชื่อมต่อบริการเพิ่มเติม",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "ค้นหาเพลงที่จะเพิ่ม...",
     "noSongsYet": "ยังไม่มีเพลง",
     "noSongsYetDesc": "ค้นหาด้านบนเพื่อเพิ่มเพลงที่คุณรู้จักและชอบร้อง!",
-    "connectYourServices": "เชื่อมต่อบริการเพลงของคุณ",
-    "connectServicesGuestDesc": "สร้างบัญชีเพื่อเชื่อมต่อ Spotify และ Last.fm สำหรับคำแนะนำเฉพาะคุณที่อิงจากประวัติการฟัง",
-    "createAccount": "สร้างบัญชี",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "เชื่อมต่อแล้ว",
@@ -465,7 +444,6 @@
     "profileSection": "โปรไฟล์",
     "yourAccountInfo": "ข้อมูลบัญชีของคุณ",
     "emailLabel": "อีเมล",
-    "guestSession": "เซสชันผู้เยี่ยมชม",
     "displayNameLabel": "ชื่อที่แสดง",
     "displayNamePlaceholder": "ให้เราเรียกคุณว่าอะไรดี?",
     "profileUpdated": "อัปเดตโปรไฟล์แล้ว!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "ไม่มีบริการที่เชื่อมต่อ",
     "servicesConnectedCount": "เชื่อมต่อแล้ว {count} บริการ",
     "logOutSection": "ออกจากระบบ",
-    "clearGuestSession": "ล้างเซสชันผู้เยี่ยมชมของคุณ",
     "signOutOfAccount": "ออกจากระบบบัญชีของคุณ",
     "dangerZone": "พื้นที่อันตราย",
     "irreversibleActions": "การกระทำที่ไม่สามารถย้อนกลับได้",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "คุณแน่ใจหรือไม่? การดำเนินการนี้จะลบบัญชีและข้อมูลทั้งหมดของคุณอย่างถาวร การกระทำนี้ไม่สามารถย้อนกลับได้",
     "yesDeleteAccount": "ใช่ ลบบัญชีของฉัน",
     "deleteNotAvailable": "ยังไม่สามารถลบบัญชีได้ในขณะนี้ โปรดติดต่อฝ่ายสนับสนุนหากคุณต้องการลบบัญชี",
-    "clearSession": "ล้างเซสชัน",
     "logOut": "ออกจากระบบ",
     "accountId": "รหัสบัญชี: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} แบรนด์",
       "pop": "ความนิยม: {value}",
       "explicit": "E",
-      "classic": "คลาสสิก"
+      "classic": "คลาสสิก",
+      "community": "ชุมชน",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "ฉันสนุกกับการร้องเพลงนี้",
@@ -664,18 +642,6 @@
       "comfortEasy": "ง่าย",
       "comfortComfortable": "สบาย",
       "comfortChallenging": "ท้าทาย"
-    },
-    "postQuizEmail": {
-      "almostThere": "ใกล้เสร็จแล้ว!",
-      "enterEmailToSeeRecs": "ใส่อีเมลของคุณเพื่อดูคำแนะนำเฉพาะคุณ",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "ที่อยู่อีเมล",
-      "invalidEmail": "โปรดใส่อีเมลที่ถูกต้อง",
-      "failedToSaveEmail": "บันทึกอีเมลไม่สำเร็จ",
-      "saving": "กำลังบันทึก...",
-      "continue": "ดำเนินการต่อ",
-      "updateNote": "เราจะส่งอัปเดตเกี่ยวกับคำแนะนำของคุณให้",
-      "noSpam": "ไม่มีสแปม สัญญาเลย"
     },
     "stickyFinish": {
       "artistSelected": "เลือกศิลปินแล้ว {count} คน",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "เชื่อมต่อ Spotify และ Last.fm",
       "syncListeningHistory": "ซิงค์ประวัติการฟังของคุณ",
       "saveProgressAcrossDevices": "บันทึกข้อมูลของคุณข้ามอุปกรณ์",
-      "createAndManagePlaylists": "สร้างและจัดการเพลย์ลิสต์"
+      "createAndManagePlaylists": "สร้างและจัดการเพลย์ลิสต์",
+      "createAccount": "ลงชื่อเข้าใช้หรือสร้างบัญชี"
     },
     "artistSearch": {
       "placeholder": "ค้นหาศิลปินที่จะเพิ่ม...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "บริการที่เชื่อมต่อ",
-      "createAccountToConnect": "สร้างบัญชีเพื่อเชื่อมต่อ",
-      "connectMusicServicesTitle": "เชื่อมต่อบริการเพลงของคุณ",
-      "connectMusicServicesDesc": "สร้างบัญชีเพื่อเชื่อมต่อ Spotify และ Last.fm สำหรับคำแนะนำเฉพาะคุณ",
-      "musicServicesFeature": "บริการเพลง",
       "noServicesConnected": "ไม่มีบริการที่เชื่อมต่อ",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "ไม่พบเพลงที่ระบบสามารถอ่านได้ใน \"{title}\" ลองใช้เพลย์ลิสต์อื่นดูนะ",
     "errorTooManyImports": "คุณนำเข้าเพลย์ลิสต์ถี่เกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง",
     "inputLabel": "ลิงก์เพลย์ลิสต์ YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "เพลงโปรดของทุกคน",
+      "decade_match": "จากยุคที่คุณชอบ",
+      "genre_match": "ตรงกับแนวเพลงที่คุณชอบ",
+      "known_artist": "จากศิลปินที่คุณชื่นชอบ",
+      "known_song": "เพลงที่คุณรู้จักดี",
+      "make_it": "สร้างเพลงนี้เลย",
+      "similar_artist": "คล้ายกับ {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "ทุกเพลงที่ตรงกัน ตามลำดับที่คุณเลือก",
+        "title": "เพลงแนะนำทั้งหมด"
+      },
+      "artists_you_love": {
+        "reason": "เพลงเพิ่มเติมจากศิลปินที่คุณฟังเป็นประจำ",
+        "title": "จากศิลปินที่คุณชื่นชอบ"
+      },
+      "because": {
+        "reason": "เพลงที่แฟนๆ ของ {artist} มักจะชอบร้อง",
+        "title": "เพราะคุณชอบ {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "เพลงที่ทำให้ทุกคนต้องร้องตามกันทั้งห้อง",
+        "title": "เพลงโปรดของทุกคน"
+      },
+      "make_it": {
+        "reason": "ยังไม่มีเวอร์ชันคาราโอเกะ แต่เราสร้างให้คุณได้",
+        "title": "สร้างเพลงนี้เลย"
+      },
+      "songs_you_know": {
+        "reason": "เวอร์ชันคาราโอเกะของเพลงจากคลังเพลงของคุณ",
+        "title": "เพลงที่คุณรู้จักดี"
+      }
+    }
   }
 }

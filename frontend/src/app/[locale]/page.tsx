@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "@/i18n/routing";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
@@ -26,10 +26,7 @@ export default function Home() {
     isLoading: authLoading,
     hasCompletedQuiz,
     quizStatusLoading,
-    startGuestSession,
   } = useAuth();
-  const [isStartingSession, setIsStartingSession] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Redirect authenticated users based on quiz completion status
   useEffect(() => {
@@ -48,17 +45,7 @@ export default function Home() {
       return;
     }
 
-    setIsStartingSession(true);
-    setError(null);
-    try {
-      await startGuestSession();
-      router.push("/quiz");
-    } catch (err) {
-      console.error("Failed to start session:", err);
-      setError(t("failedToStart"));
-    } finally {
-      setIsStartingSession(false);
-    }
+    router.push("/login?next=/quiz");
   };
 
   // Show loading while checking auth/quiz status or redirecting
@@ -88,8 +75,6 @@ export default function Home() {
             variant="primary"
             size="lg"
             onClick={handleGetStarted}
-            isLoading={isStartingSession}
-            disabled={isStartingSession}
             className="px-8 py-4 text-lg btn-glow"
           >
             {t("findYourSong")}
@@ -101,12 +86,6 @@ export default function Home() {
             {t("trustSignal")}
           </p>
 
-          {/* Error message */}
-          {error && (
-            <div className="mt-4 px-4 py-3 rounded-xl bg-[var(--danger)]/10 border border-[var(--danger)]/20 text-[var(--danger)] text-sm">
-              {error}
-            </div>
-          )}
         </div>
       </section>
 
@@ -312,8 +291,6 @@ export default function Home() {
             variant="primary"
             size="lg"
             onClick={handleGetStarted}
-            isLoading={isStartingSession}
-            disabled={isStartingSession}
             className="px-8 py-4 text-lg btn-glow"
           >
             {t("getStartedFree")}

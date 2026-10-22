@@ -17,16 +17,11 @@
     "signIn": "התחברות",
     "createAccount": "צור חשבון",
     "logOut": "התנתק",
-    "clearSession": "נקה סשן",
-    "guest": "אורח",
-    "guestSession": "סשן אורח",
-    "createAccountToSaveProgress": "צור חשבון כדי לשמור התקדמות",
     "theme": "ערכת נושא",
     "backToApp": "חזרה לאפליקציה",
     "openMenu": "פתח תפריט",
     "closeMenu": "סגור תפריט",
-    "profileSettings": "הגדרות פרופיל",
-    "clearSessionTitle": "נקה סשן"
+    "profileSettings": "הגדרות פרופיל"
   },
   "home": {
     "heroTitle": "בחר בקלות",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "לשיר",
     "heroSubtitle": "מצא שירים שאתה מכיר, שאתה באמת יכול לשיר, ושהקהל יאהב. המלצות מותאמות אישית ב-30 שניות.",
     "findYourSong": "מצא את השיר שלך",
-    "trustSignal": "חינם • ללא צורך בהרשמה • לוקח 30 שניות",
-    "failedToStart": "ההפעלה נכשלה. אנא נסה שוב.",
+    "trustSignal": "בחינם • לוקח 30 שניות",
     "soundFamiliar": "נשמע מוכר?",
     "soundFamiliarSubtitle": "אתה בקריוקי, מדפדף בספר השירים, ו...",
     "problemNothingTitle": "שום דבר לא קופץ לעין",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "ברוך שובך",
-    "signInSubtitle": "התחבר כדי לגשת לשירים ולהמלצות שלך",
     "emailLabel": "כתובת אימייל",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "שלח קישור קסם",
-    "noPasswordNeeded": "אין צורך בסיסמה. נשלח לך קישור מאובטח להתחברות.",
     "or": "או",
     "justWantToBrowse": "רק רוצה להסתכל? אין צורך בחשבון.",
     "browseSongs": "עיין בשירים",
-    "failedToSendMagicLink": "שליחת קישור הקסם נכשלה. אנא נסה שוב.",
-    "checkYourEmail": "בדוק את האימייל שלך!",
-    "magicLinkSentTo": "שלחנו קישור קסם אל",
-    "linkExpiresIn15": "לחץ על הקישור באימייל שלך כדי להתחבר. הקישור יפוג בעוד 15 דקות.",
     "useDifferentEmail": "השתמש באימייל אחר",
     "backToHome": "חזרה לדף הבית",
-    "verifyingLink": "מאמת את הקישור שלך...",
-    "pleaseWait": "אנא המתן רגע",
-    "youreSignedIn": "התחברת בהצלחה!",
-    "redirectingToSongs": "מעביר אותך לשירים שלך...",
-    "connectionError": "שגיאת חיבור",
-    "verificationFailed": "האימות נכשל",
-    "noTokenFound": "לא נמצא אסימון אימות. אנא בקש קישור קסם חדש.",
-    "linkExpired": "קישור הקסם הזה פג תוקף. אנא בקש אחד חדש.",
-    "linkAlreadyUsed": "כבר נעשה שימוש בקישור הקסם הזה. אנא בקש אחד חדש.",
-    "failedToVerify": "אימות האסימון נכשל. ייתכן שפג תוקפו או שכבר נעשה בו שימוש.",
-    "troubleshootingTips": "טיפים לפתרון בעיות:",
-    "tipMobileData": "נסה להשתמש בנתונים סלולריים במקום ב-WiFi",
-    "tipDisableVpn": "השבת VPN או תוספי חוסמי פרסומות",
-    "tipIncognito": "נסה לפתוח במצב גלישה בסתר/פרטי",
-    "tipCorporateNetwork": "בדוק אם אתה ברשת ארגונית או בית ספרית",
-    "retryAgainCount": "נסה שוב ({count})",
-    "requestNewLink": "בקש קישור חדש",
-    "backToHomeCaps": "חזרה לדף הבית"
+    "codeExpired": "פג תוקף הקוד. יש לבקש קוד חדש.",
+    "codeLabel": "קוד בן 6 ספרות",
+    "codeResent": "קוד חדש בדרך אליך.",
+    "codeSentTo": "שלחנו קוד בן 6 ספרות אל",
+    "continueWithGoogle": "המשך עם Google",
+    "enterCode": "הזנת הקוד שלך",
+    "failedToSendCode": "לא הצלחנו לשלוח את הקוד. כדאי לנסות שוב.",
+    "failedToVerifyCode": "לא הצלחנו לאמת את הקוד. כדאי לנסות שוב.",
+    "googleSignInFailed": "ההתחברות דרך Google נכשלה. כדאי לנסות שוב.",
+    "invalidCode": "הקוד שהזנת שגוי. כדאי לבדוק אותו ולנסות שוב.",
+    "resendCode": "שליחת קוד חדש",
+    "sendCode": "שליחת קוד לאימייל שלי",
+    "signInHint": "אין צורך בסיסמה. נשלח אליך לאימייל קוד בן 6 ספרות כדי להתחבר לחשבון ה-Nomad Karaoke שלך.",
+    "signInToGetPicks": "מתחברים כדי לקבל המלצות קריוקי בהתאמה אישית",
+    "tooManyAttempts": "יותר מדי ניסיונות שגויים. יש לבקש קוד חדש.",
+    "verifyCode": "אימות והתחברות",
+    "importedGuestData": "העברנו את תשובות השאלון והשירים שלך לחשבונך."
   },
   "quiz": {
     "startingQuiz": "מתחיל חידון...",
@@ -182,28 +168,8 @@
     "selected": "{count} נבחרו",
     "findingMoreArtists": "מחפש עוד אמנים שאולי אתה מכיר...",
     "noMoreArtists": "אין עוד אמנים להציג",
-    "almostThere": "כמעט סיימנו!",
-    "enterEmailToSave": "הזן את האימייל שלך כדי לשמור את ההמלצות שלך.",
-    "generatingRecs": "מייצר את ההמלצות שלך...",
-    "analyzingTaste": "מנתח את הטעם המוזיקלי שלך",
-    "recsReady": "ההמלצות מוכנות!",
-    "personalizedListWaiting": "רשימת השירים המותאמת אישית שלך מחכה",
-    "waitingToGenerate": "ממתין ליצירה...",
-    "startShortly": "זה יתחיל בקרוב",
-    "yourEmail": "האימייל שלך",
     "emailSaved": "האימייל נשמר!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "שמור",
-    "pleaseEnterEmail": "אנא הזן את האימייל שלך",
-    "pleaseEnterValidEmail": "אנא הזן אימייל תקין",
-    "failedToSaveEmail": "שמירת האימייל נכשלה",
     "skipForNow": "דלג לעת עתה",
-    "emailSavedSuccess": "האימייל נשמר!",
-    "viewRecommendations": "צפה בהמלצות שלי",
-    "emailUpdatesHint": "נשלח לך עדכונים לגבי ההמלצות שלך. בלי ספאם, לעולם.",
-    "generatingRecommendationsButton": "מייצר המלצות...",
-    "enterEmailToContinue": "הזן את האימייל שלך כדי להמשיך",
-    "pleaseEnterEmailAbove": "אנא הזן את האימייל שלך למעלה כדי לראות את ההמלצות שלך",
     "genres": {
       "pop": "פופ",
       "rock": "רוק",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "אין אהובי קהל שתואמים למסננים הנוכחיים",
     "viewMySongs": "צפה בשירים שלי",
     "syncMoreMusic": "סנכרן עוד מוזיקה",
-    "tryAgain": "נסה שוב"
+    "tryAgain": "נסה שוב",
+    "libraryAny": "כל ספרייה",
+    "libraryCommunity": "גרסאות קהילה",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "קטלוג KaraFun / Karaoke Version",
+    "libraryLabel": "ספריית קריוקי",
+    "loadMore": "טעינת עוד",
+    "loadingMore": "בטעינה…",
+    "noMatchDescription": "כדאי לנסות להסיר סינון או שניים כדי לראות עוד שירים.",
+    "noMatchTitle": "אין שירים שמתאימים לסינונים האלה",
+    "sortAz": "א׳ עד ת׳",
+    "sortBest": "הכי מתאים לך",
+    "sortLabel": "מיון לפי",
+    "sortNewest": "החדש ביותר",
+    "sortOldest": "הישן ביותר",
+    "sortPopular": "הכי פופולרי",
+    "sortShortest": "הקצר ביותר",
+    "warmingDescription": "אנחנו מחממים מנועים. זה בדרך כלל לוקח פחות מדקה, וננסה שוב באופן אוטומטי.",
+    "warmingTitle": "מכינים לך את השירים…"
   },
   "myData": {
     "title": "הנתונים שלי",
@@ -299,8 +283,6 @@
     "feedbackTitle": "משוב ושיפורים",
     "feedbackDesc": "בקרוב: אהבתי/הסתר שירים, טווח קולי, ועוד!",
     "dataPowersRecs": "נתונים אלה מפעילים את המלצות הקריוקי המותאמות אישית שלך.",
-    "createAccountToSync": "צור חשבון",
-    "toSyncServices": "כדי לסנכרן את שירותי המוזיקה שלך.",
     "moreDataBetterRecs": "יותר נתונים = המלצות טובות יותר.",
     "takeTheQuiz": "עשה את החידון",
     "orConnectMore": "או חבר שירותים נוספים.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "חפש שירים להוספה...",
     "noSongsYet": "אין שירים עדיין",
     "noSongsYetDesc": "חפש למעלה כדי להוסיף שירים שאתה מכיר ואוהב לשיר!",
-    "connectYourServices": "חבר את שירותי המוזיקה שלך",
-    "connectServicesGuestDesc": "צור חשבון כדי לחבר את Spotify ו-Last.fm לקבלת המלצות מותאמות אישית המבוססות על היסטוריית ההאזנה שלך.",
-    "createAccount": "צור חשבון",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "מחובר",
@@ -465,7 +444,6 @@
     "profileSection": "פרופיל",
     "yourAccountInfo": "פרטי החשבון שלך",
     "emailLabel": "אימייל",
-    "guestSession": "סשן אורח",
     "displayNameLabel": "שם תצוגה",
     "displayNamePlaceholder": "איך לקרוא לך?",
     "profileUpdated": "הפרופיל עודכן!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "אין שירותים מחוברים",
     "servicesConnectedCount": "{count} {count, plural, one {שירות מחובר} other {שירותים מחוברים}}",
     "logOutSection": "התנתק",
-    "clearGuestSession": "נקה את סשן האורח שלך",
     "signOutOfAccount": "התנתק מהחשבון שלך",
     "dangerZone": "אזור מסוכן",
     "irreversibleActions": "פעולות בלתי הפיכות",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "האם אתה בטוח? פעולה זו תמחק לצמיתות את החשבון שלך ואת כל הנתונים שלך. לא ניתן לבטל פעולה זו.",
     "yesDeleteAccount": "כן, מחק את החשבון שלי",
     "deleteNotAvailable": "מחיקת חשבון עדיין לא זמינה. אנא צור קשר עם התמיכה אם ברצונך למחוק את חשבונך.",
-    "clearSession": "נקה סשן",
     "logOut": "התנתק",
     "accountId": "מזהה חשבון: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} מותגים",
       "pop": "פופ: {value}",
       "explicit": "E",
-      "classic": "קלאסיקה"
+      "classic": "קלאסיקה",
+      "community": "קהילה",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "אני נהנה לשיר את זה",
@@ -664,18 +642,6 @@
       "comfortEasy": "קל",
       "comfortComfortable": "נוח",
       "comfortChallenging": "מאתגר"
-    },
-    "postQuizEmail": {
-      "almostThere": "כמעט סיימנו!",
-      "enterEmailToSeeRecs": "הזן את האימייל שלך כדי לראות את ההמלצות המותאמות אישית שלך",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "כתובת אימייל",
-      "invalidEmail": "אנא הזן כתובת אימייל תקינה",
-      "failedToSaveEmail": "שמירת האימייל נכשלה",
-      "saving": "שומר...",
-      "continue": "המשך",
-      "updateNote": "נשלח לך עדכונים לגבי ההמלצות שלך.",
-      "noSpam": "בלי ספאם, אנחנו מבטיחים."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {אמן נבחר} other {אמנים נבחרו}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "לחבר את Spotify ו-Last.fm",
       "syncListeningHistory": "לסנכרן את היסטוריית ההאזנה שלך",
       "saveProgressAcrossDevices": "לשמור את ההתקדמות שלך בין מכשירים",
-      "createAndManagePlaylists": "ליצור ולנהל פלייליסטים"
+      "createAndManagePlaylists": "ליצור ולנהל פלייליסטים",
+      "createAccount": "התחברות או יצירת חשבון"
     },
     "artistSearch": {
       "placeholder": "חפש אמנים להוספה...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "שירותים מחוברים",
-      "createAccountToConnect": "צור חשבון כדי לחבר",
-      "connectMusicServicesTitle": "חבר את שירותי המוזיקה שלך",
-      "connectMusicServicesDesc": "צור חשבון כדי לחבר את Spotify ו-Last.fm לקבלת המלצות מותאמות אישית.",
-      "musicServicesFeature": "שירותי מוזיקה",
       "noServicesConnected": "אין שירותים מחוברים",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "ב-\"{title}\" אין שירים שהצלחנו לקרוא. כדאי לנסות פלייליסט אחר.",
     "errorTooManyImports": "ייבוא הפלייליסטים מתבצע מהר מדי. נא להמתין דקה ולנסות שוב.",
     "inputLabel": "קישור לפלייליסט ב-YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "להיט בטוח",
+      "decade_match": "מעשור שאהבת",
+      "genre_match": "מתאים לסגנונות שלך",
+      "known_artist": "של אמן שאהבת",
+      "known_song": "שיר מוכר",
+      "make_it": "הכנת שיר",
+      "similar_artist": "בסגנון {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "כל מה שמתאים, לפי סדר המיון שבחרת",
+        "title": "כל ההמלצות"
+      },
+      "artists_you_love": {
+        "reason": "עוד שירים של אמנים ששמעת",
+        "title": "מאמנים שאהבת"
+      },
+      "because": {
+        "reason": "שירים שמעריצים של {artist} אוהבים לשיר",
+        "title": "בגלל שאהבת את {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "שירים שיגרמו לכולם לשיר ביחד",
+        "title": "להיטים בטוחים"
+      },
+      "make_it": {
+        "reason": "עדיין אין גרסת קריוקי. נוכל להכין אחת במיוחד בשבילך",
+        "title": "הכנת שיר"
+      },
+      "songs_you_know": {
+        "reason": "גרסאות קריוקי לשירים מהספרייה שלך",
+        "title": "שירים מוכרים"
+      }
+    }
   }
 }

@@ -17,16 +17,11 @@
     "signIn": "Giriş Yap",
     "createAccount": "Hesap Oluştur",
     "logOut": "Çıkış Yap",
-    "clearSession": "Oturumu Temizle",
-    "guest": "Misafir",
-    "guestSession": "Misafir Oturumu",
-    "createAccountToSaveProgress": "İlerlemeyi kaydetmek için hesap oluştur",
     "theme": "Tema",
     "backToApp": "Uygulamaya Dön",
     "openMenu": "Menüyü Aç",
     "closeMenu": "Menüyü Kapat",
-    "profileSettings": "Profil Ayarları",
-    "clearSessionTitle": "Oturumu Temizle"
+    "profileSettings": "Profil Ayarları"
   },
   "home": {
     "heroTitle": "Söyleyeceğin",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "Kolayca Seç",
     "heroSubtitle": "Bildiğin, gerçekten söyleyebileceğin ve kalabalığın seveceği şarkıları bul. 30 saniye içinde kişiselleştirilmiş öneriler.",
     "findYourSong": "Şarkını Bul",
-    "trustSignal": "Ücretsiz • Kayıt gerektirmez • 30 saniye sürer",
-    "failedToStart": "Başlatılamadı. Lütfen tekrar dene.",
+    "trustSignal": "Ücretsiz • Sadece 30 saniye sürer",
     "soundFamiliar": "Tanıdık geldi mi?",
     "soundFamiliarSubtitle": "Karaokedesin, şarkı kitabını karıştırıyorsun ve...",
     "problemNothingTitle": "Hiçbir şey dikkatini çekmiyor",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Tekrar hoş geldin",
-    "signInSubtitle": "Şarkılarına ve önerilerine erişmek için giriş yap",
     "emailLabel": "E-posta adresi",
     "emailPlaceholder": "sen@ornek.com",
-    "sendMagicLink": "Sihirli Bağlantı Gönder",
-    "noPasswordNeeded": "Şifreye gerek yok. Sana giriş yapman için güvenli bir bağlantı göndereceğiz.",
     "or": "veya",
     "justWantToBrowse": "Sadece göz atmak mı istiyorsun? Hesap gerekmez.",
     "browseSongs": "Şarkılara Göz At",
-    "failedToSendMagicLink": "Sihirli bağlantı gönderilemedi. Lütfen tekrar dene.",
-    "checkYourEmail": "E-postanı kontrol et!",
-    "magicLinkSentTo": "Şu adrese bir sihirli bağlantı gönderdik:",
-    "linkExpiresIn15": "Giriş yapmak için e-postandaki bağlantıya tıkla. Bağlantı 15 dakika geçerlidir.",
     "useDifferentEmail": "Farklı bir e-posta kullan",
     "backToHome": "Ana sayfaya dön",
-    "verifyingLink": "Bağlantın doğrulanıyor...",
-    "pleaseWait": "Lütfen bir an bekle",
-    "youreSignedIn": "Giriş yaptın!",
-    "redirectingToSongs": "Şarkılarına yönlendiriliyorsun...",
-    "connectionError": "Bağlantı Hatası",
-    "verificationFailed": "Doğrulama Başarısız",
-    "noTokenFound": "Doğrulama belirteci bulunamadı. Lütfen yeni bir sihirli bağlantı iste.",
-    "linkExpired": "Bu sihirli bağlantının süresi dolmuş. Lütfen yeni bir tane iste.",
-    "linkAlreadyUsed": "Bu sihirli bağlantı zaten kullanılmış. Lütfen yeni bir tane iste.",
-    "failedToVerify": "Belirteç doğrulanamadı. Süresi dolmuş veya zaten kullanılmış olabilir.",
-    "troubleshootingTips": "Sorun giderme ipuçları:",
-    "tipMobileData": "WiFi yerine mobil veri kullanmayı dene",
-    "tipDisableVpn": "VPN veya reklam engelleyici eklentilerini devre dışı bırak",
-    "tipIncognito": "Gizli/özel modda açmayı dene",
-    "tipCorporateNetwork": "Kurumsal bir ağda veya okul ağında olup olmadığını kontrol et",
-    "retryAgainCount": "Tekrar Dene ({count})",
-    "requestNewLink": "Yeni Bağlantı İste",
-    "backToHomeCaps": "Ana Sayfaya Dön"
+    "codeExpired": "Bu kodun süresi doldu. Lütfen yeni bir kod iste.",
+    "codeLabel": "6 haneli kod",
+    "codeResent": "Yeni kod yola çıktı.",
+    "codeSentTo": "6 haneli bir kodu şu adrese e-postayla gönderdik:",
+    "continueWithGoogle": "Google ile devam et",
+    "enterCode": "Kodunu gir",
+    "failedToSendCode": "Kod gönderilemedi. Lütfen tekrar dene.",
+    "failedToVerifyCode": "Kod doğrulanamadı. Lütfen tekrar dene.",
+    "googleSignInFailed": "Google ile giriş başarısız oldu. Lütfen tekrar dene.",
+    "invalidCode": "Bu kod doğru değil. Kontrol edip tekrar dene.",
+    "resendCode": "Yeni kod gönder",
+    "sendCode": "Bana kod gönder",
+    "signInHint": "Şifreye gerek yok. Nomad Karaoke hesabınla giriş yapman için sana 6 haneli bir kod göndereceğiz.",
+    "signInToGetPicks": "Sana özel karaoke önerilerini görmek için giriş yap",
+    "tooManyAttempts": "Çok fazla deneme yapıldı. Lütfen yeni bir kod iste.",
+    "verifyCode": "Doğrula ve giriş yap",
+    "importedGuestData": "Test yanıtlarını ve şarkılarını hesabına taşıdık."
   },
   "quiz": {
     "startingQuiz": "Test başlatılıyor...",
@@ -182,28 +168,8 @@
     "selected": "{count} seçildi",
     "findingMoreArtists": "Bilebileceğin daha fazla sanatçı bulunuyor...",
     "noMoreArtists": "Gösterilecek başka sanatçı yok",
-    "almostThere": "Neredeyse Bitti!",
-    "enterEmailToSave": "Önerilerini kaydetmek için e-postanı gir.",
-    "generatingRecs": "Önerilerin oluşturuluyor...",
-    "analyzingTaste": "Müzik zevkin analiz ediliyor",
-    "recsReady": "Öneriler hazır!",
-    "personalizedListWaiting": "Kişiselleştirilmiş şarkı listen seni bekliyor",
-    "waitingToGenerate": "Oluşturulması bekleniyor...",
-    "startShortly": "Bu kısa süre içinde başlayacak",
-    "yourEmail": "E-postan",
     "emailSaved": "E-posta kaydedildi!",
-    "emailPlaceholder": "sen@ornek.com",
-    "saveEmail": "Kaydet",
-    "pleaseEnterEmail": "Lütfen e-postanı gir",
-    "pleaseEnterValidEmail": "Lütfen geçerli bir e-posta gir",
-    "failedToSaveEmail": "E-posta kaydedilemedi",
     "skipForNow": "Şimdilik atla",
-    "emailSavedSuccess": "E-posta kaydedildi!",
-    "viewRecommendations": "Önerilerimi Görüntüle",
-    "emailUpdatesHint": "Sana önerilerinle ilgili güncellemeler göndereceğiz. Asla spam yapmayız.",
-    "generatingRecommendationsButton": "Öneriler oluşturuluyor...",
-    "enterEmailToContinue": "Devam etmek için e-postanı gir",
-    "pleaseEnterEmailAbove": "Önerilerini görmek için lütfen yukarıya e-postanı gir",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Mevcut filtrelerle eşleşen popüler şarkı yok",
     "viewMySongs": "Şarkılarımı görüntüle",
     "syncMoreMusic": "Daha fazla müzik senkronize et",
-    "tryAgain": "Tekrar dene"
+    "tryAgain": "Tekrar dene",
+    "libraryAny": "Tüm kütüphaneler",
+    "libraryCommunity": "Topluluk sürümleri",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version kataloğu",
+    "libraryLabel": "Karaoke kütüphanesi",
+    "loadMore": "Daha fazla yükle",
+    "loadingMore": "Yükleniyor…",
+    "noMatchDescription": "Daha fazla şarkı görmek için bir iki filtreyi kaldırmayı veya gevşetmeyi dene.",
+    "noMatchTitle": "Bu filtrelere uygun öneri bulunamadı",
+    "sortAz": "A'dan Z'ye",
+    "sortBest": "Sana en uygun",
+    "sortLabel": "Sıralama ölçütü",
+    "sortNewest": "En yeni",
+    "sortOldest": "En eski",
+    "sortPopular": "En popüler",
+    "sortShortest": "En kısa",
+    "warmingDescription": "Ortamı hazırlıyoruz. Bu işlem genellikle bir dakikadan kısa sürer ve otomatik olarak tekrar deneriz.",
+    "warmingTitle": "Önerilerin hazırlanıyor…"
   },
   "myData": {
     "title": "Verilerim",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Geri Bildirim ve İyileştirmeler",
     "feedbackDesc": "Yakında: Şarkıları beğen/gizle, vokal aralığı ve daha fazlası!",
     "dataPowersRecs": "Bu veriler kişiselleştirilmiş karaoke önerilerini destekler.",
-    "createAccountToSync": "Hesap oluştur",
-    "toSyncServices": "müzik servislerini senkronize etmek için.",
     "moreDataBetterRecs": "Daha fazla veri = daha iyi öneriler.",
     "takeTheQuiz": "Testi çöz",
     "orConnectMore": "veya daha fazla servis bağla.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Eklemek için şarkı ara...",
     "noSongsYet": "Henüz şarkı yok",
     "noSongsYetDesc": "Bildiğin ve söylemeyi sevdiğin şarkıları eklemek için yukarıda ara!",
-    "connectYourServices": "Müzik Servislerini Bağla",
-    "connectServicesGuestDesc": "Dinleme geçmişine dayalı kişiselleştirilmiş öneriler için Spotify ve Last.fm'i bağlamak üzere bir hesap oluştur.",
-    "createAccount": "Hesap Oluştur",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Bağlı",
@@ -465,7 +444,6 @@
     "profileSection": "Profil",
     "yourAccountInfo": "Hesap bilgilerin",
     "emailLabel": "E-posta",
-    "guestSession": "Misafir oturumu",
     "displayNameLabel": "Görünen Ad",
     "displayNamePlaceholder": "Sana nasıl hitap edelim?",
     "profileUpdated": "Profil güncellendi!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Bağlı servis yok",
     "servicesConnectedCount": "{count} servis bağlandı",
     "logOutSection": "Çıkış Yap",
-    "clearGuestSession": "Misafir oturumunu temizle",
     "signOutOfAccount": "Hesabından çıkış yap",
     "dangerZone": "Tehlikeli Bölge",
     "irreversibleActions": "Geri alınamaz işlemler",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Emin misin? Bu, hesabını ve tüm verilerini kalıcı olarak silecektir. Bu işlem geri alınamaz.",
     "yesDeleteAccount": "Evet, Hesabımı Sil",
     "deleteNotAvailable": "Hesap silme işlemi henüz mevcut değil. Hesabını silmen gerekiyorsa lütfen destek ile iletişime geç.",
-    "clearSession": "Oturumu Temizle",
     "logOut": "Çıkış Yap",
     "accountId": "Hesap Kimliği: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} marka",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASİK"
+      "classic": "KLASİK",
+      "community": "Topluluk",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Bunu Söylemekten Keyif Alıyorum",
@@ -664,18 +642,6 @@
       "comfortEasy": "Kolay",
       "comfortComfortable": "Rahat",
       "comfortChallenging": "Zorlayıcı"
-    },
-    "postQuizEmail": {
-      "almostThere": "Neredeyse bitti!",
-      "enterEmailToSeeRecs": "Kişiselleştirilmiş önerilerini görmek için e-postanı gir",
-      "emailPlaceholder": "senin@epostan.com",
-      "emailLabel": "E-posta adresi",
-      "invalidEmail": "Lütfen geçerli bir e-posta adresi gir",
-      "failedToSaveEmail": "E-posta kaydedilemedi",
-      "saving": "Kaydediliyor...",
-      "continue": "Devam Et",
-      "updateNote": "Sana önerilerinle ilgili güncellemeler göndereceğiz.",
-      "noSpam": "Spam yok, söz veriyoruz."
     },
     "stickyFinish": {
       "artistSelected": "{count} sanatçı seçildi",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Spotify ve Last.fm'i bağla",
       "syncListeningHistory": "Dinleme geçmişini senkronize et",
       "saveProgressAcrossDevices": "İlerlemeni cihazlar arasında kaydet",
-      "createAndManagePlaylists": "Çalma listeleri oluştur ve yönet"
+      "createAndManagePlaylists": "Çalma listeleri oluştur ve yönet",
+      "createAccount": "Giriş yap veya hesap oluştur"
     },
     "artistSearch": {
       "placeholder": "Eklemek için sanatçı ara...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Bağlı Servisler",
-      "createAccountToConnect": "Bağlamak için hesap oluştur",
-      "connectMusicServicesTitle": "Müzik Servislerini Bağla",
-      "connectMusicServicesDesc": "Kişiselleştirilmiş öneriler için Spotify ve Last.fm'i bağlamak üzere bir hesap oluştur.",
-      "musicServicesFeature": "Müzik Servisleri",
       "noServicesConnected": "Bağlı servis yok",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" içinde okuyabileceğimiz şarkı bulunamadı. Başka bir çalma listesi dene.",
     "errorTooManyImports": "Çalma listelerini çok hızlı içe aktarıyorsun. Lütfen bir dakika bekle ve tekrar dene.",
     "inputLabel": "YouTube Music çalma listesi bağlantısı"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Herkesi coşturan şarkı",
+      "decade_match": "Sevdiğin bir dönemden",
+      "genre_match": "Müzik zevkine uygun",
+      "known_artist": "Sevdiğin bir sanatçıdan",
+      "known_song": "Bunu iyi bilirsin",
+      "make_it": "Kendin yap",
+      "similar_artist": "{artist} gibi"
+    },
+    "section": {
+      "all": {
+        "reason": "Eşleşen tüm şarkılar, seçtiğin sırada",
+        "title": "Tüm öneriler"
+      },
+      "artists_you_love": {
+        "reason": "Dinlediğin sanatçılardan daha fazla şarkı",
+        "title": "Sevdiğin sanatçılardan"
+      },
+      "because": {
+        "reason": "{artist} dinleyicilerinin söylemeyi sevdiği şarkılar",
+        "title": "{artist} sevdiğin için"
+      },
+      "crowd_pleasers": {
+        "reason": "Bütün salona şarkı söyleten parçalar",
+        "title": "Herkesi coşturanlar"
+      },
+      "make_it": {
+        "reason": "Henüz karaoke sürümü yok. Senin için bir tane hazırlayabiliriz",
+        "title": "Kendin yap"
+      },
+      "songs_you_know": {
+        "reason": "Kütüphanendeki şarkıların karaoke sürümleri",
+        "title": "Bildiğin şarkılar"
+      }
+    }
   }
 }

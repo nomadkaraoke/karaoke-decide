@@ -17,16 +17,11 @@
     "signIn": "Iniciar sesión",
     "createAccount": "Crear cuenta",
     "logOut": "Cerrar sesión",
-    "clearSession": "Borrar sesión",
-    "guest": "Invitado",
-    "guestSession": "Sesión de invitado",
-    "createAccountToSaveProgress": "Crea una cuenta para guardar tu progreso",
     "theme": "Tema",
     "backToApp": "Volver a la aplicación",
     "openMenu": "Abrir menú",
     "closeMenu": "Cerrar menú",
-    "profileSettings": "Configuración de perfil",
-    "clearSessionTitle": "Borrar sesión"
+    "profileSettings": "Configuración de perfil"
   },
   "home": {
     "heroTitle": "Elige fácilmente",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "para cantar",
     "heroSubtitle": "Encuentra canciones que conoces, que realmente puedes cantar y que a todos les encantarán. Recomendaciones personalizadas en 30 segundos.",
     "findYourSong": "Encuentra tu canción",
-    "trustSignal": "Gratis • No requiere registro • Toma 30 segundos",
-    "failedToStart": "Error al iniciar. Por favor, inténtalo de nuevo.",
+    "trustSignal": "Gratis • Solo toma 30 segundos",
     "soundFamiliar": "¿Te suena familiar?",
     "soundFamiliarSubtitle": "Estás en el karaoke, hojeando el libro de canciones, y...",
     "problemNothingTitle": "Nada te llama la atención",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "Bienvenido de nuevo",
-    "signInSubtitle": "Inicia sesión para acceder a tus canciones y recomendaciones",
     "emailLabel": "Dirección de correo electrónico",
     "emailPlaceholder": "tu@ejemplo.com",
-    "sendMagicLink": "Enviar enlace mágico",
-    "noPasswordNeeded": "No se necesita contraseña. Te enviaremos un enlace seguro para iniciar sesión.",
     "or": "o",
     "justWantToBrowse": "¿Solo quieres explorar? No se necesita cuenta.",
     "browseSongs": "Explorar canciones",
-    "failedToSendMagicLink": "Error al enviar el enlace mágico. Por favor, inténtalo de nuevo.",
-    "checkYourEmail": "¡Revisa tu correo electrónico!",
-    "magicLinkSentTo": "Enviamos un enlace mágico a",
-    "linkExpiresIn15": "Haz clic en el enlace de tu correo electrónico para iniciar sesión. El enlace caduca en 15 minutos.",
     "useDifferentEmail": "Usar un correo electrónico diferente",
     "backToHome": "Volver al inicio",
-    "verifyingLink": "Verificando tu enlace...",
-    "pleaseWait": "Por favor, espera un momento",
-    "youreSignedIn": "¡Has iniciado sesión!",
-    "redirectingToSongs": "Redirigiéndote a tus canciones...",
-    "connectionError": "Error de conexión",
-    "verificationFailed": "Error de verificación",
-    "noTokenFound": "No se encontró el token de verificación. Por favor, solicita un nuevo enlace mágico.",
-    "linkExpired": "Este enlace mágico ha caducado. Por favor, solicita uno nuevo.",
-    "linkAlreadyUsed": "Este enlace mágico ya ha sido utilizado. Por favor, solicita uno nuevo.",
-    "failedToVerify": "Error al verificar el token. Puede que haya caducado o ya se haya utilizado.",
-    "troubleshootingTips": "Consejos para solucionar problemas:",
-    "tipMobileData": "Intenta usar datos móviles en lugar de WiFi",
-    "tipDisableVpn": "Desactiva las extensiones de VPN o bloqueadores de anuncios",
-    "tipIncognito": "Intenta abrir en modo incógnito/privado",
-    "tipCorporateNetwork": "Comprueba si estás en una red corporativa o escolar",
-    "retryAgainCount": "Volver a intentar ({count})",
-    "requestNewLink": "Solicitar nuevo enlace",
-    "backToHomeCaps": "Volver al inicio"
+    "codeExpired": "Ese código ha caducado. Por favor, solicita uno nuevo.",
+    "codeLabel": "Código de 6 dígitos",
+    "codeResent": "Un nuevo código va en camino.",
+    "codeSentTo": "Enviamos un código de 6 dígitos por correo a",
+    "continueWithGoogle": "Continuar con Google",
+    "enterCode": "Introduce tu código",
+    "failedToSendCode": "No se pudo enviar el código. Por favor, inténtalo de nuevo.",
+    "failedToVerifyCode": "No se pudo verificar el código. Por favor, inténtalo de nuevo.",
+    "googleSignInFailed": "Error al iniciar sesión con Google. Por favor, inténtalo de nuevo.",
+    "invalidCode": "Ese código no es correcto. Revísalo e inténtalo de nuevo.",
+    "resendCode": "Enviar un nuevo código",
+    "sendCode": "Enviarme un código por correo",
+    "signInHint": "No necesitas contraseña. Te enviaremos un código de 6 dígitos por correo para iniciar sesión con tu cuenta de Nomad Karaoke.",
+    "signInToGetPicks": "Inicia sesión para obtener tus recomendaciones personalizadas de karaoke",
+    "tooManyAttempts": "Demasiados intentos. Por favor, solicita un nuevo código.",
+    "verifyCode": "Verificar e iniciar sesión",
+    "importedGuestData": "Hemos transferido las respuestas de tu cuestionario y tus canciones a tu cuenta."
   },
   "quiz": {
     "startingQuiz": "Empezando el cuestionario...",
@@ -182,28 +168,8 @@
     "selected": "{count} {count, plural, one {seleccionado} other {seleccionados}}",
     "findingMoreArtists": "Buscando más artistas que puedas conocer...",
     "noMoreArtists": "No hay más artistas para mostrar",
-    "almostThere": "¡Casi terminamos!",
-    "enterEmailToSave": "Ingresa tu correo electrónico para guardar tus recomendaciones.",
-    "generatingRecs": "Generando tus recomendaciones...",
-    "analyzingTaste": "Analizando tus gustos musicales",
-    "recsReady": "¡Recomendaciones listas!",
-    "personalizedListWaiting": "Tu lista de canciones personalizada te está esperando",
-    "waitingToGenerate": "Esperando para generar...",
-    "startShortly": "Esto comenzará en breve",
-    "yourEmail": "Tu correo electrónico",
     "emailSaved": "¡Correo electrónico guardado!",
-    "emailPlaceholder": "tu@ejemplo.com",
-    "saveEmail": "Guardar",
-    "pleaseEnterEmail": "Por favor, ingresa tu correo electrónico",
-    "pleaseEnterValidEmail": "Por favor, ingresa un correo electrónico válido",
-    "failedToSaveEmail": "Error al guardar el correo electrónico",
     "skipForNow": "Saltar por ahora",
-    "emailSavedSuccess": "¡Correo electrónico guardado!",
-    "viewRecommendations": "Ver mis recomendaciones",
-    "emailUpdatesHint": "Te enviaremos actualizaciones sobre tus recomendaciones. Nunca enviaremos spam.",
-    "generatingRecommendationsButton": "Generando recomendaciones...",
-    "enterEmailToContinue": "Ingresa tu correo electrónico para continuar",
-    "pleaseEnterEmailAbove": "Por favor, ingresa tu correo electrónico arriba para ver tus recomendaciones",
     "genres": {
       "pop": "Pop",
       "rock": "Rock",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Ninguna favorita del público coincide con los filtros actuales",
     "viewMySongs": "Ver mis canciones",
     "syncMoreMusic": "Sincronizar más música",
-    "tryAgain": "Intentar de nuevo"
+    "tryAgain": "Intentar de nuevo",
+    "libraryAny": "Cualquier biblioteca",
+    "libraryCommunity": "Versiones de la comunidad",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catálogo de KaraFun / Karaoke Version",
+    "libraryLabel": "Biblioteca de karaoke",
+    "loadMore": "Cargar más",
+    "loadingMore": "Cargando…",
+    "noMatchDescription": "Prueba a relajar uno o dos filtros para ver más canciones.",
+    "noMatchTitle": "Ninguna selección coincide con estos filtros",
+    "sortAz": "De la A a la Z",
+    "sortBest": "Lo mejor para ti",
+    "sortLabel": "Ordenar por",
+    "sortNewest": "Más recientes",
+    "sortOldest": "Más antiguas",
+    "sortPopular": "Más populares",
+    "sortShortest": "Más cortas",
+    "warmingDescription": "Estamos preparando todo. Esto suele tardar menos de un minuto y volveremos a intentarlo automáticamente.",
+    "warmingTitle": "Preparando tus selecciones…"
   },
   "myData": {
     "title": "Mis datos",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Comentarios y mejoras",
     "feedbackDesc": "Próximamente: Me encanta/ocultar canciones, rango vocal, ¡y más!",
     "dataPowersRecs": "Estos datos impulsan tus recomendaciones de karaoke personalizadas.",
-    "createAccountToSync": "Crea una cuenta",
-    "toSyncServices": "para sincronizar tus servicios de música.",
     "moreDataBetterRecs": "Más datos = mejores recomendaciones.",
     "takeTheQuiz": "Haz el cuestionario",
     "orConnectMore": "o conecta más servicios.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Busca canciones para agregar...",
     "noSongsYet": "Aún no hay canciones",
     "noSongsYetDesc": "¡Busca arriba para agregar canciones que conoces y te encanta cantar!",
-    "connectYourServices": "Conecta tus servicios de música",
-    "connectServicesGuestDesc": "Crea una cuenta para conectar Spotify y Last.fm y obtener recomendaciones personalizadas basadas en tu historial de escucha.",
-    "createAccount": "Crear cuenta",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Conectado",
@@ -465,7 +444,6 @@
     "profileSection": "Perfil",
     "yourAccountInfo": "Información de tu cuenta",
     "emailLabel": "Correo electrónico",
-    "guestSession": "Sesión de invitado",
     "displayNameLabel": "Nombre para mostrar",
     "displayNamePlaceholder": "¿Cómo deberíamos llamarte?",
     "profileUpdated": "¡Perfil actualizado!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "No hay servicios conectados",
     "servicesConnectedCount": "{count} {count, plural, one {servicio conectado} other {servicios conectados}}",
     "logOutSection": "Cerrar sesión",
-    "clearGuestSession": "Borrar tu sesión de invitado",
     "signOutOfAccount": "Cerrar sesión en tu cuenta",
     "dangerZone": "Zona de peligro",
     "irreversibleActions": "Acciones irreversibles",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "¿Estás seguro? Esto eliminará permanentemente tu cuenta y todos tus datos. Esta acción no se puede deshacer.",
     "yesDeleteAccount": "Sí, eliminar mi cuenta",
     "deleteNotAvailable": "La eliminación de la cuenta aún no está disponible. Por favor, contacta al soporte si necesitas eliminar tu cuenta.",
-    "clearSession": "Borrar sesión",
     "logOut": "Cerrar sesión",
     "accountId": "ID de cuenta: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} marcas",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLÁSICO"
+      "classic": "CLÁSICO",
+      "community": "Comunidad",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Disfruto cantar esto",
@@ -664,18 +642,6 @@
       "comfortEasy": "Fácil",
       "comfortComfortable": "Cómoda",
       "comfortChallenging": "Desafiante"
-    },
-    "postQuizEmail": {
-      "almostThere": "¡Casi terminamos!",
-      "enterEmailToSeeRecs": "Ingresa tu correo electrónico para ver tus recomendaciones personalizadas",
-      "emailPlaceholder": "tu@email.com",
-      "emailLabel": "Dirección de correo electrónico",
-      "invalidEmail": "Por favor, ingresa una dirección de correo electrónico válida",
-      "failedToSaveEmail": "Error al guardar el correo electrónico",
-      "saving": "Guardando...",
-      "continue": "Continuar",
-      "updateNote": "Te enviaremos actualizaciones sobre tus recomendaciones.",
-      "noSpam": "Sin spam, lo prometemos."
     },
     "stickyFinish": {
       "artistSelected": "{count, plural, one {artista seleccionado} other {artistas seleccionados}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Conectar Spotify y Last.fm",
       "syncListeningHistory": "Sincronizar tu historial de escucha",
       "saveProgressAcrossDevices": "Guardar tu progreso en todos los dispositivos",
-      "createAndManagePlaylists": "Crear y administrar listas de reproducción"
+      "createAndManagePlaylists": "Crear y administrar listas de reproducción",
+      "createAccount": "Inicia sesión o crea una cuenta"
     },
     "artistSearch": {
       "placeholder": "Busca artistas para agregar...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Servicios conectados",
-      "createAccountToConnect": "Crea una cuenta para conectar",
-      "connectMusicServicesTitle": "Conecta tus servicios de música",
-      "connectMusicServicesDesc": "Crea una cuenta para conectar Spotify y Last.fm y obtener recomendaciones personalizadas.",
-      "musicServicesFeature": "Servicios de música",
       "noServicesConnected": "No hay servicios conectados",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" no tiene canciones que hayamos podido leer. Prueba con otra lista de reproducción.",
     "errorTooManyImports": "Estás importando listas de reproducción demasiado rápido. Espera un minuto y vuelve a intentarlo.",
     "inputLabel": "Enlace a la lista de reproducción de YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Éxito asegurado",
+      "decade_match": "De una década que te gusta",
+      "genre_match": "Coincide con tus géneros",
+      "known_artist": "De un artista que te encanta",
+      "known_song": "Te la sabes",
+      "make_it": "Crear",
+      "similar_artist": "Parecido a {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Todo lo que coincide, en el orden que elegiste",
+        "title": "Todas las selecciones"
+      },
+      "artists_you_love": {
+        "reason": "Más canciones de artistas que escuchas",
+        "title": "De artistas que te encantan"
+      },
+      "because": {
+        "reason": "Canciones que los fans de {artist} suelen cantar",
+        "title": "Porque te gusta {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Canciones que ponen a cantar a toda la sala",
+        "title": "Éxitos asegurados"
+      },
+      "make_it": {
+        "reason": "Aún no hay versión de karaoke. Podemos crear una para ti",
+        "title": "Crear"
+      },
+      "songs_you_know": {
+        "reason": "Versiones de karaoke de canciones de tu biblioteca",
+        "title": "Canciones que conoces"
+      }
+    }
   }
 }

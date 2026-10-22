@@ -135,6 +135,14 @@ class CatalogReader:
                 out.setdefault(r[0], int(r[1]))
         return out
 
+    def has_karaoke_key(self, song_key: str) -> bool:
+        """Whether ``song_key`` has a karaoke version: it is in ``availability.db`` or is a
+        catalog.db song that came from KaraokeNerds (the two sources spell some titles differently)."""
+        conn = self.conn()
+        if self.has_availability and conn.execute("SELECT 1 FROM av.songs WHERE song_key = ?", (song_key,)).fetchone():
+            return True
+        return conn.execute("SELECT 1 FROM songs WHERE song_key = ? AND in_kn = 1", (song_key,)).fetchone() is not None
+
     def match_kn(self, artist: str, title: str) -> KnMatch | None:
         """The KaraokeNerds song for a listening-history track (legacy ``CatalogLookup`` key).
 

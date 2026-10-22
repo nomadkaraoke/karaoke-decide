@@ -17,16 +17,11 @@
     "signIn": "Войти",
     "createAccount": "Создать аккаунт",
     "logOut": "Выйти",
-    "clearSession": "Очистить сессию",
-    "guest": "Гость",
-    "guestSession": "Гостевая сессия",
-    "createAccountToSaveProgress": "Создай аккаунт, чтобы сохранить прогресс",
     "theme": "Тема",
     "backToApp": "Вернуться в приложение",
     "openMenu": "Открыть меню",
     "closeMenu": "Закрыть меню",
-    "profileSettings": "Настройки профиля",
-    "clearSessionTitle": "Очистить сессию"
+    "profileSettings": "Настройки профиля"
   },
   "home": {
     "heroTitle": "Легко выбирай",
@@ -34,8 +29,7 @@
     "heroTitleEnd": "чтобы спеть",
     "heroSubtitle": "Найди песни, которые ты знаешь, действительно можешь спеть, и которые понравятся публике. Персональные рекомендации за 30 секунд.",
     "findYourSong": "Найди свою песню",
-    "trustSignal": "Бесплатно • Без регистрации • Займет 30 секунд",
-    "failedToStart": "Не удалось начать. Пожалуйста, попробуй еще раз.",
+    "trustSignal": "Бесплатно • Займёт 30 секунд",
     "soundFamiliar": "Звучит знакомо?",
     "soundFamiliarSubtitle": "Ты в караоке, листаешь каталог песен, и...",
     "problemNothingTitle": "Ничего не цепляет",
@@ -88,38 +82,30 @@
   },
   "auth": {
     "welcomeBack": "С возвращением",
-    "signInSubtitle": "Войди, чтобы получить доступ к своим песням и рекомендациям",
     "emailLabel": "Адрес электронной почты",
     "emailPlaceholder": "you@example.com",
-    "sendMagicLink": "Отправить магическую ссылку",
-    "noPasswordNeeded": "Пароль не нужен. Мы отправим тебе безопасную ссылку для входа.",
     "or": "или",
     "justWantToBrowse": "Просто хочешь посмотреть? Аккаунт не нужен.",
     "browseSongs": "Смотреть песни",
-    "failedToSendMagicLink": "Не удалось отправить магическую ссылку. Пожалуйста, попробуй еще раз.",
-    "checkYourEmail": "Проверь свою почту!",
-    "magicLinkSentTo": "Мы отправили магическую ссылку на",
-    "linkExpiresIn15": "Нажми на ссылку в письме, чтобы войти. Ссылка истекает через 15 минут.",
     "useDifferentEmail": "Использовать другой email",
     "backToHome": "Вернуться на главную",
-    "verifyingLink": "Проверяем твою ссылку...",
-    "pleaseWait": "Пожалуйста, подожди немного",
-    "youreSignedIn": "Ты вошел в систему!",
-    "redirectingToSongs": "Перенаправляем тебя к твоим песням...",
-    "connectionError": "Ошибка соединения",
-    "verificationFailed": "Ошибка проверки",
-    "noTokenFound": "Токен проверки не найден. Пожалуйста, запроси новую магическую ссылку.",
-    "linkExpired": "Эта магическая ссылка истекла. Пожалуйста, запроси новую.",
-    "linkAlreadyUsed": "Эта магическая ссылка уже была использована. Пожалуйста, запроси новую.",
-    "failedToVerify": "Не удалось проверить токен. Возможно, он истек или уже был использован.",
-    "troubleshootingTips": "Советы по устранению неполадок:",
-    "tipMobileData": "Попробуй использовать мобильный интернет вместо WiFi",
-    "tipDisableVpn": "Отключи VPN или расширения для блокировки рекламы",
-    "tipIncognito": "Попробуй открыть в режиме инкогнито/приватном окне",
-    "tipCorporateNetwork": "Проверь, не находишься ли ты в корпоративной или школьной сети",
-    "retryAgainCount": "Попробовать снова ({count})",
-    "requestNewLink": "Запросить новую ссылку",
-    "backToHomeCaps": "Вернуться на главную"
+    "codeExpired": "Срок действия кода истёк. Запроси новый.",
+    "codeLabel": "6-значный код",
+    "codeResent": "Новый код уже в пути.",
+    "codeSentTo": "Мы отправили 6-значный код на",
+    "continueWithGoogle": "Продолжить с Google",
+    "enterCode": "Введи код",
+    "failedToSendCode": "Не удалось отправить код. Попробуй ещё раз.",
+    "failedToVerifyCode": "Не удалось проверить код. Попробуй ещё раз.",
+    "googleSignInFailed": "Не удалось войти через Google. Попробуй ещё раз.",
+    "invalidCode": "Неверный код. Проверь его и попробуй ещё раз.",
+    "resendCode": "Отправить новый код",
+    "sendCode": "Отправить код на почту",
+    "signInHint": "Пароль не нужен. Мы пришлём тебе на почту 6-значный код для входа в аккаунт Nomad Karaoke.",
+    "signInToGetPicks": "Войди, чтобы получить персональные караоке-рекомендации",
+    "tooManyAttempts": "Слишком много попыток. Запроси новый код.",
+    "verifyCode": "Подтвердить и войти",
+    "importedGuestData": "Мы перенесли твои ответы на вопросы квиза и песни в твой аккаунт."
   },
   "quiz": {
     "startingQuiz": "Начинаем квиз...",
@@ -182,28 +168,8 @@
     "selected": "Выбрано {count}",
     "findingMoreArtists": "Ищем больше исполнителей, которых ты можешь знать...",
     "noMoreArtists": "Больше нет исполнителей для показа",
-    "almostThere": "Почти готово!",
-    "enterEmailToSave": "Введи свой email, чтобы сохранить рекомендации.",
-    "generatingRecs": "Генерируем твои рекомендации...",
-    "analyzingTaste": "Анализируем твой музыкальный вкус",
-    "recsReady": "Рекомендации готовы!",
-    "personalizedListWaiting": "Твой персональный список песен ждет",
-    "waitingToGenerate": "Ожидание генерации...",
-    "startShortly": "Это скоро начнется",
-    "yourEmail": "Твой Email",
     "emailSaved": "Email сохранен!",
-    "emailPlaceholder": "you@example.com",
-    "saveEmail": "Сохранить",
-    "pleaseEnterEmail": "Пожалуйста, введи свой email",
-    "pleaseEnterValidEmail": "Пожалуйста, введи действительный email",
-    "failedToSaveEmail": "Не удалось сохранить email",
     "skipForNow": "Пока пропустить",
-    "emailSavedSuccess": "Email сохранен!",
-    "viewRecommendations": "Смотреть мои рекомендации",
-    "emailUpdatesHint": "Мы будем присылать тебе обновления о твоих рекомендациях. Никакого спама, обещаем.",
-    "generatingRecommendationsButton": "Генерация рекомендаций...",
-    "enterEmailToContinue": "Введи свой email, чтобы продолжить",
-    "pleaseEnterEmailAbove": "Пожалуйста, введи свой email выше, чтобы увидеть свои рекомендации",
     "genres": {
       "pop": "Поп",
       "rock": "Рок",
@@ -285,7 +251,25 @@
     "crowdPleasersEmpty": "Нет любимцев публики, соответствующих текущим фильтрам",
     "viewMySongs": "Смотреть мои песни",
     "syncMoreMusic": "Синхронизировать больше музыки",
-    "tryAgain": "Попробовать снова"
+    "tryAgain": "Попробовать снова",
+    "libraryAny": "Любая библиотека",
+    "libraryCommunity": "Версии от сообщества",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Каталог KaraFun / Karaoke Version",
+    "libraryLabel": "Караоке-библиотека",
+    "loadMore": "Загрузить ещё",
+    "loadingMore": "Загрузка…",
+    "noMatchDescription": "Попробуй ослабить пару фильтров, чтобы увидеть больше песен.",
+    "noMatchTitle": "Под эти фильтры ничего не подходит",
+    "sortAz": "От А до Я",
+    "sortBest": "Лучшее для тебя",
+    "sortLabel": "Сортировка",
+    "sortNewest": "Сначала новые",
+    "sortOldest": "Сначала старые",
+    "sortPopular": "Самые популярные",
+    "sortShortest": "Самые короткие",
+    "warmingDescription": "Мы всё подготавливаем. Обычно это занимает меньше минуты — мы обновим всё автоматически.",
+    "warmingTitle": "Готовим рекомендации для тебя…"
   },
   "myData": {
     "title": "Мои данные",
@@ -299,8 +283,6 @@
     "feedbackTitle": "Отзывы и улучшения",
     "feedbackDesc": "Скоро: Любить/скрывать песни, вокальный диапазон и многое другое!",
     "dataPowersRecs": "Эти данные лежат в основе твоих персональных караоке-рекомендаций.",
-    "createAccountToSync": "Создай аккаунт",
-    "toSyncServices": "чтобы синхронизировать свои музыкальные сервисы.",
     "moreDataBetterRecs": "Больше данных = лучшие рекомендации.",
     "takeTheQuiz": "Пройди квиз",
     "orConnectMore": "или подключи больше сервисов.",
@@ -350,9 +332,6 @@
     "searchSongsToAdd": "Искать песни для добавления...",
     "noSongsYet": "Пока нет песен",
     "noSongsYetDesc": "Ищи выше, чтобы добавить песни, которые ты знаешь и любишь петь!",
-    "connectYourServices": "Подключи свои музыкальные сервисы",
-    "connectServicesGuestDesc": "Создай аккаунт, чтобы подключить Spotify и Last.fm для персональных рекомендаций на основе твоей истории прослушиваний.",
-    "createAccount": "Создать аккаунт",
     "spotify": "Spotify",
     "lastfm": "Last.fm",
     "connected": "Подключено",
@@ -465,7 +444,6 @@
     "profileSection": "Профиль",
     "yourAccountInfo": "Информация о твоем аккаунте",
     "emailLabel": "Email",
-    "guestSession": "Гостевая сессия",
     "displayNameLabel": "Отображаемое имя",
     "displayNamePlaceholder": "Как нам тебя называть?",
     "profileUpdated": "Профиль обновлен!",
@@ -480,7 +458,6 @@
     "noServicesConnected": "Нет подключенных сервисов",
     "servicesConnectedCount": "Подключено {count} {count, plural, one {сервис} few {сервиса} many {сервисов} other {сервисов}}",
     "logOutSection": "Выйти",
-    "clearGuestSession": "Очистить твою гостевую сессию",
     "signOutOfAccount": "Выйти из своего аккаунта",
     "dangerZone": "Опасная зона",
     "irreversibleActions": "Необратимые действия",
@@ -488,7 +465,6 @@
     "deleteConfirmMessage": "Ты уверен? Это навсегда удалит твой аккаунт и все твои данные. Это действие нельзя отменить.",
     "yesDeleteAccount": "Да, удалить мой аккаунт",
     "deleteNotAvailable": "Удаление аккаунта пока недоступно. Пожалуйста, свяжись с поддержкой, если тебе нужно удалить свой аккаунт.",
-    "clearSession": "Очистить сессию",
     "logOut": "Выйти",
     "accountId": "ID аккаунта: {id}"
   },
@@ -642,7 +618,9 @@
       "brands": "{count} брендов",
       "pop": "Поп: {value}",
       "explicit": "E",
-      "classic": "КЛАССИКА"
+      "classic": "КЛАССИКА",
+      "community": "Сообщество",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Мне нравится это петь",
@@ -664,18 +642,6 @@
       "comfortEasy": "Легко",
       "comfortComfortable": "Комфортно",
       "comfortChallenging": "Сложно"
-    },
-    "postQuizEmail": {
-      "almostThere": "Почти готово!",
-      "enterEmailToSeeRecs": "Введи свой email, чтобы увидеть свои персональные рекомендации",
-      "emailPlaceholder": "your@email.com",
-      "emailLabel": "Адрес электронной почты",
-      "invalidEmail": "Пожалуйста, введи действительный адрес электронной почты",
-      "failedToSaveEmail": "Не удалось сохранить email",
-      "saving": "Сохранение...",
-      "continue": "Продолжить",
-      "updateNote": "Мы будем присылать тебе обновления о твоих рекомендациях.",
-      "noSpam": "Никакого спама, обещаем."
     },
     "stickyFinish": {
       "artistSelected": "Выбрано {count} {count, plural, one {исполнитель} few {исполнителя} many {исполнителей} other {исполнителей}}",
@@ -699,7 +665,8 @@
       "connectSpotifyLastfm": "Подключить Spotify и Last.fm",
       "syncListeningHistory": "Синхронизировать свою историю прослушиваний",
       "saveProgressAcrossDevices": "Сохранять свой прогресс на разных устройствах",
-      "createAndManagePlaylists": "Создавать и управлять плейлистами"
+      "createAndManagePlaylists": "Создавать и управлять плейлистами",
+      "createAccount": "Войти или создать аккаунт"
     },
     "artistSearch": {
       "placeholder": "Искать исполнителей для добавления...",
@@ -735,10 +702,6 @@
     },
     "myDataServices": {
       "title": "Подключенные сервисы",
-      "createAccountToConnect": "Создай аккаунт для подключения",
-      "connectMusicServicesTitle": "Подключи свои музыкальные сервисы",
-      "connectMusicServicesDesc": "Создай аккаунт, чтобы подключить Spotify и Last.fm для персональных рекомендаций.",
-      "musicServicesFeature": "Музыкальные сервисы",
       "noServicesConnected": "Нет подключенных сервисов",
       "spotify": "Spotify",
       "lastfm": "Last.fm",
@@ -905,5 +868,42 @@
     "emptyPlaylist": "В плейлисте «{title}» нет песен, которые удалось бы прочитать. Попробуй другой плейлист.",
     "errorTooManyImports": "Ты импортируешь плейлисты слишком быстро. Пожалуйста, подожди минуту и попробуй снова.",
     "inputLabel": "Ссылка на плейлист YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Хит для любой компании",
+      "decade_match": "Из твоего любимого десятилетия",
+      "genre_match": "Подходит под твои любимые жанры",
+      "known_artist": "От твоего любимого исполнителя",
+      "known_song": "Ты знаешь этот трек",
+      "make_it": "Создать",
+      "similar_artist": "В стиле {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Всё подходящее в выбранном тобой порядке",
+        "title": "Все рекомендации"
+      },
+      "artists_you_love": {
+        "reason": "Больше песен от исполнителей, которых ты слушаешь",
+        "title": "От твоих любимых исполнителей"
+      },
+      "because": {
+        "reason": "Песни, которые часто поют поклонники {artist}",
+        "title": "Потому что тебе нравится {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Песни, которым подпоёт весь зал",
+        "title": "Хиты для любой компании"
+      },
+      "make_it": {
+        "reason": "Караоке-версии пока нет. Мы можем создать её для тебя",
+        "title": "Создать караоке"
+      },
+      "songs_you_know": {
+        "reason": "Караоке-версии песен из твоей медиатеки",
+        "title": "Знакомые песни"
+      }
+    }
   }
 }
