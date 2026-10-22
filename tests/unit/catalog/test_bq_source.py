@@ -52,6 +52,7 @@ def fake_bq():
     """A client that routes on SQL substrings and records every job_config."""
     bq = MagicMock()
     bq.configs = []
+    bq.jobs = []
 
     def query(sql, job_config=None):
         bq.configs.append(job_config)
@@ -71,6 +72,7 @@ def fake_bq():
             raise AssertionError("unexpected query")
         job = MagicMock()
         job.result.side_effect = lambda page_size=None: iter(rows)
+        bq.jobs.append(job)
         return job
 
     bq.query.side_effect = query
@@ -79,7 +81,9 @@ def fake_bq():
 
 @pytest.mark.parametrize("name", SQL_CONSTANTS)
 def test_sql_never_maxes_audio_features(name):
-    assert not re.search(r"MAX\(\s*(af\.)?(energy|valence|danceability|tempo)", SQL_CONSTANTS[name], re.IGNORECASE)
+    assert not re.search(
+        r"(MAX|MIN|AVG|ANY_VALUE)\(\s*(\w+\.)?(energy|valence|danceability|tempo)\b", SQL_CONSTANTS[name], re.IGNORECASE
+    )
 
 
 def test_facets_pick_one_track():
@@ -91,8 +95,9 @@ def test_every_query_has_byte_cap_and_streams_pages():
     src.fetch_catalog_rows(bq)
     assert len(bq.configs) == 6
     assert all(c.maximum_bytes_billed == MAX_BYTES_CATALOG for c in bq.configs)
-    for call in bq.query.return_value.result.call_args_list:
-        assert call.kwargs.get("page_size") == 50_000
+    assert len(bq.jobs) == 6
+    for job in bq.jobs:
+        job.result.assert_called_once_with(page_size=50_000)
 
 
 def test_dry_run_reads_nothing():

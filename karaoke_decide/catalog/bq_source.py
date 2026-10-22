@@ -9,6 +9,7 @@ Spotify audio features always come from ONE chosen track per karaoke_id
 describe a real recording.
 """
 
+import logging
 from collections import defaultdict
 from collections.abc import Iterator
 from typing import Any
@@ -20,6 +21,8 @@ from karaoke_decide.catalog.genres import map_genres
 from karaoke_decide.catalog.keys import artist_key, match_key, song_key
 from karaoke_decide.catalog.moods import mood_for
 from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
+
+logger = logging.getLogger(__name__)
 
 P = "nomadkaraoke.karaoke_decide"
 MB = "nomadkaraoke.musicbrainz"
@@ -89,22 +92,32 @@ LEFT JOIN listeners lp USING (karaoke_id)
 """
 
 NO_KARAOKE_SQL = f"""
-WITH kn_artists AS (
-  SELECT DISTINCT {_NORM_SQL.format(col="Artist")} AS artist_normalized
+WITH kn_norm AS (
+  SELECT DISTINCT {_NORM_SQL.format(col="Artist")} AS artist_normalized,
+                  {_NORM_SQL.format(col="Title")} AS name_normalized
   FROM `{P}.karaokenerds_raw`
 ),
+kn_artists AS (SELECT DISTINCT artist_normalized FROM kn_norm),
+recordings AS (
+  -- mb_recordings_enriched has one row per Spotify track: collapse to one row per recording.
+  SELECT recording_mbid, ANY_VALUE(title) AS title, ANY_VALUE(artist_credit) AS artist,
+         ANY_VALUE(artist_normalized) AS artist_normalized, ANY_VALUE(name_normalized) AS name_normalized,
+         MAX(length_ms) AS duration_ms, MAX(spotify_popularity) AS spotify_pop
+  FROM `{P}.mb_recordings_enriched`
+  WHERE artist_normalized IN (SELECT artist_normalized FROM kn_artists)
+  GROUP BY recording_mbid
+),
 popular AS (
-  SELECT r.recording_mbid, r.title, r.artist_credit AS artist, r.length_ms AS duration_ms,
-         r.spotify_popularity AS spotify_pop, p.listeners,
-         ROW_NUMBER() OVER (PARTITION BY r.artist_normalized ORDER BY p.listeners DESC) AS rn
+  SELECT r.recording_mbid, r.title, r.artist, r.duration_ms, r.spotify_pop, p.listeners,
+         ROW_NUMBER() OVER (PARTITION BY r.artist_normalized
+                            ORDER BY p.listeners DESC, r.recording_mbid) AS rn
   FROM `{P}.lb_recording_popularity` p
-  JOIN `{P}.mb_recordings_enriched` r ON r.recording_mbid = p.recording_mbid
-  JOIN kn_artists ka ON ka.artist_normalized = r.artist_normalized
+  JOIN recordings r ON r.recording_mbid = p.recording_mbid
   WHERE p.stats_range = 'all_time'
     AND p.listeners >= {NO_KARAOKE_MIN_LISTENERS}
-    AND LOWER(r.title) NOT LIKE '%live%'
-    AND LOWER(r.title) NOT LIKE '%remix%'
-    AND LOWER(r.title) NOT LIKE '%demo%'
+    AND NOT REGEXP_CONTAINS(LOWER(r.title), r'\\blive\\b|remix|demo')
+    AND NOT EXISTS (SELECT 1 FROM kn_norm k
+                    WHERE k.artist_normalized = r.artist_normalized AND k.name_normalized = r.name_normalized)
 ),
 years AS (
   SELECT mt.recording_mbid, MIN(rg.first_release_year) AS year
@@ -156,7 +169,7 @@ SIMILAR_SQL = f"""
 SELECT artist_a_name, artist_b_name, jaccard_similarity
 FROM `{P}.mlhd_artist_similarity`
 WHERE artist_a_name IS NOT NULL AND artist_b_name IS NOT NULL AND artist_a_name != artist_b_name
-QUALIFY ROW_NUMBER() OVER (PARTITION BY artist_a_name ORDER BY jaccard_similarity DESC) <= {SIMILAR_PER_ARTIST}
+QUALIFY ROW_NUMBER() OVER (PARTITION BY artist_a_name ORDER BY jaccard_similarity DESC, artist_b_name) <= {SIMILAR_PER_ARTIST}
 """
 
 RAW_GENRES_SQL = f"""
@@ -171,6 +184,7 @@ def _run(bq: bigquery.Client, sql: str, *, dry_run: bool) -> Iterator[dict[str, 
     config = bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES_CATALOG, dry_run=dry_run, use_query_cache=True)
     job = bq.query(sql, job_config=config)
     if dry_run:
+        logger.info("catalog dry run: %.2f GiB", (job.total_bytes_processed or 0) / 2**30)
         return
     for row in job.result(page_size=PAGE_SIZE):
         yield dict(row)
@@ -321,7 +335,9 @@ def fetch_catalog_rows(bq: bigquery.Client, *, dry_run: bool = False) -> Catalog
     ]
     facets = {int(r["karaoke_id"]): r for r in _run(bq, SONG_FACETS_SQL, dry_run=dry_run)}
     artist_rows = _artist_rows(_run(bq, ARTISTS_SQL, dry_run=dry_run))
-    artists = {a.artist_key: a for a in sorted(artist_rows, key=lambda a: a.lb_listeners or -1)}  # best listened wins
+    artists = {
+        a.artist_key: a for a in sorted(artist_rows, key=lambda a: (a.lb_listeners or -1, a.mbid or ""))
+    }  # best listened wins
 
     kn_songs = _kn_songs(kn, facets, artists)
     kn_keys = {s.song_key for s in kn_songs}
