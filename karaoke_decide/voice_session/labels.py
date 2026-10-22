@@ -29,7 +29,7 @@ _NOTE_RULES: tuple[tuple[LabelTag, str], ...] = (
     ("mood_only", r"flamboyant|in the mood|mood"),
     ("octave_split", r"too low if .* too high"),
     ("section_octave_jump", r"octave is mixed|verse and chorus"),
-    ("key_change", r"lower octave|raise the key|key"),
+    ("key_change", r"lower octave|raise the key|\bkey\b"),
     ("needs_practice", r"practi[cs]e"),
     ("no_intro", r"no intro|comes in immediately"),
     ("version_good", r"version is great|version is good"),
