@@ -8,10 +8,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import BackendSettings, get_backend_settings
 from backend.services.auth_service import AuthenticationError, AuthService, get_auth_service
+from backend.services.catalog_lookup import CatalogLookup, get_catalog_lookup
 from backend.services.catalog_store import CatalogStore, get_catalog_store
 from backend.services.firestore_service import FirestoreService
 from backend.services.gen_session import GenSessionError, get_gen_session_validator, is_gen_token
 from backend.services.guest_claim_service import GuestClaimService
+from backend.services.karaoke_log_service import KaraokeLogService
 from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
@@ -255,6 +257,24 @@ async def get_guest_claim_service_dep(
     return GuestClaimService(firestore, auth_service)
 
 
+async def get_catalog_lookup_dep() -> CatalogLookup:
+    """Artist + title matching against catalog.db (tests override this)."""
+    return get_catalog_lookup()
+
+
+async def get_karaoke_log_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    auth_service: Annotated[AuthService, Depends(get_auth_service_dep)],
+    catalog: Annotated[CatalogLookup, Depends(get_catalog_lookup_dep)],
+) -> KaraokeLogService:
+    """Karaoke log service; partner writes resolve (or create) the profile by gen email."""
+
+    async def resolve_user(email: str) -> str:
+        return (await auth_service.resolve_gen_user(email)).id
+
+    return KaraokeLogService(firestore, catalog=catalog, resolve_user=resolve_user)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -298,3 +318,4 @@ PlaylistServiceDep = Annotated[PlaylistService, Depends(get_playlist_service_dep
 KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_service_dep)]
 UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]
 GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
+KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]

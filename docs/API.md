@@ -88,6 +88,31 @@ Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catal
 
 `GET /api/my/songs/hidden`, `GET /api/my/songs/loved` list `{songs: [...]}`. `POST` / `DELETE /api/my/songs/{song_key}/hide` and `/love` (204) hide or love a song; hidden songs never appear in v2.
 
+Love marks the song's `user_songs` row (`loved: true`, `loved_at`) with a merge: the `{user_id}:{kn_id}` row when catalog.db maps the key to a KaraokeNerds id and that row exists, else the song_key row (created with `source: manual`). It is the same row the karaoke log counts into, so `times_sung`, `last_sung_at` and the row's source survive. Unlove clears the marker and deletes the row only when nothing else is on it (no `times_sung`, source `manual` or `karaoke_log`). Rows written before the marker existed count as loved when their source is `manual`.
+
+### Karaoke log: /api/my/karaoke-log
+
+Every song the user sang (or planned / requested), from kjbox at Nomad nights (`kj_…` ids) or the mobile app at other bars (`app_…` ids), with the optional post-song survey. Bearer gen session token. Errors are `{"detail": "<code>"}`: `invalid` (400), `not_owner` (403), `not_found` (404); a body that is not a JSON object, or `limit` outside 1–500, is 422.
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/my/karaoke-log?since=&night_id=&limit=100&cursor=` | `{entries: [entry], next_cursor}`, newest `updated_at` first. Without `since`: live records. With `since` (ISO): every record updated after it, deleted ones included (sync pull). Survey-only placeholders are never listed. |
+| `PUT /api/my/karaoke-log/{id}` | Upsert with field-level merge → the entry. `app_` ids: any of `state, artist, title, song_key, night, sung_at, ended_at, media, survey, deleted` (a new entry needs `state`, `artist`, `title`). `kj_` ids: only `survey` and `deleted` (other kjbox fields → 403 `not_owner`); a survey written before kjbox delivers is kept and merged later. `deleted: false` never revives a record the host un-did. |
+| `DELETE /api/my/karaoke-log/{id}` | Soft delete → the entry (`deleted: true`); reverses its sung count. |
+
+Entry: `{id, source: kjbox|app, state: planned|requested|sung|sung_unplayed|skipped, artist, title, song_key, song_key_status: resolved|unresolved, night: {id, kind: nomad|other, venue_name, date}, sung_at, ended_at, created_at, updated_at, survey: {feel: great|ok|bad, key: too_low|right|too_high, crowd_pleaser, notes (≤2000), answered_at}, media: {brand_code, gen_job_id, source_type}, deleted, box_id, entry_id, singers}`.
+
+Counts: a `sung`/`sung_unplayed` record that isn't deleted adds one to `user_songs.times_sung` (same row rule as Love) when `song_key` is resolved, else to `user_karaoke_unresolved` (per normalised artist + title). `song_key` is resolved server-side with a 300 ms budget; unresolved records are retried in the background at most once per 24 h per user, on `GET` (marker `karaoke_log_retry_at` on the `decide_users` doc).
+
+### kjbox partner: /api/partner/kjbox/karaoke-log
+
+Server to server from kjbox's history outbox. Header `X-Kjbox-Secret` must equal `DECIDE_KJBOX_SECRET` (Secret Manager `decide-kjbox-secret`; compared with `hmac.compare_digest`): missing or wrong → 401 `unauthenticated`; unset on the server → 503 `partner_disabled`. The local stack (`DECIDE_TEST_API=1`, never production) defaults it to `local-stack-secret`.
+
+| Route | Purpose |
+|-------|---------|
+| `PUT /api/partner/kjbox/karaoke-log/{kj_id}` | Body: the outbox record `{history_id, gen_email, source, box_id, night_id, night_date, entry_id, artist, title, sung_at, ended_at, state?, singers[], venue: {kind, name}, media}`. Resolves the decide profile by `gen_email` (created if missing). Idempotent; kjbox owns the facts, never the survey. → `{id, deleted, song_key_status}` (no user data). Missing `gen_email` → 400 `invalid`; unknown fields are ignored. |
+| `DELETE /api/partner/kjbox/karaoke-log/{kj_id}?gen_email=` | The host un-did Done (`gen_email` may also be a JSON body field). 204, idempotent, also for unknown ids. A later `PUT` (Done again) restores it; a user's own delete is never undone. |
+
 ### GET /api/quiz/progress
 
 Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when there is none.
@@ -105,6 +130,7 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `POST /api/test/profile/reset` | `{email}` → 204; deletes the user's decide data |
 | `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
 | `GET /api/test/profile?email=` | Reads the profile back |
+| `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log. |
 
 ## Song search ✅ Implemented
 

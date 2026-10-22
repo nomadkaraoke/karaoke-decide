@@ -260,6 +260,18 @@ decide_users_created_user_id_index = gcp.firestore.Index(
 # Cloud Run
 # =============================================================================
 
+# kjbox -> decide karaoke-log partner secret (X-Kjbox-Secret on /api/partner/kjbox/*).
+# Pulumi owns the secret only; its value (a version) is added by hand with /gcp-admin and
+# must exist before the API deploys, because the service mounts it as DECIDE_KJBOX_SECRET.
+# Until the value is set on the API, the partner routes answer 503.
+decide_kjbox_secret = gcp.secretmanager.Secret(
+    "decide-kjbox-secret",
+    secret_id="decide-kjbox-secret",
+    project=project,
+    replication={"auto": {}},
+    opts=pulumi.ResourceOptions(protect=True),
+)
+
 # Backend API service
 cloud_run_service = gcp.cloudrunv2.Service(
     "karaoke-decide-api",
@@ -333,6 +345,15 @@ cloud_run_service = gcp.cloudrunv2.Service(
                             }
                         },
                     },
+                    {
+                        "name": "DECIDE_KJBOX_SECRET",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "decide-kjbox-secret",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {
@@ -401,6 +422,7 @@ REQUIRED_SECRETS = [
     "spotipy-client-secret",
     "lastfm-api-key",
     "postmark-server-token",
+    "decide-kjbox-secret",
 ]
 
 # Grant Cloud Run service account access to secrets
@@ -411,6 +433,7 @@ for secret_name in REQUIRED_SECRETS:
         secret_id=secret_name,
         role="roles/secretmanager.secretAccessor",
         member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+        opts=pulumi.ResourceOptions(depends_on=[decide_kjbox_secret]) if secret_name == "decide-kjbox-secret" else None,
     )
 
 # =============================================================================

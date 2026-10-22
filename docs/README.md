@@ -15,6 +15,7 @@ A karaoke song discovery app that helps users find songs to sing based on their 
 **Phase:** MLP COMPLETE + Enhanced Recommendations + My Data + Admin Dashboard + Audio Analysis ETL + Quiz Rework + Better Artist Selection + Collaborative Recs + **MBID-First Migration COMPLETE (Phases 1-7)** + MLHD+ Import ✅
 
 ### ✅ What's Working
+- **Karaoke log (2026-10, v0.19.0, mobile Phase 5 "Tonight"):** every song a user sings is logged in Firestore `karaoke_log`, from kjbox at Nomad nights (server to server, `X-Kjbox-Secret` = Secret Manager `decide-kjbox-secret`) or the mobile app at any other bar, with an optional post-song survey. Sung records count into `user_songs.times_sung` (unmatched songs into `user_karaoke_unresolved`, retried daily on read). "Love it" now marks the same row instead of overwriting it. See [API.md § Karaoke log](API.md#karaoke-log-apimykaraoke-log)
 - **Web on gen sign-in + recommendations v2 (2026-10, v0.18.0, Phase 3a):** the web app signs in with the Nomad (gen) email code (optional Google), so the web, mobile and gen share one account; guest sessions are removed from the web and a guest's data moves over via `POST /api/auth/claim-guest` on sign-in. The recommendations page now runs on `GET /api/my/recommendations/v2` (every filter, sort, library). Local dev: `scripts/local-stack.sh` runs the main API (:8030) + search (:8020) on gen's Firestore emulator, seeded through the test API (`/api/test/*`, `DECIDE_TEST_API=1`, never mounted in production). `make_it` no longer lists songs that already have a karaoke version (`loose_keys`; `has_karaoke` = availability OR in KaraokeNerds). See [TESTING.md § Playwright against the local stacks](TESTING.md#playwright-against-the-local-stacks)
 - **Recommendations v2 + catalog.db (2026-10, v0.17.0):** `GET /api/my/recommendations/v2` serves explained sections and filtered/sorted lists from `catalog.db` (built weekly by `mb-refresh`) + `availability.db`, loaded at startup behind `/api/ready` (2Gi, warm-instance uptime ping). Song feedback (hide/love), quiz progress GET and `library=` filters on search. First `catalog.db` build is manual (see [ARCHITECTURE.md § Recommendations catalog](ARCHITECTURE.md#recommendations-catalog-catalogdb-and-startup))
 - **Song search service for the mobile app (2026-10):** `karaoke-decide-search` Cloud Run service (scale-to-zero, `/api/search*` via the Worker) + daily `song-index-build` job (builds song_id/availability/offline indexes from gen's kn-data exports, eval-gated, rolls the service) + public offline-index download. Infra in Pulumi + CI with a parity test; first rollout needs the bootstrap in [ARCHITECTURE.md § Song search](ARCHITECTURE.md#song-search)
@@ -156,6 +157,9 @@ cd frontend && npm run dev
 - `POST /api/quiz/enjoy-singing` - Submit songs user enjoys singing with metadata
 - `GET /api/quiz/status` - Get quiz completion status
 - `GET /api/my/songs` - Get user's song library
+- `GET /api/my/karaoke-log` - The user's karaoke log (paginated; `since`, `night_id`)
+- `PUT /api/my/karaoke-log/{id}` / `DELETE /api/my/karaoke-log/{id}` - Log a song / save its survey / remove it
+- `PUT /api/partner/kjbox/karaoke-log/{id}` / `DELETE …` - kjbox history outbox (`X-Kjbox-Secret`)
 - `GET /api/known-songs` - Get user's manually-added known songs
 - `POST /api/known-songs` - Add a song to known songs
 - `POST /api/known-songs/bulk` - Bulk add songs to known songs

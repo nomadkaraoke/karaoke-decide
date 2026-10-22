@@ -290,6 +290,20 @@ def test_main_memory_cpu_and_scaling_match(pulumi_main: dict[str, Any], ci_main_
     assert str(template["max_instance_request_concurrency"]) == ci_main_deploy["--concurrency"] == "80"
 
 
+def test_main_secret_env_vars_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    # CI's --set-secrets replaces the service's secret envs on every deploy: both lists must agree.
+    secrets = _secret_envs(_container(pulumi_main))
+    assert secrets == _kv(str(ci_main_deploy["--set-secrets"]))
+    assert secrets["DECIDE_KJBOX_SECRET"] == "decide-kjbox-secret:latest"
+
+
+def test_kjbox_secret_is_managed_and_readable() -> None:
+    tree = _pulumi_tree()
+    secret = _kwargs(_resource_call(tree, "Secret", "decide-kjbox-secret"), _module_constants(tree))
+    assert secret["secret_id"] == "decide-kjbox-secret"
+    assert "decide-kjbox-secret" in _module_constants(tree)["REQUIRED_SECRETS"]
+
+
 def test_main_cpu_idle_and_boost_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
     resources = _container(pulumi_main)["resources"]
     assert resources["cpu_idle"] is True and ci_main_deploy.get("--cpu-throttling") is True

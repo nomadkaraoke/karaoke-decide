@@ -205,3 +205,72 @@ def test_seeded_profile_drives_v2(client: TestClient, fs: FakeFirestore, reader:
     body = r.json()
     assert body["has_profile"] is True
     assert "artists_you_love" in [s["id"] for s in body["sections"]]
+
+
+def test_read_karaoke_log(client: TestClient, fs: FakeFirestore) -> None:
+    user_id = client.post("/api/test/profile/seed", json={"email": EMAIL}).json()["user_id"]
+    log = fs.cols.setdefault("karaoke_log", {})
+    log[f"{user_id}:kj_1"] = {
+        "id": "kj_1",
+        "user_id": user_id,
+        "email_hash": EMAIL_HASH,
+        "source": "kjbox",
+        "state": "sung",
+        "artist": "Invented Band",
+        "title": "First Song",
+        "song_key": "invented band|first song",
+        "song_key_status": "resolved",
+        "updated_at": "2026-10-21T21:00:00+00:00",
+        "survey": {"feel": "great"},
+        "counted": {"collection": "user_songs", "doc_id": "x"},
+    }
+    log[f"{user_id}:app_2"] = {
+        "id": "app_2",
+        "user_id": user_id,
+        "source": "app",
+        "state": "sung",
+        "artist": "Other Act",
+        "title": "Second Song",
+        "song_key_status": "unresolved",
+        "deleted": True,
+        "updated_at": "2026-10-21T22:00:00+00:00",
+    }
+    log["someone_else:kj_1"] = {"id": "kj_1", "user_id": "someone_else", "source": "kjbox", "state": "sung"}
+    fs.cols.setdefault("user_songs", {})[f"{user_id}:sk:1"] = {
+        "user_id": user_id,
+        "song_key": "invented band|first song",
+        "artist": "Invented Band",
+        "title": "First Song",
+        "source": "karaoke_log",
+        "times_sung": 1,
+        "last_sung_at": "2026-10-21T21:00:00+00:00",
+    }
+    fs.cols.setdefault("user_karaoke_unresolved", {})[f"{user_id}:u1"] = {
+        "user_id": user_id,
+        "artist": "Other Act",
+        "title": "Second Song",
+        "times_sung": 1,
+    }
+
+    body = client.get("/api/test/karaoke-log", params={"email": EMAIL.upper()}).json()
+    assert body["user_id"] == user_id
+    assert [(e["id"], e["deleted"]) for e in body["entries"]] == [("app_2", True), ("kj_1", False)]
+    assert body["entries"][1]["survey"]["feel"] == "great"
+    assert body["sung"] == [
+        {
+            "song_key": "invented band|first song",
+            "artist": "Invented Band",
+            "title": "First Song",
+            "times_sung": 1,
+            "last_sung_at": "2026-10-21T21:00:00+00:00",
+            "source": "karaoke_log",
+        }
+    ]
+    assert body["unresolved"] == [{"artist": "Other Act", "title": "Second Song", "times_sung": 1}]
+
+    empty = client.get("/api/test/karaoke-log", params={"email": "nobody@example.com"}).json()
+    assert empty == {"user_id": None, "entries": [], "sung": [], "unresolved": []}
+
+    assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
+    assert list(fs.cols["karaoke_log"]) == ["someone_else:kj_1"]
+    assert not fs.cols["user_karaoke_unresolved"]
