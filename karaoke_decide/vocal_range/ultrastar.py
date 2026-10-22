@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
 MIDI_OFFSET = 60  # UltraStar pitch 0 = C4 = MIDI 60
 SINGABLE_KINDS = {":", "*"}  # F (freestyle), R (rap), G (rap-golden) are not pitched
 _VIDEO_ID_RE = re.compile(r"(?:^|,)a=([^,]+)")
+_YEAR_RE = re.compile(r"^[0-9]{4}$")
 _PART_RE = re.compile(r"^P\s*([12])\s*$")
 
 
@@ -41,6 +43,8 @@ class NoteStats:
     p90: float
     span: float  # high - low
     sung_beats: int  # total note length in beats
+    raw_min: float  # unweighted min MIDI of the kept notes
+    raw_max: float  # unweighted max MIDI of the kept notes
 
 
 def _decode(raw: bytes) -> str:
@@ -52,7 +56,7 @@ def _decode(raw: bytes) -> str:
         codec = {"utf8": "utf-8-sig", "utf-8": "utf-8-sig"}.get(name, name)
         try:
             return raw.decode(codec)
-        except (LookupError, UnicodeDecodeError):
+        except (LookupError, ValueError):
             pass
     try:
         return raw.decode("utf-8-sig")
@@ -62,13 +66,24 @@ def _decode(raw: bytes) -> str:
 
 def _to_float(value: str) -> float | None:
     try:
-        return float(value.strip().replace(",", "."))
+        result = float(value.strip().replace(",", "."))
     except ValueError:
         return None
+    return result if math.isfinite(result) else None
 
 
 def parse_ultrastar(raw: bytes) -> UltraStarSong | None:
-    """Parse an UltraStar file; None without ``#BPM``, artist/title or singable notes."""
+    """Parse an UltraStar file; None without ``#BPM``, artist/title or singable notes.
+
+    Never raises: malformed input of any kind yields None.
+    """
+    try:
+        return _parse(raw)
+    except Exception:
+        return None
+
+
+def _parse(raw: bytes) -> UltraStarSong | None:
     text = _decode(raw)
     headers: dict[str, str] = {}
     parts: dict[str, list[UltraStarNote]] = {}
@@ -124,7 +139,7 @@ def parse_ultrastar(raw: bytes) -> UltraStarSong | None:
         artist=artist,
         title=title,
         language=headers.get("LANGUAGE") or None,
-        year=int(year_text) if year_text.isdigit() else None,
+        year=int(year_text) if _YEAR_RE.match(year_text) else None,
         video_id=video.group(1) if video else None,
         bpm=bpm,
         gap_ms=_to_float(headers.get("GAP", "")) or 0.0,
@@ -164,4 +179,6 @@ def note_stats(notes: list[UltraStarNote]) -> NoteStats | None:
         p90=float(_weighted_percentile(pairs, 90, total)),
         span=float(high - low),
         sung_beats=total,
+        raw_min=float(pairs[0][0]),
+        raw_max=float(pairs[-1][0]),
     )

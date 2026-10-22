@@ -18,14 +18,21 @@ _MARGIN = 2
 _OCTAVE_ERROR_SEMITONES = 9.0
 
 
-def repair_octave(stats: NoteStats, lead_gender: Literal["male", "female"] | None) -> tuple[int, float]:
+def _normalise_gender(lead_gender: str | None) -> Literal["male", "female"] | None:
+    value = lead_gender.strip().lower() if isinstance(lead_gender, str) else None
+    return "male" if value == "male" else "female" if value == "female" else None
+
+
+def repair_octave(stats: NoteStats, lead_gender: str | None) -> tuple[int, float]:
     """Pick the octave shift (-24/-12/0/12/24) that best fits the lead's register.
 
     Minimises ``|p50 + s - centre(register)|``; ties go to 0. Returns ``(shift,
     octave_confidence)``: 0.9 if exactly one shift keeps ``[p10+s, p90+s]`` within
     the register +-2 semitones, 0.5 if several do, 0.3 if none; x0.6 when the
-    gender is unknown.
+    gender is unknown. ``lead_gender`` is case-insensitive; anything other than
+    male/female counts as unknown.
     """
+    lead_gender = _normalise_gender(lead_gender)
     low, high = REGISTERS[lead_gender]
     centre = (low + high) / 2
     # min() keeps the first minimum, so order candidates with 0 first for ties.
@@ -46,6 +53,8 @@ def shifted(stats: NoteStats, shift: int) -> NoteStats:
         p10=stats.p10 + shift,
         p50=stats.p50 + shift,
         p90=stats.p90 + shift,
+        raw_min=stats.raw_min + shift,
+        raw_max=stats.raw_max + shift,
     )
 
 

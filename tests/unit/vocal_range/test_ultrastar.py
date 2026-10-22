@@ -31,6 +31,7 @@ def test_solo_stats():
     assert st is not None
     assert (st.low, st.p10, st.p50, st.p90, st.high) == (60, 60, 64, 67, 67)
     assert st.span == 7 and st.sung_beats == 26
+    assert (st.raw_min, st.raw_max) == (60, 67)
 
 
 def test_weights_1_1_2_4():
@@ -46,6 +47,7 @@ def test_weights_1_1_2_4():
     assert st is not None
     assert (st.low, st.p10, st.p50, st.p90, st.high) == (60, 60, 64, 67, 67)
     assert st.span == 7 and st.sung_beats == 8
+    assert (st.raw_min, st.raw_max) == (60, 67)
 
 
 def test_note_stats_empty():
@@ -64,6 +66,7 @@ def test_freestyle_rap_golden():
     assert {n.kind for n in song.parts["all"]} == {":", "*"}
     st = note_stats(song.parts["all"])
     assert st is not None and st.high == 65 and st.sung_beats == 8
+    assert (st.raw_min, st.raw_max) == (60, 65)
 
 
 def test_relative_parses():
@@ -100,3 +103,21 @@ def test_comma_bpm_and_bom_encoding_tag():
     assert song is not None
     assert song.bpm == pytest.approx(90.5)
     assert song.title == "Bom Doo"
+
+
+BASE = b"#TITLE:T\n#ARTIST:A\n#BPM:100\n: 0 4 0 la\nE\n"
+
+
+def test_never_raises_on_malformed_input():
+    import random
+
+    song = parse_ultrastar(BASE.replace(b"#BPM:100", "#BPM:100\n#YEAR:\u00b2".encode()))
+    assert song is not None and song.year is None
+    assert parse_ultrastar(BASE.replace(b"100", b"fast")) is None
+    for bad in (b"nan", b"inf", b"-inf", b"1e999"):
+        assert parse_ultrastar(BASE.replace(b"100", bad)) is None
+    assert parse_ultrastar(BASE.replace(b"#BPM:100", b"#BPM:100\n#GAP:nan")) is not None
+    assert parse_ultrastar(b"#ENCODING:\x00bogus\n" + BASE) is not None
+    rng = random.Random(0)
+    for _ in range(200):
+        parse_ultrastar(bytes(rng.randrange(256) for _ in range(rng.randrange(0, 300))))
