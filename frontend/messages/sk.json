@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Žiadne obľúbené hity nezodpovedajú aktuálnym filtrom",
     "viewMySongs": "Zobraziť moje piesne",
     "syncMoreMusic": "Synchronizovať viac hudby",
-    "tryAgain": "Skúsiť znova"
+    "tryAgain": "Skúsiť znova",
+    "libraryAny": "Akákoľvek knižnica",
+    "libraryCommunity": "Komunitné verzie",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalóg KaraFun / Karaoke Version",
+    "libraryLabel": "Knižnica karaoke",
+    "loadMore": "Načítať ďalšie",
+    "loadingMore": "Načítava sa…",
+    "noMatchDescription": "Skús uvoľniť filter alebo dva a uvidíš viac skladieb.",
+    "noMatchTitle": "Týmto filtrom nezodpovedajú žiadne tipy",
+    "sortAz": "Od A po Z",
+    "sortBest": "Najlepšie pre teba",
+    "sortLabel": "Zoradiť podľa",
+    "sortNewest": "Najnovšie",
+    "sortOldest": "Najstaršie",
+    "sortPopular": "Najpopulárnejšie",
+    "sortShortest": "Najkratšie",
+    "warmingDescription": "Už to chystáme. Zvyčajne to trvá necelú minútu a pokus zopakujeme automaticky.",
+    "warmingTitle": "Pripravujeme tvoje tipy…"
   },
   "myData": {
     "title": "Moje dáta",
@@ -600,7 +618,9 @@
       "brands": "{count} značiek",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIKA"
+      "classic": "KLASIKA",
+      "community": "Komunita",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Túto pieseň rád spievam",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" neobsahuje žiadne skladby, ktoré by sme vedeli načítať. Skús iný playlist.",
     "errorTooManyImports": "Importuješ playlisty príliš rýchlo. Počkaj chvíľu a skús to znova.",
     "inputLabel": "Odkaz na playlist v YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Hit pre každého",
+      "decade_match": "Z dekády, ktorú máš rád",
+      "genre_match": "Sedí k tvojim žánrom",
+      "known_artist": "Od interpreta, ktorého máš rád",
+      "known_song": "Toto poznáš",
+      "make_it": "Vytvoriť",
+      "similar_artist": "Podobné ako {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Všetko, čo vyhovuje, v tebou zvolenom poradí",
+        "title": "Všetky tipy"
+      },
+      "artists_you_love": {
+        "reason": "Ďalšie skladby od interpretov, ktorých počúvaš",
+        "title": "Od tvojich obľúbených interpretov"
+      },
+      "because": {
+        "reason": "Skladby, ktoré zvyknú spievať fanúšikovia {artist}",
+        "title": "Pretože sa ti páči {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Skladby, ktoré rozospievajú celú miestnosť",
+        "title": "Hity pre každého"
+      },
+      "make_it": {
+        "reason": "Zatiaľ neexistuje karaoke verzia. Môžeme ju pre teba vytvoriť",
+        "title": "Vytvoriť"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verzie skladieb z tvojej knižnice",
+        "title": "Skladby, ktoré poznáš"
+      }
+    }
   }
 }

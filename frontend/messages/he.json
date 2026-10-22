@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "אין אהובי קהל שתואמים למסננים הנוכחיים",
     "viewMySongs": "צפה בשירים שלי",
     "syncMoreMusic": "סנכרן עוד מוזיקה",
-    "tryAgain": "נסה שוב"
+    "tryAgain": "נסה שוב",
+    "libraryAny": "כל ספרייה",
+    "libraryCommunity": "גרסאות קהילה",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "קטלוג KaraFun / Karaoke Version",
+    "libraryLabel": "ספריית קריוקי",
+    "loadMore": "טעינת עוד",
+    "loadingMore": "בטעינה…",
+    "noMatchDescription": "כדאי לנסות להסיר סינון או שניים כדי לראות עוד שירים.",
+    "noMatchTitle": "אין שירים שמתאימים לסינונים האלה",
+    "sortAz": "א׳ עד ת׳",
+    "sortBest": "הכי מתאים לך",
+    "sortLabel": "מיון לפי",
+    "sortNewest": "החדש ביותר",
+    "sortOldest": "הישן ביותר",
+    "sortPopular": "הכי פופולרי",
+    "sortShortest": "הקצר ביותר",
+    "warmingDescription": "אנחנו מחממים מנועים. זה בדרך כלל לוקח פחות מדקה, וננסה שוב באופן אוטומטי.",
+    "warmingTitle": "מכינים לך את השירים…"
   },
   "myData": {
     "title": "הנתונים שלי",
@@ -600,7 +618,9 @@
       "brands": "{count} מותגים",
       "pop": "פופ: {value}",
       "explicit": "E",
-      "classic": "קלאסיקה"
+      "classic": "קלאסיקה",
+      "community": "קהילה",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "אני נהנה לשיר את זה",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "ב-\"{title}\" אין שירים שהצלחנו לקרוא. כדאי לנסות פלייליסט אחר.",
     "errorTooManyImports": "ייבוא הפלייליסטים מתבצע מהר מדי. נא להמתין דקה ולנסות שוב.",
     "inputLabel": "קישור לפלייליסט ב-YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "להיט בטוח",
+      "decade_match": "מעשור שאהבת",
+      "genre_match": "מתאים לסגנונות שלך",
+      "known_artist": "של אמן שאהבת",
+      "known_song": "שיר מוכר",
+      "make_it": "הכנת שיר",
+      "similar_artist": "בסגנון {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "כל מה שמתאים, לפי סדר המיון שבחרת",
+        "title": "כל ההמלצות"
+      },
+      "artists_you_love": {
+        "reason": "עוד שירים של אמנים ששמעת",
+        "title": "מאמנים שאהבת"
+      },
+      "because": {
+        "reason": "שירים שמעריצים של {artist} אוהבים לשיר",
+        "title": "בגלל שאהבת את {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "שירים שיגרמו לכולם לשיר ביחד",
+        "title": "להיטים בטוחים"
+      },
+      "make_it": {
+        "reason": "עדיין אין גרסת קריוקי. נוכל להכין אחת במיוחד בשבילך",
+        "title": "הכנת שיר"
+      },
+      "songs_you_know": {
+        "reason": "גרסאות קריוקי לשירים מהספרייה שלך",
+        "title": "שירים מוכרים"
+      }
+    }
   }
 }

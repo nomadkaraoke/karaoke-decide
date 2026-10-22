@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Geen publiekslievelingen komen overeen met de huidige filters",
     "viewMySongs": "Mijn nummers bekijken",
     "syncMoreMusic": "Meer muziek synchroniseren",
-    "tryAgain": "Probeer opnieuw"
+    "tryAgain": "Probeer opnieuw",
+    "libraryAny": "Elke bibliotheek",
+    "libraryCommunity": "Community-versies",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun- / Karaoke Version-catalogus",
+    "libraryLabel": "Karaokebibliotheek",
+    "loadMore": "Meer laden",
+    "loadingMore": "Laden…",
+    "noMatchDescription": "Probeer een of twee filters te versoepelen om meer nummers te zien.",
+    "noMatchTitle": "Geen suggesties die aan deze filters voldoen",
+    "sortAz": "A tot Z",
+    "sortBest": "Beste match",
+    "sortLabel": "Sorteren op",
+    "sortNewest": "Nieuwste",
+    "sortOldest": "Oudste",
+    "sortPopular": "Populairst",
+    "sortShortest": "Kortste",
+    "warmingDescription": "We warmen de boel even op. Dit duurt meestal minder dan een minuut en we proberen het automatisch opnieuw.",
+    "warmingTitle": "Je suggesties worden klaargezet…"
   },
   "myData": {
     "title": "Mijn gegevens",
@@ -600,7 +618,9 @@
       "brands": "{count} merken",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIEKER"
+      "classic": "KLASSIEKER",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Ik zing dit graag",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" bevat geen nummers die we konden lezen. Probeer een andere afspeellijst.",
     "errorTooManyImports": "Je importeert afspeellijsten te snel. Wacht een minuutje en probeer het opnieuw.",
     "inputLabel": "Link naar YouTube Music-afspeellijst"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publieksfavoriet",
+      "decade_match": "Uit een decennium dat je leuk vindt",
+      "genre_match": "Past bij je genres",
+      "known_artist": "Van een artiest die je geweldig vindt",
+      "known_song": "Dit nummer ken je",
+      "make_it": "Maak 'm zelf",
+      "similar_artist": "Vergelijkbaar met {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Alles wat overeenkomt, in de door jou gekozen volgorde",
+        "title": "Alle suggesties"
+      },
+      "artists_you_love": {
+        "reason": "Meer nummers van artiesten waar je naar luistert",
+        "title": "Van artiesten die je geweldig vindt"
+      },
+      "because": {
+        "reason": "Nummers die fans van {artist} vaak zingen",
+        "title": "Omdat je van {artist} houdt"
+      },
+      "crowd_pleasers": {
+        "reason": "Nummers waarmee je de hele zaal mee laat zingen",
+        "title": "Publieksfavorieten"
+      },
+      "make_it": {
+        "reason": "Nog geen karaokeversie beschikbaar. We kunnen er een voor je maken",
+        "title": "Maak 'm zelf"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversies van nummers uit je bibliotheek",
+        "title": "Nummers die je kent"
+      }
+    }
   }
 }

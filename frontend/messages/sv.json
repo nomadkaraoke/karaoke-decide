@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Inga publikfavoriter matchar nuvarande filter",
     "viewMySongs": "Visa mina låtar",
     "syncMoreMusic": "Synka mer musik",
-    "tryAgain": "Försök igen"
+    "tryAgain": "Försök igen",
+    "libraryAny": "Alla bibliotek",
+    "libraryCommunity": "Community-versioner",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalogen för KaraFun / Karaoke Version",
+    "libraryLabel": "Karaokebibliotek",
+    "loadMore": "Ladda fler",
+    "loadingMore": "Laddar…",
+    "noMatchDescription": "Prova att lätta på något filter för att se fler låtar.",
+    "noMatchTitle": "Inga låtar matchar dessa filter",
+    "sortAz": "A till Ö",
+    "sortBest": "Bäst för dig",
+    "sortLabel": "Sortera efter",
+    "sortNewest": "Nyast",
+    "sortOldest": "Äldst",
+    "sortPopular": "Populärast",
+    "sortShortest": "Kortast",
+    "warmingDescription": "Vi värmer upp systemet. Det tar oftast under en minut, och vi försöker igen automatiskt.",
+    "warmingTitle": "Förbereder dina förslag…"
   },
   "myData": {
     "title": "Min data",
@@ -600,7 +618,9 @@
       "brands": "{count} märken",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIKER"
+      "classic": "KLASSIKER",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Jag gillar att sjunga den här",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" har inga låtar som vi kunde läsa in. Testa en annan spellista.",
     "errorTooManyImports": "Du importerar spellistor för snabbt. Vänta en minut och försök igen.",
     "inputLabel": "Länk till YouTube Music-spellista"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publikfavorit",
+      "decade_match": "Från ett årtionde du gillar",
+      "genre_match": "Matchar dina genrer",
+      "known_artist": "Från en artist du älskar",
+      "known_song": "Du kan den här",
+      "make_it": "Skapa den",
+      "similar_artist": "Liknar {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Allt som matchar, i den ordning du valt",
+        "title": "Alla förslag"
+      },
+      "artists_you_love": {
+        "reason": "Fler låtar av artister du lyssnar på",
+        "title": "Från artister du älskar"
+      },
+      "because": {
+        "reason": "Låtar som fans av {artist} brukar sjunga",
+        "title": "Eftersom du gillar {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Låtar som får hela rummet att sjunga med",
+        "title": "Publikfavoriter"
+      },
+      "make_it": {
+        "reason": "Ingen karaokeversion än. Vi kan skapa en åt dig",
+        "title": "Skapa den"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversioner av låtar från ditt bibliotek",
+        "title": "Låtar du känner till"
+      }
+    }
   }
 }

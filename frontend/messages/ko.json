@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "현재 필터와 일치하는 분위기 띄우는 곡이 없습니다",
     "viewMySongs": "내 노래 보기",
     "syncMoreMusic": "더 많은 음악 동기화",
-    "tryAgain": "다시 시도"
+    "tryAgain": "다시 시도",
+    "libraryAny": "모든 라이브러리",
+    "libraryCommunity": "커뮤니티 버전",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version 카탈로그",
+    "libraryLabel": "노래방 라이브러리",
+    "loadMore": "더 보기",
+    "loadingMore": "불러오는 중…",
+    "noMatchDescription": "필터를 한두 개 조정하여 더 많은 곡을 확인해 보세요.",
+    "noMatchTitle": "필터와 일치하는 추천 곡이 없습니다",
+    "sortAz": "가나다순",
+    "sortBest": "맞춤 추천순",
+    "sortLabel": "정렬 기준",
+    "sortNewest": "최신순",
+    "sortOldest": "오래된순",
+    "sortPopular": "인기순",
+    "sortShortest": "짧은 곡 순",
+    "warmingDescription": "시스템을 준비 중입니다. 보통 1분 이내로 소요되며, 자동으로 다시 시도합니다.",
+    "warmingTitle": "추천 곡을 준비하는 중…"
   },
   "myData": {
     "title": "내 데이터",
@@ -600,7 +618,9 @@
       "brands": "{count}개의 브랜드",
       "pop": "인기도: {value}",
       "explicit": "E",
-      "classic": "클래식"
+      "classic": "클래식",
+      "community": "커뮤니티",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "이 노래 부르는 것을 좋아해요",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\"에서 불러올 수 있는 곡이 없습니다. 다른 재생목록으로 시도해 보세요.",
     "errorTooManyImports": "재생목록을 너무 빠르게 가져오고 있어요. 잠시 후 다시 시도해 주세요.",
     "inputLabel": "YouTube Music 재생목록 링크"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "분위기 띄우기 좋은 곡",
+      "decade_match": "선호하는 시대의 곡",
+      "genre_match": "취향에 맞는 장르",
+      "known_artist": "좋아하는 아티스트의 곡",
+      "known_song": "내가 아는 곡",
+      "make_it": "직접 만들기",
+      "similar_artist": "{artist} 느낌의 곡"
+    },
+    "section": {
+      "all": {
+        "reason": "선택한 정렬 순서대로 보여주는 모든 곡",
+        "title": "전체 추천 곡"
+      },
+      "artists_you_love": {
+        "reason": "자주 듣는 아티스트의 다른 곡",
+        "title": "좋아하는 아티스트의 곡"
+      },
+      "because": {
+        "reason": "{artist} 팬들이 즐겨 부르는 곡",
+        "title": "{artist} 음악을 좋아하셔서 추천해요"
+      },
+      "crowd_pleasers": {
+        "reason": "다 함께 따라 부르기 좋은 곡",
+        "title": "분위기 띄우기 좋은 곡"
+      },
+      "make_it": {
+        "reason": "아직 노래방 버전이 없는 곡이에요. 직접 제작해 드릴 수 있어요",
+        "title": "직접 만들기"
+      },
+      "songs_you_know": {
+        "reason": "내 라이브러리에 있는 곡들의 노래방 버전",
+        "title": "내가 아는 곡"
+      }
+    }
   }
 }

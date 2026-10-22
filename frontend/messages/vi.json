@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Không có bài hát được yêu thích nào khớp với bộ lọc hiện tại",
     "viewMySongs": "Xem bài hát của tôi",
     "syncMoreMusic": "Đồng bộ thêm nhạc",
-    "tryAgain": "Thử lại"
+    "tryAgain": "Thử lại",
+    "libraryAny": "Mọi thư viện",
+    "libraryCommunity": "Phiên bản cộng đồng",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Danh mục KaraFun / Karaoke Version",
+    "libraryLabel": "Thư viện karaoke",
+    "loadMore": "Tải thêm",
+    "loadingMore": "Đang tải…",
+    "noMatchDescription": "Hãy thử bỏ bớt một hoặc hai bộ lọc để xem thêm bài hát.",
+    "noMatchTitle": "Không có gợi ý nào khớp với các bộ lọc này",
+    "sortAz": "A đến Z",
+    "sortBest": "Phù hợp nhất với bạn",
+    "sortLabel": "Sắp xếp theo",
+    "sortNewest": "Mới nhất",
+    "sortOldest": "Cũ nhất",
+    "sortPopular": "Phổ biến nhất",
+    "sortShortest": "Ngắn nhất",
+    "warmingDescription": "Chúng tôi đang khởi động hệ thống. Quá trình này thường mất chưa tới một phút và hệ thống sẽ tự động thử lại.",
+    "warmingTitle": "Đang chuẩn bị gợi ý cho bạn…"
   },
   "myData": {
     "title": "Dữ liệu của tôi",
@@ -600,7 +618,9 @@
       "brands": "{count} thương hiệu",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KINH ĐIỂN"
+      "classic": "KINH ĐIỂN",
+      "community": "Cộng đồng",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Tôi thích hát bài này",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" không có bài hát nào đọc được. Bạn hãy thử một danh sách phát khác nhé.",
     "errorTooManyImports": "Bạn đang nhập danh sách phát quá nhanh. Vui lòng đợi một phút rồi thử lại nhé.",
     "inputLabel": "Liên kết danh sách phát YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Khuấy động không khí",
+      "decade_match": "Từ thập niên bạn thích",
+      "genre_match": "Hợp thể loại nhạc bạn thích",
+      "known_artist": "Từ nghệ sĩ bạn yêu thích",
+      "known_song": "Bài quen thuộc với bạn",
+      "make_it": "Tạo bản karaoke",
+      "similar_artist": "Tương tự {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tất cả bài hát phù hợp, theo thứ tự bạn đã chọn",
+        "title": "Tất cả gợi ý"
+      },
+      "artists_you_love": {
+        "reason": "Thêm bài hát từ các nghệ sĩ bạn hay nghe",
+        "title": "Từ nghệ sĩ bạn yêu thích"
+      },
+      "because": {
+        "reason": "Các bài hát mà người hâm mộ {artist} hay hát",
+        "title": "Vì bạn thích {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Những bài hát khiến cả phòng cùng hòa giọng",
+        "title": "Khuấy động không khí"
+      },
+      "make_it": {
+        "reason": "Chưa có bản karaoke. Chúng tôi có thể tạo một bản cho bạn",
+        "title": "Tạo bản karaoke"
+      },
+      "songs_you_know": {
+        "reason": "Bản karaoke của các bài hát trong thư viện của bạn",
+        "title": "Bài hát bạn đã biết"
+      }
+    }
   }
 }

@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "現在の絞り込み条件に一致する定番曲はありません",
     "viewMySongs": "自分の曲を見る",
     "syncMoreMusic": "さらに音楽を同期",
-    "tryAgain": "もう一度試す"
+    "tryAgain": "もう一度試す",
+    "libraryAny": "すべてのライブラリ",
+    "libraryCommunity": "コミュニティ版",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version カタログ",
+    "libraryLabel": "カラオケライブラリ",
+    "loadMore": "さらに読み込む",
+    "loadingMore": "読み込み中…",
+    "noMatchDescription": "フィルターを1〜2個緩めて、他の曲を探してみてください。",
+    "noMatchTitle": "条件に一致するおすすめ曲が見つかりません",
+    "sortAz": "五十音・アルファベット順",
+    "sortBest": "おすすめ順",
+    "sortLabel": "並び替え",
+    "sortNewest": "新しい順",
+    "sortOldest": "古い順",
+    "sortPopular": "人気順",
+    "sortShortest": "曲が短い順",
+    "warmingDescription": "準備を進めています。通常1分以内に完了し、自動的に再試行されます。",
+    "warmingTitle": "おすすめ曲を準備中…"
   },
   "myData": {
     "title": "マイデータ",
@@ -600,7 +618,9 @@
       "brands": "{count}種類の音源",
       "pop": "人気度: {value}",
       "explicit": "E",
-      "classic": "名曲"
+      "classic": "名曲",
+      "community": "コミュニティ",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "この曲を歌うのが好き",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "「{title}」から読み込める曲が見つかりませんでした。別のプレイリストをお試しください。",
     "errorTooManyImports": "プレイリストのインポートの間隔が短すぎます。少し時間をおいてからもう一度お試しください。",
     "inputLabel": "YouTube Musicプレイリストのリンク"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "みんなで盛り上がる曲",
+      "decade_match": "お好みの年代の曲",
+      "genre_match": "お好みのジャンルに一致",
+      "known_artist": "大好きなアーティストの曲",
+      "known_song": "おなじみの曲",
+      "make_it": "カラオケを作成",
+      "similar_artist": "{artist} が好きな方へ"
+    },
+    "section": {
+      "all": {
+        "reason": "条件に一致するすべての曲（選択した並び順）",
+        "title": "すべてのおすすめ"
+      },
+      "artists_you_love": {
+        "reason": "よく聴くアーティストの他の曲",
+        "title": "大好きなアーティストから"
+      },
+      "because": {
+        "reason": "{artist} のファンがよく歌う曲",
+        "title": "{artist} が好きなあなたへ"
+      },
+      "crowd_pleasers": {
+        "reason": "会場全体で大合唱できる盛り上げ曲",
+        "title": "定番の盛り上げソング"
+      },
+      "make_it": {
+        "reason": "まだカラオケ版がありません。新しく作成できます",
+        "title": "カラオケを作成"
+      },
+      "songs_you_know": {
+        "reason": "あなたのライブラリにある曲のカラオケ版",
+        "title": "おなじみの曲"
+      }
+    }
   }
 }

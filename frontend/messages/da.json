@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Ingen publikumsfavoritter matcher de aktuelle filtre",
     "viewMySongs": "Se mine sange",
     "syncMoreMusic": "Synkroniser mere musik",
-    "tryAgain": "Prøv igen"
+    "tryAgain": "Prøv igen",
+    "libraryAny": "Alle biblioteker",
+    "libraryCommunity": "Fællesskabsversioner",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version-katalog",
+    "libraryLabel": "Karaokebibliotek",
+    "loadMore": "Indlæs flere",
+    "loadingMore": "Indlæser…",
+    "noMatchDescription": "Prøv at fjerne et filter eller to for at se flere sange.",
+    "noMatchTitle": "Ingen anbefalinger matcher disse filtre",
+    "sortAz": "A til Å",
+    "sortBest": "Bedst til dig",
+    "sortLabel": "Sortér efter",
+    "sortNewest": "Nyeste",
+    "sortOldest": "Ældste",
+    "sortPopular": "Mest populære",
+    "sortShortest": "Korteste",
+    "warmingDescription": "Vi varmer op. Det tager normalt under et minut, og vi prøver automatisk igen.",
+    "warmingTitle": "Gør dine anbefalinger klar…"
   },
   "myData": {
     "title": "Mine data",
@@ -600,7 +618,9 @@
       "brands": "{count} mærker",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSISK"
+      "classic": "KLASSISK",
+      "community": "Fællesskab",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Jeg nyder at synge denne",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" indeholder ingen sange, vi kunne indlæse. Prøv en anden spilleliste.",
     "errorTooManyImports": "Du importerer spillelister for hurtigt. Vent venligst et minut, og prøv igen.",
     "inputLabel": "Link til YouTube Music-spilleliste"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publikumsfavorit",
+      "decade_match": "Fra et årti, du kan lide",
+      "genre_match": "Matcher dine genrer",
+      "known_artist": "Fra en kunstner, du elsker",
+      "known_song": "Den kender du",
+      "make_it": "Lav den",
+      "similar_artist": "Minder om {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Alt, der matcher, i din valgte rækkefølge",
+        "title": "Alle anbefalinger"
+      },
+      "artists_you_love": {
+        "reason": "Flere sange af kunstnere, du lytter til",
+        "title": "Fra kunstnere, du elsker"
+      },
+      "because": {
+        "reason": "Sange, som fans af {artist} ofte synger",
+        "title": "Fordi du kan lide {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Sange, der får alle i rummet til at synge med",
+        "title": "Publikumsfavoritter"
+      },
+      "make_it": {
+        "reason": "Der findes endnu ingen karaokeversion. Vi kan lave en til dig",
+        "title": "Lav den"
+      },
+      "songs_you_know": {
+        "reason": "Karaokeversioner af sange fra dit bibliotek",
+        "title": "Sange, du kender"
+      }
+    }
   }
 }

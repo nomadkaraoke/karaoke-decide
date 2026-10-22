@@ -4,6 +4,7 @@
 
 import { API_BASE_URL, AUTH_TOKEN_KEY } from "./constants";
 import { routing } from "@/i18n/routing";
+import type { RecV2Params, RecommendationsV2 } from "@/types";
 
 export function getCurrentLocale(): string {
   if (typeof window === 'undefined') return 'en';
@@ -467,6 +468,19 @@ export const api = {
           explicit: boolean;
         }>;
       }>(`/api/my/recommendations?${params.toString()}`);
+    },
+
+    getRecommendationsV2: (params: RecV2Params = {}) => {
+      const qs = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) value.forEach((v) => qs.append(key, v));
+        else qs.append(key, String(value));
+      }
+      const query = qs.toString();
+      return apiRequest<RecommendationsV2>(
+        `/api/my/recommendations/v2${query ? `?${query}` : ""}`
+      );
     },
 
     getCategorizedRecommendations: (filters?: {

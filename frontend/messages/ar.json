@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "لا توجد أغاني جماهيرية تطابق عوامل التصفية الحالية",
     "viewMySongs": "عرض أغنياتي",
     "syncMoreMusic": "مزامنة المزيد من الموسيقى",
-    "tryAgain": "حاول مرة أخرى"
+    "tryAgain": "حاول مرة أخرى",
+    "libraryAny": "أي مكتبة",
+    "libraryCommunity": "إصدارات المجتمع",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "دليل KaraFun / Karaoke Version",
+    "libraryLabel": "مكتبة الكاريوكي",
+    "loadMore": "عرض المزيد",
+    "loadingMore": "جارٍ التحميل…",
+    "noMatchDescription": "جرّب تخفيف فلتر أو اثنين لرؤية المزيد من الأغاني.",
+    "noMatchTitle": "لا توجد اختيارات تطابق هذه الفلاتر",
+    "sortAz": "أبجديًا (أ - ي)",
+    "sortBest": "الأفضل لك",
+    "sortLabel": "ترتيب حسب",
+    "sortNewest": "الأحدث",
+    "sortOldest": "الأقدم",
+    "sortPopular": "الأكثر رواجًا",
+    "sortShortest": "الأقصر مدة",
+    "warmingDescription": "نعمل على تجهيز كل شيء. يستغرق هذا عادةً أقل من دقيقة، وسنعاود المحاولة تلقائيًا.",
+    "warmingTitle": "جارٍ تحضير اختياراتك…"
   },
   "myData": {
     "title": "بياناتي",
@@ -600,7 +618,9 @@
       "brands": "{count} علامات تجارية",
       "pop": "بوب: {value}",
       "explicit": "E",
-      "classic": "كلاسيكي"
+      "classic": "كلاسيكي",
+      "community": "المجتمع",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "أستمتع بغناء هذه",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "لا تحتوي \"{title}\" على أي أغانٍ يمكننا قراءتها. يُرجى تجربة قائمة تشغيل أخرى.",
     "errorTooManyImports": "أنت تستورد قوائم التشغيل بسرعة كبيرة. يُرجى الانتظار لمدة دقيقة والمحاولة مرة أخرى.",
     "inputLabel": "رابط قائمة تشغيل YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "المفضلة لدى الجميع",
+      "decade_match": "من حقبة تفضلها",
+      "genre_match": "تناسب الأنواع المفضلة لديك",
+      "known_artist": "لفنان تحبه",
+      "known_song": "أنت تعرف هذه الأغنية",
+      "make_it": "أنشئها",
+      "similar_artist": "شبيه بأعمال {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "كل ما يتطابق، بالترتيب الذي اخترته",
+        "title": "جميع الاختيارات"
+      },
+      "artists_you_love": {
+        "reason": "المزيد من الأغاني لفنانين تستمع إليهم",
+        "title": "لفنانين تحبهم"
+      },
+      "because": {
+        "reason": "أغانٍ يميل عشاق {artist} إلى غنائها",
+        "title": "لأنك تحب {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "أغانٍ تجعل الجميع يشاركون في الغناء",
+        "title": "المفضلة لدى الجماهير"
+      },
+      "make_it": {
+        "reason": "لا تتوفر نسخة كاريوكي بعد. يمكننا إنشاء واحدة لك",
+        "title": "أنشئها"
+      },
+      "songs_you_know": {
+        "reason": "نسخ كاريوكي لأغانٍ من مكتبتك",
+        "title": "أغانٍ تعرفها"
+      }
+    }
   }
 }

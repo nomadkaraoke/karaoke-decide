@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Nincsenek a jelenlegi szűrőknek megfelelő közönségkedvencek",
     "viewMySongs": "Dalaim megtekintése",
     "syncMoreMusic": "Több zene szinkronizálása",
-    "tryAgain": "Próbáld újra"
+    "tryAgain": "Próbáld újra",
+    "libraryAny": "Bármelyik gyűjtemény",
+    "libraryCommunity": "Közösségi verziók",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version katalógus",
+    "libraryLabel": "Karaokegyűjtemény",
+    "loadMore": "Továbbiak betöltése",
+    "loadingMore": "Betöltés…",
+    "noMatchDescription": "Próbálj meg lazítani a szűrőkön, hogy több dalt láss.",
+    "noMatchTitle": "Nincs a szűrőknek megfelelő találat",
+    "sortAz": "A–Z",
+    "sortBest": "Neked ajánlott",
+    "sortLabel": "Rendezés",
+    "sortNewest": "Legújabb",
+    "sortOldest": "Legrégebbi",
+    "sortPopular": "Legnépszerűbb",
+    "sortShortest": "Legrövidebb",
+    "warmingDescription": "Épp bemelegítjük a rendszert. Ez általában kevesebb mint egy percet vesz igénybe, és automatikusan újrapróbáljuk.",
+    "warmingTitle": "Ajánlataid előkészítése…"
   },
   "myData": {
     "title": "Adataim",
@@ -600,7 +618,9 @@
       "brands": "{count} márka",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSZIKUS"
+      "classic": "KLASSZIKUS",
+      "community": "Közösségi",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Ezt szeretem énekelni",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "A(z) „{title}” lejátszási listában nem találtunk beolvasható dalt. Próbálkozz egy másik lejátszási listával.",
     "errorTooManyImports": "Túl gyorsan importálsz lejátszási listákat. Kérlek, várj egy percet, és próbáld újra.",
     "inputLabel": "YouTube Music lejátszási lista linkje"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Közönségkedvenc",
+      "decade_match": "Egy olyan évtizedből, amit kedvelsz",
+      "genre_match": "Illik a stílusaidhoz",
+      "known_artist": "Egy olyan előadótól, akit imádsz",
+      "known_song": "Ezt ismered",
+      "make_it": "Készítsd el",
+      "similar_artist": "Hasonló, mint {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Minden találat a kiválasztott sorrendben",
+        "title": "Összes ajánlat"
+      },
+      "artists_you_love": {
+        "reason": "Még több dal olyan előadóktól, akiket szívesen hallgatsz",
+        "title": "Kedvenc előadóidtól"
+      },
+      "because": {
+        "reason": "Dalok, amiket {artist} rajongói is szívesen énekelnek",
+        "title": "Mert kedveled: {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Dalok, amiktől az egész terem énekelni kezd",
+        "title": "Közönségkedvencek"
+      },
+      "make_it": {
+        "reason": "Még nincs belőle karaoke verzió. Szívesen elkészítjük neked!",
+        "title": "Készítsd el"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verziók a gyűjteményedben található dalokból",
+        "title": "Dalok, amiket ismersz"
+      }
+    }
   }
 }

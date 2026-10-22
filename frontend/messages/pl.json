@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Żadne hity nie pasują do obecnych filtrów",
     "viewMySongs": "Zobacz moje piosenki",
     "syncMoreMusic": "Zsynchronizuj więcej muzyki",
-    "tryAgain": "Spróbuj ponownie"
+    "tryAgain": "Spróbuj ponownie",
+    "libraryAny": "Dowolna biblioteka",
+    "libraryCommunity": "Wersje społeczności",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalog KaraFun / Karaoke Version",
+    "libraryLabel": "Biblioteka karaoke",
+    "loadMore": "Załaduj więcej",
+    "loadingMore": "Ładowanie…",
+    "noMatchDescription": "Spróbuj zmienić lub wyczyścić filtry, aby zobaczyć więcej utworów.",
+    "noMatchTitle": "Brak propozycji pasujących do filtrów",
+    "sortAz": "Od A do Z",
+    "sortBest": "Najlepsze dla Ciebie",
+    "sortLabel": "Sortuj według",
+    "sortNewest": "Najnowsze",
+    "sortOldest": "Najstarsze",
+    "sortPopular": "Najpopularniejsze",
+    "sortShortest": "Najkrótsze",
+    "warmingDescription": "Wszystko przygotowujemy. Zwykle zajmuje to mniej niż minutę — ponowimy próbę automatycznie.",
+    "warmingTitle": "Przygotowujemy Twoje propozycje…"
   },
   "myData": {
     "title": "Moje dane",
@@ -600,7 +618,9 @@
       "brands": "{count} {count, plural, one {marka} few {marki} many {marek} other {marek}}",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASYK"
+      "classic": "KLASYK",
+      "community": "Społeczność",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Lubię to śpiewać",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" nie zawiera utworów, które moglibyśmy odczytać. Wypróbuj inną playlistę.",
     "errorTooManyImports": "Zbyt szybko importujesz playlisty. Poczekaj chwilę i spróbuj ponownie.",
     "inputLabel": "Link do playlisty YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Hit imprezy",
+      "decade_match": "Z dekady, którą lubisz",
+      "genre_match": "Pasuje do Twoich gatunków",
+      "known_artist": "Od Twojego ulubionego wykonawcy",
+      "known_song": "Znasz to",
+      "make_it": "Stwórz wersję",
+      "similar_artist": "W stylu {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Wszystko, co pasuje, w wybranej przez Ciebie kolejności",
+        "title": "Wszystkie propozycje"
+      },
+      "artists_you_love": {
+        "reason": "Więcej utworów wykonawców, których słuchasz",
+        "title": "Od Twoich ulubionych wykonawców"
+      },
+      "because": {
+        "reason": "Piosenki, które chętnie śpiewają fani wykonawcy {artist}",
+        "title": "Bo lubisz: {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Piosenki, które rozśpiewają całą salę",
+        "title": "Hity imprezy"
+      },
+      "make_it": {
+        "reason": "Nie ma jeszcze wersji karaoke. Możemy ją dla Ciebie stworzyć",
+        "title": "Stwórz wersję"
+      },
+      "songs_you_know": {
+        "reason": "Wersje karaoke utworów z Twojej biblioteki",
+        "title": "Piosenki, które znasz"
+      }
+    }
   }
 }

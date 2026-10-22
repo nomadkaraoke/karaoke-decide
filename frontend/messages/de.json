@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Keine Publikumslieblinge entsprechen den aktuellen Filtern",
     "viewMySongs": "Meine Songs ansehen",
     "syncMoreMusic": "Mehr Musik synchronisieren",
-    "tryAgain": "Erneut versuchen"
+    "tryAgain": "Erneut versuchen",
+    "libraryAny": "Beliebige Bibliothek",
+    "libraryCommunity": "Community-Versionen",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun- / Karaoke Version-Katalog",
+    "libraryLabel": "Karaoke-Bibliothek",
+    "loadMore": "Mehr laden",
+    "loadingMore": "Wird geladen…",
+    "noMatchDescription": "Versuche, ein oder zwei Filter zurückzusetzen, um mehr Songs zu sehen.",
+    "noMatchTitle": "Keine Treffer für diese Filter",
+    "sortAz": "A bis Z",
+    "sortBest": "Das Beste für dich",
+    "sortLabel": "Sortieren nach",
+    "sortNewest": "Neueste",
+    "sortOldest": "Älteste",
+    "sortPopular": "Beliebteste",
+    "sortShortest": "Kürzeste",
+    "warmingDescription": "Wir bringen alles in Schwung. Das dauert normalerweise weniger als eine Minute, und wir versuchen es automatisch erneut.",
+    "warmingTitle": "Deine Auswahl wird vorbereitet…"
   },
   "myData": {
     "title": "Meine Daten",
@@ -600,7 +618,9 @@
       "brands": "{count} Marken",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASSIKER"
+      "classic": "KLASSIKER",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Ich singe das gerne",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" enthält keine Songs, die wir lesen konnten. Versuche es mit einer anderen Playlist.",
     "errorTooManyImports": "Du importierst Playlists zu schnell. Bitte warte eine Minute und versuche es erneut.",
     "inputLabel": "Link zur YouTube Music-Playlist"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Publikumsliebling",
+      "decade_match": "Aus einem Jahrzehnt, das du magst",
+      "genre_match": "Passt zu deinen Genres",
+      "known_artist": "Von Interpreten, die du liebst",
+      "known_song": "Kennst du schon",
+      "make_it": "Erstelle es",
+      "similar_artist": "Ähnlich wie {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Alles, was passt, in der von dir gewählten Reihenfolge",
+        "title": "Alle Empfehlungen"
+      },
+      "artists_you_love": {
+        "reason": "Weitere Songs von Interpreten, die du gerne hörst",
+        "title": "Von Interpreten, die du liebst"
+      },
+      "because": {
+        "reason": "Songs, die Fans von {artist} gerne singen",
+        "title": "Weil du {artist} magst"
+      },
+      "crowd_pleasers": {
+        "reason": "Songs, die den Raum zum Mitsingen bringen",
+        "title": "Publikumslieblinge"
+      },
+      "make_it": {
+        "reason": "Noch keine Karaoke-Version vorhanden. Wir können eine für dich erstellen",
+        "title": "Erstelle es"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke-Versionen von Songs aus deiner Bibliothek",
+        "title": "Songs, die du kennst"
+      }
+    }
   }
 }

@@ -105,6 +105,11 @@ export interface Recommendation {
   is_classic: boolean;
   duration_ms: number | null;
   explicit: boolean;
+  /** v2 only: the artist the reason refers to (e.g. "Like {artist}") */
+  reason_artist?: string | null;
+  /** v2 only: where karaoke versions exist */
+  community?: boolean;
+  karafun?: boolean;
 }
 
 export interface QuizSong {
@@ -390,4 +395,78 @@ export interface ManualArtistInput {
   artist_id: string | null; // Spotify ID (backward compat)
   artist_name: string;
   genres: string[];
+}
+
+// ============================================================================
+// Recommendations v2 (GET /api/my/recommendations/v2)
+// ============================================================================
+
+export type RecSort = "best" | "popular" | "newest" | "oldest" | "shortest" | "az";
+export type RecLibrary = "any" | "community" | "karafun";
+export type RecHasKaraoke = "yes" | "make" | "any";
+export type RecDuration = "short" | "medium" | "long";
+
+export interface RecV2Params {
+  genre?: string[];
+  mood?: string[];
+  energy?: "low" | "mid" | "high";
+  decade?: string[];
+  popularity?: number;
+  popularity_max?: number;
+  lead_gender?: "male" | "female" | "mixed";
+  duration?: RecDuration;
+  classic?: boolean;
+  explicit?: "exclude" | "include";
+  has_karaoke?: RecHasKaraoke;
+  library?: RecLibrary;
+  sort?: RecSort;
+  cursor?: string;
+}
+
+export interface RecV2Karaoke {
+  community: boolean;
+  commercial: boolean;
+  karafun: boolean;
+  brand_count: number;
+}
+
+export interface RecV2Facets {
+  decade: string | null;
+  genres: string[];
+  mood: string | null;
+  energy: number | null;
+  lead_gender: string | null;
+  duration_ms: number | null;
+  popularity: number | null;
+  is_classic: boolean;
+  explicit: boolean;
+}
+
+export interface RecV2Song {
+  song_key: string;
+  artist: string;
+  title: string;
+  reason: string;
+  reason_type: string;
+  reason_artist: string | null;
+  score: number;
+  has_karaoke_version: boolean;
+  karaoke: RecV2Karaoke;
+  facets: RecV2Facets;
+}
+
+export interface RecV2Section {
+  id: string;
+  title_key: string;
+  reason_key: string;
+  title_params: Record<string, string>;
+  songs: RecV2Song[];
+}
+
+export interface RecommendationsV2 {
+  sections: RecV2Section[];
+  filters_applied: Record<string, unknown>;
+  next_cursor: string | null;
+  has_profile: boolean;
+  catalog_run: string;
 }

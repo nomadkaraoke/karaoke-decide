@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Nicio melodie preferată de public nu se potrivește cu filtrele actuale",
     "viewMySongs": "Vezi melodiile mele",
     "syncMoreMusic": "Sincronizează mai multă muzică",
-    "tryAgain": "Încearcă din nou"
+    "tryAgain": "Încearcă din nou",
+    "libraryAny": "Orice bibliotecă",
+    "libraryCommunity": "Versiuni din comunitate",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catalogul KaraFun / Karaoke Version",
+    "libraryLabel": "Bibliotecă de karaoke",
+    "loadMore": "Încarcă mai multe",
+    "loadingMore": "Se încarcă…",
+    "noMatchDescription": "Încearcă să relaxezi un filtru sau două pentru a vedea mai multe melodii.",
+    "noMatchTitle": "Nicio sugestie nu corespunde acestor filtre",
+    "sortAz": "De la A la Z",
+    "sortBest": "Cele mai potrivite pentru tine",
+    "sortLabel": "Sortează după",
+    "sortNewest": "Cele mai noi",
+    "sortOldest": "Cele mai vechi",
+    "sortPopular": "Cele mai populare",
+    "sortShortest": "Cele mai scurte",
+    "warmingDescription": "Pregătim totul. De obicei durează mai puțin de un minut și vom reîncerca automat.",
+    "warmingTitle": "Îți pregătim sugestiile…"
   },
   "myData": {
     "title": "Datele mele",
@@ -600,7 +618,9 @@
       "brands": "{count} branduri",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASIC"
+      "classic": "CLASIC",
+      "community": "Comunitate",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Îmi place să cânt asta",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" nu conține nicio melodie care să poată fi citită. Încearcă o altă listă de redare.",
     "errorTooManyImports": "Imporți liste de redare prea rapid. Te rugăm să aștepți un minut și să încerci din nou.",
     "inputLabel": "Link către lista de redare YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Pe placul tuturor",
+      "decade_match": "Dintr-un deceniu care îți place",
+      "genre_match": "Se potrivește cu genurile tale",
+      "known_artist": "De la un artist care îți place la nebunie",
+      "known_song": "O știi deja",
+      "make_it": "Creează piesa",
+      "similar_artist": "În stilul {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tot ce se potrivește, în ordinea aleasă de tine",
+        "title": "Toate sugestiile"
+      },
+      "artists_you_love": {
+        "reason": "Mai multe melodii de la artiști pe care îi asculți",
+        "title": "De la artiști pe care îi adori"
+      },
+      "because": {
+        "reason": "Melodii pe care fanii {artist} le cântă de obicei",
+        "title": "Pentru că îți place {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Melodii care pun toată sala pe cântat",
+        "title": "Pe placul tuturor"
+      },
+      "make_it": {
+        "reason": "Nu există încă o versiune karaoke. Putem crea una pentru tine",
+        "title": "Creează piesa"
+      },
+      "songs_you_know": {
+        "reason": "Versiuni karaoke ale melodiilor din biblioteca ta",
+        "title": "Melodii pe care le știi"
+      }
+    }
   }
 }

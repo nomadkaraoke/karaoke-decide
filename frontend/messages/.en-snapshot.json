@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "No crowd pleasers match the current filters",
     "viewMySongs": "View my songs",
     "syncMoreMusic": "Sync more music",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "sortLabel": "Sort by",
+    "sortBest": "Best for you",
+    "sortPopular": "Most popular",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortShortest": "Shortest",
+    "sortAz": "A to Z",
+    "libraryLabel": "Karaoke library",
+    "libraryAny": "Any library",
+    "libraryCommunity": "Community versions",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version catalogue",
+    "warmingTitle": "Getting your picks ready…",
+    "warmingDescription": "We're warming things up. This usually takes under a minute, and we'll retry automatically.",
+    "noMatchTitle": "No picks match these filters",
+    "noMatchDescription": "Try loosening a filter or two to see more songs.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…"
   },
   "myData": {
     "title": "My Data",
@@ -600,7 +618,9 @@
       "brands": "{count} brands",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASSIC"
+      "classic": "CLASSIC",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "I Enjoy Singing This",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" has no songs we could read. Try another playlist.",
     "errorTooManyImports": "You're importing playlists too quickly. Please wait a minute and try again.",
     "inputLabel": "YouTube Music playlist link"
+  },
+  "recs": {
+    "section": {
+      "songs_you_know": {
+        "title": "Songs you know",
+        "reason": "Karaoke versions of songs from your library"
+      },
+      "artists_you_love": {
+        "title": "From artists you love",
+        "reason": "More songs by artists you listen to"
+      },
+      "because": {
+        "title": "Because you like {artist}",
+        "reason": "Songs that fans of {artist} tend to sing"
+      },
+      "crowd_pleasers": {
+        "title": "Crowd pleasers",
+        "reason": "Songs that get the room singing"
+      },
+      "make_it": {
+        "title": "Make it",
+        "reason": "No karaoke version yet. We can create one for you"
+      },
+      "all": {
+        "title": "All picks",
+        "reason": "Everything that matches, in your chosen order"
+      }
+    },
+    "reason": {
+      "known_song": "You know this",
+      "known_artist": "From an artist you love",
+      "similar_artist": "Like {artist}",
+      "genre_match": "Matches your genres",
+      "decade_match": "From a decade you like",
+      "crowd_pleaser": "Crowd pleaser",
+      "make_it": "Make it"
+    }
   }
 }

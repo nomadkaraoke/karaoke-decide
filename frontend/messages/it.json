@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Nessuna canzone popolare corrisponde ai filtri attuali",
     "viewMySongs": "Visualizza le mie canzoni",
     "syncMoreMusic": "Sincronizza altra musica",
-    "tryAgain": "Riprova"
+    "tryAgain": "Riprova",
+    "libraryAny": "Qualsiasi catalogo",
+    "libraryCommunity": "Versioni della community",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catalogo KaraFun / Karaoke Version",
+    "libraryLabel": "Catalogo karaoke",
+    "loadMore": "Carica altri",
+    "loadingMore": "Caricamento…",
+    "noMatchDescription": "Prova a modificare o rimuovere qualche filtro per vedere più brani.",
+    "noMatchTitle": "Nessun brano corrisponde a questi filtri",
+    "sortAz": "Dalla A alla Z",
+    "sortBest": "I migliori per te",
+    "sortLabel": "Ordina per",
+    "sortNewest": "I più recenti",
+    "sortOldest": "I meno recenti",
+    "sortPopular": "I più popolari",
+    "sortShortest": "I più brevi",
+    "warmingDescription": "Stiamo preparando tutto. Di solito ci vuole meno di un minuto, riproveremo automaticamente.",
+    "warmingTitle": "Prepariamo i brani scelti per te…"
   },
   "myData": {
     "title": "I miei dati",
@@ -600,7 +618,9 @@
       "brands": "{count} marchi",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASSICO"
+      "classic": "CLASSICO",
+      "community": "Community",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Mi piace cantare questa",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" non contiene brani leggibili. Prova con un'altra playlist.",
     "errorTooManyImports": "Stai importando playlist troppo velocemente. Attendi un minuto e riprova.",
     "inputLabel": "Link della playlist di YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Successo assicurato",
+      "decade_match": "Da un decennio che ti piace",
+      "genre_match": "In linea con i tuoi generi",
+      "known_artist": "Di un artista che ami",
+      "known_song": "La conosci già",
+      "make_it": "Creala",
+      "similar_artist": "Simile a {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tutti i brani corrispondenti, nell'ordine che hai scelto",
+        "title": "Tutti i brani scelti"
+      },
+      "artists_you_love": {
+        "reason": "Altri brani di artisti che ascolti",
+        "title": "Di artisti che ami"
+      },
+      "because": {
+        "reason": "Brani che i fan di {artist} cantano spesso",
+        "title": "Perché ti piace {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Brani che fanno cantare tutta la sala",
+        "title": "Successi assicurati"
+      },
+      "make_it": {
+        "reason": "Non esiste ancora una versione karaoke. Possiamo crearne una per te",
+        "title": "Creala"
+      },
+      "songs_you_know": {
+        "reason": "Versioni karaoke di brani della tua libreria",
+        "title": "Brani che conosci"
+      }
+    }
   }
 }

@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Mevcut filtrelerle eşleşen popüler şarkı yok",
     "viewMySongs": "Şarkılarımı görüntüle",
     "syncMoreMusic": "Daha fazla müzik senkronize et",
-    "tryAgain": "Tekrar dene"
+    "tryAgain": "Tekrar dene",
+    "libraryAny": "Tüm kütüphaneler",
+    "libraryCommunity": "Topluluk sürümleri",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version kataloğu",
+    "libraryLabel": "Karaoke kütüphanesi",
+    "loadMore": "Daha fazla yükle",
+    "loadingMore": "Yükleniyor…",
+    "noMatchDescription": "Daha fazla şarkı görmek için bir iki filtreyi kaldırmayı veya gevşetmeyi dene.",
+    "noMatchTitle": "Bu filtrelere uygun öneri bulunamadı",
+    "sortAz": "A'dan Z'ye",
+    "sortBest": "Sana en uygun",
+    "sortLabel": "Sıralama ölçütü",
+    "sortNewest": "En yeni",
+    "sortOldest": "En eski",
+    "sortPopular": "En popüler",
+    "sortShortest": "En kısa",
+    "warmingDescription": "Ortamı hazırlıyoruz. Bu işlem genellikle bir dakikadan kısa sürer ve otomatik olarak tekrar deneriz.",
+    "warmingTitle": "Önerilerin hazırlanıyor…"
   },
   "myData": {
     "title": "Verilerim",
@@ -600,7 +618,9 @@
       "brands": "{count} marka",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASİK"
+      "classic": "KLASİK",
+      "community": "Topluluk",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Bunu Söylemekten Keyif Alıyorum",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" içinde okuyabileceğimiz şarkı bulunamadı. Başka bir çalma listesi dene.",
     "errorTooManyImports": "Çalma listelerini çok hızlı içe aktarıyorsun. Lütfen bir dakika bekle ve tekrar dene.",
     "inputLabel": "YouTube Music çalma listesi bağlantısı"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Herkesi coşturan şarkı",
+      "decade_match": "Sevdiğin bir dönemden",
+      "genre_match": "Müzik zevkine uygun",
+      "known_artist": "Sevdiğin bir sanatçıdan",
+      "known_song": "Bunu iyi bilirsin",
+      "make_it": "Kendin yap",
+      "similar_artist": "{artist} gibi"
+    },
+    "section": {
+      "all": {
+        "reason": "Eşleşen tüm şarkılar, seçtiğin sırada",
+        "title": "Tüm öneriler"
+      },
+      "artists_you_love": {
+        "reason": "Dinlediğin sanatçılardan daha fazla şarkı",
+        "title": "Sevdiğin sanatçılardan"
+      },
+      "because": {
+        "reason": "{artist} dinleyicilerinin söylemeyi sevdiği şarkılar",
+        "title": "{artist} sevdiğin için"
+      },
+      "crowd_pleasers": {
+        "reason": "Bütün salona şarkı söyleten parçalar",
+        "title": "Herkesi coşturanlar"
+      },
+      "make_it": {
+        "reason": "Henüz karaoke sürümü yok. Senin için bir tane hazırlayabiliriz",
+        "title": "Kendin yap"
+      },
+      "songs_you_know": {
+        "reason": "Kütüphanendeki şarkıların karaoke sürümleri",
+        "title": "Bildiğin şarkılar"
+      }
+    }
   }
 }

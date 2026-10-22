@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Nijedan hit za publiku ne odgovara trenutnim filterima",
     "viewMySongs": "Pogledaj moje pjesme",
     "syncMoreMusic": "Sinkroniziraj više glazbe",
-    "tryAgain": "Pokušaj ponovno"
+    "tryAgain": "Pokušaj ponovno",
+    "libraryAny": "Bilo koja zbirka",
+    "libraryCommunity": "Verzije zajednice",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version katalog",
+    "libraryLabel": "Karaoke zbirka",
+    "loadMore": "Učitaj više",
+    "loadingMore": "Učitavanje…",
+    "noMatchDescription": "Pokušaj ublažiti koji filter da vidiš više pjesama.",
+    "noMatchTitle": "Nijedan odabir ne odgovara ovim filterima",
+    "sortAz": "Od A do Z",
+    "sortBest": "Najbolje za tebe",
+    "sortLabel": "Poredaj po",
+    "sortNewest": "Najnovije",
+    "sortOldest": "Najstarije",
+    "sortPopular": "Najpopularnije",
+    "sortShortest": "Najkraće",
+    "warmingDescription": "Zagrijavamo sustav. Ovo obično traje manje od minute i automatski ćemo pokušati ponovno.",
+    "warmingTitle": "Pripremamo tvoje preporuke…"
   },
   "myData": {
     "title": "Moji podaci",
@@ -600,7 +618,9 @@
       "brands": "{count} brendova",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIK"
+      "classic": "KLASIK",
+      "community": "Zajednica",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Uživam pjevati ovo",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" nema pjesama koje bismo mogli učitati. Isprobaj drugu playlistu.",
     "errorTooManyImports": "Prebrzo uvoziš playliste. Pričekaj minutu pa pokušaj ponovno.",
     "inputLabel": "Poveznica na YouTube Music playlistu"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Hit za publiku",
+      "decade_match": "Iz desetljeća koje voliš",
+      "genre_match": "Odgovara tvojim žanrovima",
+      "known_artist": "Od izvođača kojeg voliš",
+      "known_song": "Ovo znaš",
+      "make_it": "Napravi",
+      "similar_artist": "Slično izvođaču {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Sve što odgovara, redoslijedom koji odabereš",
+        "title": "Svi odabiri"
+      },
+      "artists_you_love": {
+        "reason": "Još pjesama izvođača koje slušaš",
+        "title": "Od izvođača koje voliš"
+      },
+      "because": {
+        "reason": "Pjesme koje obožavatelji izvođača {artist} rado pjevaju",
+        "title": "Jer voliš izvođača {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Pjesme uz koje svi pjevaju",
+        "title": "Hitovi za publiku"
+      },
+      "make_it": {
+        "reason": "Još nema karaoke verzije. Možemo je izraditi za tebe",
+        "title": "Napravi"
+      },
+      "songs_you_know": {
+        "reason": "Karaoke verzije pjesama iz tvoje zbirke",
+        "title": "Pjesme koje znaš"
+      }
+    }
   }
 }

@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Cap èxit coincideix amb els filtres actuals",
     "viewMySongs": "Veure les meves cançons",
     "syncMoreMusic": "Sincronitza més música",
-    "tryAgain": "Torna-ho a provar"
+    "tryAgain": "Torna-ho a provar",
+    "libraryAny": "Qualsevol biblioteca",
+    "libraryCommunity": "Versions de la comunitat",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catàleg de KaraFun / Karaoke Version",
+    "libraryLabel": "Biblioteca de karaoke",
+    "loadMore": "Carrega'n més",
+    "loadingMore": "Carregant…",
+    "noMatchDescription": "Prova de relaxar algun filtre per veure més cançons.",
+    "noMatchTitle": "Cap suggeriment coincideix amb aquests filtres",
+    "sortAz": "De la A a la Z",
+    "sortBest": "Ideals per a tu",
+    "sortLabel": "Ordena per",
+    "sortNewest": "Més recents",
+    "sortOldest": "Més antigues",
+    "sortPopular": "Més populars",
+    "sortShortest": "Més curtes",
+    "warmingDescription": "Ho estem preparant tot. Normalment triga menys d'un minut i ho tornarem a provar automàticament.",
+    "warmingTitle": "Preparant els teus suggeriments…"
   },
   "myData": {
     "title": "Les meves dades",
@@ -600,7 +618,9 @@
       "brands": "{count} marques",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLÀSSIC"
+      "classic": "CLÀSSIC",
+      "community": "Comunitat",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "M'agrada cantar això",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" no té cap cançó que puguem llegir. Prova amb una altra llista de reproducció.",
     "errorTooManyImports": "Estàs important llistes de reproducció massa ràpidament. Espera un minut i torna-ho a provar.",
     "inputLabel": "Enllaç a la llista de reproducció de YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Èxit assegurat",
+      "decade_match": "D'una dècada que t'agrada",
+      "genre_match": "Coincideix amb els teus gèneres",
+      "known_artist": "D'un artista que t'encanta",
+      "known_song": "Aquesta te la saps",
+      "make_it": "Crea-la",
+      "similar_artist": "A l'estil de {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tot el que coincideix, en l'ordre que has triat",
+        "title": "Tots els suggeriments"
+      },
+      "artists_you_love": {
+        "reason": "Més cançons d'artistes que escoltes",
+        "title": "D'artistes que t'encanten"
+      },
+      "because": {
+        "reason": "Cançons que els fans de {artist} solen cantar",
+        "title": "Perquè t'agrada {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Cançons que fan cantar tothom",
+        "title": "Èxits assegurats"
+      },
+      "make_it": {
+        "reason": "Encara no hi ha versió de karaoke. En podem crear una per a tu",
+        "title": "Crea-la"
+      },
+      "songs_you_know": {
+        "reason": "Versions de karaoke de cançons de la teva biblioteca",
+        "title": "Cançons que coneixes"
+      }
+    }
   }
 }

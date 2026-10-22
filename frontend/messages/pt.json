@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Nenhuma música para animar a galera corresponde aos filtros atuais",
     "viewMySongs": "Ver minhas músicas",
     "syncMoreMusic": "Sincronizar mais músicas",
-    "tryAgain": "Tentar novamente"
+    "tryAgain": "Tentar novamente",
+    "libraryAny": "Qualquer catálogo",
+    "libraryCommunity": "Versões da comunidade",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Catálogo do KaraFun / Karaoke Version",
+    "libraryLabel": "Catálogo de karaokê",
+    "loadMore": "Carregar mais",
+    "loadingMore": "Carregando…",
+    "noMatchDescription": "Tente remover um ou dois filtros para ver mais músicas.",
+    "noMatchTitle": "Nenhuma recomendação corresponde a esses filtros",
+    "sortAz": "A a Z",
+    "sortBest": "Melhores para você",
+    "sortLabel": "Ordenar por",
+    "sortNewest": "Mais recentes",
+    "sortOldest": "Mais antigas",
+    "sortPopular": "Mais populares",
+    "sortShortest": "Mais curtas",
+    "warmingDescription": "Estamos preparando tudo por aqui. Isso costuma levar menos de um minuto, e tentaremos novamente de forma automática.",
+    "warmingTitle": "Preparando suas recomendações…"
   },
   "myData": {
     "title": "Meus Dados",
@@ -600,7 +618,9 @@
       "brands": "{count} marcas",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLÁSSICO"
+      "classic": "CLÁSSICO",
+      "community": "Comunidade",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Eu Gosto de Cantar Isso",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" não tem músicas que pudemos ler. Tente outra playlist.",
     "errorTooManyImports": "Você está importando playlists rápido demais. Por favor, espere um minuto e tente novamente.",
     "inputLabel": "Link da playlist do YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Favorita do público",
+      "decade_match": "De uma década que você curte",
+      "genre_match": "Combina com seus gêneros",
+      "known_artist": "De um artista que você adora",
+      "known_song": "Você conhece esta",
+      "make_it": "Criar versão",
+      "similar_artist": "Parecido com {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Tudo o que combina, na ordem que você escolheu",
+        "title": "Todas as recomendações"
+      },
+      "artists_you_love": {
+        "reason": "Mais músicas de artistas que você escuta",
+        "title": "De artistas que você adora"
+      },
+      "because": {
+        "reason": "Músicas que fãs de {artist} costumam cantar",
+        "title": "Porque você gosta de {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Músicas que botam todo mundo para cantar",
+        "title": "Favoritas do público"
+      },
+      "make_it": {
+        "reason": "Ainda não há versão de karaokê. Podemos criar uma para você",
+        "title": "Criar versão"
+      },
+      "songs_you_know": {
+        "reason": "Versões de karaokê de músicas da sua biblioteca",
+        "title": "Músicas que você conhece"
+      }
+    }
   }
 }

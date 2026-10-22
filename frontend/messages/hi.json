@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "कोई भी क्राउड प्लीज़र मौजूदा फ़िल्टर से मेल नहीं खाता",
     "viewMySongs": "मेरे गाने देखो",
     "syncMoreMusic": "और संगीत सिंक करो",
-    "tryAgain": "फिर से कोशिश करो"
+    "tryAgain": "फिर से कोशिश करो",
+    "libraryAny": "कोई भी लाइब्रेरी",
+    "libraryCommunity": "कम्युनिटी वर्ज़न",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "KaraFun / Karaoke Version कैटलॉग",
+    "libraryLabel": "कराओकी लाइब्रेरी",
+    "loadMore": "और लोड करो",
+    "loadingMore": "लोड हो रहा है…",
+    "noMatchDescription": "और गाने देखने के लिए एक-दो फ़िल्टर कम करके देखो।",
+    "noMatchTitle": "इन फ़िल्टर से मेल खाते कोई गाने नहीं मिले",
+    "sortAz": "A से Z",
+    "sortBest": "तुम्हारे लिए सबसे सही",
+    "sortLabel": "क्रमबद्ध करें",
+    "sortNewest": "सबसे नए",
+    "sortOldest": "सबसे पुराने",
+    "sortPopular": "सबसे लोकप्रिय",
+    "sortShortest": "सबसे छोटे",
+    "warmingDescription": "हम सब कुछ तैयार कर रहे हैं। इसमें आमतौर पर एक मिनट से भी कम समय लगता है, और हम खुद ही दोबारा कोशिश करेंगे।",
+    "warmingTitle": "तुम्हारे लिए चुने गए गाने तैयार हो रहे हैं…"
   },
   "myData": {
     "title": "मेरा डेटा",
@@ -600,7 +618,9 @@
       "brands": "{count} ब्रांड्स",
       "pop": "पॉप: {value}",
       "explicit": "E",
-      "classic": "CLASSIC"
+      "classic": "CLASSIC",
+      "community": "कम्युनिटी",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "मुझे यह गाना पसंद है",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" में ऐसा कोई गाना नहीं है जिसे हम पढ़ सकें। कोई दूसरी प्लेलिस्ट आज़माओ।",
     "errorTooManyImports": "तुम बहुत तेज़ी से प्लेलिस्ट इंपोर्ट कर रहे हो। कृपया एक मिनट इंतज़ार करो और फिर से कोशिश करो।",
     "inputLabel": "YouTube Music प्लेलिस्ट लिंक"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "सबका पसंदीदा",
+      "decade_match": "तुम्हारे पसंदीदा दशक से",
+      "genre_match": "तुम्हारी पसंद के जॉनर से मेल खाता है",
+      "known_artist": "तुम्हारे पसंदीदा कलाकार का",
+      "known_song": "यह तुम्हारा सुना हुआ है",
+      "make_it": "इसे बनाओ",
+      "similar_artist": "{artist} जैसे कलाकार"
+    },
+    "section": {
+      "all": {
+        "reason": "मेल खाने वाले सभी गाने, तुम्हारे चुने हुए क्रम में",
+        "title": "सभी चुनिंदा गाने"
+      },
+      "artists_you_love": {
+        "reason": "उन कलाकारों के और गाने जिन्हें तुम सुनते हो",
+        "title": "तुम्हारे पसंदीदा कलाकारों के गाने"
+      },
+      "because": {
+        "reason": "ऐसे गाने जो {artist} के फैंस अक्सर गाते हैं",
+        "title": "क्योंकि तुम्हें {artist} पसंद है"
+      },
+      "crowd_pleasers": {
+        "reason": "ऐसे गाने जिन्हें सुनकर सब झूमकर गाने लगें",
+        "title": "सबके पसंदीदा गाने"
+      },
+      "make_it": {
+        "reason": "अभी तक कोई कराओकी वर्ज़न नहीं है। हम तुम्हारे लिए बना सकते हैं",
+        "title": "इसे बनाओ"
+      },
+      "songs_you_know": {
+        "reason": "तुम्हारी लाइब्रेरी के गानों के कराओकी वर्ज़न",
+        "title": "तुम्हारे जाने-पहचाने गाने"
+      }
+    }
   }
 }

@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Walang mga crowd pleaser ang tumutugma sa mga kasalukuyang filter",
     "viewMySongs": "Tingnan ang aking mga kanta",
     "syncMoreMusic": "Mag-sync ng higit pang musika",
-    "tryAgain": "Subukan muli"
+    "tryAgain": "Subukan muli",
+    "libraryAny": "Kahit aling library",
+    "libraryCommunity": "Mga bersyon ng komunidad",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalogo ng KaraFun / Karaoke Version",
+    "libraryLabel": "Karaoke library",
+    "loadMore": "Mag-load pa",
+    "loadingMore": "Naglo-load…",
+    "noMatchDescription": "Subukang magbawas ng isa o dalawang filter para makakita ng mas maraming kanta.",
+    "noMatchTitle": "Walang tugma sa mga filter na ito",
+    "sortAz": "A hanggang Z",
+    "sortBest": "Pinakamaganda para sa iyo",
+    "sortLabel": "I-sort ayon sa",
+    "sortNewest": "Pinakabago",
+    "sortOldest": "Pinakaluma",
+    "sortPopular": "Pinakasikat",
+    "sortShortest": "Pinakamaikli",
+    "warmingDescription": "Inihahanda pa namin ang mga ito. Karaniwang tumatagal ito nang wala pang isang minuto, at awtomatiko kaming susubok muli.",
+    "warmingTitle": "Inihahanda ang iyong mga rekomendasyon…"
   },
   "myData": {
     "title": "Aking Data",
@@ -600,7 +618,9 @@
       "brands": "{count} na mga brand",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "CLASSIC"
+      "classic": "CLASSIC",
+      "community": "Komunidad",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Gusto Kong Kantahin Ito",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "Walang makitang kanta sa \"{title}\". Sumubok ng ibang playlist.",
     "errorTooManyImports": "Masyadong mabilis ang pag-import mo ng mga playlist. Maghintay muna ng isang minuto bago subukan ulit.",
     "inputLabel": "Link ng YouTube Music playlist"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Paborito ng marami",
+      "decade_match": "Mula sa dekadang gusto mo",
+      "genre_match": "Tugma sa iyong mga genre",
+      "known_artist": "Mula sa artist na gusto mo",
+      "known_song": "Alam mo ito",
+      "make_it": "Gawin ito",
+      "similar_artist": "Tulad ni {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Lahat ng tumutugma, ayon sa napili mong pagkakasunod-sunod",
+        "title": "Lahat ng rekomendasyon"
+      },
+      "artists_you_love": {
+        "reason": "Higit pang mga kanta mula sa mga artist na pinakikinggan mo",
+        "title": "Mula sa mga artist na gusto mo"
+      },
+      "because": {
+        "reason": "Mga kantang madalas kantahin ng mga fan ni {artist}",
+        "title": "Dahil gusto mo si {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Mga kantang nagpapasabay sa lahat",
+        "title": "Paborito ng marami"
+      },
+      "make_it": {
+        "reason": "Wala pang karaoke version. Puwede kaming gumawa para sa iyo",
+        "title": "Gawin ito"
+      },
+      "songs_you_know": {
+        "reason": "Mga karaoke version ng mga kanta mula sa iyong library",
+        "title": "Mga kantang alam mo"
+      }
+    }
   }
 }

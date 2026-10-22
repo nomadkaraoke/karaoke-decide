@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Tiada pilihan ramai yang sepadan dengan penapis semasa",
     "viewMySongs": "Lihat lagu saya",
     "syncMoreMusic": "Segerak lebih banyak muzik",
-    "tryAgain": "Cuba lagi"
+    "tryAgain": "Cuba lagi",
+    "libraryAny": "Mana-mana pustaka",
+    "libraryCommunity": "Versi komuniti",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalog KaraFun / Karaoke Version",
+    "libraryLabel": "Pustaka karaoke",
+    "loadMore": "Muat lagi",
+    "loadingMore": "Memuatkan…",
+    "noMatchDescription": "Cuba longgarkan satu atau dua penapis untuk melihat lebih banyak lagu.",
+    "noMatchTitle": "Tiada pilihan yang sepadan dengan penapis ini",
+    "sortAz": "A hingga Z",
+    "sortBest": "Terbaik untuk anda",
+    "sortLabel": "Susun mengikut",
+    "sortNewest": "Terbaharu",
+    "sortOldest": "Terlama",
+    "sortPopular": "Paling popular",
+    "sortShortest": "Paling pendek",
+    "warmingDescription": "Kami sedang menyediakannya. Ini biasanya mengambil masa kurang daripada seminit, dan kami akan mencuba semula secara automatik.",
+    "warmingTitle": "Menyediakan pilihan anda…"
   },
   "myData": {
     "title": "Data Saya",
@@ -600,7 +618,9 @@
       "brands": "{count} jenama",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIK"
+      "classic": "KLASIK",
+      "community": "Komuniti",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Saya Suka Menyanyikan Ini",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" tidak mempunyai lagu yang boleh kami baca. Cuba senarai main lain.",
     "errorTooManyImports": "Anda mengimport senarai main terlalu pantas. Sila tunggu seminit dan cuba lagi.",
     "inputLabel": "Pautan senarai main YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Kegemaran ramai",
+      "decade_match": "Daripada dekad yang anda minati",
+      "genre_match": "Sepadan dengan genre kegemaran anda",
+      "known_artist": "Daripada artis yang anda minati",
+      "known_song": "Anda tahu lagu ini",
+      "make_it": "Hasilkan versi ini",
+      "similar_artist": "Mirip {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Semua yang sepadan, mengikut susunan pilihan anda",
+        "title": "Semua pilihan"
+      },
+      "artists_you_love": {
+        "reason": "Lebih banyak lagu daripada artis yang anda dengar",
+        "title": "Daripada artis yang anda minati"
+      },
+      "because": {
+        "reason": "Lagu yang sering dinyanyikan oleh peminat {artist}",
+        "title": "Kerana anda meminati {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Lagu yang membuatkan semua orang turut menyanyi",
+        "title": "Kegemaran ramai"
+      },
+      "make_it": {
+        "reason": "Belum ada versi karaoke lagi. Kami boleh ciptakan untuk anda",
+        "title": "Hasilkan versi ini"
+      },
+      "songs_you_know": {
+        "reason": "Versi karaoke bagi lagu daripada pustaka anda",
+        "title": "Lagu yang anda tahu"
+      }
+    }
   }
 }

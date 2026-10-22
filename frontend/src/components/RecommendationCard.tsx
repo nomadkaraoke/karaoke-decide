@@ -54,8 +54,14 @@ function getReasonBadgeVariant(
   reasonType: string
 ): "default" | "spotify" | "lastfm" | "quiz" | "success" | "warning" | "error" {
   switch (reasonType) {
+    case "known_song":
     case "known_artist":
       return "spotify";
+    case "similar_artist":
+    case "genre_match":
+      return "quiz";
+    case "make_it":
+      return "quiz";
     case "similar_genre":
       return "quiz";
     case "decade_match":
@@ -102,6 +108,12 @@ export function RecommendationCard({
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const t = useTranslations('components.recommendationCard');
+  const tRoot = useTranslations();
+  // v2 reason chip is rendered from reason_type (+ reason_artist); fall back to the API's English text.
+  const reasonKey = `recs.reason.${recommendation.reason_type}`;
+  const reasonText = tRoot.has(reasonKey)
+    ? tRoot(reasonKey, { artist: recommendation.reason_artist ?? recommendation.artist })
+    : recommendation.reason;
 
   const links = getKaraokeLinks(recommendation.artist, recommendation.title);
   const isGenerateOnly = !recommendation.has_karaoke_version;
@@ -183,10 +195,16 @@ export function RecommendationCard({
         </div>
 
         {/* Middle row: Reason */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Badge variant={getReasonBadgeVariant(recommendation.reason_type)}>
-            {recommendation.reason}
+            {reasonText}
           </Badge>
+          {recommendation.community && (
+            <Badge variant="success">{t('community')}</Badge>
+          )}
+          {recommendation.karafun && (
+            <Badge variant="warning">{t('karafun')}</Badge>
+          )}
           {isGenerateOnly && (
             <Badge variant="default">
               {t('generateOnly')}

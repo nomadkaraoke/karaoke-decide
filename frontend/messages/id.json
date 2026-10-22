@@ -251,7 +251,25 @@
     "crowdPleasersEmpty": "Tidak ada lagu favorit yang cocok dengan filter saat ini",
     "viewMySongs": "Lihat lagu saya",
     "syncMoreMusic": "Sinkronkan lebih banyak musik",
-    "tryAgain": "Coba lagi"
+    "tryAgain": "Coba lagi",
+    "libraryAny": "Semua pustaka",
+    "libraryCommunity": "Versi komunitas",
+    "libraryKarafun": "KaraFun",
+    "libraryKarafunInfo": "Katalog KaraFun / Karaoke Version",
+    "libraryLabel": "Pustaka karaoke",
+    "loadMore": "Muat lebih banyak",
+    "loadingMore": "Memuat…",
+    "noMatchDescription": "Coba longgarkan satu atau dua filter untuk melihat lebih banyak lagu.",
+    "noMatchTitle": "Tidak ada pilihan yang cocok dengan filter ini",
+    "sortAz": "A sampai Z",
+    "sortBest": "Terbaik untukmu",
+    "sortLabel": "Urutkan berdasarkan",
+    "sortNewest": "Terbaru",
+    "sortOldest": "Terlama",
+    "sortPopular": "Paling populer",
+    "sortShortest": "Durasi terpendek",
+    "warmingDescription": "Kami sedang menyiapkan semuanya. Ini biasanya butuh waktu kurang dari semenit, dan kami akan mencoba lagi secara otomatis.",
+    "warmingTitle": "Menyiapkan pilihan rekomendasi untukmu…"
   },
   "myData": {
     "title": "Data Saya",
@@ -600,7 +618,9 @@
       "brands": "{count} merek",
       "pop": "Pop: {value}",
       "explicit": "E",
-      "classic": "KLASIK"
+      "classic": "KLASIK",
+      "community": "Komunitas",
+      "karafun": "KaraFun"
     },
     "enjoySinging": {
       "title": "Saya Suka Menyanyikan Ini",
@@ -848,5 +868,42 @@
     "emptyPlaylist": "\"{title}\" tidak memiliki lagu yang dapat kami baca. Coba daftar putar lain.",
     "errorTooManyImports": "Anda mengimpor daftar putar terlalu cepat. Harap tunggu sebentar dan coba lagi.",
     "inputLabel": "Tautan daftar putar YouTube Music"
+  },
+  "recs": {
+    "reason": {
+      "crowd_pleaser": "Disukai banyak orang",
+      "decade_match": "Dari dekade yang kamu suka",
+      "genre_match": "Sesuai dengan genremu",
+      "known_artist": "Dari artis yang kamu sukai",
+      "known_song": "Kamu tahu lagu ini",
+      "make_it": "Buat lagunya",
+      "similar_artist": "Mirip {artist}"
+    },
+    "section": {
+      "all": {
+        "reason": "Semua yang cocok, sesuai urutan pilihanmu",
+        "title": "Semua pilihan"
+      },
+      "artists_you_love": {
+        "reason": "Lebih banyak lagu dari artis yang kamu dengarkan",
+        "title": "Dari artis yang kamu sukai"
+      },
+      "because": {
+        "reason": "Lagu yang sering dinyanyikan penggemar {artist}",
+        "title": "Karena kamu menyukai {artist}"
+      },
+      "crowd_pleasers": {
+        "reason": "Lagu yang bikin semua orang ikut bernyanyi",
+        "title": "Favorit semua orang"
+      },
+      "make_it": {
+        "reason": "Belum ada versi karaoke. Kami bisa membuatnya untukmu",
+        "title": "Buat lagunya"
+      },
+      "songs_you_know": {
+        "reason": "Versi karaoke dari lagu-lagu di pustakamu",
+        "title": "Lagu yang kamu tahu"
+      }
+    }
   }
 }
