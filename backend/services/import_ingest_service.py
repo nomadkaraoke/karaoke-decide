@@ -48,10 +48,12 @@ ImportSource = Literal[
     "listenbrainz",
     "lastfm",
     "spotify",
+    "apple_music",  # a music_services connection (decide v0.20); listed here so it can be summarised and removed
 ]
 PlayMode = Literal["max", "add"]
 
 USER_ARTISTS_COLLECTION = "user_artists"
+EXPORT_ARTISTS_COLLECTION = "user_import_artists"
 MAX_DERIVED_ARTISTS = 1000
 
 
@@ -386,6 +388,9 @@ class ImportIngestService:
         data.update(extra or {})
         await self.db.set_document(self.IMPORTS_COLLECTION, f"{user_id}:{source}", data, merge=True)
 
+    async def list_imports(self, user_id: str) -> list[dict[str, Any]]:
+        return await self.db.query_documents(self.IMPORTS_COLLECTION, filters=[("user_id", "==", user_id)])
+
     async def get_import(self, user_id: str, source: ImportSource) -> dict[str, Any] | None:
         return await self.db.get_document(self.IMPORTS_COLLECTION, f"{user_id}:{source}")
 
@@ -430,6 +435,12 @@ class ImportIngestService:
         artist_ids = [d["id"] for d in artist_docs if d.get("source") == source]
         if artist_ids:
             await self.db.batch_delete(USER_ARTISTS_COLLECTION, artist_ids)
+        # Export imports keep running artist sums per export; they go with the source.
+        sums = await self.db.query_documents(
+            EXPORT_ARTISTS_COLLECTION, filters=[("user_id", "==", user_id), ("source", "==", source)]
+        )
+        if sums:
+            await self.db.batch_delete(EXPORT_ARTISTS_COLLECTION, [d["id"] for d in sums])
         await self.db.delete_document(self.IMPORTS_COLLECTION, f"{user_id}:{source}")
         return len(deletes), len(artist_ids)
 

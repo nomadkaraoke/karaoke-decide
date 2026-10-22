@@ -6,7 +6,7 @@ Handles OAuth flows, service connections, and sync operations.
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal, cast, get_args
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -34,6 +34,7 @@ from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import ImportSource
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -85,6 +86,11 @@ class ConnectedServiceResponse(BaseModel):
     sync_error: str | None
     tracks_synced: int  # Karaoke-matched tracks
     songs_synced: int  # Total unique songs synced
+    # Added in 3b (decide web ignores them): rows stored for this source, last import, summary status.
+    artists: int = 0
+    songs: int = 0
+    last_import_at: str | None = None
+    status: str = "ok"
 
 
 class SpotifyConnectResponse(BaseModel):
@@ -186,10 +192,7 @@ class Capabilities(BaseModel):
 @router.get("/capabilities", response_model=Capabilities)
 async def get_capabilities(settings: Settings) -> Capabilities:
     """Feature flags for the Connect hub (no auth; the app hides cards that are off)."""
-    return Capabilities(
-        screenshot_import=settings.screenshot_import_enabled,
-        listenbrainz_oauth=settings.listenbrainz_oauth_active,
-    )
+    return _capabilities(settings)
 
 
 # -----------------------------------------------------------------------------
@@ -259,6 +262,76 @@ async def confirm_screenshot(
     return ImportResultResponse.from_result("screenshot", result)
 
 
+class PendingListenBrainzImport(BaseModel):
+    id: str
+    status: str
+
+
+class SourceSummary(BaseModel):
+    """One source in the app's "Connected sources" list."""
+
+    source: str
+    connected: bool
+    username: str | None = None
+    artists: int = 0
+    songs: int = 0
+    last_import_at: str | None = None
+    status: Literal["ok", "needs_reconnect", "importing", "stale", "error"] = "ok"
+    auth: Literal["username", "oauth"] | None = None
+    pending_listenbrainz_import: PendingListenBrainzImport | None = None
+
+
+class SourcesSummaryResponse(BaseModel):
+    sources: list[SourceSummary]
+    capabilities: Capabilities
+
+
+class RemoveDataResponse(BaseModel):
+    removed_songs: int
+    removed_artists: int
+
+
+def _capabilities(settings: BackendSettings) -> Capabilities:
+    return Capabilities(
+        screenshot_import=settings.screenshot_import_enabled,
+        listenbrainz_oauth=settings.listenbrainz_oauth_active,
+    )
+
+
+@router.get("/summary", response_model=SourcesSummaryResponse)
+async def get_sources_summary(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+) -> SourcesSummaryResponse:
+    """Every connected or imported source with its counts and status, plus the capability flags."""
+    rows = await music_service.get_source_summaries(user.id)
+    return SourcesSummaryResponse(sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings))
+
+
+@router.delete("/sources/{source}/data", response_model=RemoveDataResponse)
+async def remove_source_data(
+    source: str,
+    user: VerifiedUser,
+    ingest: ImportIngestServiceDep,
+    music_service: MusicServiceServiceDep,
+    request: Request,
+) -> RemoveDataResponse:
+    """Remove what one source contributed (rows sung or loved, or held by another source, are kept)
+    and its connection, if it has one."""
+    if source not in get_args(ImportSource):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t(get_locale_from_request(request), "services.invalidServiceType", service_type=source),
+        )
+    songs, artists = await ingest.remove_source_data(user.id, cast(ImportSource, source))
+    try:
+        await music_service.delete_service(user.id, source)
+    except NotFoundError:
+        pass
+    return RemoveDataResponse(removed_songs=songs, removed_artists=artists)
+
+
 @router.get("", response_model=list[ConnectedServiceResponse])
 async def list_services(
     user: VerifiedUser,
@@ -270,6 +343,7 @@ async def list_services(
     sync status and track counts.
     """
     services = await music_service.get_user_services(user.id)
+    extra = {r["source"]: r for r in await music_service.get_source_summaries(user.id)}
 
     return [
         ConnectedServiceResponse(
@@ -280,6 +354,10 @@ async def list_services(
             sync_error=svc.sync_error,
             tracks_synced=svc.tracks_synced,
             songs_synced=svc.songs_synced,
+            artists=extra.get(svc.service_type, {}).get("artists", 0),
+            songs=extra.get(svc.service_type, {}).get("songs", 0),
+            last_import_at=extra.get(svc.service_type, {}).get("last_import_at"),
+            status=extra.get(svc.service_type, {}).get("status", "ok"),
         )
         for svc in services
     ]

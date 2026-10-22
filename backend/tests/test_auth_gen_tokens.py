@@ -167,6 +167,7 @@ def test_gen_user_passes_verified_user_dep(real_auth_client: TestClient, firesto
 
     music = MagicMock()
     music.get_user_services = AsyncMock(return_value=[])
+    music.get_source_summaries = AsyncMock(return_value=[])
     app.dependency_overrides[get_music_service_service_dep] = lambda: music
     try:
         resp = real_auth_client.get("/api/services", headers=_bearer(GEN_TOKEN))

@@ -657,6 +657,20 @@ Connect Last.fm account by username.
 No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, "listenbrainz_oauth": bool, "listenbrainz_upload_max_bytes": 31457280}`.
 `screenshot_import` is true when `GEMINI_API_KEY` is set (or fakes are on); `listenbrainz_oauth` needs the MetaBrainz client id/secret, `DECIDE_TOKEN_KEY` and `LISTENBRAINZ_OAUTH_ENABLED`.
 
+### GET /api/services/summary
+
+Verified users. Every source the user has, for the app's "Connected sources" list: each `music_services` connection merged with its `user_imports` doc, plus import-only sources. Counts are Firestore aggregation queries by source.
+
+**Response:** `{"sources":[{"source":"lastfm","connected":true,"username":"x","artists":0,"songs":0,"last_import_at":null,"status":"ok","auth":"username"|"oauth"|null,"pending_listenbrainz_import":{"id":"...","status":"..."}|null}],"capabilities":{...same as /capabilities}}`. `status` (first match wins): `importing` (syncing, or import importing) > `needs_reconnect` (`error_code`) > `stale` (`lb_stale`) > `error` > `ok`.
+
+`GET /api/services` keeps its shape and gains `artists`, `songs`, `last_import_at`, `status`.
+
+### DELETE /api/services/sources/{source}/data
+
+Verified users. Remove what a source contributed and its connection, if any. Rows that were sung or loved, or are held by another source, are kept. `source` is one of `screenshot, spotify_playlist, spotify_export, apple_export, youtube_music, listenbrainz, lastfm, spotify, apple_music` (else `400`). Export sources also drop their running artist sums.
+
+**Response:** `{"removed_songs":0,"removed_artists":0}`
+
 ### POST /api/services/screenshot/extract
 
 Read artists and songs off 1-5 music-app screenshots with Gemini Flash. Multipart field `images` (each at most 4 MiB, `image/*`). Limit: 10 images per user per UTC day (reserved atomically, released if Gemini fails). Nothing is saved yet.

@@ -101,6 +101,7 @@ def mock_music_service_service(
     mock.create_or_update_spotify_service = AsyncMock(return_value=sample_spotify_service)
     mock.create_lastfm_service = AsyncMock(return_value=sample_lastfm_service)
     mock.delete_service = AsyncMock(return_value=None)
+    mock.get_source_summaries = AsyncMock(return_value=[])
 
     # Mock spotify client on the service
     mock.spotify = MagicMock()
