@@ -40,13 +40,16 @@ EXPORT_ARTISTS_COLLECTION = "user_import_artists"
 _TOTAL_FIELDS = ("artists_added", "songs_added", "songs_updated", "tracks_matched")
 
 
+MAX_TS = 4_102_444_800  # 2100-01-01 UTC, Unix seconds (rejects millisecond timestamps)
+
+
 class ExportTrack(BaseModel):
     artist: str = Field(min_length=1, max_length=300)
     title: str = Field(min_length=1, max_length=300)
     ms_played: int = Field(ge=0)
     plays: int = Field(ge=1)
-    first_ts: int
-    last_ts: int
+    first_ts: int = Field(ge=0, le=MAX_TS)
+    last_ts: int = Field(ge=0, le=MAX_TS)
 
 
 class ExportRef(BaseModel):

@@ -3,6 +3,7 @@
 from collections.abc import Generator
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 
 from backend.api.deps import get_settings
@@ -41,12 +42,34 @@ def test_capabilities_on(cap_client: TestClient, monkeypatch: pytest.MonkeyPatch
             listenbrainz_oauth_enabled=True,
             metabrainz_client_id="id",
             metabrainz_client_secret="secret",
-            decide_token_key="key",
+            decide_token_key=Fernet.generate_key().decode(),
         ),
     )
     body = cap_client.get("/api/services/capabilities").json()
     assert body["screenshot_import"] is True
     assert body["listenbrainz_oauth"] is True
+
+
+def test_oauth_off_when_token_key_malformed(cap_client: TestClient) -> None:
+    settings = BackendSettings(
+        listenbrainz_oauth_enabled=True,
+        metabrainz_client_id="id",
+        metabrainz_client_secret="secret",
+        decide_token_key="not-a-fernet-key",
+    )
+    assert settings.listenbrainz_oauth_active is False
+    _use(cap_client, settings)
+    assert cap_client.get("/api/services/capabilities").json()["listenbrainz_oauth"] is False
+
+
+def test_oauth_on_with_valid_fernet_key() -> None:
+    settings = BackendSettings(
+        listenbrainz_oauth_enabled=True,
+        metabrainz_client_id="id",
+        metabrainz_client_secret="secret",
+        decide_token_key=Fernet.generate_key().decode(),
+    )
+    assert settings.listenbrainz_oauth_active is True
 
 
 def test_oauth_needs_all_four(cap_client: TestClient) -> None:

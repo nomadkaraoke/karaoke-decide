@@ -114,7 +114,12 @@ def _now() -> str:
 
 
 def _iso(ts: int | None) -> str | None:
-    return datetime.fromtimestamp(ts, UTC).isoformat() if ts is not None else None
+    if ts is None:
+        return None
+    try:
+        return datetime.fromtimestamp(ts, UTC).isoformat()
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def _later(a: Any, b: str | None) -> Any:

@@ -18,6 +18,7 @@ from backend.services.import_ingest_service import (
     IngestArtist,
     IngestResult,
     IngestTrack,
+    _iso,
 )
 from backend.services.song_feedback_service import loved_doc_id
 from backend.services.track_matcher import MatchedTrack
@@ -451,3 +452,10 @@ def test_later_handles_naive_vs_aware_datetimes() -> None:
     assert _later(aware, naive) == naive  # comparing them raises TypeError; the new value wins
     assert _later(None, aware) == aware
     assert _later("2026-10-03T00:00:00+00:00", aware) == "2026-10-03T00:00:00+00:00"
+
+
+def test_iso_is_defensive_about_out_of_range_timestamps() -> None:
+    assert _iso(None) is None
+    assert _iso(1_700_000_000) is not None
+    assert _iso(1_700_000_000_000_000) is None  # microseconds-scale: year out of range
+    assert _iso(10**30) is None

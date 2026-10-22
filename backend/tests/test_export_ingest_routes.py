@@ -256,3 +256,14 @@ def test_failed_ingest_retry_does_not_double_artist_sums(real: Any, monkeypatch:
         client.post("/api/services/spotify-export", json=body)
     assert client.post("/api/services/spotify-export", json=body).status_code == 200
     assert artist_plays(fs) == 5
+
+
+@pytest.mark.parametrize("field", ["first_ts", "last_ts"])
+@pytest.mark.parametrize("bad", [1_700_000_000_000, -1, 4_102_444_801])
+def test_out_of_range_timestamp_is_422(env: tuple[TestClient, Env], field: str, bad: int) -> None:
+    client, e = env
+    t = track()
+    t[field] = bad
+    r = client.post("/api/services/spotify-export", json=spotify(tracks=[t]))
+    assert r.status_code == 422
+    e.ingest.ingest.assert_not_called()

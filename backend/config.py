@@ -42,11 +42,13 @@ class BackendSettings(Settings):
 
     @property
     def listenbrainz_oauth_active(self) -> bool:
+        from backend.services.token_cipher import get_token_cipher  # local: avoid import cycle
+
         return bool(
             self.listenbrainz_oauth_enabled
             and self.metabrainz_client_id
             and self.metabrainz_client_secret
-            and self.decide_token_key
+            and get_token_cipher(self).enabled
         )
 
     @property
