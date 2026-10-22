@@ -2,13 +2,15 @@
 
 import asyncio
 import logging
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, computed_field
 from starlette.requests import Request
 
+from backend.api.deps import get_catalog_store_dep
 from backend.i18n import get_locale_from_request, t
-from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
+from backend.services.catalog_store import CatalogStore, CatalogUnavailable, get_catalog_store
 from backend.services.karaoke_link_service import (
     KaraokeLinkService,
     get_karaoke_link_service,
@@ -227,6 +229,50 @@ async def get_popular_songs(
         )
         for s in results
     ]
+
+
+class SongVocalRangeOut(BaseModel):
+    """MIDI note numbers (fractional); ``tier`` rough = the artist's range standing in for the song's."""
+
+    low: float
+    high: float
+    p10: float
+    p50: float
+    p90: float
+    tier: Literal["measured", "notes", "estimated", "rough"]
+    octave_confidence: float | None
+    is_duet: bool | None
+
+
+class SongVocalRangeResponse(BaseModel):
+    song_key: str
+    range: SongVocalRangeOut | None
+
+
+@router.get("/songs/{song_key}/vocal-range", response_model=SongVocalRangeResponse)
+async def get_song_vocal_range(
+    song_key: str, store: Annotated[CatalogStore, Depends(get_catalog_store_dep)]
+) -> SongVocalRangeResponse:
+    """A song's vocal range from catalog.db (public). ``range`` is null for an unknown song or no data;
+    503 ``warming_up`` while catalog.db loads."""
+    try:
+        reader = await asyncio.to_thread(store.require)
+        vr = await asyncio.to_thread(reader.vocal_range, song_key)
+    except CatalogUnavailable:
+        raise HTTPException(status_code=503, detail="warming_up", headers={"Retry-After": "30"}) from None
+    out = None
+    if vr is not None:
+        out = SongVocalRangeOut(
+            low=vr.low,
+            high=vr.high,
+            p10=vr.p10,
+            p50=vr.p50,
+            p90=vr.p90,
+            tier=vr.tier,  # type: ignore[arg-type]
+            octave_confidence=vr.octave_confidence,
+            is_duet=vr.is_duet,
+        )
+    return SongVocalRangeResponse(song_key=song_key, range=out)
 
 
 @router.get("/songs/{song_id}", response_model=SongResponse)

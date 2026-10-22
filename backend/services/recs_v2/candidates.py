@@ -16,8 +16,10 @@ from backend.services.recs_v2.context import UserContextV2
 from backend.services.recs_v2.filters import HAS_KARAOKE_SQL, RecFilters, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
-from karaoke_decide.catalog.reader import CatalogReader
+from karaoke_decide.catalog.reader import CatalogReader, song_range_from_row
 from karaoke_decide.song_search.library_filter import library_clause
+from karaoke_decide.vocal_range.fit import FitResult, SongVocalRange
+from karaoke_decide.vocal_range.tsv import SongRange
 
 # Source caps (task brief B8).
 KNOWN_ARTISTS = 200
@@ -37,6 +39,11 @@ _CHUNK = 500
 _COLS = (
     "s.song_key, s.artist, s.title, s.artist_key, s.brand_count, s.is_classic, s.explicit, s.duration_ms, "
     "s.year, s.decade, s.popularity, s.energy, s.mood, s.lead_gender, s.genres_json, s.in_kn"
+)
+_VR_COLS = "s.vr_low, s.vr_high, s.vr_p10, s.vr_p50, s.vr_p90, s.vr_tier, s.vr_octave_conf, s.vr_duet"
+# A schema-1 catalog.db (before the vocal-range build) has no vr_* columns: select NULLs instead.
+_VR_NULLS = ", ".join(
+    f"NULL AS {c}" for c in ("vr_low", "vr_high", "vr_p10", "vr_p50", "vr_p90", "vr_tier", "vr_octave_conf", "vr_duet")
 )
 _POP_ORDER = "s.popularity DESC NULLS LAST, s.song_key"
 
@@ -66,6 +73,14 @@ class Candidate:
     genres: tuple[str, ...]
     similar_via: str | None = None  # the seed artist_key this song's artist is similar to
     similar_score: float = 0.0  # max over seeds of weight(seed) * score(seed, artist)
+    vr: SongRange | None = None  # catalog vocal range (own, or the artist's as tier "rough")
+    fit: FitResult | None = None  # set by the service when the user has a voice profile
+
+    def vocal_range(self) -> SongVocalRange | None:
+        v = self.vr
+        if v is None:
+            return None
+        return SongVocalRange(v.low, v.high, v.p10, v.p50, v.p90, v.tier, v.octave_confidence)  # type: ignore[arg-type]
 
 
 def _chunks(items: Sequence[_T]) -> Iterator[Sequence[_T]]:
@@ -78,10 +93,12 @@ def _marks(n: int) -> str:
 
 
 class _Gatherer:
-    def __init__(self, reader: CatalogReader, f: RecFilters) -> None:
+    def __init__(self, reader: CatalogReader, f: RecFilters, voice_span: int | None = None) -> None:
         self.conn = reader.conn()
         self.has_av = reader.has_availability
-        self.where, self.params = where_sql(f, has_availability=self.has_av)
+        has_vr = reader.has_vocal_range
+        self.cols = f"{_COLS}, {_VR_COLS if has_vr else _VR_NULLS}"
+        self.where, self.params = where_sql(f, has_availability=self.has_av, voice_span=voice_span if has_vr else None)
         self.rows: dict[str, sqlite3.Row] = {}
 
     def _add(self, rows: Iterator[sqlite3.Row] | list[sqlite3.Row]) -> int:
@@ -97,7 +114,7 @@ class _Gatherer:
         for chunk in _chunks(keys):
             sql = f"""
                 SELECT * FROM (
-                    SELECT {_COLS}, ROW_NUMBER() OVER (PARTITION BY s.artist_key ORDER BY {_POP_ORDER}) AS rn
+                    SELECT {self.cols}, ROW_NUMBER() OVER (PARTITION BY s.artist_key ORDER BY {_POP_ORDER}) AS rn
                     FROM songs s
                     WHERE s.artist_key IN ({_marks(len(chunk))}) AND ({extra}) AND ({self.where})
                 ) WHERE rn <= ?
@@ -105,12 +122,12 @@ class _Gatherer:
             self._add(self.conn.execute(sql, (*chunk, *self.params, per)))
 
     def top(self, cond: str, params: Sequence[object], limit: int) -> int:
-        sql = f"SELECT {_COLS} FROM songs s WHERE ({cond}) AND ({self.where}) ORDER BY {_POP_ORDER} LIMIT ?"
+        sql = f"SELECT {self.cols} FROM songs s WHERE ({cond}) AND ({self.where}) ORDER BY {_POP_ORDER} LIMIT ?"
         return self._add(self.conn.execute(sql, (*params, *self.params, limit)))
 
     def by_keys(self, song_keys: Sequence[str]) -> None:
         for chunk in _chunks(list(song_keys)):
-            sql = f"SELECT {_COLS} FROM songs s WHERE s.song_key IN ({_marks(len(chunk))}) AND ({self.where})"
+            sql = f"SELECT {self.cols} FROM songs s WHERE s.song_key IN ({_marks(len(chunk))}) AND ({self.where})"
             self._add(self.conn.execute(sql, (*chunk, *self.params)))
 
     def no_karaoke_cond(self) -> str:
@@ -217,6 +234,7 @@ def _candidate(r: sqlite3.Row, avail: dict[str, tuple[bool, bool, bool]]) -> Can
         mood=r["mood"],
         lead_gender=r["lead_gender"],
         genres=genres,
+        vr=song_range_from_row(r),
     )
 
 
@@ -245,8 +263,11 @@ def _outside_catalog(key: str, artist: str, title: str) -> Candidate:
     )
 
 
-def gather_candidates(reader: CatalogReader, ctx: UserContextV2, f: RecFilters) -> list[Candidate]:
-    g = _Gatherer(reader, f)
+def gather_candidates(
+    reader: CatalogReader, ctx: UserContextV2, f: RecFilters, voice_span: int | None = None
+) -> list[Candidate]:
+    """``voice_span`` (the user's comfort span) adds the vocal-range SQL prefilter to every source."""
+    g = _Gatherer(reader, f, voice_span)
     known_artists = [k for k, _ in sorted(ctx.artists.items(), key=lambda kv: (-kv[1].weight, kv[0]))][:KNOWN_ARTISTS]
 
     # Songs you know (bounded by weight), then known artists, similar artists, quiz, crowd pleasers, make it.

@@ -232,7 +232,7 @@ async def get_recommendation_service_v2_dep(
     feedback: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
 ) -> RecommendationServiceV2:
     """Get the v2 (catalog.db) recommendation service."""
-    return RecommendationServiceV2(firestore, store, feedback)
+    return RecommendationServiceV2(firestore, store, feedback, VoiceProfileService(firestore))
 
 
 async def get_playlist_service_dep(

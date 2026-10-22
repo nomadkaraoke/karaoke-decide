@@ -10,8 +10,9 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import logging
 import re
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
@@ -21,8 +22,12 @@ from backend.services.recs_v2.context import HiddenKeysProvider, UserContextV2, 
 from backend.services.recs_v2.filters import RecFilters, Sort, filters_applied
 from backend.services.recs_v2.scoring import Scored, score
 from backend.services.recs_v2.sections import Section, build_sections
+from backend.services.voice_profile_service import VoiceProfileOut
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
+from karaoke_decide.vocal_range.fit import UserVoiceRange, fit_song, is_singable
+
+logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 30
 _CURSOR = re.compile(r"^o:(\d{1,9})$")
@@ -52,6 +57,12 @@ class CatalogProvider(Protocol):
     def require(self) -> CatalogReader: ...
 
 
+class VoiceProfileProvider(Protocol):
+    """The slice of ``VoiceProfileService`` the service uses."""
+
+    async def get(self, user_id: str) -> VoiceProfileOut | None: ...
+
+
 class RecKaraoke(BaseModel):
     community: bool
     commercial: bool
@@ -71,6 +82,20 @@ class RecFacets(BaseModel):
     explicit: bool
 
 
+class RecFit(BaseModel):
+    """How the user's voice meets the song: bucket, the key shift (semitones) and octave shift to use."""
+
+    bucket: Literal["fits", "fitsIn", "stretch", "outside"]
+    transpose: int
+    octave: int
+    tier: Literal["measured", "notes", "estimated", "rough"]
+
+
+class RecVoice(BaseModel):
+    has_profile: bool
+    method: Literal["mic", "self"] | None
+
+
 class RecSong(BaseModel):
     song_key: str
     artist: str
@@ -82,6 +107,7 @@ class RecSong(BaseModel):
     has_karaoke_version: bool
     karaoke: RecKaraoke
     facets: RecFacets
+    fit: RecFit | None = None  # null without a voice profile or without a song vocal range
 
 
 class RecSection(BaseModel):
@@ -98,6 +124,7 @@ class RecommendationsV2Response(BaseModel):
     next_cursor: str | None
     has_profile: bool
     catalog_run: str
+    voice: RecVoice
 
 
 def encode_cursor(offset: int) -> str:
@@ -143,27 +170,83 @@ def _rec_song(s: Scored) -> RecSong:
             is_classic=c.is_classic,
             explicit=c.explicit,
         ),
+        fit=(
+            RecFit(bucket=c.fit.bucket, transpose=c.fit.transpose, octave=c.fit.octave, tier=c.vr.tier)  # type: ignore[arg-type]
+            if c.fit is not None and c.vr is not None
+            else None
+        ),
     )
 
 
-def _rank(reader: CatalogReader, ctx: UserContextV2, f: RecFilters, sort: Sort) -> list[Section]:
-    scored = [score(c, ctx) for c in gather_candidates(reader, ctx, f)]
+def voice_range(p: VoiceProfileOut | None) -> UserVoiceRange | None:
+    if p is None:
+        return None
+    return UserVoiceRange(low=p.low_midi, high=p.high_midi, comfort_low=p.comfort_low, comfort_high=p.comfort_high)
+
+
+def fitted_candidates(
+    reader: CatalogReader, ctx: UserContextV2, f: RecFilters, sort: Sort, voice: UserVoiceRange | None
+) -> list[Candidate]:
+    """Candidates with ``fit`` set (when there is a voice and a song range), ``singable`` applied.
+
+    ``singable`` / ``sort=fit`` with a voice push the span prefilter into every SQL source, so
+    ``fit_song`` only runs on rows that can fit; candidate counts stay within the source caps."""
+    prefilter = voice is not None and (f.singable or sort == "fit")
+    span = voice.comfort_high - voice.comfort_low if voice is not None and prefilter else None
+    cands = gather_candidates(reader, ctx, f, voice_span=span)
+    if voice is None:
+        return cands
+    for c in cands:
+        vr = c.vocal_range()
+        if vr is not None:
+            c.fit = fit_song(voice, vr)
+    if f.singable:
+        cands = [c for c in cands if c.fit is not None and is_singable(c.fit)]
+    return cands
+
+
+def _rank(
+    reader: CatalogReader, ctx: UserContextV2, f: RecFilters, sort: Sort, voice: UserVoiceRange | None = None
+) -> list[Section]:
+    scored = [score(c, ctx) for c in fitted_candidates(reader, ctx, f, sort, voice)]
     return build_sections(scored, ctx, sort)
 
 
 class RecommendationServiceV2:
-    def __init__(self, firestore: FirestoreService, store: CatalogProvider, feedback: HiddenKeysProvider) -> None:
+    def __init__(
+        self,
+        firestore: FirestoreService,
+        store: CatalogProvider,
+        feedback: HiddenKeysProvider,
+        voice: VoiceProfileProvider | None = None,
+    ) -> None:
         self._firestore = firestore
         self._store = store
         self._feedback = feedback
+        self._voice = voice
+
+    async def _profile(self, user_id: str) -> VoiceProfileOut | None:
+        """The voice profile; a failed read degrades to none (recs never fail on it)."""
+        if self._voice is None:
+            return None
+        try:
+            return await self._voice.get(user_id)
+        except Exception:
+            logger.warning("voice profile read failed for %s; recommending without fit", user_id, exc_info=True)
+            return None
 
     async def recommend(
         self, user: User, f: RecFilters, sort: Sort = "best", cursor: str | None = None
     ) -> RecommendationsV2Response:
         offset = decode_cursor(cursor)  # cheap; reject before any work
         reader = await asyncio.to_thread(self._store.require)  # CatalogUnavailable -> route 503
-        ctx = await build_context(self._firestore, reader, self._feedback, user.id)
-        sections = await asyncio.to_thread(_rank, reader, ctx, f, sort)
+        ctx, profile = await asyncio.gather(
+            build_context(self._firestore, reader, self._feedback, user.id), self._profile(user.id)
+        )
+        voice = voice_range(profile)
+        if voice is None and f.singable:
+            f = f.model_copy(update={"singable": False})  # ignored (and not echoed) without a profile
+        sections = await asyncio.to_thread(_rank, reader, ctx, f, sort, voice)
 
         next_cursor: str | None = None
         if sort != "best":  # only the flat list pages
@@ -189,4 +272,5 @@ class RecommendationServiceV2:
             next_cursor=next_cursor,
             has_profile=ctx.has_profile,
             catalog_run=self._store.run or "",
+            voice=RecVoice(has_profile=profile is not None, method=profile.method if profile else None),
         )

@@ -164,6 +164,13 @@ def _flat_key(sort: Sort) -> Callable[[Scored], tuple[object, ...]]:
         return lambda s: (*nulls_last(s.c.duration_ms, False), s.c.song_key)
     if sort == "az":
         return lambda s: (s.c.title.casefold(), s.c.artist.casefold(), s.c.song_key)
+    if sort == "fit":  # best fit first (lower fit score), then popularity; no fit sorts last
+        return lambda s: (
+            s.c.fit is None,
+            s.c.fit.score if s.c.fit is not None else 0.0,
+            *nulls_last(s.c.popularity, True),
+            s.c.song_key,
+        )
     raise ValueError(f"no flat order for sort {sort!r}")
 
 

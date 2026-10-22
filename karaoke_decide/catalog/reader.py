@@ -18,6 +18,7 @@ from typing import TypeVar
 
 from karaoke_decide.catalog.keys import artist_key, match_key
 from karaoke_decide.song_search.thread_conns import ThreadConnections
+from karaoke_decide.vocal_range.tsv import TIER_CODES, SongRange
 
 # SQLite's default host-parameter limit is 999 on older builds; stay under it.
 _CHUNK = 500
@@ -51,6 +52,26 @@ class ArtistSummary:
     primary_decade: str | None = None
 
 
+def song_range_from_row(row: sqlite3.Row) -> SongRange | None:
+    """A ``songs`` row's ``vr_*`` columns as a ``SongRange``; None when any is missing or the tier unknown."""
+    nums = [row[c] for c in ("vr_low", "vr_high", "vr_p10", "vr_p50", "vr_p90")]
+    tier = row["vr_tier"]
+    if any(n is None for n in nums) or tier not in TIER_CODES:
+        return None
+    low, high, p10, p50, p90 = (float(n) for n in nums)
+    duet = row["vr_duet"]
+    return SongRange(
+        low,
+        high,
+        p10,
+        p50,
+        p90,
+        tier=str(tier),
+        octave_confidence=row["vr_octave_conf"],
+        is_duet=None if duet is None else bool(duet),
+    )
+
+
 def _like_escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
@@ -79,6 +100,7 @@ class CatalogReader:
         self._local = threading.local()
         self._conns = ThreadConnections()
         self._generation = 0
+        self._has_vr: bool | None = None
         self.conn()  # fail fast on a missing / unreadable file
 
     @property
@@ -108,6 +130,14 @@ class CatalogReader:
         self._generation += 1
         self._conns.close_all()
 
+    @property
+    def has_vocal_range(self) -> bool:
+        """Whether ``songs`` has the ``vr_*`` columns (catalog schema 2+; a schema-1 file has none)."""
+        if self._has_vr is None:
+            cols = {r[1] for r in self.conn().execute("PRAGMA table_info(songs)")}
+            self._has_vr = {"vr_low", "vr_high", "vr_p10", "vr_p50", "vr_p90", "vr_tier"} <= cols
+        return self._has_vr
+
     # ---------------------------------------------------------------- queries
 
     def meta(self) -> dict[str, str]:
@@ -136,6 +166,21 @@ class CatalogReader:
             out.extend((r[0], r[1], float(r[2])) for r in rows)
         out.sort(key=lambda r: (-r[2], r[0], r[1]))
         return out
+
+    def vocal_range(self, song_key: str) -> SongRange | None:
+        """The song's vocal range (its own, or its artist's as tier ``rough``); None when unknown."""
+        if not song_key or not self.has_vocal_range:
+            return None
+        row = (
+            self.conn()
+            .execute(
+                "SELECT vr_low, vr_high, vr_p10, vr_p50, vr_p90, vr_tier, vr_octave_conf, vr_duet "
+                "FROM songs WHERE song_key = ?",
+                (song_key,),
+            )
+            .fetchone()
+        )
+        return song_range_from_row(row) if row is not None else None
 
     def kn_song_keys(self, kn_ids: Sequence[int]) -> dict[int, str]:
         """``{kn_id: song_key}`` for the KaraokeNerds ids catalog.db knows."""
