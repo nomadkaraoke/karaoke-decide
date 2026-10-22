@@ -21,7 +21,7 @@ from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
 
 logger = logging.getLogger(__name__)
-_TOP_SOURCES = {"spotify", "lastfm", "listenbrainz"}
+_TOP_SOURCES = {"spotify", "lastfm", "listenbrainz", "apple_music"}
 
 
 class HiddenKeysProvider(Protocol):

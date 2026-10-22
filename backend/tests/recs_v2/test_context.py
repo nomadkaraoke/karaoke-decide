@@ -202,3 +202,17 @@ async def test_hidden_keys_failure_degrades(reader: CatalogReader, caplog: pytes
     ctx = await build_context(FakeFirestore(), reader, Boom(), UID)  # type: ignore[arg-type]
     assert ctx.hidden == set()
     assert any(r.levelname == "WARNING" for r in caplog.records)
+
+
+# Found on prod 2026-10-22: Apple Music's ranked artists were ignored (not a top source), so a connected
+# library changed nothing in the picks.
+async def test_apple_music_artists_are_ranked_like_other_synced_services(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        decide_users=[{"id": "h", "user_id": UID}],
+        user_artists=[_artist("Toto", "apple_music", 1), _artist("Weezer", "apple_music", 100)],
+        user_songs=[],
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.artists[artist_key("Toto")].weight == pytest.approx(w.artist_top(1))
+    assert ctx.artists[artist_key("Toto")].source == "apple_music"
+    assert ctx.artists[artist_key("Weezer")].weight == pytest.approx(w.artist_top(100))
