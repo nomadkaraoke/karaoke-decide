@@ -927,6 +927,8 @@
     "signedOut": "Nejprve se přihlas k Nomad Karaoke, potom připoj Apple Music.",
     "title": "Připojit Apple Music",
     "unavailable": "Apple Music momentálně není k dispozici. Zkus to prosím znovu později.",
-    "account": "Připojování k Nomad Karaoke účtu {account}. Nejsi to ty? Zavři tuto stránku."
+    "account": "Připojování k Nomad Karaoke účtu {account}. Nejsi to ty? Zavři tuto stránku.",
+    "stuck": "Apple tě nepřesměroval zpět na tuto stránku. Klepni na Připojit Apple Music a zkus to znovu, nebo tuto stránku otevři v prohlížeči v telefonu.",
+    "waiting": "Čekání na Apple Music…"
   }
 }

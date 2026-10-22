@@ -927,6 +927,8 @@
     "signedOut": "Először jelentkezz be a Nomad Karaoke-ba, majd csatlakoztasd az Apple Musicot.",
     "title": "Apple Music csatlakoztatása",
     "unavailable": "Az Apple Music jelenleg nem érhető el. Kérjük, próbáld újra később.",
-    "account": "Csatlakozás a(z) {account} Nomad Karaoke fiókhoz. Nem te vagy az? Zárd be ezt az oldalt."
+    "account": "Csatlakozás a(z) {account} Nomad Karaoke fiókhoz. Nem te vagy az? Zárd be ezt az oldalt.",
+    "stuck": "Az Apple nem irányított vissza erre az oldalra. Koppints az Apple Music csatlakoztatása gombra az újbóli próbálkozáshoz, vagy nyisd meg ezt az oldalt a telefonod böngészőjében.",
+    "waiting": "Várakozás az Apple Musicra…"
   }
 }

@@ -927,6 +927,8 @@
     "cancelled": "Apple Music didn't connect. Connecting needs an Apple Music subscription; if you have one, tap Connect to try again.",
     "error": "Something went wrong connecting Apple Music. Please try again.",
     "privacy": "We only read your library and listening history. We never play, change or share anything.",
-    "account": "Connecting to the Nomad Karaoke account {account}. Not you? Close this page."
+    "account": "Connecting to the Nomad Karaoke account {account}. Not you? Close this page.",
+    "waiting": "Waiting for Apple Music…",
+    "stuck": "Apple didn't hand back to this page. Tap Connect Apple Music to try again, or open this page in your phone's browser."
   }
 }

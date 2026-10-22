@@ -927,6 +927,8 @@
     "signedOut": "Önce Nomad Karaoke'ye giriş yap, ardından Apple Music'i bağla.",
     "title": "Apple Music'i Bağla",
     "unavailable": "Apple Music şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.",
-    "account": "{account} Nomad Karaoke hesabına bağlanılıyor. Sen değil misin? Bu sayfayı kapatabilirsin."
+    "account": "{account} Nomad Karaoke hesabına bağlanılıyor. Sen değil misin? Bu sayfayı kapatabilirsin.",
+    "stuck": "Apple bu sayfaya geri yönlendirmedi. Tekrar denemek için Apple Music'e Bağlan'a dokun veya bu sayfayı telefonunun tarayıcısında aç.",
+    "waiting": "Apple Music bekleniyor…"
   }
 }

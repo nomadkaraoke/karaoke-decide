@@ -33,6 +33,26 @@ function ConnectAppleMusic() {
   const fromApp = params.get("return") === "app";
   const [phase, setPhase] = useState<Phase>("loading");
   const [account, setAccount] = useState<string | null>(null);
+  // Apple's sign-in runs in a popup that hands the token back to this page. Some in-app browsers drop that
+  // link, so authorize() never settles: once the user is back here and it still hasn't, say so.
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    if (phase !== "connecting") return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onBack = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      timer = setTimeout(() => setStuck(true), 4000);
+    };
+    window.addEventListener("focus", onBack);
+    document.addEventListener("visibilitychange", onBack);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", onBack);
+      document.removeEventListener("visibilitychange", onBack);
+    };
+  }, [phase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +84,7 @@ function ConnectAppleMusic() {
   }, [state]);
 
   const connect = useCallback(async () => {
+    setStuck(false);
     setPhase("connecting");
     let musicUserToken: string | undefined;
     try {
@@ -153,12 +174,17 @@ function ConnectAppleMusic() {
               <Button
                 variant="primary"
                 onClick={connect}
-                isLoading={phase === "loading" || phase === "connecting"}
-                disabled={phase === "loading" || phase === "connecting"}
+                isLoading={phase === "loading"}
+                disabled={phase === "loading" || (phase === "connecting" && !stuck)}
                 data-testid="apple-music-connect"
               >
-                {t("connect")}
+                {phase === "connecting" && !stuck ? t("waiting") : t("connect")}
               </Button>
+            )}
+            {phase === "connecting" && stuck && (
+              <p className="text-sm text-[var(--text-muted)]" data-testid="apple-music-stuck">
+                {t("stuck")}
+              </p>
             )}
             <p className="text-xs text-[var(--text-subtle)]">{t("privacy")}</p>
           </>

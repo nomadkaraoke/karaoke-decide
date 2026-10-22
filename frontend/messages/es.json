@@ -927,6 +927,8 @@
     "signedOut": "Inicia sesión primero en Nomad Karaoke y luego conecta Apple Music.",
     "title": "Conectar Apple Music",
     "unavailable": "Apple Music no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.",
-    "account": "Conectando a la cuenta de Nomad Karaoke {account}. ¿No eres tú? Cierra esta página."
+    "account": "Conectando a la cuenta de Nomad Karaoke {account}. ¿No eres tú? Cierra esta página.",
+    "stuck": "Apple no te redirigió de vuelta a esta página. Toca Conectar Apple Music para intentarlo de nuevo o abre esta página en el navegador de tu teléfono.",
+    "waiting": "Esperando a Apple Music…"
   }
 }

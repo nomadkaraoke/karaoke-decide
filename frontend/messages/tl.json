@@ -927,6 +927,8 @@
     "signedOut": "Mag-sign in muna sa Nomad Karaoke, pagkatapos ay ikonekta ang Apple Music.",
     "title": "Ikonekta ang Apple Music",
     "unavailable": "Hindi available ang Apple Music sa ngayon. Pakisubukan muli mamaya.",
-    "account": "Kumokonekta sa Nomad Karaoke account na {account}. Hindi ikaw? Isara ang page na ito."
+    "account": "Kumokonekta sa Nomad Karaoke account na {account}. Hindi ikaw? Isara ang page na ito.",
+    "stuck": "Hindi ka naibalik ng Apple sa page na ito. I-tap ang Connect Apple Music para subukan ulit, o buksan ang page na ito sa browser ng iyong telepono.",
+    "waiting": "Naghihintay sa Apple Music…"
   }
 }
