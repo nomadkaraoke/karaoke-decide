@@ -1148,3 +1148,110 @@ class TestGetProgress:
         mock_firestore.get_document = AsyncMock(return_value={"step": 2})
         assert await quiz_service.get_progress("u1") == {"step": 2}
         mock_firestore.get_document.assert_awaited_once_with("quiz_progress", "u1")
+
+
+# ---------------------------------------------------------------------------
+# catalog.db fallback when BigQuery is disabled (local stack) or failing (prod degrade)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def real_catalog(tmp_path: Any) -> Any:
+    """A small invented catalog.db read through the real CatalogReader."""
+    from karaoke_decide.catalog.build import ArtistRow, CatalogRows, SimilarRow, SongRow, build_catalog_db
+    from karaoke_decide.catalog.reader import CatalogReader
+
+    def songs(key: str, name: str, decade: str, n: int = 2) -> list[SongRow]:
+        return [
+            SongRow(f"{key}|tune {i}", name, f"Tune {i}", key, brand_count=2, decade=decade, lb_listeners=i)
+            for i in range(1, n + 1)
+        ]
+
+    rows = CatalogRows(
+        songs=[
+            *songs("muse", "Muse", "2000s"),
+            *songs("glass harbor", "Glass Harbor", "1980s"),
+            *songs("neon tide", "Neon Tide", "1980s"),
+            *songs("paper moons", "Paper Moons", "2010s"),
+            *songs("velvet static", "Velvet Static", "1990s"),
+        ],
+        artists=[
+            ArtistRow("muse", "Muse", popularity=95, genres=("rock",)),
+            ArtistRow("glass harbor", "Glass Harbor", popularity=40, genres=("pop",)),
+            ArtistRow("neon tide", "Neon Tide", popularity=70, genres=("rock",)),
+            ArtistRow("paper moons", "Paper Moons", popularity=90, genres=("rock",)),
+            ArtistRow("velvet static", "Velvet Static", popularity=99, genres=("jazz",)),
+        ],
+        similar=[SimilarRow("muse", "glass harbor", 0.8, "test"), SimilarRow("muse", "neon tide", 0.3, "test")],
+        kn=[],
+        genre_map={},
+    )
+    db = tmp_path / "catalog.db"
+    build_catalog_db(rows, db, "r")
+    reader = CatalogReader(db, None)
+    yield reader
+    reader.close()
+
+
+def _fallback_service(
+    mock_firestore: MagicMock, reader: Any, bigquery: MagicMock | None = None, disabled: bool = True
+) -> QuizService:
+    settings = BackendSettings(
+        environment="development", google_cloud_project="test-project", bigquery_disabled=disabled
+    )
+    return QuizService(
+        settings=settings,
+        firestore=mock_firestore,
+        bigquery_client=bigquery or MagicMock(),
+        catalog_store=FakeCatalogStore(reader),  # type: ignore[arg-type]
+    )
+
+
+class TestSmartArtistsCatalogFallback:
+    @pytest.mark.asyncio
+    async def test_bigquery_disabled_answers_from_catalog(self, mock_firestore: MagicMock, real_catalog: Any) -> None:
+        bq = MagicMock()
+        svc = _fallback_service(mock_firestore, real_catalog, bq)
+        artists = await svc.get_smart_quiz_artists(genres=["rock"], decades=["2010s"], seed_artists=["Muse"], count=3)
+        bq.query.assert_not_called()
+        by_name = {a.name: a for a in artists}
+        # Similar to the pick first (best score first), then the genre/decade popular artists.
+        assert [a.name for a in artists] == ["Glass Harbor", "Neon Tide", "Paper Moons"]
+        assert "Muse" not in by_name  # a pick is never suggested back
+        glass = by_name["Glass Harbor"].suggestion_reason
+        assert glass is not None and glass.type == "fans_also_like" and glass.display_text == "Fans of Muse also like"
+        paper = by_name["Paper Moons"].suggestion_reason
+        assert paper is not None and paper.type == "genre_match" and paper.display_text == "Based on rock"
+        assert by_name["Paper Moons"].top_songs and by_name["Paper Moons"].primary_decade == "2010s"
+        assert by_name["Paper Moons"].song_count == 2 and by_name["Paper Moons"].total_brand_count == 4
+
+    @pytest.mark.asyncio
+    async def test_decade_reason_and_padding(self, mock_firestore: MagicMock, real_catalog: Any) -> None:
+        svc = _fallback_service(mock_firestore, real_catalog)
+        artists = await svc.get_smart_quiz_artists(decades=["1990s"], exclude_artists=["Paper Moons"], count=3)
+        # Velvet Static is the only 1990s artist; the rest pads with any popular artist (no excludes).
+        assert [a.name for a in artists] == ["Velvet Static", "Muse", "Neon Tide"]
+        reasons = [a.suggestion_reason.type for a in artists if a.suggestion_reason]
+        assert reasons == ["decade_match", "popular_choice", "popular_choice"]
+
+    @pytest.mark.asyncio
+    async def test_bigquery_error_degrades_to_catalog(self, mock_firestore: MagicMock, real_catalog: Any) -> None:
+        bq = MagicMock()
+        bq.query.side_effect = RuntimeError("boom")
+        svc = _fallback_service(mock_firestore, real_catalog, bq, disabled=False)
+        svc._get_collaborative_suggestions = AsyncMock(return_value={})  # type: ignore[method-assign]
+        artists = await svc.get_smart_quiz_artists(genres=["jazz"], count=2)
+        assert bq.query.called
+        assert [a.name for a in artists][0] == "Velvet Static"
+        assert all(a.suggestion_reason for a in artists)
+
+    @pytest.mark.asyncio
+    async def test_catalog_warming_up_returns_empty(self, mock_firestore: MagicMock) -> None:
+        svc = _fallback_service(mock_firestore, None)
+        assert await svc.get_smart_quiz_artists(genres=["rock"], seed_artists=["Muse"]) == []
+
+    @pytest.mark.asyncio
+    async def test_catalog_error_returns_empty(self, mock_firestore: MagicMock, real_catalog: Any) -> None:
+        svc = _fallback_service(mock_firestore, real_catalog)
+        real_catalog.popular_artist_keys = MagicMock(side_effect=RuntimeError("corrupt"))
+        assert await svc.get_smart_quiz_artists(genres=["rock"]) == []

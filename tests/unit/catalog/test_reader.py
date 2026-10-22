@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from karaoke_decide.catalog import fixtures
-from karaoke_decide.catalog.build import ArtistRow, build_catalog_db
+from karaoke_decide.catalog.build import ArtistRow, CatalogRows, SimilarRow, SongRow, build_catalog_db
 from karaoke_decide.catalog.reader import CatalogReader, KnMatch
 from karaoke_decide.song_search.availability import build_availability_db
 from karaoke_decide.song_search.build_song_id import build as build_song_id
@@ -136,4 +136,75 @@ def test_artist_mbid(tmp_path: Path, make_rows) -> None:  # type: ignore[no-unty
     assert r.artist_mbid("Artist 1") == "mbid-1"
     assert r.artist_mbid("ARTIST 1") == "mbid-1"
     assert r.artist_mbid("Nobody") is None
+    r.close()
+
+
+def _artist_catalog(tmp_path: Path) -> CatalogReader:
+    """Invented artists: popularity Alpha > Beta > Gamma > Delta; Echo has no songs."""
+
+    def songs(key: str, name: str, decade: str, n: int, brands: int) -> list[SongRow]:
+        return [
+            SongRow(f"{key}|tune {i}", name, f"Tune {i}", key, brand_count=brands, decade=decade, lb_listeners=i)
+            for i in range(1, n + 1)
+        ]
+
+    rows = CatalogRows(
+        songs=[
+            *songs("alpha", "Alpha", "1980s", 3, 2),
+            *songs("beta band", "Beta Band", "1990s", 2, 1),
+            *songs("gamma ray", "Gamma Ray", "1980s", 1, 4),
+            *songs("delta", "Delta", "2000s", 1, 1),
+            SongRow("delta|old one", "Delta", "Old One", "delta", decade="1980s", lb_listeners=1),
+            SongRow("delta|older one", "Delta", "Older One", "delta", decade="1980s", lb_listeners=1),
+        ],
+        artists=[
+            ArtistRow("alpha", "Alpha", mbid="mbid-a", popularity=90, genres=("rock",)),
+            ArtistRow("beta band", "Beta Band", popularity=80, genres=("pop",)),
+            ArtistRow("gamma ray", "Gamma Ray", popularity=70, genres=("metal", "rock")),
+            ArtistRow("delta", "Delta", popularity=60, genres=("pop",)),
+            ArtistRow("echo", "Echo", popularity=99, genres=("rock",)),
+        ],
+        similar=[SimilarRow("alpha", "gamma ray", 0.9, "test")],
+        kn=[],
+        genre_map={},
+    )
+    db = tmp_path / "catalog.db"
+    build_catalog_db(rows, db, "r")
+    return CatalogReader(db, None)
+
+
+def test_popular_artist_keys_filters_and_orders(tmp_path: Path) -> None:
+    r = _artist_catalog(tmp_path)
+    # Echo is the most popular artist but has no songs, so it never appears.
+    assert r.popular_artist_keys(limit=10) == ["alpha", "beta band", "gamma ray", "delta"]
+    assert r.popular_artist_keys(limit=2) == ["alpha", "beta band"]
+    assert r.popular_artist_keys(limit=10, genres=["rock"]) == ["alpha", "gamma ray"]
+    assert r.popular_artist_keys(limit=10, decades=["1980s"]) == ["alpha", "gamma ray", "delta"]
+    assert r.popular_artist_keys(limit=10, genres=["pop"], decades=["1980s"]) == ["delta"]
+    assert r.popular_artist_keys(limit=2, exclude_keys=["alpha"]) == ["beta band", "gamma ray"]
+    r.close()
+
+
+def test_artist_summaries(tmp_path: Path) -> None:
+    r = _artist_catalog(tmp_path)
+    got = r.artist_summaries(["delta", "alpha", "nobody"])
+    assert list(got) == ["delta", "alpha"]
+    alpha = got["alpha"]
+    assert (alpha.name, alpha.mbid, alpha.popularity, alpha.genres) == ("Alpha", "mbid-a", 90, ("rock",))
+    assert (alpha.song_count, alpha.brand_total, alpha.primary_decade) == (3, 6, "1980s")
+    assert len(alpha.top_songs) == 3 and set(alpha.top_songs) == {"Tune 1", "Tune 2", "Tune 3"}
+    # Two 1980s songs beat one 2000s song.
+    assert got["delta"].primary_decade == "1980s"
+    assert r.artist_summaries([]) == {}
+    r.close()
+
+
+def test_search_artists_ranks_exact_prefix_word_substring(tmp_path: Path) -> None:
+    r = _artist_catalog(tmp_path)
+    assert [a.name for a in r.search_artists("alpha")] == ["Alpha"]
+    assert [a.name for a in r.search_artists("BAND")] == ["Beta Band"]  # word prefix, case-folded
+    assert [a.name for a in r.search_artists("ta")] == ["Beta Band", "Delta"]  # substring, by popularity
+    assert [a.name for a in r.search_artists("e")] == ["Echo", "Beta Band", "Delta"]  # prefix tier first
+    assert [a.name for a in r.search_artists("a", limit=1)] == ["Alpha"]
+    assert r.search_artists("%") == [] and r.search_artists("_") == [] and r.search_artists("  ") == []
     r.close()

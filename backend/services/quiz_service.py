@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
     from karaoke_decide.catalog.reader import CatalogReader
 
 # Smart-quiz ordering: the strongest explanation first (spec §5.6).
+logger = logging.getLogger(__name__)
+
 REASON_PRIORITY: dict[str, int] = {
     "fans_also_like": 0,
     "similar_artist": 1,
@@ -224,6 +227,125 @@ class QuizService:
         return candidates
 
     async def get_smart_quiz_artists(
+        self,
+        genres: list[str] | None = None,
+        decades: list[str] | None = None,
+        seed_artists: list[str] | None = None,
+        seed_song_artists: list[str] | None = None,
+        exclude_artists: list[str] | None = None,
+        count: int = DEFAULT_ARTIST_COUNT,
+    ) -> list[QuizArtist]:
+        """Smart quiz artists from BigQuery; from catalog.db when BigQuery is disabled (local
+        stack) or fails, so the quiz degrades instead of erroring. Empty only while catalog.db is
+        still warming up."""
+        if not self.settings.bigquery_disabled:
+            try:
+                return await self._smart_quiz_artists_bigquery(
+                    genres=genres,
+                    decades=decades,
+                    seed_artists=seed_artists,
+                    seed_song_artists=seed_song_artists,
+                    exclude_artists=exclude_artists,
+                    count=count,
+                )
+            except Exception:
+                logger.warning("Smart quiz artists: BigQuery failed, answering from catalog.db", exc_info=True)
+        seeds = list(dict.fromkeys([*(seed_artists or []), *(seed_song_artists or [])]))
+        try:
+            reader = await self._catalog_reader()
+            if reader is None:
+                return []
+            return await asyncio.to_thread(
+                self._catalog_smart_artists, reader, genres or [], decades or [], seeds, exclude_artists or [], count
+            )
+        except Exception:
+            logger.warning("Smart quiz artists: catalog.db fallback failed", exc_info=True)
+            return []
+
+    def _catalog_smart_artists(
+        self,
+        reader: CatalogReader,
+        genres: list[str],
+        decades: list[str],
+        seeds: list[str],
+        exclude_artists: list[str],
+        count: int,
+    ) -> list[QuizArtist]:
+        """Smart suggestions from catalog.db alone: ``artist_similar`` of the user's picks, then
+        the most popular catalog artists in the chosen genres/decades (any artist if those run
+        out). Every artist carries a reason; the order is deterministic."""
+        seed_by_key = {artist_key(s): s for s in seeds if artist_key(s)}
+        excluded = {artist_key(a) for a in exclude_artists} | set(seed_by_key)
+
+        fans_of: dict[str, list[str]] = {}
+        scores: dict[str, float] = {}
+        for seed_key, similar_key, score in reader.similar(list(seed_by_key)):  # best score first
+            if similar_key in excluded:
+                continue
+            names = fans_of.setdefault(similar_key, [])
+            if seed_by_key[seed_key] not in names:
+                names.append(seed_by_key[seed_key])
+            scores[similar_key] = max(scores.get(similar_key, 0.0), score)
+
+        genre_filter = [] if "other" in genres else genres
+        keys = list(fans_of)
+        keys += reader.popular_artist_keys(
+            limit=count * 2, genres=genre_filter, decades=decades, exclude_keys=[*excluded, *keys]
+        )
+        if len(keys) < count and (genre_filter or decades):
+            keys += reader.popular_artist_keys(limit=count * 2, exclude_keys=[*excluded, *keys])
+
+        summaries = reader.artist_summaries(keys)
+        artists: list[tuple[QuizArtist, int]] = []
+        for key in keys:
+            summary = summaries.get(key)
+            if summary is None:
+                continue
+            artist = QuizArtist(
+                mbid=summary.mbid,
+                name=summary.name,
+                song_count=summary.song_count,
+                top_songs=list(summary.top_songs),
+                total_brand_count=summary.brand_total,
+                primary_decade=summary.primary_decade or "Unknown",
+                genres=list(summary.genres),
+            )
+            artist.suggestion_reason = self._catalog_reason(artist, fans_of.get(key, []), genre_filter, decades)
+            artists.append((artist, summary.popularity))
+
+        artists.sort(
+            key=lambda a: (
+                REASON_PRIORITY[a[0].suggestion_reason.type if a[0].suggestion_reason else "popular_choice"],
+                -scores.get(artist_key(a[0].name), 0.0),
+                -a[1],
+                -a[0].total_brand_count,
+                a[0].name.lower(),
+            )
+        )
+        return [a for a, _ in artists[:count]]
+
+    def _catalog_reason(
+        self, artist: QuizArtist, fans_of: list[str], genres: list[str], decades: list[str]
+    ) -> SuggestionReason:
+        """Why a catalog.db-sourced artist is suggested (same reason types as the BigQuery path)."""
+        if fans_of:
+            if len(fans_of) == 1:
+                text = f"Fans of {fans_of[0]} also like"
+            elif len(fans_of) == 2:
+                text = f"Fans of {fans_of[0]} & {fans_of[1]} also like"
+            else:
+                text = f"Fans of {fans_of[0]}, {fans_of[1]} & others also like"
+            return SuggestionReason(type="fans_also_like", display_text=text, related_to=", ".join(fans_of[:3]))
+        matching = sorted(set(genres) & set(artist.genres))
+        if matching:
+            return SuggestionReason(
+                type="genre_match", display_text=f"Based on {self._format_genre_names(matching[:2])}"
+            )
+        if artist.primary_decade in decades:
+            return SuggestionReason(type="decade_match", display_text=f"Popular in the {artist.primary_decade}")
+        return SuggestionReason(type="popular_choice", display_text="Popular karaoke choice")
+
+    async def _smart_quiz_artists_bigquery(
         self,
         genres: list[str] | None = None,
         decades: list[str] | None = None,

@@ -1,5 +1,8 @@
 """Tests for catalog API endpoints."""
 
+from typing import Any
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 
@@ -187,3 +190,69 @@ class TestGetSongLinks:
             assert "url" in link
             assert "label" in link
             assert "description" in link
+
+
+class TestSearchArtistsCatalogFallback:
+    """/api/catalog/artists answers from catalog.db when BigQuery is off or failing (never 500)."""
+
+    @staticmethod
+    def _store(tmp_path: Any) -> Any:
+        from karaoke_decide.catalog.build import ArtistRow, CatalogRows, SongRow, build_catalog_db
+        from karaoke_decide.catalog.reader import CatalogReader
+
+        rows = CatalogRows(
+            songs=[SongRow("muse|tune", "Muse", "Tune", "muse", lb_listeners=1)],
+            artists=[
+                ArtistRow("muse", "Muse", mbid="mbid-muse", popularity=80, genres=("rock",)),
+                ArtistRow("mustard plug", "Mustard Plug", popularity=30, genres=("ska",)),
+                ArtistRow("the amusements", "The Amusements", popularity=90),
+            ],
+            similar=[],
+            kn=[],
+            genre_map={},
+        )
+        build_catalog_db(rows, tmp_path / "catalog.db", "r")
+        store = MagicMock()
+        store.require.return_value = CatalogReader(tmp_path / "catalog.db", None)
+        return store
+
+    def test_bigquery_disabled_uses_catalog(
+        self, client: TestClient, mock_catalog_service: MagicMock, tmp_path: Any
+    ) -> None:
+        with (
+            patch("backend.api.routes.catalog.get_settings", return_value=MagicMock(bigquery_disabled=True)),
+            patch("backend.api.routes.catalog.get_catalog_store", return_value=self._store(tmp_path)),
+        ):
+            response = client.get("/api/catalog/artists?q=mus&limit=5")
+        assert response.status_code == 200
+        data = response.json()
+        assert [a["name"] for a in data["artists"]] == ["Muse", "Mustard Plug", "The Amusements"]
+        assert data["total"] == 3
+        muse = data["artists"][0]
+        assert muse["mbid"] == "mbid-muse" and muse["genres"] == ["rock"] and muse["artist_name"] == "Muse"
+        mock_catalog_service.search_artists_mbid.assert_not_called()
+
+    def test_bigquery_error_degrades_to_catalog(
+        self, client: TestClient, mock_catalog_service: MagicMock, tmp_path: Any
+    ) -> None:
+        mock_catalog_service.search_artists_mbid.side_effect = RuntimeError("bigquery down")
+        with (
+            patch("backend.api.routes.catalog.get_settings", return_value=MagicMock(bigquery_disabled=False)),
+            patch("backend.api.routes.catalog.get_catalog_store", return_value=self._store(tmp_path)),
+        ):
+            response = client.get("/api/catalog/artists?q=muse")
+        assert response.status_code == 200
+        assert response.json()["artists"][0]["name"] == "Muse"
+
+    def test_catalog_warming_up_gives_empty_list(self, client: TestClient) -> None:
+        from backend.services.catalog_store import CatalogUnavailable
+
+        store = MagicMock()
+        store.require.side_effect = CatalogUnavailable("warming_up")
+        with (
+            patch("backend.api.routes.catalog.get_settings", return_value=MagicMock(bigquery_disabled=True)),
+            patch("backend.api.routes.catalog.get_catalog_store", return_value=store),
+        ):
+            response = client.get("/api/catalog/artists?q=muse")
+        assert response.status_code == 200
+        assert response.json() == {"artists": [], "total": 0}
