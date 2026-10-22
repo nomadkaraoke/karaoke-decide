@@ -367,6 +367,16 @@ class UserDataService:
         # NOTE: Artists are now enriched at sync time (see sync_service.py)
         # using the pre-normalized spotify_artists_normalized BigQuery table
 
+        # Attach quiz affinity (love/like/occasionally) by normalized name
+        affinity_by_name: dict[str, str] = {}
+        for entry in (user_doc or {}).get("quiz_artist_affinities") or []:
+            name = (entry.get("artist_name") or "").strip().lower()
+            affinity = entry.get("affinity")
+            if name and affinity in ("love", "like", "occasionally"):
+                affinity_by_name[name] = affinity
+        for key, merged in merged_artists.items():
+            merged["affinity"] = affinity_by_name.get(key.strip())
+
         artists = list(merged_artists.values())
 
         # Sort priority:
