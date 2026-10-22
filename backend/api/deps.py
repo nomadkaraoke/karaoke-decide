@@ -19,6 +19,7 @@ from backend.services.quiz_service import QuizService, get_quiz_service
 from backend.services.recommendation_service import RecommendationService, get_recommendation_service
 from backend.services.recs_v2.context import HiddenKeysProvider
 from backend.services.recs_v2.service import RecommendationServiceV2
+from backend.services.song_feedback_service import SongFeedbackService
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
 from karaoke_decide.core.models import User
@@ -207,16 +208,18 @@ async def get_catalog_store_dep() -> CatalogStore:
     return get_catalog_store()
 
 
-class _NoHiddenKeys:
-    """Placeholder until Task B10's ``SongFeedbackService`` lands: nothing is hidden."""
+async def get_song_feedback_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> SongFeedbackService:
+    """Song feedback ("Not for me" / "Love it") service."""
+    return SongFeedbackService(firestore)
 
-    async def hidden_keys(self, user_id: str) -> set[str]:
-        return set()
 
-
-async def get_hidden_keys_provider() -> HiddenKeysProvider:
-    """Source of a user's hidden ("Not for me") song keys. B10 swaps in ``SongFeedbackService``."""
-    return _NoHiddenKeys()
+async def get_hidden_keys_provider(
+    feedback: Annotated[SongFeedbackService, Depends(get_song_feedback_service)],
+) -> HiddenKeysProvider:
+    """Source of a user's hidden ("Not for me") song keys."""
+    return feedback
 
 
 async def get_recommendation_service_v2_dep(

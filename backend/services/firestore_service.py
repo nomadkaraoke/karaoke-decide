@@ -81,6 +81,17 @@ class FirestoreService:
                 batch.delete(self.collection(collection).document(doc_id))
             await batch.commit()
 
+    async def get_many(self, collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+        """Fetch many documents in one round trip. Missing ids are omitted."""
+        if not ids:
+            return {}
+        refs = [self.collection(collection).document(i) for i in ids]
+        found: dict[str, dict[str, Any]] = {}
+        async for snap in self.client.get_all(refs):
+            if snap.exists:
+                found[snap.id] = snap.to_dict() or {}
+        return found
+
     async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         """Update specific fields in a document."""
         doc_ref = self.collection(collection).document(doc_id)
