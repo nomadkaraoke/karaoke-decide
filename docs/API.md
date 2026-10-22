@@ -78,7 +78,7 @@ Catalog-backed, explained recommendations (auth: decide JWT or gen session token
 `sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
 
 ```json
-{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "upbeat", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}}]}],
+{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}}]}],
  "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000"}
 ```
 

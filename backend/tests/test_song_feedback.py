@@ -191,3 +191,49 @@ def test_hidden_keys_provider_is_feedback_service() -> None:
     finally:
         app.dependency_overrides.clear()
     assert isinstance(provider, SongFeedbackService)
+
+
+@pytest.mark.asyncio
+async def test_love_then_get_user_songs_does_not_crash(fs: MemoryFirestore) -> None:
+    """Regression: love() wrote datetimes; get_user_songs fromisoformat()'d them -> 500."""
+    from unittest.mock import MagicMock
+
+    from backend.services.recommendation_service import RecommendationService
+
+    await _svc(fs).love("u1", "adele|hello", "Adele", "Hello")
+    doc = next(iter(fs.cols["user_songs"].values()))
+    assert isinstance(doc["created_at"], str)
+    assert isinstance(doc["updated_at"], str)
+
+    async def count_documents(collection: str, filters: Any = None, **_: Any) -> int:
+        return len(await fs.query_documents(collection, filters=filters))
+
+    fs.count_documents = count_documents  # type: ignore[attr-defined]
+    rec = RecommendationService(settings=MagicMock(), firestore=fs, bigquery_client=MagicMock())  # type: ignore[arg-type]
+    songs, total = await rec.get_user_songs("u1")
+    assert total == 1
+    assert songs[0].title == "Hello"
+
+
+@pytest.mark.asyncio
+async def test_list_tolerates_legacy_datetime_and_iso_created_at(fs: MemoryFirestore) -> None:
+    from datetime import UTC, datetime
+
+    fs.cols["user_hidden_songs"] = {
+        "a": {
+            "user_id": "u1",
+            "song_key": "a|a",
+            "artist": "A",
+            "title": "A",
+            "created_at": datetime(2026, 1, 1, tzinfo=UTC),
+        },
+        "b": {
+            "user_id": "u1",
+            "song_key": "b|b",
+            "artist": "B",
+            "title": "B",
+            "created_at": "2026-02-01T00:00:00+00:00",
+        },
+    }
+    songs = await _svc(fs).list_hidden("u1")
+    assert [s.song_key for s in songs] == ["b|b", "a|a"]

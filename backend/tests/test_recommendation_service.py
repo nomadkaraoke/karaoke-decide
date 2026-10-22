@@ -587,3 +587,32 @@ class TestGetCrowdPleasers:
         for rec in recommendations:
             assert rec.reason_type == "crowd_pleaser"
             assert rec.score == 0.5  # Neutral cold start score
+
+
+class TestGetUserSongsDatetimeTolerance:
+    @pytest.mark.asyncio
+    async def test_accepts_datetime_timestamps(
+        self,
+        recommendation_service: RecommendationService,
+        mock_firestore: MagicMock,
+    ) -> None:
+        from datetime import UTC, datetime
+
+        now = datetime(2026, 1, 1, tzinfo=UTC)
+        mock_firestore.query_documents = AsyncMock(
+            return_value=[
+                {
+                    "id": "u:1",
+                    "user_id": "u",
+                    "song_id": "1",
+                    "artist": "A",
+                    "title": "T",
+                    "created_at": now,
+                    "updated_at": now,
+                    "last_played_at": now,
+                }
+            ]
+        )
+        mock_firestore.count_documents = AsyncMock(return_value=1)
+        songs, _ = await recommendation_service.get_user_songs(user_id="u")
+        assert songs[0].created_at == now

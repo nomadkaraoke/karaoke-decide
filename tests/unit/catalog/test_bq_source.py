@@ -204,3 +204,23 @@ def test_no_karaoke_skips_bracketed_variants_of_kn_songs():
     ]
     out = src._no_karaoke_songs(iter(rows), src._kn_title_keys(kn), {})
     assert [s.title for s in out] == ["Brand New [From The Vault]"]
+
+
+def test_no_karaoke_drops_interludes_and_skits():
+    titles = [
+        "Intro",
+        "Outro",
+        "Interlude",
+        "Prelude",
+        "Skit",
+        "Album Interlude",
+        "Real Hit",
+        "Introspection",
+        "Skitter",
+    ]
+    rows = [
+        {"recording_mbid": f"r{i}", "title": t, "artist": "Alpha Band", "listeners": 5000 - i}
+        for i, t in enumerate(titles)
+    ]
+    out = src._no_karaoke_songs(iter(rows), set(), {})
+    assert sorted(s.title for s in out) == ["Introspection", "Real Hit", "Skitter"]

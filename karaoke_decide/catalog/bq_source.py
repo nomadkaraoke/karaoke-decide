@@ -300,6 +300,10 @@ def _kn_title_keys(kn: list[KnRow]) -> set[str]:
     return {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
 
 
+# Album filler that nobody sings at karaoke (whole-word match, so "Introspection" survives).
+_NON_SONG_TITLE_RE = re.compile(r"\b(interlude|prelude|intro|outro|skit)\b", re.IGNORECASE)
+
+
 def _no_karaoke_songs(
     rows: Iterator[dict[str, Any]], kn_keys: set[str], artists: dict[str, ArtistRow]
 ) -> list[SongRow]:
@@ -311,6 +315,8 @@ def _no_karaoke_songs(
     candidates: dict[str, list[SongRow]] = defaultdict(list)
     seen: set[str] = set()
     for r in sorted(rows, key=lambda r: -(r.get("listeners") or 0)):
+        if _NON_SONG_TITLE_RE.search(r["title"]):
+            continue
         key = song_key(r["artist"], r["title"])
         base = _base_key(r["artist"], r["title"])
         a_key = artist_key(r["artist"])

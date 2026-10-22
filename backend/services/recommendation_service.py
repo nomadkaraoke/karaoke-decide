@@ -78,6 +78,11 @@ class CategorizedRecommendations:
     filters_applied: dict[str, Any]
 
 
+def _as_datetime(value: Any) -> datetime:
+    """Firestore docs hold ISO strings, but tolerate datetime values."""
+    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
+
+
 class RecommendationService:
     """Service for generating song recommendations.
 
@@ -485,17 +490,17 @@ class RecommendationService:
                 play_count=doc.get("sync_count") or doc.get("play_count", 0),
                 playcount=doc.get("playcount"),
                 rank=doc.get("rank"),
-                last_played_at=(datetime.fromisoformat(doc["last_played_at"]) if doc.get("last_played_at") else None),
+                last_played_at=(_as_datetime(doc["last_played_at"]) if doc.get("last_played_at") else None),
                 is_saved=doc.get("is_saved", False),
                 times_sung=doc.get("times_sung", 0),
-                last_sung_at=(datetime.fromisoformat(doc["last_sung_at"]) if doc.get("last_sung_at") else None),
+                last_sung_at=(_as_datetime(doc["last_sung_at"]) if doc.get("last_sung_at") else None),
                 average_rating=doc.get("average_rating"),
                 notes=doc.get("notes"),
                 artist=doc["artist"],
                 title=doc["title"],
                 spotify_popularity=doc.get("spotify_popularity"),
-                created_at=(datetime.fromisoformat(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
-                updated_at=(datetime.fromisoformat(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
+                created_at=(_as_datetime(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
+                updated_at=(_as_datetime(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
             )
             for doc in paginated_docs
         ]

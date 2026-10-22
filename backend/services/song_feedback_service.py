@@ -10,7 +10,7 @@ import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from backend.services.firestore_service import FirestoreService
 
@@ -37,6 +37,12 @@ class FeedbackSong(BaseModel):
     artist: str
     title: str
     created_at: datetime | None = None
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def _parse_created_at(cls, v: Any) -> Any:
+        """Docs hold ISO strings; tolerate datetimes written by older versions."""
+        return datetime.fromisoformat(v) if isinstance(v, str) else v
 
 
 def _to_songs(docs: list[dict[str, Any]]) -> list[FeedbackSong]:
@@ -67,7 +73,7 @@ class SongFeedbackService:
                 "song_key": song_key,
                 "artist": artist,
                 "title": title,
-                "created_at": datetime.now(UTC),
+                "created_at": datetime.now(UTC).isoformat(),
             },
         )
 
@@ -75,7 +81,7 @@ class SongFeedbackService:
         await self._fs.delete_document(HIDDEN_COLLECTION, feedback_doc_id(user_id, song_key))
 
     async def love(self, user_id: str, song_key: str, artist: str, title: str) -> None:
-        now = datetime.now(UTC)
+        now = datetime.now(UTC).isoformat()
         await self._fs.set_document(
             USER_SONGS_COLLECTION,
             loved_doc_id(user_id, song_key),
