@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.config import BackendSettings
 from backend.services.catalog_lookup import CatalogLookup
@@ -75,8 +75,8 @@ class Candidate(BaseModel):
 
 class ConfirmItem(BaseModel):
     kind: Literal["artist", "song"]
-    artist: str
-    title: str | None = None
+    artist: str = Field(min_length=1, max_length=300)
+    title: str | None = Field(default=None, max_length=300)
 
 
 class ScreenshotExtractor(Protocol):
@@ -232,6 +232,13 @@ class ScreenshotImportService:
                         matched=name is not None,
                     )
                 )
+        # Catalog names can merge candidates the raw dedupe kept apart ("The Beatles" / "Beatles").
+        best: dict[tuple[str, str, str], Candidate] = {}
+        for c in out:
+            k = (c.kind, identity_normalize(c.artist), identity_normalize(c.title or ""))
+            if k not in best or c.confidence > best[k].confidence:
+                best[k] = c
+        out = list(best.values())
         out.sort(key=lambda x: (not x.matched, -x.confidence))
         return out
 

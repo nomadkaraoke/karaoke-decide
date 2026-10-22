@@ -233,7 +233,7 @@ ScreenshotImportServiceDep = Annotated[ScreenshotImportService, Depends(get_scre
 
 @router.post("/screenshot/extract", response_model=ScreenshotExtractResponse)
 async def extract_screenshot(
-    user: CurrentUser, service: ScreenshotImportServiceDep, images: Annotated[list[UploadFile] | None, File()] = None
+    user: VerifiedUser, service: ScreenshotImportServiceDep, images: Annotated[list[UploadFile] | None, File()] = None
 ) -> ScreenshotExtractResponse:
     """Read artists/songs off 1-5 screenshots (each at most 4 MiB, image/*).
 
@@ -265,7 +265,7 @@ async def extract_screenshot(
 
 @router.post("/screenshot/confirm", response_model=ImportResultResponse)
 async def confirm_screenshot(
-    body: ScreenshotConfirmRequest, user: CurrentUser, service: ScreenshotImportServiceDep
+    body: ScreenshotConfirmRequest, user: VerifiedUser, service: ScreenshotImportServiceDep
 ) -> ImportResultResponse:
     """Save the candidates the user kept (source ``screenshot``)."""
     result = await service.confirm(user.id, body.items)

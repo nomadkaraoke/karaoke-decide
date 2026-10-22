@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -42,7 +43,7 @@ class FakeCatalog:
         return {k for k in keys if k == MUSE_KEY}
 
     def lookup_artist_keys(self, keys: list[str]) -> dict[str, str]:
-        return {"muse": "Muse"} if "muse" in keys else {}
+        return {k: "Muse" for k in keys if k in ("muse", "the muse")}
 
 
 class FakeExtractor:
@@ -142,6 +143,7 @@ def test_gemini_failure_releases_reservation(make_client: Any, caplog: pytest.Lo
     r = _post(client, 3)
     assert (r.status_code, r.json()["detail"]) == (503, "screenshot_unavailable")
     assert env.fs.docs[("screenshot_imports", "fixture-user")]["count"] == 0
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
 
 
 def test_quota_error_logs_error_once(
@@ -213,3 +215,87 @@ def test_catalog_lookup_helpers_use_reader() -> None:
     lookup = CatalogLookup(store=SimpleNamespace(reader=reader))  # type: ignore[arg-type]
     assert lookup.lookup_song_keys(["muse|hysteria", "x|y"]) == {"muse|hysteria"}
     assert lookup.lookup_artist_keys(["muse", "zzz"]) == {"muse": "Muse"}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ('[{"kind":"artist","artist":"Muse","title":null,"confidence":0.5}]', [("artist", "Muse", None, 0.5)]),
+        (
+            '{"items":[{"kind":"song","artist":"Muse","title":"Hysteria","confidence":0.8}]}',
+            [("song", "Muse", "Hysteria", 0.8)],
+        ),
+        ("not json at all", []),
+        ("", []),
+        ('{"items":"nope"}', []),
+        ('{"items":[{"kind":"song","artist":"Muse","title":null,"confidence":0.8}]}', []),
+        ('{"items":[{"kind":"podcast","artist":"X","title":"Y","confidence":0.8}]}', []),
+        (
+            '{"items":[{"kind":"artist","artist":"A","confidence":7},{"kind":"artist","artist":"B","confidence":-2}]}',
+            [("artist", "A", None, 1.0), ("artist", "B", None, 0.0)],
+        ),
+        ('{"items":[{"kind":"artist","artist":"A","confidence":"high"}]}', [("artist", "A", None, 0.5)]),
+    ],
+)
+def test_parse_items(text: str, expected: list[tuple[str, str, str | None, float]]) -> None:
+    got = [(c.kind, c.artist, c.title, c.confidence) for c in svc_mod.parse_items(text)]
+    assert got == expected
+
+
+async def test_gemini_extractor_real_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    class Models:
+        async def generate_content(self, **kw: Any) -> Any:
+            calls.append(kw)
+            return SimpleNamespace(text='{"items":[{"kind":"artist","artist":"Muse","title":null,"confidence":0.9}]}')
+
+    client = SimpleNamespace(aio=SimpleNamespace(models=Models()))
+    monkeypatch.setattr(svc_mod, "get_genai_client", lambda timeout_ms=None: client)
+    out = await svc_mod.GeminiScreenshotExtractor("gemini-test").extract(
+        [(b"abc", "image/jpeg"), (b"def", "image/png")]
+    )
+    assert [c.artist for c in out] == ["Muse", "Muse"]
+    assert len(calls) == 2
+    first = calls[0]
+    assert first["model"] == "gemini-test"
+    assert first["contents"][1] == svc_mod.EXTRACT_PROMPT
+    part = first["contents"][0]
+    assert part.inline_data.data == b"abc" and part.inline_data.mime_type == "image/jpeg"
+    assert first["config"].response_mime_type == "application/json"
+
+
+def test_real_dependency_gating(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.api.deps import get_firestore, get_settings
+    from backend.api.routes import services as routes
+    from backend.config import BackendSettings
+
+    sentinel = FakeExtractor([RawCandidate("artist", "e2e-band", None, 0.8)])
+    monkeypatch.setattr(routes, "get_screenshot_extractor", lambda settings: sentinel)
+    env = Env(None)
+    app.dependency_overrides[get_current_user] = lambda: User(id="fixture-user")
+    app.dependency_overrides[get_firestore] = lambda: env.fs
+    app.dependency_overrides[get_settings] = lambda: BackendSettings()
+    try:
+        client = TestClient(app)
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        r = _post(client)
+        assert (r.status_code, r.json()["detail"]) == (503, "screenshot_unavailable")
+        monkeypatch.setenv("GEMINI_API_KEY", "k")
+        assert _post(client).status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_second_dedupe_merges_catalog_names(make_client: Any) -> None:
+    client, _ = make_client(
+        FakeExtractor([RawCandidate("artist", "muse", None, 0.4), RawCandidate("artist", "The Muse", None, 0.9)])
+    )
+    c = _post(client).json()["candidates"]
+    assert len(c) == 1 and c[0]["confidence"] == 0.9
+
+
+def test_confirm_validation(make_client: Any) -> None:
+    client, _ = make_client(FakeExtractor([]))
+    for item in ({"kind": "artist", "artist": ""}, {"kind": "song", "artist": "a", "title": "t" * 301}):
+        assert client.post("/api/services/screenshot/confirm", json={"items": [item]}).status_code == 422
