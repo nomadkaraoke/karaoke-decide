@@ -145,6 +145,27 @@ class QuizService:
             self._listenbrainz = ListenBrainzService(self.settings, self.firestore, self._catalog_store)
         return self._listenbrainz
 
+    async def _known_artist_mbids(self, names: list[str]) -> list[str]:
+        """MBIDs for ``names`` (in order, unknown ones skipped): BigQuery, else catalog.db's artists
+        when BigQuery is disabled or fails, so a quiz submit never fails on this enrichment."""
+        if not self.settings.bigquery_disabled:
+            try:
+                mbid_map = self.catalog.lookup_mbids_by_names(names)
+                # Keys use lookup_mbids_by_names' own normalization.
+                found = [mbid_map.get(self.catalog.normalize_for_matching(n), "") for n in names]
+                return [m for m in found if m]
+            except Exception:
+                logger.warning("Quiz submit: MBID lookup failed, using catalog.db", exc_info=True)
+        reader = await self._catalog_reader()
+        if reader is None:
+            return []
+        try:
+            found_local = await asyncio.to_thread(lambda: [reader.artist_mbid(n) for n in names])
+        except Exception:
+            logger.warning("Quiz submit: catalog.db MBID lookup failed", exc_info=True)
+            return []
+        return [m for m in found_local if m]
+
     async def _catalog_reader(self) -> CatalogReader | None:
         """catalog.db's reader, or None while it is still warming up (callers degrade)."""
         store = self._catalog_store or get_catalog_store()
@@ -1702,21 +1723,20 @@ class QuizService:
         # MBID-First: Resolve artist names to MBIDs
         artist_mbids: list[str] = []
         if known_artists:
-            mbid_map = self.catalog.lookup_mbids_by_names(known_artists)
-            # Collect MBIDs in order, using same normalization as lookup_mbids_by_names
-            for artist in known_artists:
-                normalized = self.catalog.normalize_for_matching(artist)
-                # Try to find MBID in mapping (keys are normalized)
-                mbid = mbid_map.get(normalized, "")
-                if mbid:
-                    artist_mbids.append(mbid)
+            artist_mbids = await self._known_artist_mbids(known_artists)
 
         # MBID-First: Resolve Spotify IDs to MBIDs for manual artists (bulk lookup)
         manual_artists_with_mbid: list[dict[str, Any]] = []
         if manual_artists:
             # Bulk lookup all Spotify IDs in one query (filter out None values)
             spotify_ids = [a.artist_id for a in manual_artists if a.artist_id]
-            spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
+            spotify_to_mbid: dict[str, str] = {}
+            if spotify_ids and not self.settings.bigquery_disabled:
+                try:
+                    spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
+                except Exception:
+                    # Enrichment only: the artists are saved without an MBID rather than failing the submit.
+                    logger.warning("Quiz submit: Spotify->MBID lookup failed", exc_info=True)
 
             for a in manual_artists:
                 # Look up MBID from Spotify ID mapping (use artist's mbid if already provided)

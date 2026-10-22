@@ -1255,3 +1255,28 @@ class TestSmartArtistsCatalogFallback:
         svc = _fallback_service(mock_firestore, real_catalog)
         real_catalog.popular_artist_keys = MagicMock(side_effect=RuntimeError("corrupt"))
         assert await svc.get_smart_quiz_artists(genres=["rock"]) == []
+
+
+class TestKnownArtistMbidsFallback:
+    """Quiz submit's MBID enrichment never fails the submit when BigQuery is off or failing."""
+
+    @pytest.mark.asyncio
+    async def test_bigquery_disabled_uses_catalog(self, mock_firestore: MagicMock) -> None:
+        bq = MagicMock()
+        svc = _fallback_service(mock_firestore, FakeCatalogReader(), bq)
+        assert await svc._known_artist_mbids(["Muse", "Nobody"]) == ["mbid-muse"]
+        bq.query.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_bigquery_error_uses_catalog(self, mock_firestore: MagicMock) -> None:
+        bq = MagicMock()
+        bq.query.side_effect = RuntimeError("boom")
+        svc = _fallback_service(mock_firestore, FakeCatalogReader(), bq, disabled=False)
+        svc._catalog_service = MagicMock()
+        svc._catalog_service.lookup_mbids_by_names.side_effect = RuntimeError("boom")
+        assert await svc._known_artist_mbids(["Muse"]) == ["mbid-muse"]
+
+    @pytest.mark.asyncio
+    async def test_catalog_warming_up_gives_none(self, mock_firestore: MagicMock) -> None:
+        svc = _fallback_service(mock_firestore, None)
+        assert await svc._known_artist_mbids(["Muse"]) == []
