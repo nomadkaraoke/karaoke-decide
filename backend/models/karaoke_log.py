@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 LogSource = Literal["kjbox", "app"]
 LogState = Literal["planned", "requested", "sung", "sung_unplayed", "skipped"]
-SongKeyStatus = Literal["resolved", "unresolved", "ambiguous"]
+SongKeyStatus = Literal["resolved", "unresolved"]
 
 NOTES_MAX_CHARS = 2000
 

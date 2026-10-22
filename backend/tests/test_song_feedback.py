@@ -13,7 +13,12 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_catalog_store_dep, get_current_user, get_firestore
 from backend.main import app
 from backend.services.catalog_store import CatalogUnavailable
-from backend.services.song_feedback_service import HIDDEN_COLLECTION, SongFeedbackService, feedback_doc_id
+from backend.services.song_feedback_service import (
+    HIDDEN_COLLECTION,
+    SongFeedbackService,
+    feedback_doc_id,
+    loved_doc_id,
+)
 from karaoke_decide.core.models import User
 
 KEYS = [
@@ -31,8 +36,16 @@ class MemoryFirestore:
     def __init__(self) -> None:
         self.cols: dict[str, dict[str, dict[str, Any]]] = {}
 
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        d = self.cols.get(collection, {}).get(doc_id)
+        return None if d is None else {"id": doc_id, **d}
+
     async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
-        self.cols.setdefault(collection, {})[doc_id] = dict(data)
+        col = self.cols.setdefault(collection, {})
+        if merge and doc_id in col:
+            col[doc_id] = {**col[doc_id], **data}
+        else:
+            col[doc_id] = dict(data)
 
     async def delete_document(self, collection: str, doc_id: str) -> None:
         self.cols.get(collection, {}).pop(doc_id, None)
@@ -80,8 +93,9 @@ def client(fs: MemoryFirestore) -> Iterator[TestClient]:
     app.dependency_overrides.clear()
 
 
-def _svc(fs: MemoryFirestore) -> SongFeedbackService:
-    return SongFeedbackService(fs)  # type: ignore[arg-type]
+def _svc(fs: MemoryFirestore, kn_ids: dict[str, int] | None = None) -> SongFeedbackService:
+    kn = kn_ids or {}
+    return SongFeedbackService(fs, kn_id_for=kn.get)  # type: ignore[arg-type]
 
 
 def test_doc_id_has_no_slash() -> None:
@@ -125,6 +139,79 @@ async def test_love_adds_user_song_manual(fs: MemoryFirestore) -> None:
 async def test_list_loved_ignores_other_sources(fs: MemoryFirestore) -> None:
     await fs.set_document("user_songs", "u1:123", {"user_id": "u1", "source": "spotify", "song_id": "123"})
     assert await _svc(fs).list_loved("u1") == []
+
+
+@pytest.mark.asyncio
+async def test_love_merges_into_a_row_with_sung_history(fs: MemoryFirestore) -> None:
+    """A row the karaoke log created keeps times_sung, last_sung_at and its source when loved."""
+    row_id = loved_doc_id("u1", "adele|hello")
+    fs.cols["user_songs"] = {
+        row_id: {
+            "user_id": "u1",
+            "song_id": "adele|hello",
+            "song_key": "adele|hello",
+            "source": "karaoke_log",
+            "artist": "Adele",
+            "title": "Hello",
+            "times_sung": 2,
+            "last_sung_at": "2026-10-20T22:00:00+00:00",
+            "created_at": "2026-10-20T22:00:00+00:00",
+        }
+    }
+    svc = _svc(fs)
+    await svc.love("u1", "adele|hello", "Adele", "Hello")
+    row = fs.cols["user_songs"][row_id]
+    assert (row["times_sung"], row["last_sung_at"], row["source"]) == (2, "2026-10-20T22:00:00+00:00", "karaoke_log")
+    assert row["loved"] is True and isinstance(row["loved_at"], str)
+    assert row["created_at"] == "2026-10-20T22:00:00+00:00"
+    assert [s.song_key for s in await svc.list_loved("u1")] == ["adele|hello"]
+
+    await svc.unlove("u1", "adele|hello")
+    row = fs.cols["user_songs"][row_id]  # sung history: kept, love marker cleared
+    assert row["times_sung"] == 2 and row["loved"] is False
+    assert await svc.list_loved("u1") == []
+
+
+@pytest.mark.asyncio
+async def test_love_uses_existing_kn_id_row(fs: MemoryFirestore) -> None:
+    """Same row rule as the karaoke log: the {user}:{kn_id} row when catalog.db maps the key and it exists."""
+    fs.cols["user_songs"] = {"u1:77": {"user_id": "u1", "song_id": "77", "source": "spotify", "artist": "Adele"}}
+    svc = _svc(fs, {"adele|hello": 77})
+    await svc.love("u1", "adele|hello", "Adele", "Hello")
+    assert list(fs.cols["user_songs"]) == ["u1:77"]
+    row = fs.cols["user_songs"]["u1:77"]
+    assert (row["source"], row["song_id"], row["song_key"], row["title"]) == ("spotify", "77", "adele|hello", "Hello")
+    assert [s.song_key for s in await svc.list_loved("u1")] == ["adele|hello"]
+    await svc.unlove("u1", "adele|hello")
+    assert fs.cols["user_songs"]["u1:77"]["loved"] is False  # a synced row is never deleted
+    assert await svc.list_loved("u1") == []
+
+
+@pytest.mark.asyncio
+async def test_love_falls_back_to_song_key_row_when_kn_row_missing(fs: MemoryFirestore) -> None:
+    svc = _svc(fs, {"adele|hello": 77})
+    await svc.love("u1", "adele|hello", "Adele", "Hello")
+    assert list(fs.cols["user_songs"]) == [loved_doc_id("u1", "adele|hello")]
+    assert fs.cols["user_songs"][loved_doc_id("u1", "adele|hello")]["source"] == "manual"
+
+
+@pytest.mark.asyncio
+async def test_unlove_keeps_quiz_row(fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id("u1", "adele|hello")
+    fs.cols["user_songs"] = {row_id: {"user_id": "u1", "source": "quiz", "song_key": "adele|hello"}}
+    svc = _svc(fs)
+    await svc.love("u1", "adele|hello", "Adele", "Hello")
+    await svc.unlove("u1", "adele|hello")
+    assert fs.cols["user_songs"][row_id]["source"] == "quiz"
+
+
+def test_loved_rows_weigh_as_manual_in_recs() -> None:
+    from backend.services.recs_v2 import weights as w
+
+    assert w.song_weight({"source": "spotify", "loved": True}) == w.SONG_MANUAL
+    assert w.song_weight({"source": "karaoke_log", "loved": True}) == w.SONG_MANUAL
+    assert w.song_weight({"source": "manual"}) == w.SONG_MANUAL  # legacy loved rows carry no marker
+    assert w.song_weight({"source": "manual", "loved": False, "times_sung": 1}) == w.SONG_DEFAULT
 
 
 @pytest.mark.parametrize("key", KEYS)

@@ -22,7 +22,7 @@ from backend.services.karaoke_log_service import (
     log_doc_id,
     unresolved_doc_id,
 )
-from backend.services.song_feedback_service import loved_doc_id
+from backend.services.song_feedback_service import SongFeedbackService, loved_doc_id
 from karaoke_decide.catalog.reader import KnMatch
 from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
@@ -77,7 +77,17 @@ class MemoryFirestore:
         return {"id": doc_id, **copy.deepcopy(doc)} if doc is not None else None
 
     async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
-        self.cols.setdefault(collection, {})[doc_id] = copy.deepcopy(data)
+        col = self.cols.setdefault(collection, {})
+        if merge and doc_id in col:
+            col[doc_id] = {**col[doc_id], **copy.deepcopy(data)}
+        else:
+            col[doc_id] = copy.deepcopy(data)
+
+    async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        self.cols[collection][doc_id].update(copy.deepcopy(data))
+
+    async def delete_document(self, collection: str, doc_id: str) -> None:
+        self.cols.get(collection, {}).pop(doc_id, None)
 
     async def query_documents(self, collection: str, filters: Any = None, **_: Any) -> list[dict[str, Any]]:
         out = []
@@ -559,3 +569,64 @@ async def test_other_user_cannot_squat_a_kj_id(svc: KaraokeLogService, fs: Memor
     # A's own survey lands on A's record
     mine = await svc.upsert_user(USER, KJ_ID, {"survey": {"feel": "great"}})
     assert mine.survey is not None and mine.survey.feel == "great"
+
+
+# ---------------------------------------------------------------- love / unlove share the row (C-R1)
+
+
+def _feedback(fs: MemoryFirestore, reader: FakeReader) -> SongFeedbackService:
+    return SongFeedbackService(fs, kn_id_for=lambda k: reader.kn_ids_for_song_keys([k]).get(k))  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_sing_love_unlove_keeps_times_sung(
+    svc: KaraokeLogService, fs: MemoryFirestore, reader: FakeReader
+) -> None:
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    assert fs.user_songs()[row_id]["times_sung"] == 1
+    feedback = _feedback(fs, reader)
+
+    await feedback.love(USER, HELLO_KEY, "The Lanterns", "Paper Harbour")
+    assert list(fs.user_songs()) == [row_id]
+    row = fs.user_songs()[row_id]
+    assert (row["times_sung"], row["source"], row["loved"]) == (1, "karaoke_log", True)
+    assert row["last_sung_at"] == "2026-10-21T21:30:00+00:00"
+    assert [s.song_key for s in await feedback.list_loved(USER)] == [HELLO_KEY]
+
+    await feedback.unlove(USER, HELLO_KEY)
+    row = fs.user_songs()[row_id]
+    assert (row["times_sung"], row["loved"]) == (1, False)
+    assert await feedback.list_loved(USER) == []
+
+
+@pytest.mark.asyncio
+async def test_love_survives_host_undo_then_unlove_removes_empty_row(
+    svc: KaraokeLogService, fs: MemoryFirestore, reader: FakeReader
+) -> None:
+    feedback = _feedback(fs, reader)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    await feedback.love(USER, HELLO_KEY, "The Lanterns", "Paper Harbour")
+    await svc.delete_partner(EMAIL, KJ_ID)  # host un-does Done: count goes to 0
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    row = fs.user_songs()[row_id]  # still loved, so the log must not delete it
+    assert (row["times_sung"], row["loved"]) == (0, True)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())  # Done again
+    assert fs.user_songs()[row_id]["times_sung"] == 1
+    await svc.delete_partner(EMAIL, KJ_ID)
+    await feedback.unlove(USER, HELLO_KEY)  # nothing else on the row now
+    assert row_id not in fs.user_songs()
+
+
+@pytest.mark.asyncio
+async def test_love_then_sing_uses_the_same_kn_row(
+    svc: KaraokeLogService, fs: MemoryFirestore, reader: FakeReader
+) -> None:
+    kn_row_id = f"{USER}:{KN_ID}"
+    fs.cols["user_songs"] = {kn_row_id: {"user_id": USER, "song_id": str(KN_ID), "source": "spotify"}}
+    feedback = _feedback(fs, reader)
+    await feedback.love(USER, HELLO_KEY, "The Lanterns", "Paper Harbour")
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    assert list(fs.user_songs()) == [kn_row_id]
+    row = fs.user_songs()[kn_row_id]
+    assert (row["times_sung"], row["loved"], row["source"]) == (1, True, "spotify")

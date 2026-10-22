@@ -14,7 +14,8 @@ Counters. A record "counts" while its state is ``sung``/``sung_unplayed``, it is
 and it has artist + title. A counting record with a resolved ``song_key`` adds one to
 ``user_songs.times_sung``: the row ``{user_id}:{kn_id}`` when catalog.db maps the key to a
 KaraokeNerds id and that row exists, else ``loved_doc_id(user_id, song_key)`` (created with
-``source: karaoke_log`` when missing). Unresolved records count in
+``source: karaoke_log`` when missing; the rule is ``song_feedback_service.choose_user_song_row``,
+shared with "Love it", and a loved row is never deleted when its count drops to 0). Unresolved records count in
 ``user_karaoke_unresolved/{user_id}:{sha1(song_key(artist, title))[:24]}`` instead, so
 nothing a singer sang goes missing. The log doc remembers which counter doc it added to
 (``counted``) and every change runs in one Firestore transaction, so a transition counts
@@ -40,7 +41,12 @@ from pydantic import ValidationError
 
 from backend.models.karaoke_log import KaraokeLogEntry, LogMedia, LogNight, Survey
 from backend.services.catalog_lookup import CatalogLookup, get_catalog_lookup
-from backend.services.song_feedback_service import USER_SONGS_COLLECTION, loved_doc_id
+from backend.services.song_feedback_service import (
+    USER_SONGS_COLLECTION,
+    choose_user_song_row,
+    is_loved,
+    kn_id_for_song_key,
+)
 from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
 logger = logging.getLogger(__name__)
@@ -271,7 +277,9 @@ def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: s
 def _dec(doc: dict[str, Any], target: Target, now: str) -> dict[str, Any] | None:
     """The decremented doc, or None to delete it (a counter doc the log alone created)."""
     times = max(0, int(doc.get("times_sung") or 0) - 1)
-    if times == 0 and (target[0] == UNRESOLVED_COLLECTION or doc.get("source") == "karaoke_log"):
+    if times == 0 and (
+        target[0] == UNRESOLVED_COLLECTION or (doc.get("source") == "karaoke_log" and not is_loved(doc))
+    ):
         return None
     out = {**doc, "times_sung": times, "updated_at": now}
     if times == 0:
@@ -351,14 +359,7 @@ class KaraokeLogService:
         return None, "unresolved"
 
     def _kn_id(self, song_key: str) -> int | None:
-        reader = self.catalog.store.reader
-        if reader is None:
-            return None
-        try:
-            return reader.kn_ids_for_song_keys([song_key]).get(song_key)
-        except Exception:
-            logger.warning("kn_ids_for_song_keys failed; using the song_key row", exc_info=True)
-            return None
+        return kn_id_for_song_key(self.catalog.store.reader, song_key)
 
     async def _resolution(
         self, pre: dict[str, Any] | None, patch: dict[str, Any], writer: Writer
@@ -405,13 +406,9 @@ class KaraokeLogService:
                 user_id = new["user_id"]
                 if new.get("song_key_status") == "resolved" and new.get("song_key"):
                     kn = await kn_for(new["song_key"])
-                    if kn is not None:
-                        kn_target = (USER_SONGS_COLLECTION, f"{user_id}:{kn}")
-                        reads[kn_target] = await txn.get(*kn_target)
-                        if reads[kn_target] is not None:
-                            new_target = kn_target
-                    if new_target is None:
-                        new_target = (USER_SONGS_COLLECTION, loved_doc_id(user_id, new["song_key"]))
+                    row_id, row = await choose_user_song_row(user_id, new["song_key"], kn, txn.get)
+                    new_target = (USER_SONGS_COLLECTION, row_id)
+                    reads[new_target] = row
                 else:
                     new_target = (UNRESOLVED_COLLECTION, unresolved_doc_id(user_id, new["artist"], new["title"]))
             counted = (cur or {}).get("counted")
