@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artis",
       "lastSyncLabel": "Sinkronisasi terakhir: {date}",
       "failedToLoadServices": "Gagal memuat layanan",
-      "failedToStartSync": "Gagal memulai sinkronisasi"
+      "failedToStartSync": "Gagal memulai sinkronisasi",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Hubungkan Apple Music",
+      "reconnectAppleMusic": "Hubungkan Ulang Apple Music"
     },
     "myDataPreferences": {
       "title": "Preferensi",
@@ -905,5 +908,23 @@
         "title": "Lagu yang kamu tahu"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Kembali ke aplikasi",
+    "cancelled": "Proses masuk ke Apple Music dibatalkan. Ketuk Hubungkan untuk mencoba lagi.",
+    "connect": "Hubungkan Apple Music",
+    "connectedTitle": "Apple Music terhubung",
+    "doneApp": "Kami sedang membaca perpustakaan Anda. Silakan kembali ke aplikasi: lagu pilihan Anda akan diperbarui dalam satu atau dua menit.",
+    "doneWeb": "Kami sedang membaca perpustakaan Anda. Lagu pilihan Anda akan diperbarui dalam satu atau dua menit.",
+    "error": "Terjadi kesalahan saat menghubungkan Apple Music. Silakan coba lagi.",
+    "expired": "Tautan ini telah kedaluwarsa. Silakan kembali ke aplikasi dan ketuk Apple Music lagi.",
+    "intro": "Masuk ke Apple Music agar kami dapat membaca perpustakaan serta riwayat putar Anda untuk menemukan lagu-lagu yang cocok untuk Anda nyanyikan.",
+    "privacy": "Kami hanya membaca perpustakaan dan riwayat mendengarkan Anda. Kami tidak akan pernah memutar, mengubah, atau membagikan apa pun.",
+    "refused": "Apple Music tidak membagikan perpustakaan Anda. Menghubungkan akun memerlukan langganan Apple Music yang aktif.",
+    "seePicks": "Lihat pilihan Anda",
+    "signIn": "Masuk",
+    "signedOut": "Masuk ke Nomad Karaoke terlebih dahulu, lalu hubungkan Apple Music.",
+    "title": "Hubungkan Apple Music",
+    "unavailable": "Apple Music sedang tidak tersedia saat ini. Silakan coba lagi nanti."
   }
 }

@@ -727,7 +727,10 @@
       "artistsLabel": "{count} אמנים",
       "lastSyncLabel": "סנכרון אחרון: {date}",
       "failedToLoadServices": "טעינת השירותים נכשלה",
-      "failedToStartSync": "הפעלת הסנכרון נכשלה"
+      "failedToStartSync": "הפעלת הסנכרון נכשלה",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "חיבור ל-Apple Music",
+      "reconnectAppleMusic": "חיבור מחדש של Apple Music"
     },
     "myDataPreferences": {
       "title": "העדפות",
@@ -905,5 +908,23 @@
         "title": "שירים מוכרים"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "חזרה לאפליקציה",
+    "cancelled": "ההתחברות ל-Apple Music בוטלה. לחצו על \"חיבור ל-Apple Music\" כדי לנסות שוב.",
+    "connect": "חיבור ל-Apple Music",
+    "connectedTitle": "Apple Music חובר בהצלחה",
+    "doneApp": "אנחנו סורקים את הספרייה שלכם עכשיו. חזרו לאפליקציה: ההמלצות שלכם יתעדכנו בעוד דקה או שתיים.",
+    "doneWeb": "אנחנו סורקים את הספרייה שלכם עכשיו. ההמלצות שלכם יתעדכנו בעוד דקה או שתיים.",
+    "error": "משהו השתבש בחיבור ל-Apple Music. נסו שוב.",
+    "expired": "תוקף הקישור פג. חזרו לאפליקציה ולחצו שוב על Apple Music.",
+    "intro": "התחברו ל-Apple Music ואנחנו נסרוק את הספרייה והשירים האחרונים ששמעתם כדי למצוא שירים שתאהבו לשיר.",
+    "privacy": "אנחנו רק ניגשים לספרייה ולהיסטוריית ההאזנה שלכם. לעולם לא ננגן, נשנה או נשתף שום דבר.",
+    "refused": "Apple Music לא שיתף את הספרייה שלכם. החיבור מצריך מנוי פעיל ל-Apple Music.",
+    "seePicks": "לצפייה בהמלצות שלכם",
+    "signIn": "התחברות",
+    "signedOut": "התחברו תחילה ל-Nomad Karaoke, ואז חברו את Apple Music.",
+    "title": "חיבור ל-Apple Music",
+    "unavailable": "Apple Music אינו זמין כרגע. נסו שוב מאוחר יותר."
   }
 }

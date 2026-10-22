@@ -681,6 +681,26 @@ Liked Music. Tracks (up to 1000; 500 for guests) are matched to the catalog and 
 Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `429` rate limited
 (one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `503` YouTube unreachable (after one automatic retry).
 
+### Apple Music (MusicKit)
+
+Users sign in to Apple Music on decide web with MusicKit JS (`/connect/apple-music`). decide stores
+the Music User Token (about 6 months) as the `apple_music` service's access token, and sync reads
+recent plays (up to 150) and library songs (up to 3,000) from `/v1/me/*`. A refused token marks the
+service `error` with "reconnect". Keys: Secret Manager `apple-musickit-private-key` (.p8),
+`apple-musickit-key-id`, `apple-team-id` (Media ID `media.com.nomadkaraoke.mobile`).
+
+- `GET /api/services/apple-music/developer-token` (public) → `{developer_token, expires_at}`. An
+  ES256 JWT with an `origin` claim of `FRONTEND_URL`, so it only works from decide web. 503 when the
+  key isn't configured.
+- `POST /api/services/apple-music/link` (signed in) → `{connect_url, expires_in}`. For the app: a
+  one-time `state` (10 min) in `connect_url` (`{FRONTEND_URL}/{locale}/connect/apple-music?state=…&return=app`),
+  so the page works in an in-app browser that isn't signed in to decide. The page returns to
+  `nomadkaraoke://music-connected?service=apple_music`.
+- `POST /api/services/apple-music/connect` `{music_user_token, state?}` → `{service, sync_job_id}`.
+  Signed in, or with `state` from `/link` (consumed). Checks the token against Apple
+  (`/v1/me/storefront`), stores it and starts a sync job. 401 no user / bad or expired state; 422
+  Apple refused the token; 503 not configured. `sync_job_id` is null if the job couldn't be queued.
+
 ### DELETE /api/services/{service_type}
 
 Disconnect a music service.

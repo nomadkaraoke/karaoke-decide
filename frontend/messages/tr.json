@@ -727,7 +727,10 @@
       "artistsLabel": "{count} sanatçı",
       "lastSyncLabel": "Son senkronizasyon: {date}",
       "failedToLoadServices": "Servisler yüklenemedi",
-      "failedToStartSync": "Senkronizasyon başlatılamadı"
+      "failedToStartSync": "Senkronizasyon başlatılamadı",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Apple Music'i Bağla",
+      "reconnectAppleMusic": "Apple Music'i Yeniden Bağla"
     },
     "myDataPreferences": {
       "title": "Tercihler",
@@ -905,5 +908,23 @@
         "title": "Bildiğin şarkılar"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Uygulamaya geri dön",
+    "cancelled": "Apple Music girişi iptal edildi. Tekrar denemek için Bağla'ya dokun.",
+    "connect": "Apple Music'i Bağla",
+    "connectedTitle": "Apple Music bağlandı",
+    "doneApp": "Şimdi arşivini inceliyoruz. Uygulamaya dönebilirsin; seçimlerin bir iki dakika içinde güncellenir.",
+    "doneWeb": "Şimdi arşivini inceliyoruz. Seçimlerin bir iki dakika içinde güncellenir.",
+    "error": "Apple Music bağlanırken bir sorun oluştu. Lütfen tekrar dene.",
+    "expired": "Bu bağlantının süresi doldu. Uygulamaya geri dönüp Apple Music'e tekrar dokun.",
+    "intro": "Apple Music'e giriş yap; söylemekten keyif alacağın şarkıları bulmak için arşivine ve son çaldıklarına göz atalım.",
+    "privacy": "Yalnızca arşivini ve dinleme geçmişini görüntüleriz. Asla hiçbir şeyi çalmaz, değiştirmez veya paylaşmayız.",
+    "refused": "Apple Music arşivini paylaşmadı. Bağlanmak için aktif bir Apple Music aboneliği gerekir.",
+    "seePicks": "Seçimlerini gör",
+    "signIn": "Giriş yap",
+    "signedOut": "Önce Nomad Karaoke'ye giriş yap, ardından Apple Music'i bağla.",
+    "title": "Apple Music'i Bağla",
+    "unavailable": "Apple Music şu anda kullanılamıyor. Lütfen daha sonra tekrar dene."
   }
 }

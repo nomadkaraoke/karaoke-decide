@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artistes",
       "lastSyncLabel": "Dernière synchro : {date}",
       "failedToLoadServices": "Échec du chargement des services",
-      "failedToStartSync": "Échec du démarrage de la synchronisation"
+      "failedToStartSync": "Échec du démarrage de la synchronisation",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Connecter Apple Music",
+      "reconnectAppleMusic": "Reconnecter Apple Music"
     },
     "myDataPreferences": {
       "title": "Préférences",
@@ -905,5 +908,23 @@
         "title": "Chansons que tu connais"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Retour à l'application",
+    "cancelled": "La connexion à Apple Music a été annulée. Appuie sur Connecter Apple Music pour réessayer.",
+    "connect": "Connecter Apple Music",
+    "connectedTitle": "Apple Music connecté",
+    "doneApp": "Nous analysons ta bibliothèque en ce moment. Retourne sur l'application : tes suggestions apparaîtront d'ici une minute ou deux.",
+    "doneWeb": "Nous analysons ta bibliothèque en ce moment. Tes suggestions apparaîtront d'ici une minute ou deux.",
+    "error": "Une erreur s'est produite lors de la connexion à Apple Music. Merci de réessayer.",
+    "expired": "Ce lien a expiré. Retourne sur l'application et appuie à nouveau sur Apple Music.",
+    "intro": "Connecte-toi à Apple Music pour que nous analysions ta bibliothèque et tes écoutes récentes afin de te trouver des morceaux que tu vas adorer chanter.",
+    "privacy": "Nous consultons uniquement ta bibliothèque et ton historique d'écoute. Nous ne lançons aucune lecture, ne modifions rien et ne partageons aucune donnée.",
+    "refused": "Apple Music n'a pas partagé ta bibliothèque. La connexion nécessite un abonnement Apple Music actif.",
+    "seePicks": "Voir tes suggestions",
+    "signIn": "Se connecter",
+    "signedOut": "Connecte-toi d'abord à Nomad Karaoke, puis connecte Apple Music.",
+    "title": "Connecter Apple Music",
+    "unavailable": "Apple Music n'est pas disponible pour le moment. Merci de réessayer plus tard."
   }
 }

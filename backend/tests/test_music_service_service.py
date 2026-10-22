@@ -549,3 +549,75 @@ class TestSpotifyAuthUrl:
 
         mock_spotify_client.get_auth_url.assert_called_once_with("test-state")
         assert url == "https://accounts.spotify.com/authorize?..."
+
+
+class TestAppleMusicService:
+    """Tests for create_apple_music_service."""
+
+    @pytest.fixture
+    def apple_client(self) -> MagicMock:
+        client = MagicMock()
+        client.get_storefront = AsyncMock(return_value="gb")
+        return client
+
+    @pytest.fixture
+    def apple_service(
+        self, mock_settings: BackendSettings, mock_firestore: MagicMock, apple_client: MagicMock
+    ) -> MusicServiceService:
+        return MusicServiceService(settings=mock_settings, firestore=mock_firestore, apple_music_client=apple_client)
+
+    async def test_creates_service_with_token(
+        self, apple_service: MusicServiceService, mock_firestore: MagicMock, apple_client: MagicMock
+    ) -> None:
+        service = await apple_service.create_apple_music_service("user_1", "mut")
+
+        apple_client.get_storefront.assert_called_once_with("mut")
+        assert service.service_type == "apple_music"
+        assert service.access_token == "mut"
+        assert service.service_user_id == "gb"
+        collection, doc_id, data = mock_firestore.set_document.call_args.args
+        assert (collection, doc_id) == ("music_services", "user_1_apple_music")
+        assert data["access_token"] == "mut"
+
+    async def test_reconnect_replaces_token_and_keeps_history(
+        self, apple_service: MusicServiceService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.get_document = AsyncMock(
+            return_value={
+                "id": "user_1_apple_music",
+                "user_id": "user_1",
+                "service_type": "apple_music",
+                "access_token": "old",
+                "sync_status": "error",
+                "sync_error": "Apple Music sign-in expired - reconnect Apple Music",
+                "tracks_synced": 42,
+                "last_sync_at": "2026-10-01T00:00:00+00:00",
+                "created_at": "2026-09-01T00:00:00+00:00",
+            }
+        )
+
+        service = await apple_service.create_apple_music_service("user_1", "new")
+
+        mock_firestore.set_document.assert_not_called()
+        fields = mock_firestore.update_document.call_args.args[2]
+        assert fields["access_token"] == "new"
+        assert fields["sync_status"] == "idle" and fields["sync_error"] is None
+        assert service.tracks_synced == 42
+
+    async def test_refused_token_is_validation_error(
+        self, apple_service: MusicServiceService, apple_client: MagicMock, mock_firestore: MagicMock
+    ) -> None:
+        from karaoke_decide.core.exceptions import ValidationError
+        from karaoke_decide.services.apple_music import AppleMusicAuthError
+
+        apple_client.get_storefront = AsyncMock(side_effect=AppleMusicAuthError("403"))
+
+        with pytest.raises(ValidationError):
+            await apple_service.create_apple_music_service("user_1", "bad")
+        mock_firestore.set_document.assert_not_called()
+
+    def test_builds_client_lazily(self, mock_settings: BackendSettings, mock_firestore: MagicMock) -> None:
+        service = MusicServiceService(settings=mock_settings, firestore=mock_firestore)
+
+        assert service.apple_music is service.apple_music
+        assert service.apple_music_signer.configured is False

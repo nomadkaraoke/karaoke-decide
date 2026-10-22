@@ -12,6 +12,7 @@ from backend.services.sync_service import SyncService
 from backend.services.track_matcher import MatchedTrack
 from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import MusicService
+from karaoke_decide.services.apple_music import AppleMusicLibrary, AppleMusicTrack
 
 
 @pytest.fixture
@@ -897,3 +898,115 @@ class TestYouTubeMusicImportLimits:
         client = self._client()
         await sync_service.import_youtube_music_playlist("u", "PLabc123", is_guest=is_guest, client=client)
         client.get_playlist.assert_awaited_once_with("PLabc123", limit=expected_limit)
+
+
+class TestSyncAppleMusic:
+    """Tests for the Apple Music branch of sync."""
+
+    @pytest.fixture
+    def apple_service(self) -> MusicService:
+        now = datetime.now(UTC)
+        return MusicService(
+            id="user_123_apple_music",
+            user_id="user_123",
+            service_type="apple_music",
+            service_user_id="us",
+            service_username="Apple Music",
+            access_token="music-user-token",
+            created_at=now,
+            updated_at=now,
+        )
+
+    @pytest.fixture
+    def library(self) -> AppleMusicLibrary:
+        return AppleMusicLibrary(
+            recent=[
+                AppleMusicTrack("Queen", "Bohemian Rhapsody", 354_000),
+                AppleMusicTrack("Adele", "Hello"),
+                AppleMusicTrack("queen", "bohemian rhapsody"),  # played again, different casing
+            ],
+            library=[AppleMusicTrack("Adele", "Hello"), AppleMusicTrack("Muse", "Starlight")],
+            artists=["Queen", "Adele", "Muse"],
+        )
+
+    async def test_syncs_recent_then_library(
+        self,
+        sync_service: SyncService,
+        mock_music_service_service: MagicMock,
+        mock_track_matcher: MagicMock,
+        mock_firestore: MagicMock,
+        apple_service: MusicService,
+        library: AppleMusicLibrary,
+    ) -> None:
+        mock_music_service_service.get_user_services = AsyncMock(return_value=[apple_service])
+        mock_music_service_service.apple_music.get_library = AsyncMock(return_value=library)
+        progress = AsyncMock()
+
+        results = await sync_service.sync_all_services_with_progress("user_123", progress)
+
+        assert results[0].service_type == "apple_music"
+        assert results[0].error is None
+        assert results[0].tracks_fetched == 3
+        assert results[0].tracks_matched == 1  # the fixture matcher matches one of its two tracks
+        assert results[0].artists_stored == 3
+        mock_music_service_service.apple_music.get_library.assert_called_once_with("music-user-token")
+        infos = mock_track_matcher.batch_match_tracks.call_args.args[0]
+        assert [(i["artist"], i["title"], i["playcount"], i["rank"]) for i in infos] == [
+            ("Queen", "Bohemian Rhapsody", 2, 1),
+            ("Adele", "Hello", 1, 2),
+            ("Muse", "Starlight", None, 3),
+        ]
+        artist_docs = [c.args for c in mock_firestore.set_document.call_args_list if c.args[0] == "user_artists"]
+        assert [(d[1], d[2]["rank"]) for d in artist_docs] == [
+            ("user_123:apple_music:queen", 1),
+            ("user_123:apple_music:adele", 2),
+            ("user_123:apple_music:muse", 3),
+        ]
+        song_docs = [c.args[2] for c in mock_firestore.set_document.call_args_list if c.args[0] == "user_songs"]
+        assert {d["source"] for d in song_docs} == {"apple_music"}
+        mock_music_service_service.update_sync_status.assert_called_with(
+            "user_123", "apple_music", "idle", tracks_synced=1, songs_synced=2
+        )
+        assert {c.kwargs["current_phase"] for c in progress.call_args_list} == {
+            "fetching_library",
+            "matching",
+            "saving",
+        }
+
+    async def test_refused_token_asks_to_reconnect(
+        self,
+        sync_service: SyncService,
+        mock_music_service_service: MagicMock,
+        apple_service: MusicService,
+    ) -> None:
+        from karaoke_decide.services.apple_music import AppleMusicAuthError
+
+        mock_music_service_service.get_user_services = AsyncMock(return_value=[apple_service])
+        mock_music_service_service.apple_music.get_library = AsyncMock(side_effect=AppleMusicAuthError("401"))
+
+        results = await sync_service.sync_all_services("user_123")
+
+        assert "reconnect" in (results[0].error or "")
+        mock_music_service_service.update_sync_status.assert_called_with(
+            "user_123", "apple_music", "error", error=results[0].error
+        )
+
+    async def test_missing_token_asks_to_reconnect(
+        self, sync_service: SyncService, mock_music_service_service: MagicMock, apple_service: MusicService
+    ) -> None:
+        apple_service.access_token = None
+        mock_music_service_service.get_user_services = AsyncMock(return_value=[apple_service])
+
+        results = await sync_service.sync_all_services("user_123")
+
+        assert "reconnect" in (results[0].error or "")
+
+    async def test_unexpected_error_is_reported(
+        self, sync_service: SyncService, mock_music_service_service: MagicMock, apple_service: MusicService
+    ) -> None:
+        mock_music_service_service.get_user_services = AsyncMock(return_value=[apple_service])
+        mock_music_service_service.apple_music.get_library = AsyncMock(side_effect=RuntimeError("boom"))
+
+        results = await sync_service.sync_all_services("user_123")
+
+        assert results[0].error == "boom"

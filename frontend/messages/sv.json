@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artister",
       "lastSyncLabel": "Senaste synk: {date}",
       "failedToLoadServices": "Kunde inte ladda tjänster",
-      "failedToStartSync": "Kunde inte starta synk"
+      "failedToStartSync": "Kunde inte starta synk",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Anslut Apple Music",
+      "reconnectAppleMusic": "Återanslut Apple Music"
     },
     "myDataPreferences": {
       "title": "Preferenser",
@@ -905,5 +908,23 @@
         "title": "Låtar du känner till"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Tillbaka till appen",
+    "cancelled": "Inloggningen på Apple Music avbröts. Tryck på Anslut för att försöka igen.",
+    "connect": "Anslut Apple Music",
+    "connectedTitle": "Apple Music är anslutet",
+    "doneApp": "Vi läser in ditt bibliotek nu. Gå tillbaka till appen så uppdateras dina val om någon minut.",
+    "doneWeb": "Vi läser in ditt bibliotek nu. Dina val uppdateras om någon minut.",
+    "error": "Något gick fel när Apple Music skulle anslutas. Försök igen.",
+    "expired": "Den här länken har gått ut. Gå tillbaka till appen och tryck på Apple Music igen.",
+    "intro": "Logga in på Apple Music så läser vi av ditt bibliotek och nyligen spelade låtar för att hitta låtar du kommer att älska att sjunga.",
+    "privacy": "Vi läser bara av ditt bibliotek och din lyssningshistorik. Vi spelar aldrig upp, ändrar eller delar någonting.",
+    "refused": "Apple Music delade inte ditt bibliotek. För att ansluta krävs en aktiv Apple Music-prenumeration.",
+    "seePicks": "Se dina val",
+    "signIn": "Logga in",
+    "signedOut": "Logga in på Nomad Karaoke först och anslut sedan Apple Music.",
+    "title": "Anslut Apple Music",
+    "unavailable": "Apple Music är inte tillgängligt just nu. Försök igen senare."
   }
 }

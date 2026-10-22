@@ -364,6 +364,33 @@ cloud_run_service = gcp.cloudrunv2.Service(
                             }
                         },
                     },
+                    {
+                        "name": "APPLE_MUSICKIT_PRIVATE_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-musickit-private-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "APPLE_MUSICKIT_KEY_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-musickit-key-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "APPLE_TEAM_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-team-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {

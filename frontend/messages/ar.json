@@ -727,7 +727,10 @@
       "artistsLabel": "{count} فنانين",
       "lastSyncLabel": "آخر مزامنة: {date}",
       "failedToLoadServices": "فشل تحميل الخدمات",
-      "failedToStartSync": "فشل بدء المزامنة"
+      "failedToStartSync": "فشل بدء المزامنة",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "ربط Apple Music",
+      "reconnectAppleMusic": "إعادة ربط Apple Music"
     },
     "myDataPreferences": {
       "title": "التفضيلات",
@@ -905,5 +908,23 @@
         "title": "أغانٍ تعرفها"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "العودة إلى التطبيق",
+    "cancelled": "تم إلغاء تسجيل الدخول إلى Apple Music. اضغط على \"ربط\" للمحاولة مجدداً.",
+    "connect": "ربط Apple Music",
+    "connectedTitle": "تم ربط Apple Music",
+    "doneApp": "نقوم الآن بقراءة مكتبتك الموسيقية. عُد إلى التطبيق: سيتم تحديث اختياراتك خلال دقيقة أو دقيقتين.",
+    "doneWeb": "نقوم الآن بقراءة مكتبتك الموسيقية. سيتم تحديث اختياراتك خلال دقيقة أو دقيقتين.",
+    "error": "حدث خطأ ما أثناء ربط Apple Music. يُرجى المحاولة مرة أخرى.",
+    "expired": "انتهت صلاحية هذا الرابط. عُد إلى التطبيق واضغط على Apple Music مجدداً.",
+    "intro": "سجّل الدخول إلى Apple Music وسنقرأ مكتبتك وما استمعت إليه مؤخراً للعثور على أغانٍ ستستمتع بغنائها.",
+    "privacy": "نحن نقرأ مكتبتك وسجل استماعك فقط، ولن نقوم أبداً بتشغيل أي شيء أو تعديله أو مشاركته.",
+    "refused": "لم تمنح Apple Music الإذن للوصول إلى مكتبتك. يتطلب الربط وجود اشتراك نشط في Apple Music.",
+    "seePicks": "عرض اختياراتك",
+    "signIn": "تسجيل الدخول",
+    "signedOut": "سجّل الدخول إلى Nomad Karaoke أولاً، ثم اربط Apple Music.",
+    "title": "ربط Apple Music",
+    "unavailable": "Apple Music غير متوفرة حالياً. يُرجى المحاولة مرة أخرى لاحقاً."
   }
 }

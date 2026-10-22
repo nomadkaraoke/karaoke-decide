@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artisti",
       "lastSyncLabel": "Ultima sincronizzazione: {date}",
       "failedToLoadServices": "Impossibile caricare i servizi",
-      "failedToStartSync": "Impossibile avviare la sincronizzazione"
+      "failedToStartSync": "Impossibile avviare la sincronizzazione",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Connetti Apple Music",
+      "reconnectAppleMusic": "Riconnetti Apple Music"
     },
     "myDataPreferences": {
       "title": "Preferenze",
@@ -905,5 +908,23 @@
         "title": "Brani che conosci"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Torna all'app",
+    "cancelled": "L'accesso ad Apple Music è stato annullato. Tocca Connetti per riprovare.",
+    "connect": "Connetti Apple Music",
+    "connectedTitle": "Apple Music connesso",
+    "doneApp": "Stiamo analizzando la tua libreria. Torna all'app: i tuoi brani consigliati si aggiorneranno in un minuto o due.",
+    "doneWeb": "Stiamo analizzando la tua libreria. I tuoi brani consigliati si aggiorneranno in un minuto o due.",
+    "error": "Si è verificato un errore durante la connessione ad Apple Music. Riprova.",
+    "expired": "Questo link è scaduto. Torna all'app e tocca di nuovo Apple Music.",
+    "intro": "Accedi ad Apple Music e analizzeremo la tua libreria e i tuoi ascolti recenti per trovare le canzoni che amerai cantare.",
+    "privacy": "Leggiamo solo la tua libreria e la cronologia di ascolto. Non riproduciamo, modifichiamo né condividiamo mai nulla.",
+    "refused": "Apple Music non ha condiviso la tua libreria. Per connetterti è necessario un abbonamento attivo ad Apple Music.",
+    "seePicks": "Vedi i brani consigliati",
+    "signIn": "Accedi",
+    "signedOut": "Prima accedi a Nomad Karaoke, poi connetti Apple Music.",
+    "title": "Connetti Apple Music",
+    "unavailable": "Apple Music non è disponibile al momento. Riprova più tardi."
   }
 }

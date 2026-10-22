@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artis",
       "lastSyncLabel": "Segerak terakhir: {date}",
       "failedToLoadServices": "Gagal memuatkan perkhidmatan",
-      "failedToStartSync": "Gagal memulakan segerak"
+      "failedToStartSync": "Gagal memulakan segerak",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Sambungkan Apple Music",
+      "reconnectAppleMusic": "Sambung Semula Apple Music"
     },
     "myDataPreferences": {
       "title": "Keutamaan",
@@ -905,5 +908,23 @@
         "title": "Lagu yang anda tahu"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Kembali ke aplikasi",
+    "cancelled": "Log masuk Apple Music telah dibatalkan. Ketik Sambung untuk cuba lagi.",
+    "connect": "Sambungkan Apple Music",
+    "connectedTitle": "Apple Music disambungkan",
+    "doneApp": "Kami sedang membaca pustaka anda sekarang. Kembali ke aplikasi: lagu pilihan anda akan dikemas kini dalam satu atau dua minit.",
+    "doneWeb": "Kami sedang membaca pustaka anda sekarang. Lagu pilihan anda akan dikemas kini dalam satu atau dua minit.",
+    "error": "Masalah berlaku semasa menyambungkan Apple Music. Sila cuba lagi.",
+    "expired": "Pautan ini telah tamat tempoh. Kembali ke aplikasi dan ketik Apple Music sekali lagi.",
+    "intro": "Log masuk ke Apple Music dan kami akan membaca pustaka serta lagu yang baru dimainkan untuk mencari lagu yang anda gemar nyanyikan.",
+    "privacy": "Kami hanya membaca pustaka dan sejarah pendengaran anda. Kami tidak akan sekali-kali memainkan, mengubah atau berkongsi apa-apa.",
+    "refused": "Apple Music tidak berkongsi pustaka anda. Langganan Apple Music yang aktif diperlukan untuk menyambung.",
+    "seePicks": "Lihat lagu pilihan anda",
+    "signIn": "Log masuk",
+    "signedOut": "Log masuk ke Nomad Karaoke terlebih dahulu, kemudian sambungkan Apple Music.",
+    "title": "Sambungkan Apple Music",
+    "unavailable": "Apple Music tidak tersedia buat masa ini. Sila cuba sebentar lagi."
   }
 }

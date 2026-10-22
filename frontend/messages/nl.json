@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artiesten",
       "lastSyncLabel": "Laatste sync: {date}",
       "failedToLoadServices": "Services laden mislukt",
-      "failedToStartSync": "Synchronisatie starten mislukt"
+      "failedToStartSync": "Synchronisatie starten mislukt",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Apple Music verbinden",
+      "reconnectAppleMusic": "Opnieuw verbinden met Apple Music"
     },
     "myDataPreferences": {
       "title": "Voorkeuren",
@@ -905,5 +908,23 @@
         "title": "Nummers die je kent"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Terug naar de app",
+    "cancelled": "Aanmelden bij Apple Music is geannuleerd. Tik op Verbinden om het opnieuw te proberen.",
+    "connect": "Apple Music verbinden",
+    "connectedTitle": "Apple Music verbonden",
+    "doneApp": "We lezen nu je bibliotheek uit. Ga terug naar de app: je aanbevelingen worden over een minuut of twee bijgewerkt.",
+    "doneWeb": "We lezen nu je bibliotheek uit. Je aanbevelingen worden over een minuut of twee bijgewerkt.",
+    "error": "Er is iets misgegaan bij het verbinden met Apple Music. Probeer het opnieuw.",
+    "expired": "Deze link is verlopen. Ga terug naar de app en tik opnieuw op Apple Music.",
+    "intro": "Meld je aan bij Apple Music, dan bekijken we je bibliotheek en recent afgespeelde nummers om nummers te vinden die je geweldig vindt om te zingen.",
+    "privacy": "We lezen alleen je bibliotheek en luistergeschiedenis uit. We spelen, wijzigen of delen nooit iets.",
+    "refused": "Apple Music heeft je bibliotheek niet gedeeld. Om te verbinden heb je een actief Apple Music-abonnement nodig.",
+    "seePicks": "Bekijk je aanbevelingen",
+    "signIn": "Aanmelden",
+    "signedOut": "Meld je eerst aan bij Nomad Karaoke en verbind daarna Apple Music.",
+    "title": "Apple Music verbinden",
+    "unavailable": "Apple Music is op dit moment niet beschikbaar. Probeer het later opnieuw."
   }
 }

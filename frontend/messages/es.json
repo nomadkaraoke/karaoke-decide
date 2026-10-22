@@ -727,7 +727,10 @@
       "artistsLabel": "{count} artistas",
       "lastSyncLabel": "Última sincronización: {date}",
       "failedToLoadServices": "Error al cargar los servicios",
-      "failedToStartSync": "Error al iniciar la sincronización"
+      "failedToStartSync": "Error al iniciar la sincronización",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Conectar Apple Music",
+      "reconnectAppleMusic": "Reconectar Apple Music"
     },
     "myDataPreferences": {
       "title": "Preferencias",
@@ -905,5 +908,23 @@
         "title": "Canciones que conoces"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Volver a la app",
+    "cancelled": "Se canceló el inicio de sesión con Apple Music. Toca Conectar para intentarlo de nuevo.",
+    "connect": "Conectar Apple Music",
+    "connectedTitle": "Apple Music conectado",
+    "doneApp": "Estamos leyendo tu biblioteca. Vuelve a la app: tus selecciones se actualizarán en uno o dos minutos.",
+    "doneWeb": "Estamos leyendo tu biblioteca. Tus selecciones se actualizarán en uno o dos minutos.",
+    "error": "Ocurrió un error al conectar Apple Music. Por favor, inténtalo de nuevo.",
+    "expired": "Este enlace ha caducado. Vuelve a la app y toca Apple Music otra vez.",
+    "intro": "Inicia sesión en Apple Music y leeremos tu biblioteca y reproducciones recientes para encontrar canciones que te encantará cantar.",
+    "privacy": "Solo leemos tu biblioteca y tu historial de reproducción. Nunca reproducimos, modificamos ni compartimos nada.",
+    "refused": "Apple Music no compartió tu biblioteca. Para conectarte necesitas una suscripción activa a Apple Music.",
+    "seePicks": "Ver tus selecciones",
+    "signIn": "Iniciar sesión",
+    "signedOut": "Inicia sesión primero en Nomad Karaoke y luego conecta Apple Music.",
+    "title": "Conectar Apple Music",
+    "unavailable": "Apple Music no está disponible en este momento. Por favor, inténtalo de nuevo más tarde."
   }
 }

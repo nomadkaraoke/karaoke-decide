@@ -187,9 +187,13 @@ POST /api/services/sync
     │                       │
     │                       └─→ Create/update user_songs records
     │
-    └─→ Last.fm: Get top tracks, loved tracks, recent scrobbles
+    ├─→ Last.fm: Get top tracks, loved tracks, recent scrobbles
+    │       │
+    │       └─→ (same flow as Spotify)
+    │
+    └─→ Apple Music: recent plays + library songs (/v1/me, Music User Token from MusicKit JS)
             │
-            └─→ (same flow as Spotify)
+            └─→ (same flow as Spotify; artists ranked by appearances, source "apple_music")
 ```
 
 ### 4. Song Discovery

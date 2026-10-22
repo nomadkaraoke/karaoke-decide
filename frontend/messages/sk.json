@@ -727,7 +727,10 @@
       "artistsLabel": "{count} interpretov",
       "lastSyncLabel": "Posledná synchronizácia: {date}",
       "failedToLoadServices": "Nepodarilo sa načítať služby",
-      "failedToStartSync": "Nepodarilo sa spustiť synchronizáciu"
+      "failedToStartSync": "Nepodarilo sa spustiť synchronizáciu",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Pripojiť Apple Music",
+      "reconnectAppleMusic": "Znova pripojiť Apple Music"
     },
     "myDataPreferences": {
       "title": "Preferencie",
@@ -905,5 +908,23 @@
         "title": "Skladby, ktoré poznáš"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Späť do aplikácie",
+    "cancelled": "Prihlásenie do Apple Music bolo zrušené. Klepnutím na Pripojiť to skús znova.",
+    "connect": "Pripojiť Apple Music",
+    "connectedTitle": "Apple Music je pripojené",
+    "doneApp": "Práve načítavame tvoju knižnicu. Vráť sa do aplikácie: tvoje tipy sa aktualizujú o minútu či dve.",
+    "doneWeb": "Práve načítavame tvoju knižnicu. Tvoje tipy sa aktualizujú o minútu či dve.",
+    "error": "Pri pripájaní Apple Music sa vyskytla chyba. Skús to znova, prosím.",
+    "expired": "Platnosť tohto odkazu vypršala. Vráť sa do aplikácie a znova klepni na Apple Music.",
+    "intro": "Prihlás sa do Apple Music a my načítame tvoju knižnicu a nedávno prehrávané skladby, aby sme našli piesne, ktoré si s radosťou zaspievaš.",
+    "privacy": "Iba čítame tvoju knižnicu a históriu počúvania. Nikdy nič neprehrávame, nemeníme ani nezdieľame.",
+    "refused": "Služba Apple Music nezdieľala tvoju knižnicu. Pripojenie vyžaduje aktívne predplatné Apple Music.",
+    "seePicks": "Zobraziť tvoje tipy",
+    "signIn": "Prihlásiť sa",
+    "signedOut": "Najprv sa prihlás do Nomad Karaoke, potom pripoj Apple Music.",
+    "title": "Pripojiť Apple Music",
+    "unavailable": "Služba Apple Music momentálne nie je k dispozícii. Skús to znova neskôr, prosím."
   }
 }

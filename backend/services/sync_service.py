@@ -17,6 +17,7 @@ from backend.services.music_service_service import MusicServiceError, MusicServi
 from backend.services.track_matcher import MatchedTrack, TrackMatcher
 from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import MusicService
+from karaoke_decide.services.apple_music import AppleMusicAuthError, AppleMusicLibrary
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
@@ -152,6 +153,8 @@ class SyncService:
                 result = await self.sync_lastfm(user_id, service)
             elif service.service_type == "listenbrainz":
                 result = await self.sync_listenbrainz(user_id, service)
+            elif service.service_type == "apple_music":
+                result = await self._sync_apple_music_with_progress(user_id, service, None)
             else:
                 result = SyncResult(
                     service_type=service.service_type,
@@ -195,6 +198,8 @@ class SyncService:
                 result = await self._sync_lastfm_with_progress(user_id, service, progress_callback)
             elif service.service_type == "listenbrainz":
                 result = await self._sync_listenbrainz_with_progress(user_id, service, progress_callback)
+            elif service.service_type == "apple_music":
+                result = await self._sync_apple_music_with_progress(user_id, service, progress_callback)
             else:
                 result = SyncResult(
                     service_type=service.service_type,
@@ -1526,6 +1531,144 @@ class SyncService:
             stored += 1
 
         return stored
+
+    # -------------------------------------------------------------------------
+    # Apple Music Sync
+    # -------------------------------------------------------------------------
+
+    async def _sync_apple_music_with_progress(
+        self,
+        user_id: str,
+        service: MusicService,
+        progress_callback: ProgressCallback | None,
+    ) -> SyncResult:
+        """Sync recent plays + library songs from Apple Music.
+
+        Recent plays come first (rank 1 = most recent) and carry how often they appear in the
+        play history as `playcount`; library songs follow. Artists are ranked by how often they
+        appear (a recent play counts twice). A refused token marks the service `error` with a
+        reconnect message, since Music User Tokens expire after about six months.
+        """
+        failure = SyncResult(
+            service_type="apple_music",
+            tracks_fetched=0,
+            tracks_matched=0,
+            user_songs_created=0,
+            user_songs_updated=0,
+        )
+        try:
+            await self.music_service_service.update_sync_status(user_id, "apple_music", "syncing")
+            if progress_callback:
+                await progress_callback(
+                    current_service="apple_music",
+                    current_phase="fetching_library",
+                    total_tracks=0,
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+
+            if not service.access_token:
+                raise AppleMusicAuthError("Not signed in to Apple Music")
+            library = await self.music_service_service.apple_music.get_library(service.access_token)
+
+            track_infos = _apple_music_track_infos(library)
+            artists_stored = await self._store_ranked_artists(user_id, "apple_music", library.artists[:200])
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="apple_music",
+                    current_phase="matching",
+                    total_tracks=len(track_infos),
+                    processed_tracks=0,
+                    matched_tracks=0,
+                )
+            matched_tracks = await self.track_matcher.batch_match_tracks(track_infos)
+            tracks_matched = sum(1 for m in matched_tracks if m.catalog_song is not None)
+
+            if progress_callback:
+                await progress_callback(
+                    current_service="apple_music",
+                    current_phase="saving",
+                    total_tracks=len(track_infos),
+                    processed_tracks=len(track_infos),
+                    matched_tracks=tracks_matched,
+                )
+            created, updated = await self._upsert_user_songs(user_id, matched_tracks, "apple_music")
+
+            await self.music_service_service.update_sync_status(
+                user_id,
+                "apple_music",
+                "idle",
+                tracks_synced=tracks_matched,
+                songs_synced=created + updated,
+            )
+            logger.info(
+                f"Apple Music sync for {user_id}: {len(library.recent)} recent, {len(library.library)} library, "
+                f"{tracks_matched}/{len(track_infos)} matched"
+            )
+            return SyncResult(
+                service_type="apple_music",
+                tracks_fetched=len(track_infos),
+                tracks_matched=tracks_matched,
+                user_songs_created=created,
+                user_songs_updated=updated,
+                artists_stored=artists_stored,
+            )
+
+        except AppleMusicAuthError as e:
+            # Expected once a token expires or the subscription lapses: not an ERROR, the user reconnects.
+            logger.warning(f"Apple Music sync for {user_id}: token refused: {e}")
+            message = "Apple Music sign-in expired - reconnect Apple Music"
+            await self.music_service_service.update_sync_status(user_id, "apple_music", "error", error=message)
+            failure.error = message
+            return failure
+
+        except Exception as e:
+            logger.exception(f"Unexpected error during Apple Music sync: {e}")
+            await self.music_service_service.update_sync_status(user_id, "apple_music", "error", error=str(e))
+            failure.error = str(e)
+            return failure
+
+    async def _store_ranked_artists(self, user_id: str, source: str, artist_names: list[str]) -> int:
+        """Store a ranked list of artist names as the user's artists from `source`."""
+        now = datetime.now(UTC)
+        stored = 0
+        for rank, artist_name in enumerate(artist_names, 1):
+            safe_name = re.sub(r"[^a-z0-9_]", "_", artist_name.lower())[:50]
+            artist_id = f"{user_id}:{source}:{safe_name}"
+            await self.firestore.set_document(
+                "user_artists",
+                artist_id,
+                {
+                    "id": artist_id,
+                    "user_id": user_id,
+                    "source": source,
+                    "artist_name": artist_name,
+                    "rank": rank,
+                    "updated_at": now.isoformat(),
+                },
+            )
+            stored += 1
+        return stored
+
+
+def _apple_music_track_infos(library: AppleMusicLibrary) -> list[dict[str, Any]]:
+    """Recent plays (with play counts) then library songs, one entry per (artist, title)."""
+    infos: dict[tuple[str, str], dict[str, Any]] = {}
+    for track in library.recent + library.library:
+        key = (track.artist.casefold(), track.title.casefold())
+        if key not in infos:
+            infos[key] = {
+                "artist": track.artist,
+                "title": track.title,
+                "duration_ms": track.duration_ms,
+                "playcount": None,
+                "rank": len(infos) + 1,
+            }
+    for track in library.recent:
+        info = infos[(track.artist.casefold(), track.title.casefold())]
+        info["playcount"] = (info["playcount"] or 0) + 1
+    return list(infos.values())
 
 
 # Lazy initialization
