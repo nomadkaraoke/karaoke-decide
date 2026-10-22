@@ -700,6 +700,24 @@ Liked Music. Tracks (up to 1000; 500 for guests) are matched to the catalog and 
 Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `429` rate limited
 (one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `503` YouTube unreachable (after one automatic retry).
 
+### POST /api/services/spotify-playlist/import
+
+Import up to 100 tracks from a public Spotify playlist link (no Spotify login). Best-effort: it reads
+the undocumented `open.spotify.com/embed/playlist/{id}` page (`__NEXT_DATA__`), so a Spotify layout
+change degrades it. A daily GitHub workflow (`spotify-embed-canary.yml`) posts to Discord #noise when
+parsing breaks. Tracks are ingested with `source: "spotify_playlist"`.
+
+**Requires:** Bearer token (verified user)
+
+**Request:** `{"url": "https://open.spotify.com/playlist/..."}` (also `spotify:playlist:` URIs, bare
+22-char ids, or share text containing a link)
+
+**Response:** `{"playlist_title": "...", "tracks_fetched": 50, "tracks_matched": 20}`
+
+**Errors:** `400` not a Spotify playlist link · `404` missing or private · `422` Spotify changed its
+embed page · `429` rate limited (same 30s cooldown / 20 per day as YouTube Music, separate counter) ·
+`503` Spotify unreachable.
+
 ### Apple Music (MusicKit)
 
 Users sign in to Apple Music on decide web with MusicKit JS (`/connect/apple-music`). decide stores

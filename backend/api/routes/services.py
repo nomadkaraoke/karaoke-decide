@@ -47,6 +47,12 @@ from backend.services.screenshot_import_service import (
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
+from karaoke_decide.services.spotify_embed import (
+    InvalidSpotifyPlaylistUrlError,
+    SpotifyEmbedFetchError,
+    SpotifyEmbedFormatChangedError,
+    SpotifyPlaylistNotFoundError,
+)
 from karaoke_decide.services.youtube_music import (
     InvalidPlaylistUrlError,
     PlaylistFetchError,
@@ -525,6 +531,59 @@ async def import_youtube_music_playlist(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not reach YouTube Music")
 
     return YouTubeMusicImportResponse(
+        playlist_title=result["playlist_title"],
+        tracks_fetched=result["tracks_fetched"],
+        tracks_matched=result["tracks_matched"],
+    )
+
+
+# -----------------------------------------------------------------------------
+# Spotify public playlist import (embed page, best-effort)
+# -----------------------------------------------------------------------------
+
+
+class SpotifyPlaylistImportRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=500, description="Playlist link, URI, id or share text")
+
+
+class SpotifyPlaylistImportResponse(BaseModel):
+    playlist_title: str
+    tracks_fetched: int
+    tracks_matched: int
+
+
+@router.post("/spotify-playlist/import", response_model=SpotifyPlaylistImportResponse)
+async def import_spotify_playlist(
+    request_body: SpotifyPlaylistImportRequest,
+    user: VerifiedUser,
+    sync_service: SyncServiceDep,
+) -> SpotifyPlaylistImportResponse:
+    """Import up to 100 tracks from a public Spotify playlist link (no Spotify login).
+
+    - 400: not a Spotify playlist link
+    - 404: playlist doesn't exist or is private
+    - 422: Spotify changed its embed page and we can't read it (best-effort feature)
+    - 429: too many imports (30 s cooldown / 20 per day)
+    - 503: Spotify couldn't be reached (503, not 502: Cloudflare replaces origin 502 bodies)
+    """
+    try:
+        result = await sync_service.import_spotify_playlist(user.id, request_body.url)
+    except ImportRateLimitedError:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many playlist imports")
+    except InvalidSpotifyPlaylistUrlError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a Spotify playlist link")
+    except SpotifyPlaylistNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found or private")
+    except SpotifyEmbedFormatChangedError as e:
+        logger.warning(f"Spotify embed format changed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not read this Spotify playlist right now"
+        )
+    except SpotifyEmbedFetchError as e:
+        logger.warning(f"Spotify embed fetch failed: {e}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not reach Spotify")
+
+    return SpotifyPlaylistImportResponse(
         playlist_title=result["playlist_title"],
         tracks_fetched=result["tracks_fetched"],
         tracks_matched=result["tracks_matched"],

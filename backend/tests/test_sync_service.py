@@ -879,9 +879,9 @@ class TestYouTubeMusicImportLimits:
 
     @pytest.mark.asyncio
     async def test_release_keeps_newer_reservation(self, sync_service: SyncService, store: dict[str, Any]) -> None:
-        token = await sync_service._reserve_youtube_music_import("guest_1")
+        token = await sync_service._reserve_playlist_import("guest_1", "youtube_music_imports")
         store["guest_1"]["token"] = "someone-else"
-        await sync_service._release_youtube_music_import("guest_1", token)
+        await sync_service._release_playlist_import("guest_1", "youtube_music_imports", token)
         assert store["guest_1"]["token"] == "someone-else"
 
     @pytest.mark.asyncio
@@ -1010,3 +1010,112 @@ class TestSyncAppleMusic:
         results = await sync_service.sync_all_services("user_123")
 
         assert results[0].error == "boom"
+
+
+class TestSpotifyPlaylistImport:
+    """Spotify playlist import shares the YouTube Music cooldown / daily-cap logic."""
+
+    @staticmethod
+    def _client(error: Exception | None = None) -> MagicMock:
+        from karaoke_decide.services.spotify_embed import SpotifyEmbedPlaylist
+
+        client = MagicMock()
+        client.get_playlist = AsyncMock(
+            side_effect=error,
+            return_value=SpotifyEmbedPlaylist(
+                title="Mix", tracks=[{"artist": "Adele", "title": "Hello"}, {"artist": "Muse", "title": "Starlight"}]
+            ),
+        )
+        return client
+
+    @staticmethod
+    def _ingest() -> MagicMock:
+        from backend.services.import_ingest_service import IngestResult
+
+        ingest = MagicMock()
+        ingest.ingest = AsyncMock(
+            return_value=IngestResult(artists_added=2, songs_added=2, songs_updated=0, tracks_matched=1)
+        )
+        ingest.record_import = AsyncMock()
+        return ingest
+
+    @pytest.fixture
+    def store(self, mock_firestore: MagicMock) -> dict[str, Any]:
+        docs: dict[str, Any] = {}
+
+        async def transform(collection: str, doc_id: str, fn: Any) -> Any:
+            assert collection == "spotify_playlist_imports"
+            new = fn(docs.get(doc_id))
+            if new is None:
+                docs.pop(doc_id, None)
+            else:
+                docs[doc_id] = new
+            return new
+
+        mock_firestore.transform_document_atomically = AsyncMock(side_effect=transform)
+        return docs
+
+    @pytest.mark.asyncio
+    async def test_ingests_and_records(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        from backend.services.import_ingest_service import IngestTrack
+
+        ingest = self._ingest()
+        result = await sync_service.import_spotify_playlist(
+            "u1", "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M", client=self._client(), ingest=ingest
+        )
+
+        assert result["playlist_title"] == "Mix"
+        assert (result["tracks_fetched"], result["tracks_matched"]) == (2, 1)
+        args = ingest.ingest.await_args
+        assert args.args[:2] == ("u1", "spotify_playlist")
+        assert args.kwargs["tracks"] == [IngestTrack("Adele", "Hello"), IngestTrack("Muse", "Starlight")]
+        assert ingest.record_import.await_args.args[:2] == ("u1", "spotify_playlist")
+        assert store["u1"]["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_spotify_playlist_shares_cooldown_logic(
+        self, sync_service: SyncService, store: dict[str, Any]
+    ) -> None:
+        from backend.services.sync_service import ImportRateLimitedError
+
+        pid = "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"
+        await sync_service.import_spotify_playlist("u1", pid, client=self._client(), ingest=self._ingest())
+        client = self._client()
+        with pytest.raises(ImportRateLimitedError):
+            await sync_service.import_spotify_playlist("u1", pid, client=client, ingest=self._ingest())
+        client.get_playlist.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_daily_cap(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        from backend.services.sync_service import ImportRateLimitedError
+
+        now = datetime.now(UTC)
+        store["u1"] = {
+            "last_import_at": (now - timedelta(hours=1)).isoformat(),
+            "day": now.date().isoformat(),
+            "count": SyncService.YOUTUBE_MUSIC_IMPORTS_PER_DAY,
+        }
+        with pytest.raises(ImportRateLimitedError):
+            await sync_service.import_spotify_playlist(
+                "u1", "37i9dQZF1DXcBWIGoYBM5M", client=self._client(), ingest=self._ingest()
+            )
+
+    @pytest.mark.asyncio
+    async def test_failed_fetch_releases_reservation(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        from karaoke_decide.services.spotify_embed import SpotifyPlaylistNotFoundError
+
+        ingest = self._ingest()
+        with pytest.raises(SpotifyPlaylistNotFoundError):
+            await sync_service.import_spotify_playlist(
+                "u1", "37i9dQZF1DXcBWIGoYBM5M", client=self._client(SpotifyPlaylistNotFoundError("x")), ingest=ingest
+            )
+        assert "u1" not in store
+        ingest.ingest.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_bad_url_does_not_reserve(self, sync_service: SyncService, store: dict[str, Any]) -> None:
+        from karaoke_decide.services.spotify_embed import InvalidSpotifyPlaylistUrlError
+
+        with pytest.raises(InvalidSpotifyPlaylistUrlError):
+            await sync_service.import_spotify_playlist("u1", "https://example.com/x", client=self._client())
+        assert "u1" not in store

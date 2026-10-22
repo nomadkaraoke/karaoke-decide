@@ -1,0 +1,36 @@
+name: Spotify Embed Canary
+
+# Spotify playlist-link import reads the undocumented embed page. This checks daily that the
+# page still parses, and tells #noise (not #alerts: it is a best-effort feature) when it does not.
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install httpx
+      - name: Parse a public playlist's embed page
+        id: canary
+        run: |
+          set +e
+          out=$(python -m karaoke_decide.services.spotify_embed canary 37i9dQZF1DXcBWIGoYBM5M 2>&1)
+          code=$?
+          echo "$out"
+          echo "reason=$(echo "$out" | tail -n 1 | tr -d '"\\' | cut -c1-300)" >> "$GITHUB_OUTPUT"
+          exit $code
+      - name: Post to Discord #noise on failure
+        if: failure()
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_NOISE_WEBHOOK_URL }}
+          REASON: ${{ steps.canary.outputs.reason }}
+        run: |
+          payload=$(jq -n --arg r "$REASON" '{content: ("Spotify embed canary failed: " + $r + ". Playlist-link import is degraded (best-effort feature). Check karaoke_decide/services/spotify_embed.py parse_embed_html.")}')
+          curl -sf -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK"

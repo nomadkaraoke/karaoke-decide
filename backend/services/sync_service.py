@@ -13,6 +13,7 @@ from typing import Any
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import ImportIngestService, IngestTrack
 from backend.services.music_service_service import MusicServiceError, MusicServiceService
 from backend.services.track_matcher import MatchedTrack, TrackMatcher
 from karaoke_decide.core.exceptions import ExternalServiceError
@@ -21,6 +22,11 @@ from karaoke_decide.services.apple_music import AppleMusicAuthError, AppleMusicL
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
+from karaoke_decide.services.spotify_embed import (
+    EMBED_TRACK_LIMIT,
+    SpotifyEmbedClient,
+    parse_spotify_playlist_id,
+)
 from karaoke_decide.services.youtube_music import YouTubeMusicClient, parse_playlist_id
 
 logger = logging.getLogger(__name__)
@@ -71,6 +77,7 @@ class SyncService:
     YOUTUBE_MUSIC_IMPORT_COOLDOWN_SECONDS = 30
     YOUTUBE_MUSIC_IMPORTS_PER_DAY = 20
     YOUTUBE_MUSIC_IMPORTS_COLLECTION = "youtube_music_imports"
+    SPOTIFY_PLAYLIST_IMPORTS_COLLECTION = "spotify_playlist_imports"
     # Full scrobble history - now incremental with progress tracking
     LASTFM_FULL_SCROBBLE_HISTORY = True  # Enable fetching scrobbles beyond top tracks
     LASTFM_BATCH_SIZE = 1000  # Save progress every N scrobbles
@@ -1241,13 +1248,13 @@ class SyncService:
             PlaylistFetchError: See karaoke_decide.services.youtube_music.
         """
         playlist_id = parse_playlist_id(playlist_url)
-        token = await self._reserve_youtube_music_import(user_id)
+        token = await self._reserve_playlist_import(user_id, self.YOUTUBE_MUSIC_IMPORTS_COLLECTION)
         limit = self.YOUTUBE_MUSIC_GUEST_PLAYLIST_LIMIT if is_guest else self.YOUTUBE_MUSIC_PLAYLIST_LIMIT
         try:
             playlist = await (client or YouTubeMusicClient()).get_playlist(playlist_id, limit=limit)
         except Exception:
             # Only successful fetches count, so a user can fix a private playlist and retry at once
-            await self._release_youtube_music_import(user_id, token)
+            await self._release_playlist_import(user_id, self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, token)
             raise
 
         matched = await self.track_matcher.batch_match_tracks(playlist.tracks)
@@ -1267,7 +1274,7 @@ class SyncService:
             "updated": updated,
         }
 
-    async def _reserve_youtube_music_import(self, user_id: str) -> str:
+    async def _reserve_playlist_import(self, user_id: str, collection: str) -> str:
         """Atomically enforce the import cooldown + daily cap and reserve a slot.
 
         The check and the write happen in one Firestore transaction, so parallel
@@ -1305,10 +1312,10 @@ class SyncService:
                 "previous": previous,
             }
 
-        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, reserve)
+        await self.firestore.transform_document_atomically(collection, user_id, reserve)
         return token
 
-    async def _release_youtube_music_import(self, user_id: str, token: str) -> None:
+    async def _release_playlist_import(self, user_id: str, collection: str, token: str) -> None:
         """Undo a reservation after a failed fetch, if it's still this request's."""
 
         def release(current: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -1316,7 +1323,61 @@ class SyncService:
                 return current  # A later import has taken over; leave it alone
             return current.get("previous")
 
-        await self.firestore.transform_document_atomically(self.YOUTUBE_MUSIC_IMPORTS_COLLECTION, user_id, release)
+        await self.firestore.transform_document_atomically(collection, user_id, release)
+
+    # -------------------------------------------------------------------------
+    # Spotify Public Playlist Import (embed page, best-effort)
+    # -------------------------------------------------------------------------
+
+    async def import_spotify_playlist(
+        self,
+        user_id: str,
+        url: str,
+        client: SpotifyEmbedClient | None = None,
+        ingest: ImportIngestService | None = None,
+    ) -> dict[str, Any]:
+        """Import up to 100 tracks from a public Spotify playlist link.
+
+        Shares the YouTube Music limits (30 s cooldown, 20 imports/day, failed fetches don't count).
+
+        Returns:
+            Dict with playlist_title, tracks_fetched, tracks_matched, songs_added, songs_updated.
+
+        Raises:
+            ImportRateLimitedError, InvalidSpotifyPlaylistUrlError, SpotifyPlaylistNotFoundError,
+            SpotifyEmbedFormatChangedError, SpotifyEmbedFetchError.
+        """
+        playlist_id = parse_spotify_playlist_id(url)
+        collection = self.SPOTIFY_PLAYLIST_IMPORTS_COLLECTION
+        token = await self._reserve_playlist_import(user_id, collection)
+        try:
+            playlist = await (client or SpotifyEmbedClient(self.settings.spotify_embed_base)).get_playlist(
+                playlist_id, limit=EMBED_TRACK_LIMIT
+            )
+        except Exception:
+            await self._release_playlist_import(user_id, collection, token)
+            raise
+
+        ingest = ingest or ImportIngestService(self.firestore)
+        result = await ingest.ingest(
+            user_id,
+            "spotify_playlist",
+            tracks=[IngestTrack(artist=t["artist"], title=t["title"]) for t in playlist.tracks],
+        )
+        await ingest.record_import(
+            user_id, "spotify_playlist", status="ok", result=result, extra={"playlist_id": playlist_id}
+        )
+        logger.info(
+            f"Spotify playlist import for {user_id}: {playlist_id} "
+            f"{len(playlist.tracks)} fetched, {result.tracks_matched} matched"
+        )
+        return {
+            "playlist_title": playlist.title,
+            "tracks_fetched": len(playlist.tracks),
+            "tracks_matched": result.tracks_matched,
+            "songs_added": result.songs_added,
+            "songs_updated": result.songs_updated,
+        }
 
     # -------------------------------------------------------------------------
     # ListenBrainz Sync
