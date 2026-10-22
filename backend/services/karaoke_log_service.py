@@ -111,6 +111,7 @@ class LogFirestore(Protocol):
 
 
 UserResolver = Callable[[str], Awaitable[str]]
+UserFinder = Callable[[str], Awaitable[str | None]]
 
 
 # ---------------------------------------------------------------- pure helpers
@@ -177,6 +178,24 @@ def _check_id(entry_id: str) -> None:
 
 def _counts(doc: dict[str, Any]) -> bool:
     return doc.get("state") in SUNG_STATES and not doc.get("deleted") and bool(doc.get("artist") and doc.get("title"))
+
+
+MAX_SINGERS = 6
+MAX_SINGER_CHARS = 100
+
+
+def _clean_singers(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if (
+        not isinstance(value, list)
+        or len(value) > MAX_SINGERS
+        or not all(isinstance(s, str) and len(s) <= MAX_SINGER_CHARS for s in value)
+    ):
+        raise KaraokeLogInvalidError(
+            f"singers must be a list of at most {MAX_SINGERS} names ({MAX_SINGER_CHARS} chars)"
+        )
+    return list(value)
 
 
 def _merge_sub(cur: dict[str, Any] | None, patch: Any, field: str) -> dict[str, Any] | None:
@@ -313,12 +332,14 @@ class KaraokeLogService:
         catalog: CatalogLookup | None = None,
         resolve_user: UserResolver | None = None,
         resolve_budget_s: float = RESOLVE_BUDGET_S,
+        find_user: UserFinder | None = None,
     ) -> None:
         """``resolve_user`` maps a gen email to the decide user_id, creating the profile when
         missing (the API passes ``AuthService.resolve_gen_user``); only the partner calls need it."""
         self.db = firestore_service
         self._catalog = catalog
         self._resolve_user = resolve_user
+        self._find_user = find_user
         self._budget = resolve_budget_s
 
     @property
@@ -452,7 +473,7 @@ class KaraokeLogService:
             if field in patch:
                 new[field] = _iso(patch[field])
         if "singers" in patch:
-            new["singers"] = [str(s) for s in patch["singers"] or []]
+            new["singers"] = _clean_singers(patch["singers"])
         if "night" in patch:
             new["night"] = _clean_model(_merge_sub(cur.get("night"), patch["night"], "night"), LogNight, "night")
         if "media" in patch:
@@ -582,11 +603,20 @@ class KaraokeLogService:
         return self._entry(await self._transact(doc_id, build), entry_id)
 
     async def delete_partner(self, email: str, entry_id: str) -> KaraokeLogEntry | None:
-        """kjbox un-done (``DELETE /api/partner/kjbox/karaoke-log/{id}``). Idempotent; None if unknown."""
+        """kjbox un-done (``DELETE /api/partner/kjbox/karaoke-log/{id}``). Idempotent; None if unknown.
+
+        Never creates a profile: with ``find_user`` set (the API), an email with no decide
+        profile is a no-op."""
         if not entry_id.startswith("kj_"):
             raise KaraokeLogInvalidError("kjbox writes kj_ ids only")
         _check_id(entry_id)
-        user_id = await self._partner_user(email)
+        if self._find_user is not None:
+            found = await self._find_user(email.strip().lower())
+            if found is None:
+                return None
+            user_id = found
+        else:
+            user_id = await self._partner_user(email)
 
         def build(cur: dict[str, Any] | None) -> dict[str, Any] | None:
             if cur is None or cur.get("deleted"):

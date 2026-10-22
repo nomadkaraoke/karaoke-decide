@@ -271,6 +271,16 @@ decide_kjbox_secret = gcp.secretmanager.Secret(
     replication={"auto": {}},
     opts=pulumi.ResourceOptions(protect=True),
 )
+# Its accessor grant is created here, not in the REQUIRED_SECRETS loop below, so the service
+# can depend on it.
+decide_kjbox_secret_access = gcp.secretmanager.SecretIamMember(
+    "cloud-run-secret-access-decide-kjbox-secret",
+    project=project,
+    secret_id="decide-kjbox-secret",
+    role="roles/secretmanager.secretAccessor",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
+    opts=pulumi.ResourceOptions(depends_on=[decide_kjbox_secret]),
+)
 
 # Backend API service
 cloud_run_service = gcp.cloudrunv2.Service(
@@ -397,7 +407,9 @@ cloud_run_service = gcp.cloudrunv2.Service(
     scaling={
         "min_instance_count": 0,  # Scale to zero (~$10/mo saved); must match CI --min-instances 0
     },
-    opts=pulumi.ResourceOptions(protect=True),
+    # DECIDE_KJBOX_SECRET is mounted: the secret and its grant must exist first. Its version
+    # (the value) is added by hand before the deploy (see decide_kjbox_secret above).
+    opts=pulumi.ResourceOptions(protect=True, depends_on=[decide_kjbox_secret, decide_kjbox_secret_access]),
 )
 
 # Allow unauthenticated access to Cloud Run service
@@ -422,7 +434,7 @@ REQUIRED_SECRETS = [
     "spotipy-client-secret",
     "lastfm-api-key",
     "postmark-server-token",
-    "decide-kjbox-secret",
+    # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 
 # Grant Cloud Run service account access to secrets
@@ -433,7 +445,6 @@ for secret_name in REQUIRED_SECRETS:
         secret_id=secret_name,
         role="roles/secretmanager.secretAccessor",
         member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
-        opts=pulumi.ResourceOptions(depends_on=[decide_kjbox_secret]) if secret_name == "decide-kjbox-secret" else None,
     )
 
 # =============================================================================

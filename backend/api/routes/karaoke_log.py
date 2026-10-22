@@ -4,8 +4,9 @@
   Bearer gen session token (``get_current_user``).
 * ``/api/partner/kjbox/karaoke-log`` (mounted at ``/partner/kjbox/karaoke-log``): kjbox's
   history outbox, server to server. Header ``X-Kjbox-Secret`` must equal the
-  ``DECIDE_KJBOX_SECRET`` setting (``hmac.compare_digest``); the routes answer 503 while it
-  is unset.
+  ``DECIDE_KJBOX_SECRET`` setting (``hmac.compare_digest``). A missing or wrong secret is
+  503 ``partner_auth`` and an unset one 503 ``partner_disabled``: both retryable, because
+  kjbox's outbox drops a record on any 4xx but 429.
 
 Errors use decide's usual shape, ``{"detail": "<code>"}``, with the karaoke-log codes
 ``invalid`` (400), ``not_owner`` (403) and ``not_found`` (404). A body that isn't a JSON
@@ -162,8 +163,11 @@ async def require_kjbox_partner(settings: Settings, x_kjbox_secret: Annotated[st
     expected = settings.kjbox_secret
     if not expected:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="partner_disabled")
-    if not x_kjbox_secret or not hmac.compare_digest(x_kjbox_secret.encode(), expected.encode()):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="unauthenticated")
+    if not hmac.compare_digest((x_kjbox_secret or "").encode(), expected.encode()):
+        # 503, not 401: kjbox's outbox treats 4xx (but 429) as permanent and would drop the
+        # night's history over a misconfigured or rotating secret. 503 keeps it retrying.
+        logger.warning("karaoke-log partner: missing or wrong X-Kjbox-Secret")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="partner_auth")
 
 
 Partner = Annotated[None, Depends(require_kjbox_partner)]

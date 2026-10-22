@@ -106,12 +106,29 @@ Counts: a `sung`/`sung_unplayed` record that isn't deleted adds one to `user_son
 
 ### kjbox partner: /api/partner/kjbox/karaoke-log
 
-Server to server from kjbox's history outbox. Header `X-Kjbox-Secret` must equal `DECIDE_KJBOX_SECRET` (Secret Manager `decide-kjbox-secret`; compared with `hmac.compare_digest`): missing or wrong → 401 `unauthenticated`; unset on the server → 503 `partner_disabled`. The local stack (`DECIDE_TEST_API=1`, never production) defaults it to `local-stack-secret`.
+Server to server from kjbox's history outbox. Header `X-Kjbox-Secret` must equal `DECIDE_KJBOX_SECRET` (Secret Manager `decide-kjbox-secret`; compared with `hmac.compare_digest`): missing or wrong → **503 `partner_auth`** (not 401: kjbox's outbox drops records on any 4xx but 429, so a misconfigured or rotating secret must stay retryable); unset on the server → 503 `partner_disabled`. Both are logged at WARNING. The local stack (`DECIDE_TEST_API=1`, never production) defaults it to `local-stack-secret`.
 
 | Route | Purpose |
 |-------|---------|
 | `PUT /api/partner/kjbox/karaoke-log/{kj_id}` | Body: the outbox record `{history_id, gen_email, source, box_id, night_id, night_date, entry_id, artist, title, sung_at, ended_at, state?, singers[], venue: {kind, name}, media}`. Resolves the decide profile by `gen_email` (created if missing). Idempotent; kjbox owns the facts, never the survey. → `{id, deleted, song_key_status}` (no user data). Missing `gen_email` → 400 `invalid`; unknown fields are ignored. |
-| `DELETE /api/partner/kjbox/karaoke-log/{kj_id}?gen_email=` | The host un-did Done (`gen_email` may also be a JSON body field). 204, idempotent, also for unknown ids. A later `PUT` (Done again) restores it; a user's own delete is never undone. |
+| `DELETE /api/partner/kjbox/karaoke-log/{kj_id}?gen_email=` | The host un-did Done (`gen_email` may also be a JSON body field). 204, idempotent, also for unknown ids and for an email with no decide profile (never creates one). A later `PUT` (Done again) restores it; a user's own delete is never undone. |
+
+`singers` must be a list of at most 6 strings of at most 100 characters each (else 400 `invalid`).
+
+#### Errors (karaoke-log and partner routes)
+
+decide's usual shape: `{"detail": "<code>"}` (FastAPI's own 422 body for schema errors).
+
+| Status | Code | Routes | Retry? |
+|--------|------|--------|--------|
+| 400 | `invalid` | all (bad id prefix, field values, `since`, `cursor`, `singers`, missing `gen_email`) | No: fix the request |
+| 401 | `Not authenticated` / `gen_session_*` | user routes (no or bad gen token) | After signing in again |
+| 403 | `not_owner` | `PUT /api/my/karaoke-log/{kj_…}` with a kjbox-owned field | No |
+| 404 | `not_found` | user `DELETE` of an unknown id | No |
+| 422 | FastAPI validation | body not a JSON object; `limit` outside 1–500 | No |
+| 503 | `partner_auth` | partner routes: missing or wrong `X-Kjbox-Secret` | **Yes** (fix the secret; the outbox keeps retrying) |
+| 503 | `partner_disabled` | partner routes: secret unset on decide | **Yes** |
+| 5xx | (other) | any (Firestore errors) | **Yes** |
 
 ### GET /api/quiz/progress
 

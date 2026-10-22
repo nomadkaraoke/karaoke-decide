@@ -53,6 +53,29 @@ class FakeFirestore:
         for doc_id, data in docs.items():
             await self.set_document(col, doc_id, data, merge=merge)
 
+    async def run_transaction(self, fn: Any) -> Any:
+        writes: list[tuple[str, str, dict[str, Any] | None]] = []
+        cols = self.cols
+
+        class Txn:
+            async def get(self, col: str, doc_id: str) -> dict[str, Any] | None:
+                d = cols.get(col, {}).get(doc_id)
+                return None if d is None else dict(d)
+
+            def set(self, col: str, doc_id: str, data: dict[str, Any]) -> None:
+                writes.append((col, doc_id, dict(data)))
+
+            def delete(self, col: str, doc_id: str) -> None:
+                writes.append((col, doc_id, None))
+
+        result = await fn(Txn())
+        for col, doc_id, data in writes:
+            if data is None:
+                cols.get(col, {}).pop(doc_id, None)
+            else:
+                cols.setdefault(col, {})[doc_id] = data
+        return result
+
     async def batch_delete(self, col: str, doc_ids: list[str]) -> None:
         for doc_id in doc_ids:
             await self.delete_document(col, doc_id)

@@ -126,9 +126,8 @@ class SongFeedbackService:
         self._fs = firestore
         self._kn_id_for = kn_id_for or _catalog_kn_id
 
-    async def _row(self, user_id: str, song_key: str) -> tuple[str, dict[str, Any] | None]:
-        kn_id = await asyncio.to_thread(self._kn_id_for, song_key)  # SQLite: off the event loop
-        return await choose_user_song_row(user_id, song_key, kn_id, self._fs.get_document)
+    async def _kn_id(self, song_key: str) -> int | None:
+        return await asyncio.to_thread(self._kn_id_for, song_key)  # SQLite: off the event loop
 
     async def hide(self, user_id: str, song_key: str, artist: str, title: str) -> None:
         await self._fs.set_document(
@@ -147,44 +146,65 @@ class SongFeedbackService:
         await self._fs.delete_document(HIDDEN_COLLECTION, feedback_doc_id(user_id, song_key))
 
     async def love(self, user_id: str, song_key: str, artist: str, title: str) -> None:
-        """Merge the love marker into the song's row; a new row gets ``source: manual``."""
-        now = datetime.now(UTC).isoformat()
-        doc_id, existing = await self._row(user_id, song_key)
-        data: dict[str, Any] = {
-            "user_id": user_id,
-            "song_key": song_key,
-            "artist": artist,
-            "title": title,
-            "loved": True,
-            "loved_at": now,
-            "updated_at": now,
-        }
-        if existing is None:
-            data.update(
-                {"song_id": song_key, "source": "manual", "play_count": 0, "is_saved": False, "created_at": now}
+        """Set the love marker on the song's row; a new row gets ``source: manual``.
+
+        Runs in a Firestore transaction that re-reads the row, so a concurrent karaoke-log
+        increment is never lost and the row's source is never overwritten."""
+        kn_id = await self._kn_id(song_key)
+
+        async def body(txn: Any) -> None:
+            doc_id, existing = await choose_user_song_row(user_id, song_key, kn_id, txn.get)
+            now = datetime.now(UTC).isoformat()
+            if existing is None:
+                row: dict[str, Any] = {
+                    "song_id": song_key,
+                    "source": "manual",
+                    "play_count": 0,
+                    "is_saved": False,
+                    "created_at": now,
+                }
+            else:
+                row = {k: v for k, v in existing.items() if k != "id"}
+            row.update(
+                {
+                    "user_id": user_id,
+                    "song_key": song_key,
+                    "artist": artist,
+                    "title": title,
+                    "loved": True,
+                    "loved_at": now,
+                    "updated_at": now,
+                }
             )
-        await self._fs.set_document(USER_SONGS_COLLECTION, doc_id, data, merge=True)
+            txn.set(USER_SONGS_COLLECTION, doc_id, row)
+
+        await self._fs.run_transaction(body)
 
     async def unlove(self, user_id: str, song_key: str) -> None:
         """Clear the love marker; delete the row only when nothing else is on it.
 
         Clears both candidate rows (the kn_id row and ``loved_doc_id``): a song loved before a
-        sync created its kn_id row is still un-loved."""
-        doc_id, existing = await self._row(user_id, song_key)
-        rows = {doc_id: existing}
-        fallback = loved_doc_id(user_id, song_key)
-        if fallback not in rows:
-            rows[fallback] = await self._fs.get_document(USER_SONGS_COLLECTION, fallback)
-        now = datetime.now(UTC).isoformat()
-        for row_id, doc in rows.items():
-            if doc is None or not is_loved(doc):
-                continue
-            if not doc.get("times_sung") and doc.get("source") in _DELETABLE_SOURCES:
-                await self._fs.delete_document(USER_SONGS_COLLECTION, row_id)
-            else:
-                await self._fs.set_document(
-                    USER_SONGS_COLLECTION, row_id, {"loved": False, "loved_at": None, "updated_at": now}, merge=True
-                )
+        sync created its kn_id row is still un-loved. One transaction, like ``love``."""
+        kn_id = await self._kn_id(song_key)
+
+        async def body(txn: Any) -> None:
+            doc_id, existing = await choose_user_song_row(user_id, song_key, kn_id, txn.get)
+            rows = {doc_id: existing}
+            fallback = loved_doc_id(user_id, song_key)
+            if fallback not in rows:
+                rows[fallback] = await txn.get(USER_SONGS_COLLECTION, fallback)
+            now = datetime.now(UTC).isoformat()  # all reads done; writes from here on
+            for row_id, doc in rows.items():
+                if doc is None or not is_loved(doc):
+                    continue
+                if not doc.get("times_sung") and doc.get("source") in _DELETABLE_SOURCES:
+                    txn.delete(USER_SONGS_COLLECTION, row_id)
+                else:
+                    cleared = {k: v for k, v in doc.items() if k != "id"}
+                    cleared.update({"loved": False, "loved_at": None, "updated_at": now})
+                    txn.set(USER_SONGS_COLLECTION, row_id, cleared)
+
+        await self._fs.run_transaction(body)
 
     async def _hidden_docs(self, user_id: str) -> list[dict[str, Any]]:
         return await self._fs.query_documents(HIDDEN_COLLECTION, filters=[("user_id", "==", user_id)])
@@ -205,5 +225,9 @@ class SongFeedbackService:
                 USER_SONGS_COLLECTION, filters=[("user_id", "==", user_id), ("source", "==", "manual")]
             ),
         )
-        docs = {d["id"]: d for d in [*marked, *manual] if is_loved(d)}
-        return _to_songs(list(docs.values()))
+        # One song can be loved on two rows (a legacy song_key row + a later kn_id row): one entry.
+        by_key: dict[str, dict[str, Any]] = {}
+        for d in [*marked, *manual]:
+            if is_loved(d) and d.get("song_key"):
+                by_key.setdefault(d["song_key"], d)
+        return _to_songs(list(by_key.values()))

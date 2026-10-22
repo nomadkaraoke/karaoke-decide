@@ -272,7 +272,11 @@ async def get_karaoke_log_service(
     async def resolve_user(email: str) -> str:
         return (await auth_service.resolve_gen_user(email)).id
 
-    return KaraokeLogService(firestore, catalog=catalog, resolve_user=resolve_user)
+    async def find_user(email: str) -> str | None:  # lookup only: never creates a profile
+        doc = await firestore.get_document(AuthService.USERS_COLLECTION, auth_service._hash_email(email.lower()))
+        return doc.get("user_id") if doc else None
+
+    return KaraokeLogService(firestore, catalog=catalog, resolve_user=resolve_user, find_user=find_user)
 
 
 _bigquery_catalog_instance: BigQueryCatalogService | None = None

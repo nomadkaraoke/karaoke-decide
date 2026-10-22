@@ -153,10 +153,16 @@ def test_routes_require_gen_token(anon: TestClient) -> None:
 
 
 def test_partner_requires_secret(client: TestClient, fs: RouteFirestore) -> None:
+    """A missing or wrong secret is 503 partner_auth: retryable, so kjbox's outbox keeps the
+    night's records (it drops 4xx other than 429) until the secret is fixed."""
     path = f"/api/partner/kjbox/karaoke-log/{KJ_ID}"
-    assert client.put(path, json=_outbox()).status_code == 401
-    assert client.put(path, json=_outbox(), headers=_partner("wrong")).status_code == 401
-    assert client.delete(path, params={"gen_email": EMAIL}, headers=_partner("wrong")).status_code == 401
+    for r in (
+        client.put(path, json=_outbox()),
+        client.put(path, json=_outbox(), headers=_partner("wrong")),
+        client.put(path, json=_outbox(), headers=_partner(SECRET + "x")),
+        client.delete(path, params={"gen_email": EMAIL}, headers=_partner("wrong")),
+    ):
+        assert r.status_code == 503 and r.json() == {"detail": "partner_auth"}
     assert LOG_COLLECTION not in fs.cols
     assert client.put(path, json=_outbox(), headers=_partner()).status_code == 200
 
@@ -219,6 +225,25 @@ def test_partner_delete_undoes_and_is_idempotent(client: TestClient, fs: RouteFi
     other = f"/api/partner/kjbox/karaoke-log/kj_{'c' * 24}"
     assert client.delete(other, params={"gen_email": EMAIL}, headers=_partner()).status_code == 204
     assert client.delete(path, headers=_partner()).status_code == 400  # no email at all
+
+
+def test_partner_delete_never_creates_a_profile(client: TestClient, fs: RouteFirestore) -> None:
+    stranger = "never.seen@example.com"
+    r = client.delete(f"/api/partner/kjbox/karaoke-log/{KJ_ID}", params={"gen_email": stranger}, headers=_partner())
+    assert r.status_code == 204
+    assert hashlib.sha256(stranger.encode()).hexdigest() not in fs.cols["decide_users"]
+    assert LOG_COLLECTION not in fs.cols
+
+
+def test_partner_singers_must_be_short_strings(client: TestClient, fs: RouteFirestore) -> None:
+    path = f"/api/partner/kjbox/karaoke-log/{KJ_ID}"
+    for bad in ("Sam", [1, 2], ["x" * 101], [f"s{i}" for i in range(7)], {"a": 1}):
+        r = client.put(path, json=_outbox(singers=bad), headers=_partner())
+        assert r.status_code == 400 and r.json() == {"detail": "invalid"}, bad
+    assert LOG_COLLECTION not in fs.cols
+    ok = client.put(path, json=_outbox(singers=["Sam", "y" * 100, "a", "b", "c", "d"]), headers=_partner())
+    assert ok.status_code == 200
+    assert fs.log(KJ_ID, USER_ID)["singers"][0] == "Sam"
 
 
 def test_partner_rejects_app_ids(client: TestClient) -> None:

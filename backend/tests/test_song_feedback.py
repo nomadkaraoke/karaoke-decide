@@ -50,6 +50,32 @@ class MemoryFirestore:
     async def delete_document(self, collection: str, doc_id: str) -> None:
         self.cols.get(collection, {}).pop(doc_id, None)
 
+    async def run_transaction(self, fn: Any) -> Any:
+        """Reads see committed state; writes apply at commit (Firestore's model)."""
+        self.transactions = getattr(self, "transactions", 0) + 1
+        writes: list[tuple[str, str, dict[str, Any] | None]] = []
+        cols = self.cols
+
+        class Txn:
+            async def get(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+                assert not writes, "read after write inside a transaction"
+                d = cols.get(collection, {}).get(doc_id)
+                return None if d is None else dict(d)
+
+            def set(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+                writes.append((collection, doc_id, dict(data)))
+
+            def delete(self, collection: str, doc_id: str) -> None:
+                writes.append((collection, doc_id, None))
+
+        result = await fn(Txn())
+        for collection, doc_id, data in writes:
+            if data is None:
+                cols.get(collection, {}).pop(doc_id, None)
+            else:
+                cols.setdefault(collection, {})[doc_id] = data
+        return result
+
     async def query_documents(self, collection: str, filters: Any = None, **_: Any) -> list[dict[str, Any]]:
         out = []
         for doc_id, d in self.cols.get(collection, {}).items():
@@ -203,6 +229,60 @@ async def test_unlove_keeps_quiz_row(fs: MemoryFirestore) -> None:
     await svc.love("u1", "adele|hello", "Adele", "Hello")
     await svc.unlove("u1", "adele|hello")
     assert fs.cols["user_songs"][row_id]["source"] == "quiz"
+
+
+@pytest.mark.asyncio
+async def test_love_and_unlove_run_in_a_transaction(fs: MemoryFirestore) -> None:
+    """The row is re-read inside the transaction, so a log increment between love's reads
+    and its write can't be lost (Firestore retries the transaction on contention)."""
+    svc = _svc(fs)
+    await svc.love("u1", "adele|hello", "Adele", "Hello")
+    await svc.unlove("u1", "adele|hello")
+    assert getattr(fs, "transactions", 0) == 2
+
+
+@pytest.mark.asyncio
+async def test_love_keeps_a_concurrent_log_increment(fs: MemoryFirestore) -> None:
+    """A log increment that lands while love is running (here: during the kn_id lookup, before
+    any row read) is kept, and its source isn't overwritten: love reads the row in its transaction."""
+    row_id = loved_doc_id("u1", "adele|hello")
+
+    def racing_kn_lookup(song_key: str) -> int | None:
+        fs.cols.setdefault("user_songs", {})[row_id] = {
+            "user_id": "u1",
+            "song_key": song_key,
+            "source": "karaoke_log",
+            "times_sung": 1,
+        }
+        return None
+
+    await SongFeedbackService(fs, kn_id_for=racing_kn_lookup).love("u1", "adele|hello", "Adele", "Hello")  # type: ignore[arg-type]
+    row = fs.cols["user_songs"][row_id]
+    assert (row["times_sung"], row["source"], row["loved"]) == (1, "karaoke_log", True)
+
+
+@pytest.mark.asyncio
+async def test_list_loved_dedupes_on_song_key(fs: MemoryFirestore) -> None:
+    fs.cols["user_songs"] = {
+        loved_doc_id("u1", "adele|hello"): {
+            "user_id": "u1",
+            "song_key": "adele|hello",
+            "source": "manual",
+            "artist": "Adele",
+            "title": "Hello",
+            "created_at": "2026-01-01T00:00:00+00:00",
+        },
+        "u1:77": {
+            "user_id": "u1",
+            "song_key": "adele|hello",
+            "source": "spotify",
+            "loved": True,
+            "artist": "Adele",
+            "title": "Hello",
+            "created_at": "2026-02-01T00:00:00+00:00",
+        },
+    }
+    assert [s.song_key for s in await _svc(fs).list_loved("u1")] == ["adele|hello"]
 
 
 def test_loved_rows_weigh_as_manual_in_recs() -> None:
