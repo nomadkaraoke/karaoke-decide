@@ -12,6 +12,7 @@ from karaoke_decide.voice_session.model import (
     VOICE_TYPES,
     PitchSummary,
     Posterior,
+    SongDemand,
     comfort,
     full,
     likelihood_difficulty,
@@ -20,7 +21,7 @@ from karaoke_decide.voice_session.model import (
     likely_octave,
     sung_octave,
 )
-from karaoke_decide.voice_session.weights import OCTAVE_PRIOR
+from karaoke_decide.voice_session.weights import OCTAVE_PRIOR, TEMP
 
 from .builders import ctx, evidence, quiz, song
 
@@ -67,35 +68,63 @@ def _voiced_in_octave(s_p50: float) -> PitchSummary:
     return PitchSummary(voiced_s=30, held_count=0, held_low=0, held_high=0, p10=0, p50=s_p50, p90=0)
 
 
+def _quiz_only(post: Posterior, s_lo: float, s_hi: float, n: int = 5) -> Posterior:
+    for _ in range(n):
+        post = post.update(evidence(song(s_lo, s_hi), quiz(position="comfortable", difficulty="easy")))
+    return post
+
+
+MALE_TYPES = ("bass", "baritone", "tenor")
+
+
 def test_comfortable_answers_concentrate_on_truth() -> None:
-    post = Posterior.uniform()
-    for _ in range(5):
-        post = post.update(evidence(song(53, 61), quiz(position="comfortable", difficulty="easy")))
+    """Quiz-only answers centred at 57: baritone leads the male types; its octave twin mezzo stays close.
+
+    An honest near-tie between h and h+12 is intended without pitch; the profile prior or pitch separates them.
+    """
+    post = _quiz_only(Posterior.uniform(), 53, 61)
     _assert_valid(post)
-    assert _top_type(post) == "baritone"
-    lo, hi = post.comfort_estimate()
-    assert lo < 53 and hi > 61
-
-
-def test_quiz_only_comfortable_prefers_own_octave_type() -> None:
-    """Unknown octave is marginalised with the own octave most likely, so h and h+12 no longer tie."""
-    post = Posterior.uniform()
-    for _ in range(5):
-        post = post.update(evidence(song(53, 61), quiz(position="comfortable", difficulty="easy")))
     marg = post.type_marginal()
-    assert marg["baritone"] > marg["mezzo"]
+    assert max(MALE_TYPES, key=lambda t: marg[t]) == "baritone"
+    assert marg["baritone"] > 0.3
+    assert marg["baritone"] + marg["mezzo"] > 0.6
 
 
-def test_unknown_octave_is_marginalised_with_prior() -> None:
+def test_quiz_only_female_songs_no_spurious_lean_for_baritone() -> None:
+    """Baritone truth, comfortable+easy on female-range songs, uniform start: mezzo must not run away."""
+    marg = _quiz_only(Posterior.uniform(), 64, 76).type_marginal()
+    assert marg["mezzo"] < 2 * marg["baritone"]
+
+
+def test_quiz_only_male_songs_no_spurious_lean_for_mezzo() -> None:
+    """Mezzo truth, comfortable+easy on male-range songs, uniform start: baritone must not run away."""
+    marg = _quiz_only(Posterior.uniform(), 50, 64).type_marginal()
+    assert marg["baritone"] < 2 * marg["mezzo"]
+
+
+def _octave_weights(h: tuple[str, int], s: SongDemand) -> dict[int, float]:
+    c_lo, c_hi = comfort(h)
+    raw = {}
+    for o in (0, -12, 12):
+        excess = max(c_lo - (s.p10 + o), s.p90 + o - c_hi)
+        raw[o] = OCTAVE_PRIOR[o] / (1 + math.exp((excess - 1) / TEMP))
+    z = sum(raw.values())
+    return {o: v / z for o, v in raw.items()}
+
+
+def test_unknown_octave_is_marginalised_with_fit_weighted_prior() -> None:
     s = song(64, 76)
-    for h in (("baritone", 0), ("tenor", 1), ("soprano", -2)):
+    for h in (("baritone", 0), ("tenor", 1), ("soprano", -2), ("bass", 2)):
+        w = _octave_weights(h, s)
         for a in ("too_low", "comfortable", "too_high", "both_ends"):
-            mixed = sum(OCTAVE_PRIOR[o] * likelihood_position(h, s, a, o) for o in (0, -12, 12))
+            mixed = sum(w[o] * likelihood_position(h, s, a, o) for o in w)
             assert likelihood_position(h, s, a, None) == pytest.approx(mixed)
         for d in ("easy", "stretch", "couldnt"):
-            mixed = sum(OCTAVE_PRIOR[o] * likelihood_difficulty(h, s, d, o) for o in (0, -12, 12))
+            mixed = sum(w[o] * likelihood_difficulty(h, s, d, o) for o in w)
             assert likelihood_difficulty(h, s, d, None) == pytest.approx(mixed)
     assert sum(OCTAVE_PRIOR.values()) == pytest.approx(1.0)
+    # A baritone mostly sings a female-range song down an octave.
+    assert _octave_weights(("baritone", 0), s)[-12] > 0.5
 
 
 def test_likely_octave_picks_with_penalty() -> None:
@@ -215,16 +244,17 @@ def test_octave_choice_for_female_song_by_male_singer() -> None:
     s = song(64, 76)
     # Sung an octave down, a baritone finds it comfortable.
     assert likelihood_position(("baritone", 0), s, "comfortable", -12) > 0.5
-    post = Posterior.uniform()
-    for _ in range(3):
-        post = post.update(evidence(song(53, 61), quiz(position="comfortable", difficulty="easy")))
-    assert _top_type(post) == "baritone"
-    after = post.update(evidence(s, quiz(position="comfortable", difficulty="easy")))
+    # From a uniform start, one comfortable answer leaves baritone a real contender against mezzo.
+    marg = Posterior.uniform().update(evidence(s, quiz(position="comfortable", difficulty="easy"))).type_marginal()
+    assert marg["baritone"] >= 0.5 * marg["mezzo"]
+    # From a baritone-leaning start, baritone stays top.
+    prior = Posterior.from_profile(Profile(method="mic", voice_type="baritone"))
+    after = prior.update(evidence(s, quiz(position="comfortable", difficulty="easy")))
     _assert_valid(after)
     assert _top_type(after) == "baritone"
     # With a pitch summary showing the lower octave, the same holds.
     pitch = PitchSummary(voiced_s=30, held_count=4, held_low=53, held_high=63, p10=52, p50=58, p90=64)
-    after2 = post.update(evidence(s, quiz(position="comfortable"), ctx(headphones=True), pitch=pitch))
+    after2 = prior.update(evidence(s, quiz(position="comfortable"), ctx(headphones=True), pitch=pitch))
     assert _top_type(after2) == "baritone"
 
 

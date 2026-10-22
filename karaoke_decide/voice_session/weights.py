@@ -23,7 +23,8 @@ K_EARLY_MISS = 0.7
 EPS_POSITION = 0.15
 EPS_DIFFICULTY = 0.2
 TEMP = 1.5
-# Prior over the octave a singer used when no pitch tells us (own octave most likely).
+# Base lean over the octave a singer used when no pitch tells us (own octave most likely); model.py
+# multiplies it by how well the song fits each hypothesis at that octave.
 OCTAVE_PRIOR: dict[int, float] = {0: 0.6, -12: 0.2, 12: 0.2}
 
 CONDITIONAL_REASONS = frozenset({"warmer", "practice"})
