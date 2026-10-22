@@ -36,6 +36,7 @@ from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportSource
+from backend.services.music_service_service import MusicServiceError
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -50,6 +51,7 @@ from backend.services.screenshot_import_service import (
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
+from karaoke_decide.services.listenbrainz import ListenBrainzImportInProgressError, ListenBrainzRateLimitedError
 from karaoke_decide.services.metabrainz_oauth import new_pkce_pair
 from karaoke_decide.services.spotify_embed import (
     InvalidSpotifyPlaylistUrlError,
@@ -591,6 +593,83 @@ def _listenbrainz_oauth_return(
     query = "listenbrainz=connected" if reason is None else f"listenbrainz=error&reason={reason}"
     url = f"{settings.frontend_url}{get_locale_prefix(DEFAULT_LOCALE)}/music-i-know?{query}"
     return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND, headers=headers)
+
+
+LB_IMPORT_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
+_ZIP_MAGIC = b"PK\x03\x04"
+
+
+class ListenBrainzUploadResponse(BaseModel):
+    import_id: str
+    status: str
+
+
+@router.post("/listenbrainz/upload-export", response_model=ListenBrainzUploadResponse)
+async def upload_listenbrainz_export(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    file: Annotated[UploadFile, File()],
+) -> ListenBrainzUploadResponse:
+    """Hand the user's Spotify export zip (at most 30 MiB) to ListenBrainz's importer for them.
+
+    Needs a ListenBrainz connection made with OAuth. The listens are not ingested here (the app
+    already sent its aggregates); this only feeds ListenBrainz. Errors: 409 not_oauth_connected /
+    needs_reconnect / import_in_progress, 413 too_large, 400 not_a_zip, 429 rate_limited
+    (Retry-After), 503 listenbrainz_unavailable.
+    """
+    service = await music_service.get_service(user.id, "listenbrainz")
+    doc = await music_service.get_service_doc(user.id, "listenbrainz") or {}
+    if service is None or doc.get("auth") != "oauth":
+        raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
+
+    data = await file.read(LISTENBRAINZ_UPLOAD_MAX_BYTES + 1)
+    if len(data) > LISTENBRAINZ_UPLOAD_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too_large")
+    if not data.startswith(_ZIP_MAGIC):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_a_zip")
+
+    try:
+        token = await music_service.get_listenbrainz_token(service)
+    except MusicServiceError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "needs_reconnect")
+
+    lb = music_service.listenbrainz
+    pending = doc.get("lb_pending_import")
+    try:
+        if isinstance(pending, dict) and pending.get("id") and pending.get("status") not in LB_IMPORT_TERMINAL_STATUSES:
+            try:
+                latest = (await lb.get_import_status(token, str(pending["id"]))).get("status") or pending.get("status")
+            except ExternalServiceError:
+                latest = pending.get("status")  # can't tell: assume it is still running
+            if latest not in LB_IMPORT_TERMINAL_STATUSES:
+                raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
+        filename = file.filename if (file.filename or "").lower().endswith(".zip") else "spotify-export.zip"
+        import_id = await lb.submit_import(token, data, filename)
+    except ListenBrainzImportInProgressError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
+    except ListenBrainzRateLimitedError as e:
+        logger.warning("ListenBrainz rate limited the export upload for %s (retry in %ss)", user.id, e.retry_after)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "rate_limited",
+            headers={"Retry-After": str(max(1, round(e.retry_after)))},
+        )
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz export upload failed for %s: %s", user.id, e)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "listenbrainz_unavailable")
+
+    await music_service.firestore.update_document(
+        music_service.SERVICES_COLLECTION,
+        service.id,
+        {
+            "lb_pending_import": {
+                "id": import_id,
+                "status": "waiting",
+                "submitted_at": datetime.now(UTC).isoformat(),
+            }
+        },
+    )
+    return ListenBrainzUploadResponse(import_id=import_id, status="waiting")
 
 
 @router.get("/listenbrainz/oauth/callback", response_model=None)

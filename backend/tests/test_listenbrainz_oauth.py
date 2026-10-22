@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
@@ -43,6 +44,15 @@ class FakeDb:
 
     async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         self.cols.setdefault(collection, {}).setdefault(doc_id, {}).update(copy.deepcopy(data))
+
+    async def transform_document_atomically(self, collection: str, doc_id: str, transform: Any) -> Any:
+        current = self.doc(collection, doc_id)
+        new = transform(copy.deepcopy(current) if current is not None else None)
+        if new is None:
+            self.cols.get(collection, {}).pop(doc_id, None)
+        else:
+            self.cols.setdefault(collection, {})[doc_id] = copy.deepcopy(new)
+        return new
 
     async def delete_document_atomically(self, collection: str, doc_id: str) -> dict[str, Any] | None:
         return self.cols.get(collection, {}).pop(doc_id, None)
@@ -370,3 +380,52 @@ def test_callback_after_oauth_switched_off_stores_nothing(make_client: Any, db: 
     resp = _callback(client2, code="c", state=state)
     assert resp.headers["location"].endswith("reason=exchange_failed")
     assert db.doc("music_services", LB_DOC) is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_callers_share_one_refresh(db: FakeDb) -> None:
+    svc = _service(db)
+    service = await _lb_service(db, svc, 60)
+    refresh = svc.metabrainz.refresh  # type: ignore[attr-defined]
+
+    async def slow_refresh(_: str) -> dict[str, Any]:
+        await asyncio.sleep(0.05)  # the second caller arrives while the first is mid-refresh
+        return {"access_token": "meba_access2", "refresh_token": "meba_refresh2", "expires_in": 3600}
+
+    refresh.side_effect = slow_refresh
+    tokens = await asyncio.gather(*(svc.get_listenbrainz_token(service) for _ in range(3)))
+    assert tokens == ["meba_access2"] * 3
+    assert refresh.await_count == 1
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None and stored["refresh_lease_until"] is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_uses_stored_refresh_token_not_a_stale_caller_copy(db: FakeDb) -> None:
+    svc = _service(db)
+    stale = await _lb_service(db, svc, 60)
+    await svc.get_listenbrainz_token(stale)  # rotates r -> refresh2 and stores it
+    await db.update_document("music_services", LB_DOC, {"token_expires_at": datetime.now(UTC).isoformat()})
+    refresh = svc.metabrainz.refresh  # type: ignore[attr-defined]
+    await svc.get_listenbrainz_token(stale)  # `stale` still holds the old "meba_r"
+    assert refresh.await_args.args == ("meba_refresh2",)
+
+
+@pytest.mark.asyncio
+async def test_failed_write_after_refresh_marks_needs_reconnect(db: FakeDb, caplog: pytest.LogCaptureFixture) -> None:
+    svc = _service(db)
+    service = await _lb_service(db, svc, 60)
+    real_update = db.update_document
+
+    async def failing_update(collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        if "access_token" in data:
+            raise RuntimeError("firestore down")
+        await real_update(collection, doc_id, data)
+
+    db.update_document = failing_update  # type: ignore[method-assign]
+    with caplog.at_level("ERROR"), pytest.raises(MusicServiceError):
+        await svc.get_listenbrainz_token(service)
+    assert any(r.levelname == "ERROR" for r in caplog.records)
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None
+    assert stored["error_code"] == "needs_reconnect" and stored["refresh_lease_until"] is None

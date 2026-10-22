@@ -656,6 +656,10 @@ Connect Last.fm account by username.
 
 Verified users. Start connecting ListenBrainz through MetaBrainz OAuth (authorization code + PKCE S256, scopes `profile listenbrainz:submit-listens`). Query `return_to=app|web` (required). Response `{"auth_url": "https://metabrainz.org/oauth2/authorize?..."}`; `404 {"detail":"oauth_disabled"}` when `capabilities.listenbrainz_oauth` is false.
 
+### POST /api/services/listenbrainz/upload-export
+
+Verified users, ListenBrainz connected with OAuth. Multipart `file` (a Spotify export `.zip`, at most 31,457,280 bytes). Hands the zip to ListenBrainz's importer (`POST /1/import-listens/`, `service=spotify`) with the user's token; nothing is ingested here. Response `{"import_id":"42","status":"waiting"}`, and `lb_pending_import={id,status,submitted_at}` is stored on the connection (shown as `pending_listenbrainz_import` in `/summary`). Errors (`detail`): `409 not_oauth_connected | needs_reconnect | import_in_progress`, `413 too_large`, `400 not_a_zip` (no `PK\x03\x04` magic), `429 rate_limited` (with `Retry-After`), `503 listenbrainz_unavailable`.
+
 ### GET /api/services/listenbrainz/oauth/callback
 
 No auth (MetaBrainz redirects here; the one-time state identifies the user). Query `code`, `state`, `error`. Stores the connection (`auth: "oauth"`, tokens encrypted with `DECIDE_TOKEN_KEY`) and answers `302` with `Cache-Control: no-store`:

@@ -10,6 +10,7 @@ artist similarity lookups.
 import logging
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -17,6 +18,21 @@ from backend.config import BackendSettings
 from karaoke_decide.core.exceptions import ExternalServiceError
 
 logger = logging.getLogger(__name__)
+
+
+class ListenBrainzRateLimitedError(ExternalServiceError):
+    """ListenBrainz answered 429; ``retry_after`` is X-RateLimit-Reset-In in seconds."""
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__("ListenBrainz", f"Rate limited, retry in {retry_after:g}s")
+        self.retry_after = retry_after
+
+
+class ListenBrainzImportInProgressError(ExternalServiceError):
+    """ListenBrainz refused an import because one for this user is already waiting or running."""
+
+    def __init__(self) -> None:
+        super().__init__("ListenBrainz", "An import is already in progress")
 
 
 @dataclass
@@ -133,6 +149,73 @@ class ListenBrainzClient:
         if not data.get("valid") or not user_name:
             raise ExternalServiceError("ListenBrainz", "Token is not valid")
         return str(user_name)
+
+    async def submit_import(self, token: str, data: bytes, filename: str) -> str:
+        """Upload a Spotify export zip to ListenBrainz's importer for the token's user.
+
+        ``POST /1/import-listens/`` multipart: ``file`` (must be a ``.zip``) and ``service=spotify``.
+        The token needs the ``listenbrainz:submit-listens`` scope (MetaBrainz OAuth ``meba_`` tokens).
+
+        Returns:
+            The import id.
+
+        Raises:
+            ListenBrainzRateLimitedError: 429.
+            ListenBrainzImportInProgressError: LB already has a waiting/in-progress Spotify import.
+            ExternalServiceError: Any other failure.
+        """
+        client = await self._get_client()
+        try:
+            response = await client.post(
+                f"{self.api_base}/import-listens/",
+                headers={"Authorization": f"Token {token}"},
+                files={"file": (filename, data, "application/zip")},
+                data={"service": "spotify"},
+                timeout=120.0,
+            )
+        except httpx.HTTPError as e:
+            raise ExternalServiceError("ListenBrainz", f"Failed to connect: {type(e).__name__}")
+        self._raise_for_import_status(response)
+        import_id = _json(response).get("import_id")
+        if import_id is None:
+            raise ExternalServiceError("ListenBrainz", "Import response had no import_id")
+        return str(import_id)
+
+    async def get_import_status(self, token: str, import_id: str) -> dict[str, Any]:
+        """``GET /1/import-listens/<id>/``: the import's state.
+
+        Returns:
+            ``{"status": "waiting|in_progress|completed|failed|cancelled", "progress": str, "metadata": dict}``.
+        """
+        client = await self._get_client()
+        try:
+            response = await client.get(
+                f"{self.api_base}/import-listens/{import_id}/",
+                headers={"Authorization": f"Token {token}"},
+            )
+        except httpx.HTTPError as e:
+            raise ExternalServiceError("ListenBrainz", f"Failed to connect: {type(e).__name__}")
+        self._raise_for_import_status(response)
+        metadata = _json(response).get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        return {
+            "status": str(metadata.get("status") or ""),
+            "progress": str(metadata.get("progress") or ""),
+            "metadata": metadata,
+        }
+
+    @staticmethod
+    def _raise_for_import_status(response: httpx.Response) -> None:
+        if response.status_code == 429:
+            try:
+                retry_after = float(response.headers.get("X-RateLimit-Reset-In", ""))
+            except ValueError:
+                retry_after = 60.0
+            raise ListenBrainzRateLimitedError(retry_after)
+        if response.status_code == 400 and "already in progress" in response.text:
+            raise ListenBrainzImportInProgressError()
+        if response.status_code != 200:
+            raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
     async def get_user_info(self, username: str) -> ListenBrainzUserInfo:
         """Get user information.
@@ -351,3 +434,11 @@ class ListenBrainzClient:
 
         except httpx.HTTPError as e:
             raise ExternalServiceError("ListenBrainz", f"Failed to fetch top tracks: {e}")
+
+
+def _json(response: httpx.Response) -> dict[str, Any]:
+    try:
+        data = response.json()
+    except ValueError:
+        raise ExternalServiceError("ListenBrainz", "Response was not JSON")
+    return data if isinstance(data, dict) else {}
