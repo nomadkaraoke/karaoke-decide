@@ -448,5 +448,80 @@
       "cost": 18,
       "score": 18
     }
+  },
+  {
+    "name": "fractional_half_semitones",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 48.5,
+      "high": 72.5,
+      "p10": 53.5,
+      "p50": 60,
+      "p90": 67.5,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.75,
+      "score": 0.75
+    }
+  },
+  {
+    "name": "fractional_rounds_up_at_half_milli",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 50,
+      "high": 70,
+      "p10": 54,
+      "p50": 60,
+      "p90": 67.0005,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.001,
+      "score": 0.001
+    }
+  },
+  {
+    "name": "fractional_rounds_down_below_half_milli",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 47.9995,
+      "high": 70,
+      "p10": 55,
+      "p50": 60,
+      "p90": 66,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.0,
+      "score": 0.0
+    }
   }
 ]

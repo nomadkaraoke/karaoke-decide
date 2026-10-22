@@ -7,6 +7,7 @@ regenerating the fixtures and updating the TS side.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -71,6 +72,12 @@ def _outside(a: float, b: float, lo: float, hi: float) -> float:
     return max(0.0, lo - a) + max(0.0, b - hi)
 
 
+def _round3(x: float) -> float:
+    # Rounding recipe shared with the TS port: half rounds up, i.e. JS
+    # Math.round(x * 1000) / 1000. Not Python's round(x, 3) (banker's / repr-based).
+    return math.floor(x * 1000 + 0.5) / 1000
+
+
 def fit_song(user: UserVoiceRange, song: SongVocalRange) -> FitResult:
     tol = TIER_TOLERANCE[song.tier]
     confidence = 1.0 if song.octave_confidence is None else song.octave_confidence
@@ -97,9 +104,9 @@ def fit_song(user: UserVoiceRange, song: SongVocalRange) -> FitResult:
         bucket = "stretch"
     else:
         bucket = "outside"
-    return FitResult(bucket, t, o, round(cost, 3), round(score, 3))
+    return FitResult(bucket, t, o, _round3(cost), _round3(score))
 
 
 def is_singable(fit: FitResult) -> bool:
-    """Anything but 'outside' (a stretch is singable with effort)."""
-    return fit.bucket != "outside"
+    """Singable = bucket fits or fitsIn (a stretch is not)."""
+    return fit.bucket in ("fits", "fitsIn")

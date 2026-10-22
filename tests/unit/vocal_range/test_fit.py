@@ -53,5 +53,11 @@ def test_constants():
 def test_is_singable():
     assert is_singable(FitResult("fits", 0, 0, 0.0, 0.0))
     assert is_singable(FitResult("fitsIn", -2, 0, 0.0, 0.1))
-    assert is_singable(FitResult("stretch", 0, 0, 1.0, 1.0))
+    assert not is_singable(FitResult("stretch", 0, 0, 1.0, 1.0))
     assert not is_singable(FitResult("outside", 0, 0, 24.0, 24.0))
+
+
+@pytest.mark.parametrize("case", CASES, ids=[c["name"] for c in CASES])
+def test_singable_derives_from_bucket(case):
+    r = fit_song(UserVoiceRange(**case["user"]), SongVocalRange(**case["song"]))
+    assert is_singable(r) == (case["expect"]["bucket"] in ("fits", "fitsIn"))

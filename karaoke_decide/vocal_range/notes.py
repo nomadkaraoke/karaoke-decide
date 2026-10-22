@@ -7,7 +7,7 @@ import re
 
 _NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 _SEMITONE = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
-_NOTE_RE = re.compile(r"^([A-Ga-g])([#♯b♭]?)(-?\d+)$")
+_NOTE_RE = re.compile(r"^([A-Ga-g])([#♯b♭]?)(-?[0-9]+)$")
 
 # (low, high) MIDI range per voice type, in this order.
 VOICE_TYPES: dict[str, tuple[int, int]] = {
