@@ -341,3 +341,36 @@ def test_missing_local_catalog(new_store: Callable[[], CatalogStore], tmp_path: 
 
 def test_get_catalog_store_is_singleton() -> None:
     assert get_catalog_store() is get_catalog_store()
+
+
+def test_start_load_runs_in_the_background_and_load_at_startup_joins_it(
+    new_store: Callable[[], CatalogStore],
+    tmp_path: Path,
+    catalog_dir: Path,
+    index_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """backend.serve starts the download before the app import; the lifespan waits for it."""
+    from backend.services import catalog_store
+
+    store = new_store()
+    client = _published(catalog_dir, index_dir)
+    client.buckets["nomadkaraoke-musicbrainz-data"].delay = 0.3
+    monkeypatch.setattr(catalog_store, "_storage_client", lambda: client)
+    settings = _settings(tmp_path)
+    started = time.monotonic()
+    store.start_load(settings)
+    store.start_load(settings)  # idempotent: one early load
+    assert time.monotonic() - started < 0.2
+    assert store.status == "warming_up"
+    store.load_at_startup(settings)
+    assert store.status == "ready" and store.run == POINTER_RUN
+    assert client.buckets["nomadkaraoke-musicbrainz-data"].reads.count("catalog/latest.json") == 1
+
+
+def test_load_at_startup_without_start_load_loads_now(
+    new_store: Callable[[], CatalogStore], tmp_path: Path, catalog_dir: Path, index_dir: Path
+) -> None:
+    store = new_store()
+    store.load_at_startup(_settings(tmp_path, catalog_local_dir=str(catalog_dir), song_index_local_dir=str(index_dir)))
+    assert store.status == "ready"

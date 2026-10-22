@@ -3,14 +3,20 @@
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
-
-from jose import JWTError, jwt
+from typing import TYPE_CHECKING, Any
 
 from backend.config import BackendSettings
 from backend.services.email_service import EmailService, get_email_service
 from backend.services.firestore_service import FirestoreService
+from karaoke_decide.core.lazy_import import lazy_module
 from karaoke_decide.core.models import User
+
+if TYPE_CHECKING:
+    from jose import exceptions as jose_exceptions
+    from jose import jwt
+else:  # imported on first use (API cold start: jose pulls in cryptography)
+    jose_exceptions = lazy_module("jose.exceptions")
+    jwt = lazy_module("jose.jwt")
 
 
 class AuthenticationError(Exception):
@@ -331,7 +337,7 @@ class AuthService:
                 algorithms=[self.settings.jwt_algorithm],
             )
             return dict(payload)
-        except JWTError as e:
+        except jose_exceptions.JWTError as e:
             raise AuthenticationError(f"Invalid token: {e}")
 
     async def send_magic_link(self, email: str, locale: str = "en") -> bool:
