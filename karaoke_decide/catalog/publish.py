@@ -30,6 +30,8 @@ KEEP_RUNS = 3
 MIN_SONGS_PROD = 100_000
 MAX_COVERAGE_DROP = 0.10  # absolute (0.80 -> 0.70 is the limit)
 MAX_SONG_DROP = 0.10  # relative to the previous build
+# Reported in the pointer and logs, never gated (vocal ranges are optional enrichment).
+INFORMATIONAL_COVERAGE = frozenset({"vocal_range"})
 
 _RUN_DIR = re.compile(rf"^{CATALOG_PREFIX}/(\d{{8}}-\d{{6}})/")
 
@@ -44,6 +46,8 @@ def catalog_gate(stats: CatalogStats, prev: dict[str, Any] | None, *, min_songs:
         if prev_songs and stats.songs < prev_songs * (1 - MAX_SONG_DROP):
             failures.append(f"songs dropped {prev_songs} -> {stats.songs} (> {MAX_SONG_DROP:.0%})")
         for facet, before in (prev.get("coverage") or {}).items():
+            if facet in INFORMATIONAL_COVERAGE:
+                continue
             after = stats.coverage.get(facet, 0.0)
             if after < before - MAX_COVERAGE_DROP:
                 failures.append(f"coverage[{facet}] dropped {before:.2f} -> {after:.2f}")
@@ -133,6 +137,7 @@ def build_and_publish_catalog(
     db_path = workdir / "catalog.db"
     stats = build_catalog_db(fetch_catalog_rows(bq), db_path, run)
     logger.info(f"Catalog built: {stats.songs} songs, {stats.bytes} bytes, coverage={stats.coverage}")
+    logger.info(f"Catalog vr coverage: {stats.coverage.get('vocal_range', 0.0):.1%} (informational, not gated)")
     failures = catalog_gate(stats, _read_pointer(bucket), min_songs=min_songs)
     if failures:
         logger.warning("catalog gate failed: " + "; ".join(failures) + " (pointer unchanged)")

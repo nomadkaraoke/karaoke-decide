@@ -84,3 +84,23 @@ def test_fixture_build_is_deterministic(tmp_path):
         return conn.execute("SELECT * FROM songs ORDER BY song_key").fetchall()
 
     assert dump(tmp_path / "a") == dump(tmp_path / "b")
+
+
+def test_fixture_catalog_carries_vocal_ranges(tmp_path):
+    conn = sqlite3.connect(fixtures.build(tmp_path))
+    try:
+
+        def vr(key):
+            return conn.execute(
+                "SELECT vr_p10, vr_p50, vr_p90, vr_tier, vr_octave_conf, vr_duet FROM songs WHERE song_key = ?", (key,)
+            ).fetchone()
+
+        assert vr("muse|starlight") == (51.0, 57.3, 63.0, "measured", None, 0)
+        assert vr("muse|uprising")[3:] == ("notes", 0.92, 0)
+        assert vr("adele|hello")[3:] == ("estimated", None, 0)
+        assert vr("brandy and monica|the boy is mine")[5] == 1
+        assert vr("taylor swift|shake it off")[3:] == ("rough", None, None)
+        assert vr("lady gaga|shallow") == (None,) * 6
+        assert conn.execute("SELECT vr_basis FROM artists WHERE artist_key = 'taylor swift'").fetchone() == ("gender",)
+    finally:
+        conn.close()

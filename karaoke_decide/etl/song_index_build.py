@@ -9,7 +9,12 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
 2. BUILD     In ``workdir`` (Cloud Run job disk is in-memory: it counts against the
              job's 8 GiB, so inputs are deleted as soon as they are consumed):
              ``song_id.db`` from the TSV shards, ``availability.db`` from the KN full +
-             community exports, ``offline.db`` (gzipped to ``offline.db.gz``).
+             community exports, ``offline.db`` (gzipped to ``offline.db.gz``) with the
+             per-song vocal ranges (``vr_*``) from mb-refresh's vocal_range step:
+             ``gs://nomadkaraoke-musicbrainz-data/vocal-range/latest.json`` (read by
+             name, no listing), then both ``latest/*.tsv.gz``, sha256-checked against
+             it. Missing, forbidden or a sha mismatch (a half-done publish) -> one
+             WARNING and NULL ``vr_*``. A new vocal-range run also triggers a rebuild.
 3. EVAL      ``run_eval`` (cloud matcher, labelled set) and ``dual_eval`` (offline vs
              cloud, labelled + frozen synthetic set). Gates: ``wrong_auto`` may rise by
              at most 1 and the ``auto`` rate drop by at most 2 points vs the previous
@@ -71,6 +76,7 @@ from karaoke_decide.song_search import eval as song_eval
 from karaoke_decide.song_search import offline as song_offline
 from karaoke_decide.song_search.identify import SongIdentifier
 from karaoke_decide.song_search.text_normalize import NORMALIZER_VERSION, SEARCH_INDEX_VERSION
+from karaoke_decide.vocal_range import tsv as vocal_range_tsv
 
 logger = logging.getLogger("song_index_build")
 
@@ -87,6 +93,12 @@ INDEX_BUCKET = os.environ.get("SONG_INDEX_BUCKET", "nomadkaraoke-kn-data")
 PUBLIC_BUCKET = os.environ.get("SONG_INDEX_PUBLIC_BUCKET", "nomadkaraoke-song-index-public")
 
 SONG_ID_LATEST = "song-id/latest.json"
+# mb-refresh's vocal_range step output (read by name: the job's grant has no list clause).
+VOCAL_RANGE_BUCKET = vocal_range_tsv.BUCKET
+VOCAL_RANGE_POINTER = vocal_range_tsv.POINTER_BLOB
+VOCAL_RANGE_SONG_TSV = vocal_range_tsv.SONG_TSV_BLOB
+VOCAL_RANGE_ARTIST_TSV = vocal_range_tsv.ARTIST_TSV_BLOB
+_REPO_VR_FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "vocal_range"
 KN_FULL = "full/full-data-latest.json.gz"
 KN_COMMUNITY = "community/community-data-latest.json.gz"
 
@@ -313,10 +325,19 @@ def _storage_client() -> Any:
 
 
 @dataclass(frozen=True)
+class VocalRangeFiles:
+    run: str
+    songs: Path
+    artists: Path
+
+
+@dataclass(frozen=True)
 class SourceFiles:
     shards: list[Path]
     kn_full: Path
     kn_community: Path
+    vocal_range: VocalRangeFiles | None = None  # None -> offline.db has NULL vr_*
+    vocal_range_pointer_run: str = ""  # the vocal-range run latest.json named ("" = none/unreadable)
 
 
 def _sha256(path: Path) -> str:
@@ -426,8 +447,17 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
         )
     src.kn_full.unlink(missing_ok=True)
     src.kn_community.unlink(missing_ok=True)
+    vocal_range = None
+    if src.vocal_range is not None:
+        vr = src.vocal_range
+        vocal_range = vocal_range_tsv.load(vr.songs, vr.artists, run=vr.run)
+        vr.songs.unlink(missing_ok=True)
+        vr.artists.unlink(missing_ok=True)
+        counts["vocal_range"] = {"songs": len(vocal_range.songs), "artists": len(vocal_range.artists)}
     with stats.stage("offline"):
-        counts["offline"] = song_offline.build_offline_db(song_id_db, availability_db, offline_db, run)
+        counts["offline"] = song_offline.build_offline_db(
+            song_id_db, availability_db, offline_db, run, vocal_range=vocal_range
+        )
         _gzip_file(offline_db, offline_gz)
 
     cases = load_eval_cases()
@@ -473,6 +503,8 @@ def build_local(src: SourceFiles, workdir: Path, run: str, token: str, stats: _S
         "run": run,
         "token": token,
         **VERSIONS,
+        "vocal_range_run": vocal_range.run if vocal_range else "",
+        "vocal_range_pointer_run": src.vocal_range_pointer_run,
         "built_at": int(time.time()),
         "files": files,
         "eval": ev,
@@ -551,8 +583,67 @@ def _previous(storage: Storage) -> tuple[str | None, dict[str, Any] | None]:
     return index_run, manifest
 
 
-def _up_to_date(prev: dict[str, Any] | None, run: str) -> bool:
-    return prev is not None and prev.get("run") == run and all(prev.get(k) == v for k, v in VERSIONS.items())
+def _prev_vocal_range_run(prev: dict[str, Any]) -> str:
+    """The vocal-range pointer run the previous build saw (manifests before Phase 3c: "")."""
+    return str(prev.get("vocal_range_pointer_run", prev.get("vocal_range_run")) or "")
+
+
+def _up_to_date(prev: dict[str, Any] | None, run: str, vocal_range_run: str = "") -> bool:
+    return (
+        prev is not None
+        and prev.get("run") == run
+        and all(prev.get(k) == v for k, v in VERSIONS.items())
+        and _prev_vocal_range_run(prev) == vocal_range_run
+    )
+
+
+def _vocal_range_pointer(storage: Storage, *, level: int = logging.WARNING) -> dict[str, Any] | None:
+    """``vocal-range/latest.json``, or None (logged once at ``level``) when missing or unreadable."""
+    where = f"gs://{VOCAL_RANGE_BUCKET}/{VOCAL_RANGE_POINTER}"
+    try:
+        pointer = _read_json(storage, VOCAL_RANGE_BUCKET, VOCAL_RANGE_POINTER)
+    except Exception as exc:  # noqa: BLE001 - optional input (403 until the IAM grant is applied)
+        logger.log(level, f"Vocal ranges unavailable ({where} unreadable: {exc}); offline.db vr_* stay NULL")
+        return None
+    if not pointer or not pointer.get("run"):
+        logger.log(level, f"Vocal ranges unavailable ({where} missing or has no run); offline.db vr_* stay NULL")
+        return None
+    return pointer
+
+
+def _vocal_range_run(storage: Storage) -> str:
+    """The CHECK step's view: INFO only (a skipped daily run must not warn every day; the
+    build that actually goes without vocal ranges logs the WARNING)."""
+    pointer = _vocal_range_pointer(storage, level=logging.INFO)
+    return str(pointer["run"]) if pointer else ""
+
+
+def _fetch_vocal_range(storage: Storage, inputs: Path) -> tuple[str, VocalRangeFiles | None]:
+    """(pointer run, the two sha-verified TSVs or None). Never raises: any problem is one
+    WARNING and no vocal-range data, never a mix of two publishes."""
+    pointer = _vocal_range_pointer(storage)
+    if pointer is None:
+        return "", None
+    run = str(pointer["run"])
+    files = VocalRangeFiles(run, inputs / "song_vocal_range.tsv.gz", inputs / "artist_vocal_range.tsv.gz")
+    try:
+        for name, dest, sha_key in (
+            (VOCAL_RANGE_SONG_TSV, files.songs, "sha256_song"),
+            (VOCAL_RANGE_ARTIST_TSV, files.artists, "sha256_artist"),
+        ):
+            storage.download(VOCAL_RANGE_BUCKET, name, dest)
+            actual = _sha256(dest)
+            if actual != pointer.get(sha_key):
+                raise ValueError(
+                    f"sha256 of gs://{VOCAL_RANGE_BUCKET}/{name} is {actual}, latest.json {sha_key} says "
+                    f"{pointer.get(sha_key)} (publish in progress or half done)"
+                )
+    except Exception as exc:  # noqa: BLE001 - optional input
+        logger.warning(f"Vocal ranges for run {run} not used ({exc}); offline.db vr_* stay NULL")
+        files.songs.unlink(missing_ok=True)
+        files.artists.unlink(missing_ok=True)
+        return run, None
+    return run, files
 
 
 def _fetch_sources(storage: Storage, inputs: Path) -> tuple[str, SourceFiles]:
@@ -572,7 +663,8 @@ def _fetch_sources(storage: Storage, inputs: Path) -> tuple[str, SourceFiles]:
     full, community = inputs / "full.json.gz", inputs / "community.json.gz"
     storage.download(SOURCE_BUCKET, KN_FULL, full)
     storage.download(SOURCE_BUCKET, KN_COMMUNITY, community)
-    return str(latest["run"]), SourceFiles(shards, full, community)
+    vr_pointer_run, vr_files = _fetch_vocal_range(storage, inputs)
+    return str(latest["run"]), SourceFiles(shards, full, community, vr_files, vr_pointer_run)
 
 
 def _source_run(storage: Storage) -> str:
@@ -653,7 +745,7 @@ def build_and_publish(
     workdir.mkdir(parents=True, exist_ok=True)
     run = _source_run(storage)
     serving, prev = _previous(storage)
-    if not force and _up_to_date(prev, run):
+    if not force and _up_to_date(prev, run, _vocal_range_run(storage)):
         logger.info(f"Source run {run} already published as {serving} with the same versions; skipping")
         return {"skipped": True, "run": run, "index_run": serving}
 
@@ -751,9 +843,17 @@ def _copy_input(src: Path, dest: Path, *, gz: bool) -> Path:
     return dest
 
 
-def dry_run(workdir: Path, songs: list[Path], kn_full: Path, kn_community: Path, run: str) -> dict[str, Any]:
+def dry_run(
+    workdir: Path,
+    songs: list[Path],
+    kn_full: Path,
+    kn_community: Path,
+    run: str,
+    vocal_range: VocalRangeFiles | None = None,
+) -> dict[str, Any]:
     """Build + evaluate from local files into ``workdir``; write ``manifest.json`` there.
-    Nothing is uploaded or deployed. Gates run without a baseline (dual eval only)."""
+    Nothing is uploaded or deployed. Gates run without a baseline (dual eval only).
+    ``vocal_range``: local song/artist vocal-range TSVs (plain or .gz) for offline.db."""
     workdir = Path(workdir)
     inputs = workdir / "inputs"
     inputs.mkdir(parents=True, exist_ok=True)
@@ -761,6 +861,16 @@ def dry_run(workdir: Path, songs: list[Path], kn_full: Path, kn_community: Path,
         shards=[_copy_input(p, inputs / f"{i:05d}-{p.name}", gz=False) for i, p in enumerate(songs)],
         kn_full=_copy_input(kn_full, inputs / "full.json.gz", gz=True),
         kn_community=_copy_input(kn_community, inputs / "community.json.gz", gz=True),
+        vocal_range=(
+            VocalRangeFiles(
+                vocal_range.run,
+                _copy_input(vocal_range.songs, inputs / "song_vocal_range.tsv.gz", gz=True),
+                _copy_input(vocal_range.artists, inputs / "artist_vocal_range.tsv.gz", gz=True),
+            )
+            if vocal_range
+            else None
+        ),
+        vocal_range_pointer_run=vocal_range.run if vocal_range else "",
     )
     token = secrets.token_hex(8)
     manifest = build_local(src, workdir, run, token)
@@ -778,6 +888,23 @@ def dry_run(workdir: Path, songs: list[Path], kn_full: Path, kn_community: Path,
 # --------------------------------------------------------------------------
 
 
+def fixture_vocal_range() -> VocalRangeFiles:
+    """The invented fixture vocal ranges (local stack + default dry run)."""
+    return VocalRangeFiles(
+        "fixture",
+        _REPO_VR_FIXTURES / "song_vocal_range_fixture.tsv",
+        _REPO_VR_FIXTURES / "artist_vocal_range_fixture.tsv",
+    )
+
+
+def _dry_run_vocal_range(args: argparse.Namespace) -> VocalRangeFiles | None:
+    if args.vocal_range_songs or args.vocal_range_artists:
+        if not (args.vocal_range_songs and args.vocal_range_artists):
+            raise SystemExit("--vocal-range-songs and --vocal-range-artists go together")
+        return VocalRangeFiles("local", args.vocal_range_songs, args.vocal_range_artists)
+    return fixture_vocal_range() if not args.songs else None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build, eval-gate and publish the song-search indexes")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -793,6 +920,8 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--songs", type=Path, nargs="+", help="dry run: song-id TSV(.gz) shard(s)")
     p_run.add_argument("--kn-full", type=Path, help="dry run: KN full export (.json or .json.gz)")
     p_run.add_argument("--kn-community", type=Path, help="dry run: KN community export (.json or .json.gz)")
+    p_run.add_argument("--vocal-range-songs", type=Path, help="dry run: song vocal-range TSV(.gz)")
+    p_run.add_argument("--vocal-range-artists", type=Path, help="dry run: artist vocal-range TSV(.gz)")
     p_run.add_argument("--run", default="local", help="dry run: run id (default: local)")
     args = parser.parse_args(argv)
 
@@ -806,6 +935,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.kn_full or _REPO_FIXTURES / "kn_full_fixture.json",
                 args.kn_community or _REPO_FIXTURES / "kn_community_fixture.json",
                 args.run,
+                _dry_run_vocal_range(args),
             )
         else:
             out = build_and_publish(

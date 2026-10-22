@@ -1030,6 +1030,21 @@ gcp.storage.BucketIAMMember(
         "expression": (f'resource.name.startsWith("projects/_/buckets/{KN_DATA_BUCKET}/objects/song-index/")'),
     },
 )
+# Read mb-refresh's vocal ranges for offline.db's vr_* columns: vocal-range/latest.json and
+# vocal-range/latest/*.tsv.gz, read BY NAME (the job never lists this bucket, so the
+# condition needs no objectListPrefix clause). Until applied, the job logs one WARNING per
+# build and publishes offline.db with NULL vr_*.
+gcp.storage.BucketIAMMember(
+    "song-index-build-vocal-range-reader",
+    bucket=musicbrainz_bucket.name,
+    role="roles/storage.objectViewer",
+    member=song_index_build_member,
+    condition={
+        "title": "vocal-range prefix only",
+        "description": "song-index-build may only read vocal-range/ objects by name",
+        "expression": 'resource.name.startsWith("projects/_/buckets/nomadkaraoke-musicbrainz-data/objects/vocal-range/")',
+    },
+)
 gcp.storage.BucketIAMMember(
     "song-index-build-public-admin",
     bucket=song_index_public_bucket.name,

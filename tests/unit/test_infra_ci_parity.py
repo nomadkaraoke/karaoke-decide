@@ -521,3 +521,28 @@ def test_vocal_range_bucket_grant_has_list_clause() -> None:
     assert 'resource.type == "storage.googleapis.com/Bucket"' in expr
     assert 'api.getAttribute("storage.googleapis.com/objectListPrefix", "")' in expr
     assert '.startsWith("vocal-range/gen_measured/")' in expr
+
+
+def test_song_index_build_reads_vocal_range_by_name() -> None:
+    """song-index-build reads vocal-range/latest.json + the two TSVs by name (no list), so
+    its grant is objectViewer on the musicbrainz bucket, conditioned on the object prefix."""
+    tree = _pulumi_tree()
+    kw = _kwargs(
+        _resource_call(tree, "BucketIAMMember", "song-index-build-vocal-range-reader"), _module_constants(tree)
+    )
+    assert kw["role"] == "roles/storage.objectViewer"
+    bucket = kw["bucket"] if isinstance(kw["bucket"], str) else ast.unparse(kw["bucket"])
+    assert "musicbrainz" in bucket.lower()
+    expr = kw["condition"]["expression"]
+    if not isinstance(expr, str):
+        expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
+    assert "nomadkaraoke-musicbrainz-data/objects/vocal-range/" in expr
+    assert "objectListPrefix" not in expr  # by-name reads only
+
+    from karaoke_decide.etl import song_index_build as sib
+
+    assert sib.VOCAL_RANGE_BUCKET == "nomadkaraoke-musicbrainz-data"
+    for name in (sib.VOCAL_RANGE_POINTER, sib.VOCAL_RANGE_SONG_TSV, sib.VOCAL_RANGE_ARTIST_TSV):
+        assert name.startswith("vocal-range/")
+    # by name: the job never lists that bucket
+    assert "list_names(VOCAL_RANGE_BUCKET" not in Path(sib.__file__).read_text()

@@ -1,0 +1,5 @@
+song_key	low_midi	high_midi	p10	p50	p90	tier	source	octave_confidence	is_duet	n_sources	confidence
+muse|starlight	47.2	66.1	51.0	57.3	63.0	measured	gen_measured		0	1	
+muse|uprising	48.0	70.0	52.0	59.0	66.0	notes	ultrastar	0.92	0	1	
+adele|hello	62.0	81.0	65.0	71.0	77.0	estimated	gemini		0	1	0.81
+brandy and monica|the boy is mine	55.0	74.0	58.0	64.0	70.0	notes	ultrastar	0.85	1	1	

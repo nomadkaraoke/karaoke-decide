@@ -1,0 +1,4 @@
+artist_key	low_midi	high_midi	p10	p50	p90	basis	confidence
+muse	47.6	68.0	51.5	58.1	64.5	songs	
+adele	60.0	80.0	64.0	70.0	76.0	songs	
+taylor swift	57.0	76.0	60.0	66.0	72.0	gender	

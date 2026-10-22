@@ -15,13 +15,15 @@ from collections import defaultdict
 from collections.abc import Iterator
 from typing import Any
 
+from google.api_core.exceptions import GoogleAPICallError
 from google.cloud import bigquery
 
-from karaoke_decide.catalog.build import ArtistRow, CatalogRows, KnRow, SimilarRow, SongRow
+from karaoke_decide.catalog.build import ArtistRow, CatalogRows, KnRow, SimilarRow, SongRow, with_vocal_range
 from karaoke_decide.catalog.genres import map_genres
 from karaoke_decide.catalog.keys import artist_key, loose_keys, match_key, song_key
 from karaoke_decide.catalog.moods import mood_for
 from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
+from karaoke_decide.vocal_range import tsv as vocal_range_tsv
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +197,20 @@ RAW_GENRES_SQL = f"""
 SELECT genre FROM `{P}.spotify_artist_genres` WHERE genre IS NOT NULL
 UNION DISTINCT
 SELECT tag_name AS genre FROM `{P}.mb_artist_tags` WHERE vote_count >= 1 AND tag_name IS NOT NULL
+"""
+
+# Written by mb-refresh's vocal_range step, which runs just before the catalog build in the
+# same job (karaoke_decide/etl/vocal_range_refresh.py). Not there yet -> vr_* NULL + WARNING.
+VOCAL_RANGE_SQL = f"""
+SELECT song_key, low_midi, high_midi, p10, p50, p90, tier, octave_confidence, is_duet
+FROM `{P}.song_vocal_range`
+WHERE song_key IS NOT NULL
+"""
+
+ARTIST_VOCAL_RANGE_SQL = f"""
+SELECT artist_key, low_midi, high_midi, p10, p50, p90, basis
+FROM `{P}.artist_vocal_range`
+WHERE artist_key IS NOT NULL
 """
 
 
@@ -377,6 +393,17 @@ def _similar_rows(rows: Iterator[dict[str, Any]], wanted: set[str]) -> list[Simi
     return [SimilarRow(a, b, score / peak[a] if peak[a] else 0.0, "mlhd") for (a, b), score in best.items()]
 
 
+def fetch_vocal_ranges(bq: bigquery.Client, *, dry_run: bool = False) -> vocal_range_tsv.VocalRanges:
+    """Song + artist vocal ranges from BigQuery; empty (one WARNING) when the tables can't be read."""
+    try:
+        songs = list(_run(bq, VOCAL_RANGE_SQL, dry_run=dry_run))
+        artists = list(_run(bq, ARTIST_VOCAL_RANGE_SQL, dry_run=dry_run))
+    except GoogleAPICallError as exc:
+        logger.warning("catalog: vocal-range tables unreadable (%s); vr_* columns left NULL", exc)
+        return vocal_range_tsv.VocalRanges()
+    return vocal_range_tsv.from_records(songs, artists)
+
+
 def fetch_catalog_rows(bq: bigquery.Client, *, dry_run: bool = False) -> CatalogRows:
     """Run every catalog query and assemble the rows for ``build_catalog_db``.
 
@@ -412,10 +439,11 @@ def fetch_catalog_rows(bq: bigquery.Client, *, dry_run: bool = False) -> Catalog
         mapped = map_genres([r["genre"]])
         if mapped:
             genre_map[r["genre"]] = mapped[0]
-    return CatalogRows(
+    rows = CatalogRows(
         songs=songs,
         artists=[a for a in artists.values() if a.artist_key in wanted],
         similar=similar,
         kn=kn,
         genre_map=genre_map,
     )
+    return with_vocal_range(rows, fetch_vocal_ranges(bq, dry_run=dry_run))

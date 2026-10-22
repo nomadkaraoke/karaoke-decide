@@ -5,7 +5,9 @@ Writes (default ``tests/fixtures/song_search/``):
 
   offline_fixture.db  ``offline.build_offline_db`` over the decide fixtures
                       (songs_fixture.tsv → song_id.db; kn_*_fixture.json →
-                      availability.db), run ``"fixture"``, ``meta.built_at = 0``.
+                      availability.db; tests/fixtures/vocal_range/*_fixture.tsv →
+                      songs.vr_*, ``meta.vocal_range_run = "fixture"``), run
+                      ``"fixture"``, ``meta.built_at = 0``.
   parity.json         what the Python matcher answers over offline_fixture.db with
                       ``margin_bonus = OFFLINE_MARGIN_BONUS`` (0.03), for every
                       song_id_eval.jsonl query (file order) then the Review Focus 1
@@ -80,8 +82,10 @@ from karaoke_decide.song_search.identify import SongIdentifier  # noqa: E402
 from karaoke_decide.song_search.identify_kind import identify_kind  # noqa: E402
 from karaoke_decide.song_search.offline import OFFLINE_MARGIN_BONUS, build_offline_db, offline_groups  # noqa: E402
 from karaoke_decide.song_search.text_normalize import song_key  # noqa: E402
+from karaoke_decide.vocal_range import tsv as vocal_range_tsv  # noqa: E402
 
 FIXTURES = REPO / "tests" / "fixtures" / "song_search"
+VR_FIXTURES = REPO / "tests" / "fixtures" / "vocal_range"
 
 # Review Focus 1: queries the matcher has never seen (status none, no groups, no throw).
 REVIEW_FOCUS_1 = ["", " ", "karaoke", "x", "🎤🎤", "a" * 250, "שיר", "歌"]
@@ -106,7 +110,10 @@ def build_fixture_db(out: Path) -> None:
             availability_db,
             run="fixture",
         )
-        build_offline_db(song_id_db, availability_db, out, run="fixture")
+        vocal_range = vocal_range_tsv.load(
+            VR_FIXTURES / "song_vocal_range_fixture.tsv", VR_FIXTURES / "artist_vocal_range_fixture.tsv", run="fixture"
+        )
+        build_offline_db(song_id_db, availability_db, out, run="fixture", vocal_range=vocal_range)
     conn = sqlite3.connect(out)
     try:
         conn.execute("UPDATE meta SET value = '0' WHERE key = 'built_at'")  # reproducible content

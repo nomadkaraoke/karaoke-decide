@@ -16,12 +16,18 @@ from karaoke_decide.catalog.build import (
     SimilarRow,
     SongRow,
     build_catalog_db,
+    with_vocal_range,
 )
 from karaoke_decide.catalog.genres import GENRE_IDS
 from karaoke_decide.catalog.keys import artist_key, match_key, song_key
 from karaoke_decide.catalog.moods import mood_for
+from karaoke_decide.vocal_range import tsv as vocal_range_tsv
 
-KN_FIXTURE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "song_search" / "kn_full_fixture.json"
+_FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+KN_FIXTURE = _FIXTURES / "song_search" / "kn_full_fixture.json"
+# Invented vocal ranges (not measurements); shared with the offline fixture index.
+VOCAL_RANGE_SONGS = _FIXTURES / "vocal_range" / "song_vocal_range_fixture.tsv"
+VOCAL_RANGE_ARTISTS = _FIXTURES / "vocal_range" / "artist_vocal_range_fixture.tsv"
 
 N_SYNTHETIC_ARTISTS = 20
 SONGS_PER_SYNTHETIC_ARTIST = 10
@@ -135,7 +141,8 @@ def _rows() -> CatalogRows:
             songs.append(_song(f"Fixture Artist {a:02d}", f"Fixture Song {a:02d}-{n:02d}", 0, 0))
     artists, similar = _artists_and_similar(songs)
     genre_map = {"alternative rock": "indie", "classic rock": "classic-rock", "dance pop": "pop"}
-    return CatalogRows(songs=songs, artists=artists, similar=similar, kn=kn, genre_map=genre_map)
+    rows = CatalogRows(songs=songs, artists=artists, similar=similar, kn=kn, genre_map=genre_map)
+    return with_vocal_range(rows, vocal_range_tsv.load(VOCAL_RANGE_SONGS, VOCAL_RANGE_ARTISTS, run="fixture"))
 
 
 def build(dest: Path) -> Path:

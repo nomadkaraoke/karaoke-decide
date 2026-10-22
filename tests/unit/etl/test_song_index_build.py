@@ -804,3 +804,125 @@ def test_main_no_deploy_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert seen["deploy"] is False
     assert sib.main(["run", "--workdir", str(tmp_path)]) == 0
     assert seen["deploy"] is True
+
+
+# ---- vocal range (Phase 3c) ---------------------------------------------------------------
+
+VR_FIXTURES = FIXTURES.parent / "vocal_range"
+VRB = sib.VOCAL_RANGE_BUCKET
+
+
+def seed_vocal_range(store: FakeStore, run: str = "20261020-010000", *, corrupt: bool = False) -> None:
+    song = _gz((VR_FIXTURES / "song_vocal_range_fixture.tsv").read_bytes())
+    artist = _gz((VR_FIXTURES / "artist_vocal_range_fixture.tsv").read_bytes())
+    store.put(VRB, sib.VOCAL_RANGE_SONG_TSV, song)
+    store.put(VRB, sib.VOCAL_RANGE_ARTIST_TSV, artist)
+    pointer = {
+        "run": run,
+        "sha256_song": hashlib.sha256(song).hexdigest(),
+        "sha256_artist": "0" * 64 if corrupt else hashlib.sha256(artist).hexdigest(),
+    }
+    store.put(VRB, sib.VOCAL_RANGE_POINTER, json.dumps(pointer).encode())
+    store.writes.clear()
+
+
+def _offline_vr(store: FakeStore, out: dict[str, Any], tmp_path: Path) -> tuple[dict[str, str], int]:
+    import sqlite3
+
+    m = manifest_of(store, out["index_run"])
+    db = tmp_path / "offline-check.db"
+    db.write_bytes(gzip.decompress(store.objects[(PUB, m["files"]["offline.db.gz"]["path"])]))
+    conn = sqlite3.connect(db)
+    try:
+        meta = dict(conn.execute("SELECT key, value FROM meta").fetchall())
+        n = conn.execute("SELECT count(*) FROM songs WHERE vr_p50 IS NOT NULL").fetchone()[0]
+    finally:
+        conn.close()
+    return meta, n
+
+
+def test_index_build_reads_vocal_ranges_by_name(store: FakeStore, tmp_path: Path) -> None:
+    seed_vocal_range(store)
+    out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "a")
+    assert out["published"] is True
+    m = manifest_of(store, out["index_run"])
+    assert m["vocal_range_run"] == "20261020-010000"
+    meta, n = _offline_vr(store, out, tmp_path)
+    assert meta["vocal_range_run"] == "20261020-010000" and n > 0
+    assert meta["offline_schema_version"] == "1"
+
+
+def test_index_build_rebuilds_when_vocal_range_run_changes(store: FakeStore, tmp_path: Path) -> None:
+    first = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "a")
+    assert manifest_of(store, first["index_run"])["vocal_range_run"] == ""
+    # unchanged (still no vocal-range data) -> skipped
+    assert sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "b").get("skipped")
+    seed_vocal_range(store, run="20261021-010000")
+    second = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "c")
+    assert second["published"] is True
+    assert manifest_of(store, second["index_run"])["vocal_range_run"] == "20261021-010000"
+    # same vocal-range run again -> skipped
+    assert sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "d").get("skipped")
+
+
+def test_previous_manifest_without_vocal_range_key_is_not_rebuilt(store: FakeStore, tmp_path: Path) -> None:
+    first = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "a")
+    key = (IDX, f"song-index/{first['index_run']}/manifest.json")
+    m = json.loads(store.objects[key])
+    m.pop("vocal_range_run")
+    m.pop("vocal_range_pointer_run", None)
+    store.objects[key] = json.dumps(m).encode()
+    assert sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "b").get("skipped")
+
+
+def test_index_build_missing_tsv_is_warning(store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    seed_vocal_range(store)
+    del store.objects[(VRB, sib.VOCAL_RANGE_SONG_TSV)]
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert out["published"] is True
+    assert _errors(caplog) == []
+    assert any(r.levelno == logging.WARNING and "vocal" in r.getMessage().lower() for r in caplog.records)
+    m = manifest_of(store, out["index_run"])
+    assert m["vocal_range_run"] == ""
+    meta, n = _offline_vr(store, out, tmp_path)
+    assert meta["vocal_range_run"] == "" and n == 0
+
+
+def test_index_build_sha_mismatch_uses_no_vocal_range(
+    store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    seed_vocal_range(store, corrupt=True)
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert out["published"] is True and _errors(caplog) == []
+    assert any(r.levelno == logging.WARNING and "sha256" in r.getMessage() for r in caplog.records)
+    m = manifest_of(store, out["index_run"])
+    assert m["vocal_range_run"] == "" and m["vocal_range_pointer_run"] == "20261020-010000"
+    _meta, n = _offline_vr(store, out, tmp_path)
+    assert n == 0
+    # the half-published pointer is not retried daily: same pointer run -> skipped
+    assert sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "b").get("skipped")
+
+
+def test_unreadable_vocal_range_pointer_is_warning(
+    store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = store.read_bytes
+
+    def read(bucket: str, name: str) -> bytes | None:
+        if bucket == VRB:
+            raise PermissionError("403 storage.objects.get denied")
+        return real(bucket, name)
+
+    monkeypatch.setattr(store, "read_bytes", read)
+    with caplog.at_level(logging.INFO):
+        out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert out["published"] is True and _errors(caplog) == []
+    assert any(r.levelno == logging.WARNING and "vocal" in r.getMessage().lower() for r in caplog.records)
+
+
+def test_dry_run_reads_the_fixture_vocal_ranges(tmp_path: Path) -> None:
+    assert sib.main(["run", "--dry-run", "--workdir", str(tmp_path)]) == 0
+    m = json.loads((tmp_path / "manifest.json").read_text())
+    assert m["vocal_range_run"] == "fixture"

@@ -1,6 +1,7 @@
 """SQLite schema for catalog.db (per-song facets, artists, similarity, KaraokeNerds id map)."""
 
-CATALOG_SCHEMA_VERSION = 1
+# 2: songs.vr_* + artists.vr_* (vocal range, Phase 3c). Additive; readers select by column name.
+CATALOG_SCHEMA_VERSION = 2
 
 DDL = """
 CREATE TABLE meta (
@@ -29,7 +30,15 @@ CREATE TABLE songs (
     mood TEXT,
     lead_gender TEXT,
     genres_json TEXT,
-    in_kn INTEGER
+    in_kn INTEGER,
+    vr_low REAL,
+    vr_high REAL,
+    vr_p10 REAL,
+    vr_p50 REAL,
+    vr_p90 REAL,
+    vr_tier TEXT,
+    vr_octave_conf REAL,
+    vr_duet INTEGER
 );
 
 CREATE TABLE song_genres (
@@ -45,7 +54,11 @@ CREATE TABLE artists (
     lb_listeners INTEGER,
     popularity INTEGER,
     gender TEXT,
-    genres_json TEXT
+    genres_json TEXT,
+    vr_p10 REAL,
+    vr_p50 REAL,
+    vr_p90 REAL,
+    vr_basis TEXT
 );
 
 CREATE TABLE artist_similar (
