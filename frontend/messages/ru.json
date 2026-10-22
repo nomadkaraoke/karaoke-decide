@@ -927,6 +927,8 @@
     "signedOut": "Сначала войди в Nomad Karaoke, затем подключи Apple Music.",
     "title": "Подключить Apple Music",
     "unavailable": "Apple Music сейчас недоступен. Пожалуйста, попробуй позже.",
-    "account": "Подключение к аккаунту Nomad Karaoke {account}. Это не ты? Закрой эту страницу."
+    "account": "Подключение к аккаунту Nomad Karaoke {account}. Это не ты? Закрой эту страницу.",
+    "stuck": "Apple не вернула тебя на эту страницу. Нажми «Подключить Apple Music», чтобы попробовать снова, или открой эту страницу в браузере телефона.",
+    "waiting": "Ожидание Apple Music…"
   }
 }

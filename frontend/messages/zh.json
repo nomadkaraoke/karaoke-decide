@@ -927,6 +927,8 @@
     "signedOut": "请先登录 Nomad Karaoke，然后再连接 Apple Music。",
     "title": "连接 Apple Music",
     "unavailable": "Apple Music 目前不可用，请稍后重试。",
-    "account": "正在连接到 Nomad Karaoke 账户 {account}。不是你？请关闭此页面。"
+    "account": "正在连接到 Nomad Karaoke 账户 {account}。不是你？请关闭此页面。",
+    "stuck": "Apple 未能自动跳回此页面。请轻按“连接 Apple Music”重试，或在手机浏览器中打开此页面。",
+    "waiting": "正在等待 Apple Music…"
   }
 }

@@ -927,6 +927,8 @@
     "signedOut": "Masuk ke Nomad Karaoke terlebih dahulu, lalu hubungkan Apple Music.",
     "title": "Hubungkan Apple Music",
     "unavailable": "Apple Music sedang tidak tersedia saat ini. Silakan coba lagi nanti.",
-    "account": "Menghubungkan ke akun Nomad Karaoke {account}. Bukan Anda? Tutup halaman ini."
+    "account": "Menghubungkan ke akun Nomad Karaoke {account}. Bukan Anda? Tutup halaman ini.",
+    "stuck": "Apple tidak mengarahkan kembali ke halaman ini. Ketuk Hubungkan Apple Music untuk mencoba lagi, atau buka halaman ini di browser ponsel Anda.",
+    "waiting": "Menunggu Apple Music…"
   }
 }
