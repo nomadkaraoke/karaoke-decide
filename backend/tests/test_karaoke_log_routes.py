@@ -246,6 +246,27 @@ def test_partner_singers_must_be_short_strings(client: TestClient, fs: RouteFire
     assert fs.log(KJ_ID, USER_ID)["singers"][0] == "Sam"
 
 
+def test_partner_nested_objects_must_be_objects(client: TestClient, fs: RouteFirestore) -> None:
+    """A malformed outbox record is a 400 (kjbox stops retrying it), never a 500 (retried forever)."""
+    path = f"/api/partner/kjbox/karaoke-log/{KJ_ID}"
+    for bad in (
+        {"venue": "Andrew"},
+        {"venue": ["nomad", "Andrew"]},
+        {"venue": {"kind": "nomad", "name": 7}},
+        {"media": "NOMAD-0001"},
+        {"media": ["NOMAD-0001"]},
+        {"night": "abcd"},
+        {"night_id": 12},
+        {"sung_at": 12},
+    ):
+        r = client.put(path, json=_outbox(**bad), headers=_partner())
+        assert r.status_code == 400 and r.json() == {"detail": "invalid"}, bad
+    assert LOG_COLLECTION not in fs.cols
+    ok = client.put(path, json=_outbox(venue=None), headers=_partner())
+    assert ok.status_code == 200
+    assert fs.log(KJ_ID, USER_ID)["night"]["kind"] == "nomad"
+
+
 def test_partner_rejects_app_ids(client: TestClient) -> None:
     r = client.put(f"/api/partner/kjbox/karaoke-log/{APP_ID}", json=_outbox(), headers=_partner())
     assert r.status_code == 400

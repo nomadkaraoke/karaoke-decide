@@ -234,8 +234,15 @@ def _partner_patch(patch: dict[str, Any]) -> dict[str, Any]:
     unknown = set(patch) - PARTNER_FIELDS - PARTNER_NIGHT_KEYS - PARTNER_IGNORED
     if unknown:  # kjbox may add fields before decide knows them; never fail its delivery for that
         logger.info("karaoke-log partner write: ignoring unknown fields %s", sorted(unknown))
+    for field in ("night", "media"):  # merged field by field later; must be objects
+        if out.get(field) is not None and not isinstance(out[field], dict):
+            raise KaraokeLogInvalidError(f"{field} must be an object")
     if "night" not in out and PARTNER_NIGHT_KEYS & set(patch):
-        venue = patch.get("venue") or {}
+        venue = patch.get("venue")
+        if venue is None:
+            venue = {}
+        elif not isinstance(venue, dict):
+            raise KaraokeLogInvalidError("venue must be an object")
         out["night"] = {
             "id": patch.get("night_id"),
             "kind": venue.get("kind") or "nomad",
