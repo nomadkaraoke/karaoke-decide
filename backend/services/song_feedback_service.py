@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Container, Sequence
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -23,6 +23,7 @@ from pydantic import BaseModel, field_validator
 
 from backend.services.catalog_store import get_catalog_store
 from backend.services.firestore_service import FirestoreService
+from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,13 @@ KnIdLookup = Callable[[str], int | None]
 
 class KnIdReader(Protocol):
     def kn_ids_for_song_keys(self, keys: list[str]) -> dict[str, int]: ...
+
+
+class SongKeyReader(Protocol):
+    """The catalog.db calls ``resolve_song_keys`` makes."""
+
+    def kn_song_keys(self, kn_ids: Sequence[int]) -> dict[int, str]: ...
+    def has_karaoke_key(self, key: str) -> bool: ...
 
 
 def _digest(song_key: str) -> str:
@@ -69,6 +77,33 @@ def _catalog_kn_id(song_key: str) -> int | None:
     return kn_id_for_song_key(get_catalog_store().reader, song_key)
 
 
+def resolve_song_keys(reader: SongKeyReader, items: Sequence[tuple[str, str, int | None]]) -> list[str | None]:
+    """The karaoke ``song_key`` per ``(artist, title, kn_hit_id)``, or None when unresolved.
+
+    The exact identity key wins when catalog.db has karaoke for it ("Song (Live)" stays the live
+    song even though the looser KaraokeNerds match lands on the studio row); otherwise the key
+    of the KaraokeNerds match ``kn_hit_id``. Shared by the karaoke log and imports. Blocking SQLite."""
+    hit_ids = [kn for _, _, kn in items if kn is not None]
+    kn_keys = reader.kn_song_keys(hit_ids) if hit_ids else {}
+    out: list[str | None] = []
+    for artist, title, kn in items:
+        if not (artist or "").strip() or not (title or "").strip():
+            out.append(None)
+            continue
+        direct = make_song_key(artist, title)
+        out.append(direct if reader.has_karaoke_key(direct) else (kn_keys.get(kn) if kn is not None else None))
+    return out
+
+
+def user_song_row_id(user_id: str, song_key: str, kn_id: int | None, existing_ids: Container[str]) -> str:
+    """The ``user_songs`` row for ``song_key``: ``{user_id}:{kn_id}`` when ``kn_id`` is known and
+    that row is in ``existing_ids``, else ``loved_doc_id``. The rule ``choose_user_song_row``
+    applies one row at a time; bulk writers (imports) read the candidate rows first."""
+    if kn_id is not None and f"{user_id}:{kn_id}" in existing_ids:
+        return f"{user_id}:{kn_id}"
+    return loved_doc_id(user_id, song_key)
+
+
 async def choose_user_song_row(
     user_id: str, song_key: str, kn_id: int | None, get: DocGetter
 ) -> tuple[str, dict[str, Any] | None]:
@@ -81,8 +116,8 @@ async def choose_user_song_row(
         kn_doc_id = f"{user_id}:{kn_id}"
         doc = await get(USER_SONGS_COLLECTION, kn_doc_id)
         if doc is not None:
-            return kn_doc_id, doc
-    doc_id = loved_doc_id(user_id, song_key)
+            return user_song_row_id(user_id, song_key, kn_id, {kn_doc_id}), doc
+    doc_id = user_song_row_id(user_id, song_key, None, ())
     return doc_id, await get(USER_SONGS_COLLECTION, doc_id)
 
 

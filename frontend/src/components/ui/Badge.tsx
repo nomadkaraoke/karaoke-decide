@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 interface BadgeProps {
   variant?: "default" | "spotify" | "lastfm" | "youtube" | "quiz" | "success" | "warning" | "error" | "danger" | "primary" | "secondary";
@@ -48,17 +49,22 @@ export function Badge({
   );
 }
 
-// Convenience component for source badges
-const SOURCE_BADGES: Record<string, { variant: BadgeProps["variant"]; label: string }> = {
+// Convenience component for source badges. Brand names stay as-is; other labels are message keys.
+const SOURCE_BADGES: Record<string, { variant: BadgeProps["variant"]; label?: string; labelKey?: string }> = {
   spotify: { variant: "spotify", label: "Spotify" },
+  spotify_playlist: { variant: "spotify", label: "Spotify" },
+  spotify_export: { variant: "spotify", label: "Spotify" },
   lastfm: { variant: "lastfm", label: "Last.fm" },
   listenbrainz: { variant: "default", label: "ListenBrainz" },
   youtube_music: { variant: "youtube", label: "YouTube Music" },
   apple_music: { variant: "default", label: "Apple Music" },
+  apple_export: { variant: "default", label: "Apple Music" },
+  screenshot: { variant: "default", labelKey: "screenshot" },
 };
 
 export function SourceBadge({ source }: { source: string }) {
-  const { variant, label } = SOURCE_BADGES[source] ?? { variant: "quiz", label: "Quiz" };
+  const t = useTranslations("components.sourceBadge");
+  const { variant, label, labelKey } = SOURCE_BADGES[source] ?? { variant: "quiz", label: "Quiz" };
 
-  return <Badge variant={variant}>{label}</Badge>;
+  return <Badge variant={variant}>{labelKey ? t(labelKey) : label}</Badge>;
 }

@@ -216,3 +216,22 @@ async def test_apple_music_artists_are_ranked_like_other_synced_services(reader:
     assert ctx.artists[artist_key("Toto")].weight == pytest.approx(w.artist_top(1))
     assert ctx.artists[artist_key("Toto")].source == "apple_music"
     assert ctx.artists[artist_key("Weezer")].weight == pytest.approx(w.artist_top(100))
+
+
+def test_import_sources_weigh_like_their_counterparts() -> None:
+    """Privacy-export plays are real listens (like Last.fm); playlist / screenshot picks like YT Music."""
+    for source in ("spotify_export", "apple_export"):
+        assert [w.song_weight({"source": source, "playcount": n}) for n in (12, 5, 1)] == [1.0, 0.7, 0.4]
+    assert w.song_weight({"source": "spotify_playlist"}) == w.song_weight({"source": "screenshot"}) == 0.8
+
+
+@pytest.mark.parametrize("source", ["spotify_export", "apple_export", "screenshot", "spotify_playlist"])
+async def test_import_artists_are_ranked_top_artists(reader: CatalogReader, source: str) -> None:
+    fs = FakeFirestore(
+        decide_users=[{"id": "h", "user_id": UID}],
+        user_artists=[_artist("Toto", source, 1)],
+        user_songs=[],
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.artists[artist_key("Toto")].weight == pytest.approx(w.artist_top(1))
+    assert ctx.artists[artist_key("Toto")].source == source
