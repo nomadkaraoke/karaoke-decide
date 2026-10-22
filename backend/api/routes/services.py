@@ -17,15 +17,19 @@ from backend.api.deps import (
     CurrentUser,
     FirestoreServiceDep,
     MusicServiceServiceDep,
+    OptionalUser,
     Settings,
     SyncServiceDep,
     VerifiedUser,
 )
+from backend.config import BackendSettings
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
+from backend.services.firestore_service import FirestoreService
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
+from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
 from karaoke_decide.services.youtube_music import (
     InvalidPlaylistUrlError,
     PlaylistFetchError,
@@ -404,6 +408,157 @@ async def import_youtube_music_playlist(
 
 
 # -----------------------------------------------------------------------------
+# Apple Music (MusicKit)
+# -----------------------------------------------------------------------------
+
+
+class AppleMusicDeveloperTokenResponse(BaseModel):
+    """Developer token for MusicKit JS on decide's web origin."""
+
+    developer_token: str
+    expires_at: int  # Unix seconds
+
+
+class AppleMusicLinkResponse(BaseModel):
+    """A one-time link that connects Apple Music from a browser the user isn't signed in to (the app)."""
+
+    connect_url: str
+    expires_in: int  # Seconds
+
+
+class AppleMusicConnectRequest(BaseModel):
+    """Music User Token from MusicKit JS; `state` comes from /apple-music/link when not signed in."""
+
+    music_user_token: str = Field(..., min_length=1, max_length=4096)
+    state: str | None = Field(default=None, max_length=128)
+
+
+class AppleMusicConnectResponse(BaseModel):
+    """The connected service, plus the sync job that started reading the library."""
+
+    service: ConnectedServiceResponse
+    sync_job_id: str | None
+
+
+@router.get("/apple-music/developer-token", response_model=AppleMusicDeveloperTokenResponse)
+async def apple_music_developer_token(
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+) -> AppleMusicDeveloperTokenResponse:
+    """Developer token for MusicKit JS. Public: it only works from decide's own web origin."""
+    try:
+        token, expires_at = music_service.apple_music_signer.token(origins=(settings.frontend_url.rstrip("/"),))
+    except AppleMusicNotConfiguredError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Apple Music is not available")
+    return AppleMusicDeveloperTokenResponse(developer_token=token, expires_at=expires_at)
+
+
+@router.post("/apple-music/link", response_model=AppleMusicLinkResponse)
+async def apple_music_link(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    request: Request,
+) -> AppleMusicLinkResponse:
+    """Start connecting Apple Music from the app.
+
+    The app opens `connect_url` (decide web) in an in-app browser. That page signs the user in
+    to Apple Music with MusicKit JS and posts the token back with this link's one-time state,
+    then returns to the app at `nomadkaraoke://music-connected`. The state expires in 10 minutes.
+    """
+    state = await music_service.create_oauth_state(user.id, "apple_music", account_hint=mask_email(user.email))
+    prefix = get_locale_prefix(get_locale_from_request(request))
+    url = f"{settings.frontend_url.rstrip('/')}{prefix}/connect/apple-music?state={quote(state)}&return=app"
+    return AppleMusicLinkResponse(connect_url=url, expires_in=music_service.STATE_EXPIRATION_MINUTES * 60)
+
+
+class AppleMusicLinkInfoResponse(BaseModel):
+    """Which Nomad Karaoke account a hand-off link connects Apple Music to (masked email)."""
+
+    account: str | None
+
+
+def mask_email(email: str | None) -> str | None:
+    """`andrew@example.com` -> `a•••@example.com`: enough to recognise your own account, not to harvest it."""
+    if not email or "@" not in email:
+        return None
+    name, domain = email.split("@", 1)
+    return f"{name[:1]}•••@{domain}"
+
+
+@router.get("/apple-music/link-info", response_model=AppleMusicLinkInfoResponse)
+async def apple_music_link_info(
+    music_service: MusicServiceServiceDep,
+    state: str = Query(..., max_length=128),
+) -> AppleMusicLinkInfoResponse:
+    """The account a hand-off link belongs to, shown before connecting so nobody connects their
+    Apple Music to someone else's account from a forwarded link. 404 when expired or unknown."""
+    link = await music_service.peek_oauth_state(state)
+    if link is None or link["service_type"] != "apple_music":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link expired - start again")
+    return AppleMusicLinkInfoResponse(account=link.get("account_hint"))
+
+
+@router.post("/apple-music/connect", response_model=AppleMusicConnectResponse)
+async def connect_apple_music(
+    request_body: AppleMusicConnectRequest,
+    user: OptionalUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    firestore: FirestoreServiceDep,
+) -> AppleMusicConnectResponse:
+    """Connect Apple Music with a Music User Token and start syncing it.
+
+    Signed-in callers (decide web) send their own token. The app's browser hand-off sends the
+    `state` from /apple-music/link instead; it's consumed once Apple accepts the token.
+
+    - 401: neither a signed-in user nor a valid, unexpired state
+    - 422: Apple refused the Music User Token
+    - 503: Apple Music isn't configured on this server
+    """
+    if request_body.state:
+        # Peek first and consume only once Apple has accepted the token, so a refused or failed
+        # attempt can be retried from the same page.
+        link = await music_service.peek_oauth_state(request_body.state)
+        if link is None or link["service_type"] != "apple_music" or not link["user_id"]:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Link expired - start again")
+        user_id = link["user_id"]
+    elif user is not None and not user.is_guest:
+        user_id = user.id
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in to connect Apple Music")
+
+    try:
+        service = await music_service.create_apple_music_service(user_id, request_body.music_user_token)
+    except AppleMusicNotConfiguredError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Apple Music is not available")
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    if request_body.state:
+        await music_service.verify_oauth_state(request_body.state)  # one connection per link
+
+    try:
+        job_id: str | None = await _start_sync_job(user_id, settings, firestore)
+    except SyncEnqueueError as e:
+        # Connected all the same; the next sync (button or daily) reads the library.
+        logger.warning(f"Apple Music connected for {user_id} but the sync didn't start: {e}")
+        job_id = None
+
+    return AppleMusicConnectResponse(
+        service=ConnectedServiceResponse(
+            service_type=service.service_type,
+            service_username=service.service_username,
+            last_sync_at=service.last_sync_at.isoformat() if service.last_sync_at else None,
+            sync_status=service.sync_status,
+            sync_error=service.sync_error,
+            tracks_synced=service.tracks_synced,
+            songs_synced=service.songs_synced,
+        ),
+        sync_job_id=job_id,
+    )
+
+
+# -----------------------------------------------------------------------------
 # Disconnect Service
 # -----------------------------------------------------------------------------
 
@@ -422,7 +577,7 @@ async def disconnect_service(
     """
     locale = get_locale_from_request(request)
 
-    if service_type not in ("spotify", "lastfm", "listenbrainz"):
+    if service_type not in ("spotify", "lastfm", "listenbrainz", "apple_music"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=t(locale, "services.invalidServiceType", service_type=service_type),
@@ -444,6 +599,33 @@ async def disconnect_service(
 # -----------------------------------------------------------------------------
 
 
+class SyncEnqueueError(Exception):
+    """The sync job's Cloud Task couldn't be created (the job is marked failed)."""
+
+
+async def _start_sync_job(user_id: str, settings: BackendSettings, firestore: FirestoreService) -> str:
+    """Create a sync job for all of the user's services and enqueue its Cloud Task. Returns the job id."""
+    job_id = str(uuid.uuid4())
+    job = SyncJob(
+        id=job_id,
+        user_id=user_id,
+        status=SyncJobStatus.PENDING,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    await firestore.set_document("sync_jobs", job_id, job.to_dict())
+
+    try:
+        cloud_tasks = get_cloud_tasks_service(settings)
+        cloud_tasks.create_sync_task(job_id=job_id, user_id=user_id)
+    except Exception as e:
+        job.status = SyncJobStatus.FAILED
+        job.error = f"Failed to enqueue task: {e}"
+        await firestore.set_document("sync_jobs", job_id, job.to_dict())
+        raise SyncEnqueueError(str(e)) from e
+    return job_id
+
+
 @router.post("/sync", response_model=SyncJobStartResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync(
     user: VerifiedUser,
@@ -460,28 +642,9 @@ async def trigger_sync(
     Returns immediately with a job_id. Use GET /sync/status to poll
     for progress. An email will be sent when sync completes.
     """
-    # Create sync job
-    job_id = str(uuid.uuid4())
-    job = SyncJob(
-        id=job_id,
-        user_id=user.id,
-        status=SyncJobStatus.PENDING,
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
-
-    # Store job in Firestore
-    await firestore.set_document("sync_jobs", job_id, job.to_dict())
-
-    # Enqueue Cloud Task
     try:
-        cloud_tasks = get_cloud_tasks_service(settings)
-        cloud_tasks.create_sync_task(job_id=job_id, user_id=user.id)
-    except Exception as e:
-        # If task creation fails, mark job as failed
-        job.status = SyncJobStatus.FAILED
-        job.error = f"Failed to enqueue task: {e}"
-        await firestore.set_document("sync_jobs", job_id, job.to_dict())
+        job_id = await _start_sync_job(user.id, settings, firestore)
+    except SyncEnqueueError as e:
         locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

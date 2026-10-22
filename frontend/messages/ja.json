@@ -727,7 +727,11 @@
       "artistsLabel": "{count}組のアーティスト",
       "lastSyncLabel": "最終同期: {date}",
       "failedToLoadServices": "サービスの読み込みに失敗しました",
-      "failedToStartSync": "同期の開始に失敗しました"
+      "failedToStartSync": "同期の開始に失敗しました",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Apple Musicに接続",
+      "reconnectAppleMusic": "Apple Musicに再接続",
+      "appleMusicNeedsReconnect": "選択した曲を最新の状態に保つには、Apple Musicへの再接続が必要です。"
     },
     "myDataPreferences": {
       "title": "好み",
@@ -905,5 +909,24 @@
         "title": "おなじみの曲"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "アプリに戻る",
+    "cancelled": "Apple Musicへのサインインがキャンセルされました。「接続」をタップしてもう一度お試しください。",
+    "connect": "Apple Musicに接続",
+    "connectedTitle": "Apple Musicに接続しました",
+    "doneApp": "ライブラリを読み込み中です。アプリにお戻りください。1〜2分でおすすめ曲が更新されます。",
+    "doneWeb": "ライブラリを読み込み中です。1〜2分でおすすめ曲が更新されます。",
+    "error": "Apple Musicへの接続中にエラーが発生しました。もう一度お試しください。",
+    "expired": "このリンクの有効期限が切れています。アプリに戻り、もう一度「Apple Music」をタップしてください。",
+    "intro": "Apple Musicにサインインすると、ライブラリや最近再生した曲を読み込んで、歌いたくなる曲を見つけ出します。",
+    "privacy": "ライブラリと再生履歴の読み取りのみを行います。曲の再生や変更、他者との共有を行うことは一切ありません。",
+    "refused": "Apple Musicのライブラリが共有されませんでした。接続にはApple Musicの有効なサブスクリプションが必要です。",
+    "seePicks": "おすすめ曲を見る",
+    "signIn": "サインイン",
+    "signedOut": "まずNomad Karaokeにサインインしてから、Apple Musicを接続してください。",
+    "title": "Apple Musicに接続",
+    "unavailable": "現在Apple Musicをご利用いただけません。後でもう一度お試しください。",
+    "account": "Nomad Karaokeアカウント（{account}）に接続しています。ご自身のアカウントではない場合は、このページを閉じてください。"
   }
 }

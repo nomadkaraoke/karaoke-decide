@@ -727,7 +727,11 @@
       "artistsLabel": "{count} kunstnere",
       "lastSyncLabel": "Sidste synkronisering: {date}",
       "failedToLoadServices": "Kunne ikke indlæse tjenester",
-      "failedToStartSync": "Kunne ikke starte synkronisering"
+      "failedToStartSync": "Kunne ikke starte synkronisering",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Forbind Apple Music",
+      "reconnectAppleMusic": "Genopret forbindelsen til Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music skal forbindes igen for at holde dine valg opdaterede."
     },
     "myDataPreferences": {
       "title": "Præferencer",
@@ -905,5 +909,24 @@
         "title": "Sange, du kender"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Tilbage til appen",
+    "cancelled": "Login med Apple Music blev annulleret. Tryk på Forbind for at prøve igen.",
+    "connect": "Forbind Apple Music",
+    "connectedTitle": "Apple Music er forbundet",
+    "doneApp": "Vi indlæser dit bibliotek nu. Gå tilbage til appen: dine anbefalinger opdateres om et minut eller to.",
+    "doneWeb": "Vi indlæser dit bibliotek nu. Dine anbefalinger opdateres om et minut eller to.",
+    "error": "Der gik noget galt med at forbinde Apple Music. Prøv venligst igen.",
+    "expired": "Dette link er udløbet. Gå tilbage til appen, og tryk på Apple Music igen.",
+    "intro": "Log ind på Apple Music, så gennemgår vi dit bibliotek og senest afspillede sange for at finde sange, du vil elske at synge.",
+    "privacy": "Vi læser kun dit bibliotek og din lyttehistorik. Vi afspiller, ændrer eller deler aldrig noget.",
+    "refused": "Apple Music delte ikke dit bibliotek. Tilslutning kræver et aktivt Apple Music-abonnement.",
+    "seePicks": "Se dine anbefalinger",
+    "signIn": "Log ind",
+    "signedOut": "Log ind på Nomad Karaoke først, og forbind derefter Apple Music.",
+    "title": "Forbind Apple Music",
+    "unavailable": "Apple Music er ikke tilgængelig i øjeblikket. Prøv venligst igen senere.",
+    "account": "Opretter forbindelse til Nomad Karaoke-kontoen {account}. Er det ikke dig? Luk denne side."
   }
 }

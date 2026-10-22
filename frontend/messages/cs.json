@@ -727,7 +727,11 @@
       "artistsLabel": "{count} interpretů",
       "lastSyncLabel": "Poslední synchronizace: {date}",
       "failedToLoadServices": "Nepodařilo se načíst služby",
-      "failedToStartSync": "Nepodařilo se spustit synchronizaci"
+      "failedToStartSync": "Nepodařilo se spustit synchronizaci",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Připojit Apple Music",
+      "reconnectAppleMusic": "Znovu připojit Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music je potřeba znovu připojit, aby byly tvoje výběry aktuální."
     },
     "myDataPreferences": {
       "title": "Preference",
@@ -905,5 +909,24 @@
         "title": "Skladby, které znáš"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Zpět do aplikace",
+    "cancelled": "Přihlášení k Apple Music bylo zrušeno. Klepnutím na Připojit to zkus znovu.",
+    "connect": "Připojit Apple Music",
+    "connectedTitle": "Apple Music je připojeno",
+    "doneApp": "Právě načítáme tvou knihovnu. Vrať se do aplikace – tvůj výběr se aktualizuje za minutu nebo dvě.",
+    "doneWeb": "Právě načítáme tvou knihovnu. Tvůj výběr se aktualizuje za minutu nebo dvě.",
+    "error": "Při připojování Apple Music došlo k chybě. Zkus to prosím znovu.",
+    "expired": "Platnost tohoto odkazu vypršela. Vrať se do aplikace a klepni znovu na Apple Music.",
+    "intro": "Přihlas se k Apple Music a my z tvé knihovny a nedávno přehraných skladeb vybereme písničky, které tě bude bavit zpívat.",
+    "privacy": "Máme přístup pouze k tvé knihovně a historii poslechu. Nikdy nic nepřehráváme, neupravujeme ani nesdílíme.",
+    "refused": "Apple Music neposkytlo přístup ke knihovně. K propojení je potřeba aktivní předplatné Apple Music.",
+    "seePicks": "Zobrazit výběr",
+    "signIn": "Přihlásit se",
+    "signedOut": "Nejprve se přihlas k Nomad Karaoke, potom připoj Apple Music.",
+    "title": "Připojit Apple Music",
+    "unavailable": "Apple Music momentálně není k dispozici. Zkus to prosím znovu později.",
+    "account": "Připojování k Nomad Karaoke účtu {account}. Nejsi to ty? Zavři tuto stránku."
   }
 }

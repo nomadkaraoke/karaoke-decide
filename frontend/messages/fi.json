@@ -727,7 +727,11 @@
       "artistsLabel": "{count} artistia",
       "lastSyncLabel": "Viimeisin synkronointi: {date}",
       "failedToLoadServices": "Palveluiden lataaminen epäonnistui",
-      "failedToStartSync": "Synkronoinnin aloittaminen epäonnistui"
+      "failedToStartSync": "Synkronoinnin aloittaminen epäonnistui",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Yhdistä Apple Music",
+      "reconnectAppleMusic": "Yhdistä Apple Music uudelleen",
+      "appleMusicNeedsReconnect": "Apple Music on yhdistettävä uudelleen, jotta valintasi pysyvät ajan tasalla."
     },
     "myDataPreferences": {
       "title": "Mieltymykset",
@@ -905,5 +909,24 @@
         "title": "Sinulle tutut kappaleet"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Takaisin sovellukseen",
+    "cancelled": "Apple Music -kirjautuminen peruutettiin. Napauta Yhdistä yrittääksesi uudelleen.",
+    "connect": "Yhdistä Apple Music",
+    "connectedTitle": "Apple Music yhdistetty",
+    "doneApp": "Luemme kirjastoasi juuri nyt. Palaa sovellukseen: suosituksesi päivittyvät minuutin tai parin kuluessa.",
+    "doneWeb": "Luemme kirjastoasi juuri nyt. Suosituksesi päivittyvät minuutin tai parin kuluessa.",
+    "error": "Jokin meni pieleen Apple Musicin yhdistämisessä. Yritä uudelleen.",
+    "expired": "Tämä linkki on vanhentunut. Palaa sovellukseen ja napauta Apple Musicia uudelleen.",
+    "intro": "Kirjaudu sisään Apple Musiciin, niin luemme kirjastosi ja viimeksi toistetut kappaleesi löytääksemme biisejä, joita rakastat laulaa.",
+    "privacy": "Luemme vain kirjastoasi ja kuunteluhistoriaasi. Emme koskaan toista, muokkaa tai jaa mitään.",
+    "refused": "Apple Music ei jakanut kirjastoasi. Yhdistäminen vaatii aktiivisen Apple Music -tilauksen.",
+    "seePicks": "Katso suosituksesi",
+    "signIn": "Kirjaudu sisään",
+    "signedOut": "Kirjaudu ensin sisään Nomad Karaokeen ja yhdistä sitten Apple Music.",
+    "title": "Yhdistä Apple Music",
+    "unavailable": "Apple Music ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen.",
+    "account": "Yhdistetään Nomad Karaoke -tiliin {account}. Eikö tili ole sinun? Sulje tämä sivu."
   }
 }

@@ -12,6 +12,7 @@ from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
+from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
@@ -44,6 +45,7 @@ class MusicServiceService:
         spotify_client: SpotifyClient | None = None,
         lastfm_client: LastFmClient | None = None,
         listenbrainz_client: ListenBrainzClient | None = None,
+        apple_music_client: AppleMusicClient | None = None,
     ):
         """Initialize the music service service.
 
@@ -59,6 +61,8 @@ class MusicServiceService:
         self._spotify_client = spotify_client
         self._lastfm_client = lastfm_client
         self._listenbrainz_client = listenbrainz_client
+        self._apple_music_signer: DeveloperTokenSigner | None = None
+        self._apple_music_client = apple_music_client
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -80,6 +84,20 @@ class MusicServiceService:
         if self._listenbrainz_client is None:
             self._listenbrainz_client = ListenBrainzClient(self.settings)
         return self._listenbrainz_client
+
+    @property
+    def apple_music_signer(self) -> DeveloperTokenSigner:
+        """Get or create the Apple Music developer token signer (caches signed tokens)."""
+        if self._apple_music_signer is None:
+            self._apple_music_signer = DeveloperTokenSigner(self.settings)
+        return self._apple_music_signer
+
+    @property
+    def apple_music(self) -> AppleMusicClient:
+        """Get or create Apple Music client."""
+        if self._apple_music_client is None:
+            self._apple_music_client = AppleMusicClient(self.apple_music_signer)
+        return self._apple_music_client
 
     # -------------------------------------------------------------------------
     # OAuth State Management
@@ -105,12 +123,13 @@ class MusicServiceService:
         """
         return f"{user_id}_{service_type}"
 
-    async def create_oauth_state(self, user_id: str, service_type: str) -> str:
+    async def create_oauth_state(self, user_id: str, service_type: str, account_hint: str | None = None) -> str:
         """Create and store OAuth state for CSRF protection.
 
         Args:
             user_id: User initiating OAuth flow.
             service_type: Service type (e.g., "spotify").
+            account_hint: Masked email shown to whoever opens a hand-off link (Apple Music).
 
         Returns:
             State token to include in OAuth redirect.
@@ -125,12 +144,24 @@ class MusicServiceService:
             {
                 "user_id": user_id,
                 "service_type": service_type,
+                "account_hint": account_hint,
                 "created_at": now.isoformat(),
                 "expires_at": expires_at.isoformat(),
             },
         )
 
         return state
+
+    async def peek_oauth_state(self, state: str) -> dict[str, str | None] | None:
+        """Read a valid, unexpired state without consuming it (user_id, service_type, account_hint)."""
+        doc = await self.firestore.get_document(self.OAUTH_STATES_COLLECTION, state)
+        if doc is None or datetime.now(UTC) > datetime.fromisoformat(doc["expires_at"]):
+            return None
+        return {
+            "user_id": doc["user_id"],
+            "service_type": doc["service_type"],
+            "account_hint": doc.get("account_hint"),
+        }
 
     async def verify_oauth_state(self, state: str) -> dict[str, str] | None:
         """Verify and consume OAuth state atomically.
@@ -459,6 +490,50 @@ class MusicServiceService:
             service_data,
         )
 
+        return self._doc_to_music_service(service_data)
+
+    async def create_apple_music_service(self, user_id: str, music_user_token: str) -> MusicService:
+        """Connect Apple Music with the Music User Token MusicKit JS returned.
+
+        The token is checked against Apple first (storefront lookup), then stored as the
+        service's access token. Reconnecting replaces the token and keeps the sync history.
+
+        Raises:
+            ValidationError: Apple refused the token.
+        """
+        try:
+            storefront = await self.apple_music.get_storefront(music_user_token)
+        except ExternalServiceError as e:
+            raise ValidationError(f"Apple Music didn't accept the sign-in: {e}")
+
+        service_id = self._get_service_id(user_id, "apple_music")
+        now = datetime.now(UTC)
+        fields: dict[str, Any] = {
+            "service_user_id": storefront,
+            "service_username": "Apple Music",
+            "access_token": music_user_token,
+            "sync_status": "idle",
+            "sync_error": None,
+            "updated_at": now.isoformat(),
+        }
+
+        existing = await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
+        if existing:
+            await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
+            return self._doc_to_music_service({**existing, **fields})
+
+        service_data: dict[str, Any] = {
+            "id": service_id,
+            "user_id": user_id,
+            "service_type": "apple_music",
+            "refresh_token": None,
+            "token_expires_at": None,
+            "last_sync_at": None,
+            "tracks_synced": 0,
+            "created_at": now.isoformat(),
+            **fields,
+        }
+        await self.firestore.set_document(self.SERVICES_COLLECTION, service_id, service_data)
         return self._doc_to_music_service(service_data)
 
     async def delete_service(self, user_id: str, service_type: str) -> None:

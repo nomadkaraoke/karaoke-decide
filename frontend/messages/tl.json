@@ -727,7 +727,11 @@
       "artistsLabel": "{count} na artist",
       "lastSyncLabel": "Huling na-sync: {date}",
       "failedToLoadServices": "Nabigong i-load ang mga serbisyo",
-      "failedToStartSync": "Nabigong simulan ang pag-sync"
+      "failedToStartSync": "Nabigong simulan ang pag-sync",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Ikonekta ang Apple Music",
+      "reconnectAppleMusic": "Muling ikonekta ang Apple Music",
+      "appleMusicNeedsReconnect": "Kailangang ikonekta muli ang Apple Music para mapanatiling updated ang iyong mga napili."
     },
     "myDataPreferences": {
       "title": "Mga Kagustuhan",
@@ -905,5 +909,24 @@
         "title": "Mga kantang alam mo"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Bumalik sa app",
+    "cancelled": "Nakansela ang pag-sign in sa Apple Music. I-tap ang Ikonekta para subukang muli.",
+    "connect": "Ikonekta ang Apple Music",
+    "connectedTitle": "Nakakonekta na ang Apple Music",
+    "doneApp": "Binabasa na namin ang iyong library. Bumalik na sa app: mag-a-update ang iyong mga napiling kanta sa loob ng isa o dalawang minuto.",
+    "doneWeb": "Binabasa na namin ang iyong library. Mag-a-update ang iyong mga napiling kanta sa loob ng isa o dalawang minuto.",
+    "error": "Nagkaproblema sa pagkonekta sa Apple Music. Pakisubukan muli.",
+    "expired": "Nag-expire na ang link na ito. Bumalik sa app at i-tap muli ang Apple Music.",
+    "intro": "Mag-sign in sa Apple Music at babasahin namin ang iyong library at mga kamakailang pinatugtog para maghanap ng mga kantang magugustuhan mong kantahin.",
+    "privacy": "Binabasa lang namin ang iyong library at history ng pakikinig. Hinding-hindi kami magpapatugtog, magbabago, o magbabahagi ng anuman.",
+    "refused": "Hindi ibinahagi ng Apple Music ang iyong library. Kailangan ng aktibong subscription sa Apple Music para makakonekta.",
+    "seePicks": "Tingnan ang iyong mga napili",
+    "signIn": "Mag-sign in",
+    "signedOut": "Mag-sign in muna sa Nomad Karaoke, pagkatapos ay ikonekta ang Apple Music.",
+    "title": "Ikonekta ang Apple Music",
+    "unavailable": "Hindi available ang Apple Music sa ngayon. Pakisubukan muli mamaya.",
+    "account": "Kumokonekta sa Nomad Karaoke account na {account}. Hindi ikaw? Isara ang page na ito."
   }
 }

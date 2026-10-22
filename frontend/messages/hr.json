@@ -727,7 +727,11 @@
       "artistsLabel": "{count} izvođača",
       "lastSyncLabel": "Zadnja sinkronizacija: {date}",
       "failedToLoadServices": "Učitavanje usluga nije uspjelo",
-      "failedToStartSync": "Pokretanje sinkronizacije nije uspjelo"
+      "failedToStartSync": "Pokretanje sinkronizacije nije uspjelo",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Poveži Apple Music",
+      "reconnectAppleMusic": "Ponovno poveži Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music treba ponovno povezati kako bi tvoji odabiri bili ažurni."
     },
     "myDataPreferences": {
       "title": "Preferencije",
@@ -905,5 +909,24 @@
         "title": "Pjesme koje znaš"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Natrag u aplikaciju",
+    "cancelled": "Prijava putem usluge Apple Music je otkazana. Dodirni „Poveži” za ponovni pokušaj.",
+    "connect": "Poveži Apple Music",
+    "connectedTitle": "Apple Music je povezan",
+    "doneApp": "Upravo učitavamo tvoju zbirku. Vrati se u aplikaciju: tvoji će se odabiri ažurirati za minutu-dvije.",
+    "doneWeb": "Upravo učitavamo tvoju zbirku. Tvoji će se odabiri ažurirati za minutu-dvije.",
+    "error": "Nešto je pošlo po zlu pri povezivanju usluge Apple Music. Pokušaj ponovno.",
+    "expired": "Ova je poveznica istekla. Vrati se u aplikaciju i ponovno dodirni Apple Music.",
+    "intro": "Prijavi se na Apple Music, a mi ćemo pregledati tvoju zbirku i nedavno slušane pjesme kako bismo pronašli pjesme koje ćeš voljeti pjevati.",
+    "privacy": "Pregledavamo samo tvoju zbirku i povijest slušanja. Nikada ništa ne reproduciramo, ne mijenjamo niti dijelimo.",
+    "refused": "Apple Music nije podijelio tvoju zbirku. Za povezivanje je potrebna aktivna pretplata na Apple Music.",
+    "seePicks": "Pogledaj svoje odabire",
+    "signIn": "Prijavi se",
+    "signedOut": "Najprije se prijavi na Nomad Karaoke, a zatim poveži Apple Music.",
+    "title": "Poveži Apple Music",
+    "unavailable": "Apple Music trenutačno nije dostupan. Pokušaj ponovno kasnije.",
+    "account": "Povezivanje s Nomad Karaoke računom {account}. Nisi to ti? Zatvori ovu stranicu."
   }
 }

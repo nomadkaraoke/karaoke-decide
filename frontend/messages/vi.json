@@ -727,7 +727,11 @@
       "artistsLabel": "{count} nghệ sĩ",
       "lastSyncLabel": "Lần đồng bộ cuối: {date}",
       "failedToLoadServices": "Không thể tải các dịch vụ",
-      "failedToStartSync": "Không thể bắt đầu đồng bộ"
+      "failedToStartSync": "Không thể bắt đầu đồng bộ",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Kết nối Apple Music",
+      "reconnectAppleMusic": "Kết nối lại Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music cần được kết nối lại để luôn cập nhật các bài hát bạn chọn."
     },
     "myDataPreferences": {
       "title": "Sở thích",
@@ -905,5 +909,24 @@
         "title": "Bài hát bạn đã biết"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Quay lại ứng dụng",
+    "cancelled": "Đã hủy đăng nhập Apple Music. Nhấn vào Kết nối để thử lại.",
+    "connect": "Kết nối Apple Music",
+    "connectedTitle": "Đã kết nối Apple Music",
+    "doneApp": "Chúng tôi đang tải thư viện của bạn. Hãy quay lại ứng dụng: danh sách gợi ý sẽ được cập nhật trong 1–2 phút tới.",
+    "doneWeb": "Chúng tôi đang tải thư viện của bạn. Danh sách gợi ý sẽ được cập nhật trong 1–2 phút tới.",
+    "error": "Đã xảy ra lỗi khi kết nối Apple Music. Vui lòng thử lại.",
+    "expired": "Liên kết này đã hết hạn. Hãy quay lại ứng dụng và nhấn vào Apple Music lần nữa.",
+    "intro": "Đăng nhập Apple Music để chúng tôi đọc thư viện và lịch sử nghe gần đây, từ đó gợi ý những bài hát bạn sẽ thích hát.",
+    "privacy": "Chúng tôi chỉ đọc thư viện và lịch sử nghe của bạn. Chúng tôi tuyệt đối không phát, chỉnh sửa hay chia sẻ bất cứ thông tin nào.",
+    "refused": "Apple Music không chia sẻ thư viện của bạn. Để kết nối, bạn cần có gói đăng ký Apple Music đang hoạt động.",
+    "seePicks": "Xem danh sách gợi ý",
+    "signIn": "Đăng nhập",
+    "signedOut": "Vui lòng đăng nhập Nomad Karaoke trước, sau đó kết nối Apple Music.",
+    "title": "Kết nối Apple Music",
+    "unavailable": "Apple Music hiện không khả dụng. Vui lòng thử lại sau.",
+    "account": "Đang kết nối với tài khoản Nomad Karaoke {account}. Không phải bạn? Hãy đóng trang này."
   }
 }

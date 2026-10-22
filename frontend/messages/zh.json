@@ -727,7 +727,11 @@
       "artistsLabel": "{count} 位歌手",
       "lastSyncLabel": "上次同步：{date}",
       "failedToLoadServices": "加载服务失败",
-      "failedToStartSync": "启动同步失败"
+      "failedToStartSync": "启动同步失败",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "连接 Apple Music",
+      "reconnectAppleMusic": "重新连接 Apple Music",
+      "appleMusicNeedsReconnect": "需要重新连接 Apple Music，以保持你的精选内容同步更新。"
     },
     "myDataPreferences": {
       "title": "偏好",
@@ -905,5 +909,24 @@
         "title": "你熟悉的歌曲"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "返回 App",
+    "cancelled": "已取消 Apple Music 登录。轻点“连接”以重试。",
+    "connect": "连接 Apple Music",
+    "connectedTitle": "已连接 Apple Music",
+    "doneApp": "我们正在读取您的资料库。请返回 App：为您推荐的歌曲将在几分钟内更新。",
+    "doneWeb": "我们正在读取您的资料库。为您推荐的歌曲将在几分钟内更新。",
+    "error": "连接 Apple Music 时出现问题，请重试。",
+    "expired": "此链接已过期。请返回 App 并再次轻点 Apple Music。",
+    "intro": "登录 Apple Music，我们将读取您的资料库和最近播放记录，为您挑选您想唱的歌曲。",
+    "privacy": "我们仅会读取您的资料库和收听历史记录，绝不会播放、更改或共享任何内容。",
+    "refused": "Apple Music 未授权访问您的资料库。连接需要有效的 Apple Music 订阅。",
+    "seePicks": "查看精选推荐",
+    "signIn": "登录",
+    "signedOut": "请先登录 Nomad Karaoke，然后再连接 Apple Music。",
+    "title": "连接 Apple Music",
+    "unavailable": "Apple Music 目前不可用，请稍后重试。",
+    "account": "正在连接到 Nomad Karaoke 账户 {account}。不是你？请关闭此页面。"
   }
 }

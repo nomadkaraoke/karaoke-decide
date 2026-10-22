@@ -364,6 +364,33 @@ cloud_run_service = gcp.cloudrunv2.Service(
                             }
                         },
                     },
+                    {
+                        "name": "APPLE_MUSICKIT_PRIVATE_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-musickit-private-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "APPLE_MUSICKIT_KEY_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-musickit-key-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "APPLE_TEAM_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "apple-team-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {
@@ -434,6 +461,10 @@ REQUIRED_SECRETS = [
     "spotipy-client-secret",
     "lastfm-api-key",
     "postmark-server-token",
+    # Apple MusicKit (Apple Music connect), created by hand 2026-10-22 from the Apple Developer account.
+    "apple-musickit-private-key",
+    "apple-musickit-key-id",
+    "apple-team-id",
     # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 

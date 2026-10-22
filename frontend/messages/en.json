@@ -727,7 +727,11 @@
       "artistsLabel": "{count} artists",
       "lastSyncLabel": "Last sync: {date}",
       "failedToLoadServices": "Failed to load services",
-      "failedToStartSync": "Failed to start sync"
+      "failedToStartSync": "Failed to start sync",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Connect Apple Music",
+      "reconnectAppleMusic": "Reconnect Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music needs reconnecting to keep your picks up to date."
     },
     "myDataPreferences": {
       "title": "Preferences",
@@ -905,5 +909,24 @@
       "crowd_pleaser": "Crowd pleaser",
       "make_it": "Make it"
     }
+  },
+  "appleMusicConnect": {
+    "title": "Connect Apple Music",
+    "connectedTitle": "Apple Music connected",
+    "intro": "Sign in to Apple Music and we'll read your library and recent plays to find songs you'll love singing.",
+    "connect": "Connect Apple Music",
+    "doneApp": "We're reading your library now. Head back to the app: your picks update in a minute or two.",
+    "doneWeb": "We're reading your library now. Your picks update in a minute or two.",
+    "backToApp": "Back to the app",
+    "seePicks": "See your picks",
+    "signedOut": "Sign in to Nomad Karaoke first, then connect Apple Music.",
+    "signIn": "Sign in",
+    "expired": "This link has expired. Go back to the app and tap Apple Music again.",
+    "refused": "Apple Music didn't share your library. Connecting needs an active Apple Music subscription.",
+    "unavailable": "Apple Music isn't available right now. Please try again later.",
+    "cancelled": "Apple Music sign-in was cancelled. Tap Connect to try again.",
+    "error": "Something went wrong connecting Apple Music. Please try again.",
+    "privacy": "We only read your library and listening history. We never play, change or share anything.",
+    "account": "Connecting to the Nomad Karaoke account {account}. Not you? Close this page."
   }
 }

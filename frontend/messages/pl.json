@@ -727,7 +727,11 @@
       "artistsLabel": "{count} {count, plural, one {artysta} few {artystów} many {artystów} other {artystów}}",
       "lastSyncLabel": "Ostatnia synchronizacja: {date}",
       "failedToLoadServices": "Nie udało się załadować usług",
-      "failedToStartSync": "Nie udało się rozpocząć synchronizacji"
+      "failedToStartSync": "Nie udało się rozpocząć synchronizacji",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Połącz z Apple Music",
+      "reconnectAppleMusic": "Połącz ponownie z Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music wymaga ponownego połączenia, aby Twoje utwory były zawsze aktualne."
     },
     "myDataPreferences": {
       "title": "Preferencje",
@@ -905,5 +909,24 @@
         "title": "Piosenki, które znasz"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Wróć do aplikacji",
+    "cancelled": "Logowanie do Apple Music zostało anulowane. Dotknij „Połącz”, aby spróbować ponownie.",
+    "connect": "Połącz z Apple Music",
+    "connectedTitle": "Połączono z Apple Music",
+    "doneApp": "Wczytujemy Twoją bibliotekę. Wróć do aplikacji – Twoje propozycje zaktualizują się za minutę lub dwie.",
+    "doneWeb": "Wczytujemy Twoją bibliotekę. Twoje propozycje zaktualizują się za minutę lub dwie.",
+    "error": "Coś poszło nie tak podczas łączenia z Apple Music. Spróbuj ponownie.",
+    "expired": "Ten link wygasł. Wróć do aplikacji i dotknij ponownie Apple Music.",
+    "intro": "Zaloguj się do Apple Music, a my przejrzymy Twoją bibliotekę i ostatnio odtwarzane utwory, aby znaleźć piosenki, które pokochasz śpiewać.",
+    "privacy": "Odczytujemy tylko Twoją bibliotekę i historię odtwarzania. Nigdy niczego nie odtwarzamy, nie zmieniamy ani nie udostępniamy.",
+    "refused": "Apple Music nie udostępniło Twojej biblioteki. Połączenie wymaga aktywnej subskrypcji Apple Music.",
+    "seePicks": "Zobacz swoje propozycje",
+    "signIn": "Zaloguj się",
+    "signedOut": "Najpierw zaloguj się do Nomad Karaoke, a następnie połącz z Apple Music.",
+    "title": "Połącz z Apple Music",
+    "unavailable": "Apple Music jest w tej chwili niedostępne. Spróbuj ponownie później.",
+    "account": "Łączenie z kontem Nomad Karaoke {account}. To nie Ty? Zamknij tę stronę."
   }
 }

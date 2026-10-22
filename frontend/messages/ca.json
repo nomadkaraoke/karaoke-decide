@@ -727,7 +727,11 @@
       "artistsLabel": "{count} artistes",
       "lastSyncLabel": "Última sincronització: {date}",
       "failedToLoadServices": "No s'han pogut carregar els serveis",
-      "failedToStartSync": "No s'ha pogut iniciar la sincronització"
+      "failedToStartSync": "No s'ha pogut iniciar la sincronització",
+      "appleMusic": "Apple Music",
+      "connectAppleMusic": "Connecta Apple Music",
+      "reconnectAppleMusic": "Torna a connectar Apple Music",
+      "appleMusicNeedsReconnect": "Cal tornar a connectar Apple Music per mantenir la teva selecció de cançons al dia."
     },
     "myDataPreferences": {
       "title": "Preferències",
@@ -905,5 +909,24 @@
         "title": "Cançons que coneixes"
       }
     }
+  },
+  "appleMusicConnect": {
+    "backToApp": "Torna a l'aplicació",
+    "cancelled": "S'ha cancel·lat l'inici de sessió a Apple Music. Toca «Connecta» per tornar-ho a provar.",
+    "connect": "Connecta Apple Music",
+    "connectedTitle": "Apple Music connectat",
+    "doneApp": "Ara estem llegint la teva biblioteca. Torna a l'aplicació: les teves seleccions s'actualitzaran d'aquí a un parell de minuts.",
+    "doneWeb": "Ara estem llegint la teva biblioteca. Les teves seleccions s'actualitzaran d'aquí a un parell de minuts.",
+    "error": "S'ha produït un error en connectar Apple Music. Torna-ho a provar.",
+    "expired": "Aquest enllaç ha caducat. Torna a l'aplicació i torna a tocar Apple Music.",
+    "intro": "Inicia la sessió a Apple Music i llegirem la teva biblioteca i el que has escoltat darrerament per trobar cançons que t'encantarà cantar.",
+    "privacy": "Només llegim la teva biblioteca i l'historial de reproducció. Mai no reproduirem, modificarem ni compartirem res.",
+    "refused": "Apple Music no ha compartit la teva biblioteca. Per connectar-te cal tenir una subscripció activa a Apple Music.",
+    "seePicks": "Mira les teves seleccions",
+    "signIn": "Inicia la sessió",
+    "signedOut": "Primer inicia la sessió a Nomad Karaoke i després connecta Apple Music.",
+    "title": "Connecta Apple Music",
+    "unavailable": "Apple Music no està disponible ara mateix. Torna-ho a provar més tard.",
+    "account": "Connectant amb el compte de Nomad Karaoke {account}. No ets tu? Tanca aquesta pàgina."
   }
 }

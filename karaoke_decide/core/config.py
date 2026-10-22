@@ -81,6 +81,12 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("lastfm_username", "andrew_lastfm_username"),
     )
 
+    # Apple Music (MusicKit). The key is the .p8 PEM text from the Apple Developer account
+    # (Secret Manager apple-musickit-private-key); the developer token is signed from it.
+    apple_musickit_private_key: str = ""
+    apple_musickit_key_id: str = ""
+    apple_team_id: str = ""
+
     # flacfetch (sourceability pre-check)
     flacfetch_api_url: str = "https://flacfetch.nomadkaraoke.com"
     flacfetch_api_key: str = ""

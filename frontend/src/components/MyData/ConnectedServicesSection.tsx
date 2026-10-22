@@ -3,7 +3,9 @@
 import { useState, useCallback, useRef, useEffect, FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
+import { Link } from "@/i18n/routing";
 import {
+  AppleMusicIcon,
   SpotifyIcon,
   LastfmIcon,
   RefreshIcon,
@@ -251,6 +253,8 @@ export function ConnectedServicesSection({
 
   const spotifyConnected = isConnected("spotify");
   const lastfmConnected = isConnected("lastfm");
+  const appleMusicConnected = isConnected("apple_music");
+  const appleMusic = getService("apple_music");
 
   return (
     <div className="rounded-2xl bg-[var(--card)] border border-[var(--card-border)] overflow-hidden">
@@ -274,6 +278,11 @@ export function ConnectedServicesSection({
                   <LastfmIcon className="w-4 h-4 text-[#ff4444]" />
                 </div>
               )}
+              {appleMusicConnected && (
+                <div className="w-9 h-9 rounded-full bg-[#FA243C]/20 flex items-center justify-center">
+                  <AppleMusicIcon className="w-4 h-4 text-[#FA243C]" />
+                </div>
+              )}
             </div>
           ) : (
             <div className="w-10 h-10 rounded-full bg-[var(--secondary)] flex items-center justify-center">
@@ -288,6 +297,7 @@ export function ConnectedServicesSection({
                 : [
                     spotifyConnected && t('spotify'),
                     lastfmConnected && t('lastfm'),
+                    appleMusicConnected && t('appleMusic'),
                   ]
                     .filter(Boolean)
                     .join(", ")}
@@ -441,6 +451,60 @@ export function ConnectedServicesSection({
                       {t('connectLastfm')}
                     </Button>
                   </form>
+                )}
+              </div>
+
+              {/* Apple Music (MusicKit JS on the connect page) */}
+              <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-[#FA243C]/20 flex items-center justify-center">
+                    <AppleMusicIcon className="w-4 h-4 text-[#FA243C]" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-[var(--text)]">{t('appleMusic')}</h3>
+                    {appleMusic?.sync_status === "error" ? (
+                      <p className="text-xs text-[var(--error)]">{t('appleMusicNeedsReconnect')}</p>
+                    ) : null}
+                  </div>
+                  {appleMusicConnected ? (
+                    <Badge variant="success">{t('connected')}</Badge>
+                  ) : (
+                    <Badge variant="default">{t('notConnected')}</Badge>
+                  )}
+                </div>
+
+                {appleMusicConnected ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
+                      <span>
+                        {t('songsLabel', { count: appleMusic?.songs_synced || appleMusic?.tracks_synced || 0 })}
+                      </span>
+                      {appleMusic?.last_sync_at && (
+                        <span>{t('lastSyncLabel', { date: formatDate(appleMusic.last_sync_at) })}</span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      {appleMusic?.sync_status === "error" && (
+                        <Link href="/connect/apple-music">
+                          <Button variant="primary" size="sm">{t('reconnectAppleMusic')}</Button>
+                        </Link>
+                      )}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDisconnect("apple_music")}
+                        isLoading={disconnecting === "apple_music"}
+                      >
+                        {t('disconnect')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Link href="/connect/apple-music">
+                    <Button variant="primary" size="sm" leftIcon={<AppleMusicIcon className="w-4 h-4" />}>
+                      {t('connectAppleMusic')}
+                    </Button>
+                  </Link>
                 )}
               </div>
 

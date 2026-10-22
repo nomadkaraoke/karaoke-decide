@@ -575,3 +575,12 @@ export function ArrowRightIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** Generic music note, drawn in Apple Music's red where used (not Apple's logo). */
+export function AppleMusicIcon({ className }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 3.5v11.25a3.25 3.25 0 1 1-2-3V7.1l-8 1.6v8.3a3.25 3.25 0 1 1-2-3V6.1a1 1 0 0 1 .8-.98l10-2A1 1 0 0 1 20 3.5z" />
+    </svg>
+  );
+}
