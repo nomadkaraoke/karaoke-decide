@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, HTTPException, Response, status
 
 from backend.api.deps import CurrentUser, VoiceProfileServiceDep
-from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut, VoiceProfileUserNotFoundError
+from backend.services.voice_profile_service import (
+    VoiceProfileIn,
+    VoiceProfileOut,
+    VoiceProfileResponse,
+    VoiceProfileUserNotFoundError,
+)
 
 router = APIRouter()
 
 
-@router.get("/voice")
-async def get_voice(user: CurrentUser, service: VoiceProfileServiceDep) -> dict[str, Any]:
-    profile = await service.get(user.id)
-    return {"profile": profile.model_dump(mode="json") if profile else None}
+@router.get("/voice", response_model=VoiceProfileResponse)
+async def get_voice(user: CurrentUser, service: VoiceProfileServiceDep) -> VoiceProfileResponse:
+    return VoiceProfileResponse(profile=await service.get(user.id))
 
 
 @router.put("/voice")

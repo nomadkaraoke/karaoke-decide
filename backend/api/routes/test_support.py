@@ -137,9 +137,9 @@ async def seed_profile(body: SeedBody, fs: FirestoreDep, auth: AuthDep) -> dict[
 async def seed_voice(body: VoiceSeedBody, fs: FirestoreDep, auth: AuthDep) -> Response:
     """Set the user's voice profile (validated like PUT /api/my/voice) on their profile doc."""
     await auth.resolve_gen_user(body.email)
-    profile = VoiceProfileOut(**body.profile.model_dump(), updated_at=datetime.now(UTC))
+    profile = VoiceProfileOut(**body.profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
     await fs.update_document(
-        USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json")}
+        USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json", by_alias=True)}
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

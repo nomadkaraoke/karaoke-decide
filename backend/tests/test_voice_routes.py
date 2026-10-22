@@ -194,3 +194,27 @@ def test_test_api_seed_voice(monkeypatch: pytest.MonkeyPatch) -> None:
         c.post("/api/test/voice/seed", json={"email": EMAIL, "profile": {**PROFILE, "samples": []}}).status_code == 422
     )
     assert c.get("/api/test/profile", params={"email": "none@example.com"}).json()["voice_profile"] is None
+
+
+def test_register_key_is_register_in_json_and_firestore(client: TestClient, fs: RouteFirestore) -> None:
+    body = {**PROFILE, "voice_type": None, "voice_type_between": None, "register": "middle"}
+    put = client.put("/api/my/voice", json=body).json()
+    assert put["register"] == "middle" and "register_" not in put
+    stored = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert stored["register"] == "middle" and "register_" not in stored
+    got = client.get("/api/my/voice").json()["profile"]
+    assert got["register"] == "middle" and "register_" not in got
+
+
+@pytest.mark.asyncio
+async def test_invalid_stored_profile_is_unset(fs: RouteFirestore, caplog: pytest.LogCaptureFixture) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {"low_midi": 1, "junk": True}
+    svc = VoiceProfileService(fs)  # type: ignore[arg-type]
+    with caplog.at_level("WARNING"):
+        assert await svc.get(USER_ID) is None
+    assert len([r for r in caplog.records if r.levelname == "WARNING"]) == 1
+
+
+def test_get_route_survives_invalid_stored_profile(client: TestClient, fs: RouteFirestore) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {"low_midi": 1}
+    assert client.get("/api/my/voice").json() == {"profile": None}

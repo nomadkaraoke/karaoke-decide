@@ -7,12 +7,15 @@ optional ``evidence_count`` / ``session_id`` fields (extend the Literal and add 
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from backend.services.firestore_service import FirestoreService
+
+logger = logging.getLogger(__name__)
 
 USERS_COLLECTION = "decide_users"
 FIELD = "voice_profile"
@@ -22,7 +25,7 @@ Midi = Field(ge=24, le=96)
 
 
 class VoiceProfileIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     low_midi: int = Midi
     high_midi: int = Midi
@@ -30,7 +33,8 @@ class VoiceProfileIn(BaseModel):
     comfort_high: int = Midi
     voice_type: VoiceType | None
     voice_type_between: VoiceType | None = None
-    register: Literal["lower", "middle", "higher"] | None
+    # Python name avoids shadowing BaseModel.register; JSON and Firestore key stay "register".
+    register_: Literal["lower", "middle", "higher"] | None = Field(alias="register")
     confidence: Literal["low", "medium", "high"]
     method: Literal["mic", "self"]
     measured_at: datetime
@@ -39,7 +43,7 @@ class VoiceProfileIn(BaseModel):
     def _consistent(self) -> Self:
         if not (self.low_midi <= self.comfort_low <= self.comfort_high <= self.high_midi):
             raise ValueError("require low_midi <= comfort_low <= comfort_high <= high_midi")
-        if (self.voice_type is None) == (self.register is None):
+        if (self.voice_type is None) == (self.register_ is None):
             raise ValueError("exactly one of voice_type / register must be set")
         if self.method == "self" and self.confidence != "low":
             raise ValueError("self-reported profiles must have confidence 'low'")
@@ -48,6 +52,10 @@ class VoiceProfileIn(BaseModel):
 
 class VoiceProfileOut(VoiceProfileIn):
     updated_at: datetime
+
+
+class VoiceProfileResponse(BaseModel):
+    profile: VoiceProfileOut | None
 
 
 class VoiceProfileUserNotFoundError(Exception):
@@ -69,15 +77,23 @@ class VoiceProfileService:
     async def get(self, user_id: str) -> VoiceProfileOut | None:
         doc, _ = await self._doc(user_id)
         raw = (doc or {}).get(FIELD)
-        return VoiceProfileOut.model_validate(raw) if raw else None
+        if not raw:
+            return None
+        try:
+            return VoiceProfileOut.model_validate(raw)
+        except ValidationError:
+            logger.warning("voice_profile for %s no longer validates; treating as unset", user_id)
+            return None
 
     async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut:
         """Overwrite the stored profile; the last explicit save wins, whatever its measured_at."""
         _, doc_id = await self._doc(user_id)
         if doc_id is None:
             raise VoiceProfileUserNotFoundError(user_id)
-        out = VoiceProfileOut(**profile.model_dump(), updated_at=datetime.now(UTC))
-        await self.firestore.update_document(USERS_COLLECTION, doc_id, {FIELD: out.model_dump(mode="json")})
+        out = VoiceProfileOut(**profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
+        await self.firestore.update_document(
+            USERS_COLLECTION, doc_id, {FIELD: out.model_dump(mode="json", by_alias=True)}
+        )
         return out
 
     async def delete(self, user_id: str) -> None:
