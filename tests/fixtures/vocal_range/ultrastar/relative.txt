@@ -1,0 +1,13 @@
+#TITLE:Doo Wah Day
+#ARTIST:The Lalas
+#BPM:120
+#GAP:1500
+#RELATIVE:yes
+: 0 4 7 la
+: 4 4 0 doo
+: 8 8 4 wah
+- 16 16
+: 0 2 4 da
+: 2 2 4 da
+: 4 4 7 doo
+: 8 2 7 la
