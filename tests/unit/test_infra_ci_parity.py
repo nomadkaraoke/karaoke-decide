@@ -466,3 +466,33 @@ def test_lb_poll_is_scheduled_daily() -> None:
     assert sched["http_target"]["http_method"] == "POST"
     invoker = _kwargs(_resource_call(tree, "JobIamMember", "lb-poll-scheduler-invoker"), _module_constants(tree))
     assert invoker["role"] == "roles/run.invoker"
+# The vocal-range-gen job (on demand, no scheduler)
+# --------------------------------------------------------------------------
+
+
+def test_vocal_range_job_shape() -> None:
+    tree = _pulumi_tree()
+    call = _resource_call(tree, "Job", "vocal-range-gen-job")
+    kw = _kwargs(call, _module_constants(tree))
+    assert kw["name"] == "vocal-range-gen"
+    assert kw["template"]["task_count"] == 10
+    tmpl = kw["template"]["template"]
+    (c,) = tmpl["containers"]
+    assert ast.unparse(c["image"]).rstrip("'").endswith("/karaoke-decide-vocal:latest")
+    assert c["commands"] == ["python", "-m", "karaoke_decide.etl.vocal_range_gen"]
+    assert c["resources"]["limits"] == {"cpu": "2", "memory": "4Gi"}
+    assert tmpl["timeout"] == "21600s"
+    assert tmpl["max_retries"] == 0
+    assert "template.template.containers[0].image" in _ignore_changes(call)
+    # on demand: nothing schedules it
+    assert not re.search(r'Job\(\s*"vocal-range-gen-scheduler', PULUMI.read_text())
+
+
+def test_vocal_range_job_image_is_pinned_by_ci() -> None:
+    steps = [s for s in _ci_steps() if "gcloud run jobs update vocal-range-gen" in s.get("run", "")]
+    assert len(steps) == 1
+    flags = _flags(_command_line(steps[0]["run"], "gcloud run jobs update vocal-range-gen"))
+    assert flags["--image"].endswith("/karaoke-decide-vocal:EXPR")
+    assert "::warning::" in steps[0]["run"]  # skipped, not failed, until Pulumi creates the job
+    build = [s for s in _ci_steps() if "Dockerfile.vocal-analysis" in s.get("run", "")]
+    assert len(build) == 1 and "karaoke-decide-vocal" in build[0]["run"]

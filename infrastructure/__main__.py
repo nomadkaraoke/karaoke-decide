@@ -1288,6 +1288,88 @@ gcp.monitoring.UptimeCheckConfig(
 # role is ever narrowed, add roles/storage.objectViewer BucketIAMMembers (with prefix
 # conditions) for {PROJECT_NUMBER}-compute@developer.gserviceaccount.com on both buckets.
 
+# =============================================================================
+# vocal-range-gen (on-demand Cloud Run Job, Phase 3c)
+# =============================================================================
+# Runs pyin over karaoke-gen jobs' separated vocals stems (word-timed windows) and
+# writes the "measured" tier CSVs. On demand only (no scheduler):
+#   gcloud run jobs execute vocal-range-gen --region us-central1 --tasks 10
+# No re-separation (gen's audio-separator is disabled); jobs whose stem was purged are
+# skipped. See karaoke_decide/etl/vocal_range_gen.py. CI pins the image
+# (karaoke-decide-vocal:<sha>) with `gcloud run jobs update` once this job exists.
+
+VOCAL_RANGE_JOB_NAME = "vocal-range-gen"
+GEN_STORAGE_BUCKET = "karaoke-gen-storage-nomadkaraoke"  # owned by karaoke-gen
+MUSICBRAINZ_DATA_BUCKET = "nomadkaraoke-musicbrainz-data"
+
+vocal_range_gen_sa = gcp.serviceaccount.Account(
+    "vocal-range-gen-sa",
+    account_id="vocal-range-gen",
+    display_name="Vocal Range Gen Job",
+    description="Reads karaoke-gen vocals stems + job docs, writes vocal-range/gen_measured/ CSVs",
+    project=project,
+)
+vocal_range_gen_member = vocal_range_gen_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+gcp.storage.BucketIAMMember(
+    "vocal-range-gen-gen-storage-reader",
+    bucket=GEN_STORAGE_BUCKET,
+    role="roles/storage.objectViewer",
+    member=vocal_range_gen_member,
+)
+# Firestore read of jobs/{id} (artist/title/tenant), via the project-level Datastore role.
+gcp.projects.IAMMember(
+    "vocal-range-gen-datastore-viewer",
+    project=project,
+    role="roles/datastore.viewer",
+    member=vocal_range_gen_member,
+)
+# Write (and list/read back for resume) only under vocal-range/gen_measured/. objectAdmin
+# is needed to overwrite the task's checkpointed part file (same prefix-condition pattern
+# as song-index-build's kn-data writer, which also lists under its prefix).
+gcp.storage.BucketIAMMember(
+    "vocal-range-gen-musicbrainz-data-writer",
+    bucket=MUSICBRAINZ_DATA_BUCKET,
+    role="roles/storage.objectAdmin",
+    member=vocal_range_gen_member,
+    condition={
+        "title": "vocal-range gen_measured prefix only",
+        "description": "vocal-range-gen may only write and read vocal-range/gen_measured/",
+        "expression": (
+            f'resource.name.startsWith("projects/_/buckets/{MUSICBRAINZ_DATA_BUCKET}/objects/vocal-range/gen_measured/")'
+        ),
+    },
+)
+
+vocal_range_gen_job = gcp.cloudrunv2.Job(
+    "vocal-range-gen-job",
+    name=VOCAL_RANGE_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "task_count": 10,
+        "parallelism": 10,
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide-vocal:latest",
+                    "commands": ["python", "-m", "karaoke_decide.etl.vocal_range_gen"],
+                    "args": ["run"],
+                    "resources": {"limits": {"cpu": "2", "memory": "4Gi"}},
+                }
+            ],
+            "service_account": vocal_range_gen_sa.email,
+            "timeout": "21600s",
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(
+        ignore_changes=["template.template.containers[0].image"],
+    ),
+)
+
 pulumi.export("song_index_public_bucket", song_index_public_bucket.name)
 
 # =============================================================================
