@@ -7,7 +7,7 @@
     python scripts/vocal_range/gemini_batch.py poll
     python scripts/vocal_range/gemini_batch.py collect
 
-Work files go in --work-dir (default: $VR_GEMINI_DIR or ./gemini_work), never in the repo.
+Work files go in --work-dir or $VR_GEMINI_DIR (required; refused if inside the repo).
 Uses GOOGLE_AI_STUDIO_KEY (Gemini Developer API; never Vertex, never GEMINI_API_KEY).
 BigQuery is read-only via ADC and every query has maximum_bytes_billed.
 """
@@ -33,9 +33,13 @@ from karaoke_decide.vocal_range.gemini import (  # noqa: E402
     BUDGET_USD,
     DEFAULT_MODEL,
     PRICES_PER_M,
+    SCHEMA_TOKENS,
     build_request,
+    check_estimate,
+    classify_result,
     estimate_cost,
-    parse_response,
+    requests_fingerprint,
+    resolve_work_dir,
 )
 
 P = "nomadkaraoke.karaoke_decide"
@@ -67,7 +71,10 @@ ORDER BY listeners DESC, karaoke_id
 
 
 def work_dir(args) -> Path:
-    d = Path(args.work_dir or os.environ.get("VR_GEMINI_DIR") or "gemini_work")
+    try:
+        d = resolve_work_dir(args.work_dir, dict(os.environ), REPO)
+    except ValueError as e:
+        sys.exit(str(e))
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -131,7 +138,7 @@ def cmd_prepare(args):
 
 def _estimate_one(client, model, line):
     # count_tokens rejects system_instruction on the Developer API: count it as leading content instead
-    # (same token total). The response schema's own tokens are measured separately (SCHEMA_TOKENS).
+    # (same token total). The response schema is not covered by count_tokens on this API, so SCHEMA_TOKENS is added.
     req = line["request"]
     text = req["system_instruction"]["parts"][0]["text"] + "\n" + req["contents"][0]["parts"][0]["text"]
     return client.models.count_tokens(model=model, contents=text).total_tokens
@@ -147,7 +154,7 @@ def cmd_estimate(args):
     sample = lines[:SAMPLE]
     client = genai_client()
     toks = [_estimate_one(client, model, ln) for ln in sample]
-    avg_in = sum(toks) / len(toks)
+    avg_in = sum(toks) / len(toks) + SCHEMA_TOKENS
     # Output: JSON with 4 notes, voice_type, confidence, unknown -> measured from the schema's typical answer.
     typical = json.dumps(
         {
@@ -166,6 +173,8 @@ def cmd_estimate(args):
     est = {
         "model": model,
         "n": len(lines),
+        "requests": requests_fingerprint(d / "requests.jsonl"),
+        "schema_tokens": SCHEMA_TOKENS,
         "avg_in": avg_in,
         "avg_out": avg_out,
         "prices_per_m": PRICES_PER_M[model],
@@ -185,9 +194,12 @@ def _count_text(client, model, text):
 
 def cmd_submit(args):
     d = work_dir(args)
-    est = json.loads((d / "estimate.json").read_text())
-    if est["model"] != args.model or est["cost"] * 1.5 > BUDGET_USD:
-        sys.exit("run `estimate` for this model first (and it must be within budget)")
+    try:
+        est = check_estimate(d / "estimate.json", d / "requests.jsonl", args.model)
+    except ValueError as e:
+        sys.exit(str(e))
+    if est["cost"] * 1.5 > BUDGET_USD:
+        sys.exit(f"estimate x 1.5 = ${est['cost'] * 1.5:.2f} exceeds budget ${BUDGET_USD:.2f}")
     from google.genai import types
 
     client = genai_client()
@@ -227,22 +239,16 @@ def cmd_collect(args):
     (d / "results.jsonl").write_bytes(raw)
     meta = {r["key"]: r for r in csv.DictReader(open(d / "meta.csv", encoding="utf-8"))}
     out = {"song": [], "artist": []}
-    unknown = total = 0
+    counts = {"ok": 0, "unknown": 0, "api_error": 0, "unparseable": 0}
     for line in raw.decode("utf-8").splitlines():
         r = json.loads(line)
         m = meta.get(r.get("key"))
         if not m:
             continue
-        total += 1
-        try:
-            text = r["response"]["candidates"][0]["content"]["parts"][0]["text"]
-        except (KeyError, IndexError, TypeError):
-            text = ""
-        p = parse_response(text)
-        if p is None:
-            unknown += 1
-            continue
-        out[m["kind"]].append({**{k: m[k] for k in ("kind", "key", "artist", "title", "pop_rank")}, **p})
+        status, p = classify_result(r)
+        counts[status] += 1
+        if p is not None:
+            out[m["kind"]].append({**{k: m[k] for k in ("kind", "key", "artist", "title", "pop_rank")}, **p})
     for kind in ("song", "artist"):
         path = REPO / "data" / "vocal_range" / f"gemini_{kind}s.csv.gz"
         with gzip.open(path, "wt", newline="", encoding="utf-8") as f:
@@ -250,7 +256,10 @@ def cmd_collect(args):
             w.writeheader()
             w.writerows(out[kind])
         print(path, len(out[kind]), f"{path.stat().st_size / 1e6:.2f} MB")
-    print(f"unknown/unparseable: {unknown}/{total} = {unknown / max(total, 1):.1%}")
+    total = max(sum(counts.values()), 1)
+    print(
+        f"results: {counts} (unknown rate {counts['unknown'] / total:.1%}, errors+unparseable {(counts['api_error'] + counts['unparseable']) / total:.1%})"
+    )
 
 
 def main():

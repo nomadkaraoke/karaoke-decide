@@ -106,3 +106,49 @@ def test_budget_and_prices():
 
 def test_default_model_has_a_price():
     assert DEFAULT_MODEL in PRICES_PER_M
+
+
+def test_resolve_work_dir(tmp_path):
+    from karaoke_decide.vocal_range.gemini import resolve_work_dir
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    out = tmp_path / "scratch"
+    assert resolve_work_dir(None, {"VR_GEMINI_DIR": str(out)}, repo) == out.resolve()
+    assert resolve_work_dir(str(out), {}, repo) == out.resolve()
+    with pytest.raises(ValueError, match="VR_GEMINI_DIR"):
+        resolve_work_dir(None, {}, repo)
+    with pytest.raises(ValueError, match="inside the repo"):
+        resolve_work_dir(str(repo / "gemini_work"), {}, repo)
+
+
+def test_check_estimate(tmp_path):
+    from karaoke_decide.vocal_range.gemini import check_estimate, requests_fingerprint
+
+    req = tmp_path / "requests.jsonl"
+    req.write_text('{"a":1}\n{"b":2}\n')
+    est_path = tmp_path / "estimate.json"
+    with pytest.raises(ValueError, match="missing"):
+        check_estimate(est_path, req, "m")
+    est_path.write_text(json.dumps({"model": "m", "requests": requests_fingerprint(req), "cost": 1}))
+    assert check_estimate(est_path, req, "m")["cost"] == 1
+    with pytest.raises(ValueError, match="model"):
+        check_estimate(est_path, req, "other")
+    req.write_text('{"a":1}\n{"b":3}\n')  # same line count, different content
+    with pytest.raises(ValueError, match="changed"):
+        check_estimate(est_path, req, "m")
+
+
+def _resp(text):
+    return {"key": "k", "response": {"candidates": [{"content": {"parts": [{"text": text}]}}]}}
+
+
+def test_classify_result():
+    from karaoke_decide.vocal_range.gemini import classify_result
+
+    assert classify_result(_resp(json.dumps(GOOD)))[0] == "ok"
+    assert classify_result(_resp(json.dumps({**GOOD, "unknown": True})))[0] == "unknown"
+    assert classify_result(_resp("not json"))[0] == "unparseable"
+    assert classify_result(_resp(json.dumps({**GOOD, "high_note": "H9"})))[0] == "unparseable"
+    assert classify_result({"key": "k", "error": {"code": 500}})[0] == "api_error"
+    assert classify_result({"key": "k", "response": {"candidates": []}})[0] == "api_error"

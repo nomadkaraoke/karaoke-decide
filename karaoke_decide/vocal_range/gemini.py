@@ -5,7 +5,9 @@ Prompts carry artist and title ONLY (never lyrics). Gemini Developer API (AI Stu
 
 from __future__ import annotations
 
+import hashlib
 import json
+from pathlib import Path
 from typing import Any, Literal
 
 from karaoke_decide.vocal_range.notes import VOICE_TYPES, note_name_to_midi
@@ -115,3 +117,65 @@ def estimate_cost(n: int, avg_in: float, avg_out: float, model: str) -> float:
         raise ValueError(f"no verified batch price for model {model!r}; add it to PRICES_PER_M")
     p_in, p_out = PRICES_PER_M[model]
     return n * (avg_in * p_in + avg_out * p_out) / 1e6
+
+
+# Tokens of the JSON response schema, counted as extra input per request (conservative upper bound:
+# count_tokens of json.dumps(RESPONSE_SCHEMA) = 232 on gemini-3.6-flash; a live A/B showed the billed
+# prompt_token_count was 129 with AND without the schema, so the true overhead is ~0).
+SCHEMA_TOKENS = 232
+
+
+def resolve_work_dir(arg: str | None, env: dict[str, str], repo: Path) -> Path:
+    """Work dir from --work-dir or $VR_GEMINI_DIR; never implicit, never inside the repo."""
+    raw = arg or env.get("VR_GEMINI_DIR")
+    if not raw:
+        raise ValueError("no work dir: pass --work-dir or set VR_GEMINI_DIR (outputs must not go in the repo)")
+    d = Path(raw).expanduser().resolve()
+    if d == repo.resolve() or repo.resolve() in d.parents:
+        raise ValueError(f"work dir {d} is inside the repo; use a scratch directory outside it")
+    return d
+
+
+def requests_fingerprint(path: Path) -> dict[str, Any]:
+    """Line count + sha256 of a requests.jsonl."""
+    h = hashlib.sha256()
+    n = 0
+    with open(path, "rb") as f:
+        for line in f:
+            h.update(line)
+            n += 1
+    return {"lines": n, "sha256": h.hexdigest()}
+
+
+def check_estimate(estimate_path: Path, requests_path: Path, model: str) -> dict[str, Any]:
+    """Load estimate.json and verify it belongs to the current requests.jsonl and model; ValueError if not."""
+    if not estimate_path.exists():
+        raise ValueError(f"{estimate_path} is missing: run `estimate` first")
+    est = json.loads(estimate_path.read_text())
+    if est.get("model") != model:
+        raise ValueError(f"estimate is for model {est.get('model')!r}, not {model!r}: re-run `estimate`")
+    if est.get("requests") != requests_fingerprint(requests_path):
+        raise ValueError("requests.jsonl changed since `estimate` (line count / sha256 mismatch): re-run `estimate`")
+    return est
+
+
+def classify_result(
+    line: dict[str, Any],
+) -> tuple[Literal["ok", "unknown", "api_error", "unparseable"], dict[str, Any] | None]:
+    """Classify one batch result line. 'unknown' = the model said it does not know the song/artist."""
+    if line.get("error") or "response" not in line:
+        return "api_error", None
+    try:
+        text = line["response"]["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError, TypeError):
+        return "api_error", None
+    parsed = parse_response(text)
+    if parsed is not None:
+        return "ok", parsed
+    try:
+        d = json.loads(text)
+    except (TypeError, ValueError):
+        return "unparseable", None
+    if isinstance(d, dict) and d.get("unknown") is True:
+        return "unknown", None
+    return "unparseable", None
