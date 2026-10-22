@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -184,3 +185,21 @@ async def test_client_429_and_status() -> None:
 
     with pytest.raises(ListenBrainzImportInProgressError):
         await _client_with(busy).submit_import("t", ZIP, "e.zip")
+
+
+@pytest.mark.asyncio
+async def test_status_check_error_does_not_block_upload(client: TestClient, db: FakeDb, lb: MagicMock) -> None:
+    await _connect(
+        db, lb_pending_import={"id": "41", "status": "waiting", "submitted_at": datetime.now(UTC).isoformat()}
+    )
+    lb.get_import_status.side_effect = ExternalServiceError("ListenBrainz", "API error: 404")
+    assert client.post(URL, files=FILES).status_code == 200
+    lb.submit_import.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_stale_pending_import_is_ignored(client: TestClient, db: FakeDb, lb: MagicMock) -> None:
+    old = (datetime.now(UTC) - timedelta(hours=7)).isoformat()
+    await _connect(db, lb_pending_import={"id": "41", "status": "waiting", "submitted_at": old})
+    assert client.post(URL, files=FILES).status_code == 200
+    lb.get_import_status.assert_not_awaited()

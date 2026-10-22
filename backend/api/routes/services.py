@@ -6,7 +6,7 @@ Handles OAuth flows, service connections, and sync operations.
 import html
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal, cast, get_args
 from urllib.parse import quote
 
@@ -599,6 +599,19 @@ LB_IMPORT_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
 _ZIP_MAGIC = b"PK\x03\x04"
 
 
+LB_PENDING_IMPORT_MAX_AGE = timedelta(hours=6)
+
+
+def _pending_import_blocks(pending: object) -> bool:
+    """Whether a stored pending import is recent and not known to be finished."""
+    if not isinstance(pending, dict) or not pending.get("id") or pending.get("status") in LB_IMPORT_TERMINAL_STATUSES:
+        return False
+    try:
+        return datetime.now(UTC) - datetime.fromisoformat(pending["submitted_at"]) < LB_PENDING_IMPORT_MAX_AGE
+    except (KeyError, TypeError, ValueError):
+        return True
+
+
 class ListenBrainzUploadResponse(BaseModel):
     import_id: str
     status: str
@@ -617,9 +630,11 @@ async def upload_listenbrainz_export(
     needs_reconnect / import_in_progress, 413 too_large, 400 not_a_zip, 429 rate_limited
     (Retry-After), 503 listenbrainz_unavailable.
     """
-    service = await music_service.get_service(user.id, "listenbrainz")
-    doc = await music_service.get_service_doc(user.id, "listenbrainz") or {}
-    if service is None or doc.get("auth") != "oauth":
+    doc = await music_service.get_service_doc(user.id, "listenbrainz")
+    if doc is None or doc.get("auth") != "oauth":
+        raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
+    service = music_service.service_from_doc(doc)
+    if not service.access_token:
         raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
 
     data = await file.read(LISTENBRAINZ_UPLOAD_MAX_BYTES + 1)
@@ -636,12 +651,14 @@ async def upload_listenbrainz_export(
     lb = music_service.listenbrainz
     pending = doc.get("lb_pending_import")
     try:
-        if isinstance(pending, dict) and pending.get("id") and pending.get("status") not in LB_IMPORT_TERMINAL_STATUSES:
+        if _pending_import_blocks(pending):
             try:
-                latest = (await lb.get_import_status(token, str(pending["id"]))).get("status") or pending.get("status")
-            except ExternalServiceError:
-                latest = pending.get("status")  # can't tell: assume it is still running
-            if latest not in LB_IMPORT_TERMINAL_STATUSES:
+                latest = (await lb.get_import_status(token, str(pending["id"]))).get("status")  # type: ignore[index]
+            except ExternalServiceError as e:
+                # Can't tell (404/401/429...): never block on it. LB's own "already in progress" 400 is the guard.
+                logger.warning("Could not check ListenBrainz import status for %s: %s", user.id, e)
+                latest = None
+            if latest and latest not in LB_IMPORT_TERMINAL_STATUSES:
                 raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
         filename = file.filename if (file.filename or "").lower().endswith(".zip") else "spotify-export.zip"
         import_id = await lb.submit_import(token, data, filename)
@@ -658,17 +675,7 @@ async def upload_listenbrainz_export(
         logger.warning("ListenBrainz export upload failed for %s: %s", user.id, e)
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "listenbrainz_unavailable")
 
-    await music_service.firestore.update_document(
-        music_service.SERVICES_COLLECTION,
-        service.id,
-        {
-            "lb_pending_import": {
-                "id": import_id,
-                "status": "waiting",
-                "submitted_at": datetime.now(UTC).isoformat(),
-            }
-        },
-    )
+    await music_service.set_pending_listenbrainz_import(user.id, import_id)
     return ListenBrainzUploadResponse(import_id=import_id, status="waiting")
 
 
