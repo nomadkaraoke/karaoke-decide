@@ -82,7 +82,8 @@ test.describe("Production Comprehensive E2E Tests", () => {
       }
     });
 
-    test("complete magic link login flow", async ({ page }) => {
+    // Superseded by e2e/gen-signin.spec.ts (login is now gen's email-code flow)
+    test.skip("complete magic link login flow", async ({ page }) => {
       // Generate a unique tag for this test
       const tag = generateTestTag();
       const testEmail = getEmailAddress(testMailClient!.namespace, tag);

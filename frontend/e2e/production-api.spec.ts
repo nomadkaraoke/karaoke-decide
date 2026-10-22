@@ -183,13 +183,13 @@ test.describe("Frontend-API Integration", () => {
     await expect(emailInput).toBeVisible({ timeout: 10000 });
     await emailInput.fill("e2e-integration-test@example.com");
 
-    // Submit the form - use the specific "Send Magic Link" button
-    const submitButton = page.getByRole("button", { name: /send magic link/i });
+    // Submit the form - use the "Email me a code" button
+    const submitButton = page.getByTestId("login-send-code");
     await expect(submitButton).toBeVisible();
     await submitButton.click();
 
     // Should show success message (API is working)
-    await expect(page.getByRole("heading", { name: /check your email/i })).toBeVisible({
+    await expect(page.getByRole("heading", { name: /enter your code/i })).toBeVisible({
       timeout: 10000,
     });
   });

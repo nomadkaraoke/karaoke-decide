@@ -9,6 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { api, getAuthToken, setAuthToken, clearAuthToken } from "@/lib/api";
+import * as genAuth from "@/lib/genAuth";
 
 interface User {
   id: string;
@@ -30,8 +31,6 @@ interface AuthContextType {
   login: (token: string) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
-  startGuestSession: () => Promise<void>;
-  requestUpgrade: (email: string) => Promise<void>;
   refreshQuizStatus: () => Promise<void>;
 }
 
@@ -95,8 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const token = getAuthToken();
     try {
-      await api.auth.logout();
+      // Revoke the gen session (a legacy decide JWT has nothing to revoke)
+      if (token && !token.includes(".")) await genAuth.logout(token);
     } catch {
       // Ignore errors on logout
     } finally {
@@ -104,22 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setHasCompletedQuiz(false);
     }
-  }, []);
-
-  const startGuestSession = useCallback(async () => {
-    try {
-      const response = await api.auth.createGuestSession();
-      setAuthToken(response.access_token);
-      await checkAuth();
-    } catch (error) {
-      console.error("Failed to create guest session:", error);
-      throw error;
-    }
-  }, [checkAuth]);
-
-  const requestUpgrade = useCallback(async (email: string) => {
-    await api.auth.upgradeGuest(email);
-    // Email sent - user needs to click link to verify
   }, []);
 
   // Check auth on mount
@@ -157,8 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         checkAuth,
-        startGuestSession,
-        requestUpgrade,
         refreshQuizStatus,
       }}
     >

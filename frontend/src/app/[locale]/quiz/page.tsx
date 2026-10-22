@@ -138,7 +138,6 @@ export default function QuizPage() {
     isLoading: authLoading,
     hasCompletedQuiz,
     quizStatusLoading,
-    startGuestSession,
     refreshQuizStatus,
   } = useAuth();
 
@@ -316,20 +315,12 @@ export default function QuizPage() {
     }
   }, [selectedGenres, selectedDecades]);
 
-  // Create guest session if not authenticated
+  // Quiz needs a Nomad Karaoke account: sign in, then come back
   useEffect(() => {
-    const initSession = async () => {
-      if (!authLoading && !isAuthenticated) {
-        try {
-          await startGuestSession();
-        } catch (err) {
-          console.error("Failed to create guest session:", err);
-          setError(t("failedToStartQuiz"));
-        }
-      }
-    };
-    initSession();
-  }, [authLoading, isAuthenticated, startGuestSession]);
+    if (!authLoading && !isAuthenticated) {
+      router.push("/login?next=/quiz");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   // Redirect users who have already completed the quiz
   // But not if we're on step 6 (email collection + generating)

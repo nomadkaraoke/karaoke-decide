@@ -3,11 +3,14 @@
  */
 
 import { API_BASE_URL, AUTH_TOKEN_KEY } from "./constants";
+import { routing } from "@/i18n/routing";
 
-function getCurrentLocale(): string {
+export function getCurrentLocale(): string {
   if (typeof window === 'undefined') return 'en';
-  const match = window.location.pathname.match(/^\/(en|es|de)\//);
-  return match ? match[1] : 'en';
+  const match = window.location.pathname.match(/^\/([a-z]{2})(?:\/|$)/);
+  return match && (routing.locales as readonly string[]).includes(match[1])
+    ? match[1]
+    : 'en';
 }
 
 export class ApiError extends Error {
@@ -157,23 +160,6 @@ export const api = {
   // ============================================================================
 
   auth: {
-    requestMagicLink: (email: string) =>
-      api.post<{ message: string }>("/api/auth/magic-link", { email }),
-
-    verifyToken: (token: string) =>
-      api.post<{ access_token: string; token_type: string; expires_in: number }>(
-        "/api/auth/verify",
-        { token }
-      ),
-
-    createGuestSession: () =>
-      api.post<{ access_token: string; token_type: string; expires_in: number }>(
-        "/api/auth/guest"
-      ),
-
-    upgradeGuest: (email: string) =>
-      api.post<{ message: string }>("/api/auth/upgrade", { email }),
-
     collectEmail: (email: string) =>
       api.post<{ message: string; user_id: string }>("/api/auth/collect-email", { email }),
 
@@ -197,7 +183,6 @@ export const api = {
         body: JSON.stringify(data),
       }),
 
-    logout: () => api.post<{ message: string }>("/api/auth/logout"),
   },
 
   // ============================================================================
