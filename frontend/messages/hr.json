@@ -730,7 +730,8 @@
       "failedToStartSync": "Pokretanje sinkronizacije nije uspjelo",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Poveži Apple Music",
-      "reconnectAppleMusic": "Ponovno poveži Apple Music"
+      "reconnectAppleMusic": "Ponovno poveži Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music treba ponovno povezati kako bi tvoji odabiri bili ažurni."
     },
     "myDataPreferences": {
       "title": "Preferencije",
@@ -925,6 +926,7 @@
     "signIn": "Prijavi se",
     "signedOut": "Najprije se prijavi na Nomad Karaoke, a zatim poveži Apple Music.",
     "title": "Poveži Apple Music",
-    "unavailable": "Apple Music trenutačno nije dostupan. Pokušaj ponovno kasnije."
+    "unavailable": "Apple Music trenutačno nije dostupan. Pokušaj ponovno kasnije.",
+    "account": "Povezivanje s Nomad Karaoke računom {account}. Nisi to ti? Zatvori ovu stranicu."
   }
 }

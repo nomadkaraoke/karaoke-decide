@@ -730,7 +730,8 @@
       "failedToStartSync": "เริ่มการซิงค์ไม่สำเร็จ",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "เชื่อมต่อ Apple Music",
-      "reconnectAppleMusic": "เชื่อมต่อ Apple Music อีกครั้ง"
+      "reconnectAppleMusic": "เชื่อมต่อ Apple Music อีกครั้ง",
+      "appleMusicNeedsReconnect": "โปรดเชื่อมต่อ Apple Music ใหม่อีกครั้งเพื่อให้รายการเพลงที่คุณเลือกอัปเดตอยู่เสมอ"
     },
     "myDataPreferences": {
       "title": "ความชอบ",
@@ -925,6 +926,7 @@
     "signIn": "ลงชื่อเข้าใช้",
     "signedOut": "ลงชื่อเข้าใช้ Nomad Karaoke ก่อน แล้วจึงเชื่อมต่อ Apple Music",
     "title": "เชื่อมต่อ Apple Music",
-    "unavailable": "Apple Music ยังไม่พร้อมใช้งานในขณะนี้ โปรดลองอีกครั้งในภายหลัง"
+    "unavailable": "Apple Music ยังไม่พร้อมใช้งานในขณะนี้ โปรดลองอีกครั้งในภายหลัง",
+    "account": "กำลังเชื่อมต่อไปยังบัญชี Nomad Karaoke {account} หากไม่ใช่คุณ ให้ปิดหน้านี้"
   }
 }

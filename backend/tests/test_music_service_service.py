@@ -621,3 +621,44 @@ class TestAppleMusicService:
 
         assert service.apple_music is service.apple_music
         assert service.apple_music_signer.configured is False
+
+
+class TestPeekOAuthState:
+    """peek_oauth_state reads a hand-off link without consuming it."""
+
+    async def test_valid_state(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
+        mock_firestore.get_document = AsyncMock(
+            return_value={
+                "user_id": "user_1",
+                "service_type": "apple_music",
+                "account_hint": "a•••@example.com",
+                "expires_at": (datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
+            }
+        )
+
+        assert await service.peek_oauth_state("s") == {
+            "user_id": "user_1",
+            "service_type": "apple_music",
+            "account_hint": "a•••@example.com",
+        }
+        mock_firestore.delete_document.assert_not_called()
+
+    async def test_expired_or_missing(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
+        mock_firestore.get_document = AsyncMock(
+            return_value={
+                "user_id": "user_1",
+                "service_type": "apple_music",
+                "expires_at": (datetime.now(UTC) - timedelta(minutes=1)).isoformat(),
+            }
+        )
+        assert await service.peek_oauth_state("s") is None
+
+        mock_firestore.get_document = AsyncMock(return_value=None)
+        assert await service.peek_oauth_state("s") is None
+
+    async def test_create_stores_the_account_hint(
+        self, service: MusicServiceService, mock_firestore: MagicMock
+    ) -> None:
+        await service.create_oauth_state("user_1", "apple_music", account_hint="a•••@example.com")
+
+        assert mock_firestore.set_document.call_args.args[2]["account_hint"] == "a•••@example.com"

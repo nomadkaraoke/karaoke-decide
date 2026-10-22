@@ -813,6 +813,16 @@ export const api = {
     appleMusicDeveloperToken: () =>
       api.get<{ developer_token: string; expires_at: number }>("/api/services/apple-music/developer-token"),
 
+    /** The masked account a hand-off link connects to, or null when the link has expired (404). */
+    appleMusicLinkAccount: async (state: string): Promise<{ account: string | null } | null> => {
+      const response = await fetch(
+        `${API_BASE_URL}/api/services/apple-music/link-info?state=${encodeURIComponent(state)}`,
+      );
+      if (response.status === 404) return null;
+      if (!response.ok) throw new ApiError(response.status, `API error: ${response.status}`);
+      return (await response.json()) as { account: string | null };
+    },
+
     /**
      * Connect Apple Music with the Music User Token MusicKit JS returned. With `state` (the
      * app's one-time link) no decide sign-in is needed. Plain fetch, so a 401 (expired link,

@@ -730,7 +730,8 @@
       "failedToStartSync": "Gagal memulakan segerak",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Sambungkan Apple Music",
-      "reconnectAppleMusic": "Sambung Semula Apple Music"
+      "reconnectAppleMusic": "Sambung Semula Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music perlu disambungkan semula untuk memastikan pilihan lagu anda sentiasa terkini."
     },
     "myDataPreferences": {
       "title": "Keutamaan",
@@ -925,6 +926,7 @@
     "signIn": "Log masuk",
     "signedOut": "Log masuk ke Nomad Karaoke terlebih dahulu, kemudian sambungkan Apple Music.",
     "title": "Sambungkan Apple Music",
-    "unavailable": "Apple Music tidak tersedia buat masa ini. Sila cuba sebentar lagi."
+    "unavailable": "Apple Music tidak tersedia buat masa ini. Sila cuba sebentar lagi.",
+    "account": "Menyambung ke akaun Nomad Karaoke {account}. Bukan anda? Tutup halaman ini."
   }
 }

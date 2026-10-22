@@ -730,7 +730,8 @@
       "failedToStartSync": "Không thể bắt đầu đồng bộ",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Kết nối Apple Music",
-      "reconnectAppleMusic": "Kết nối lại Apple Music"
+      "reconnectAppleMusic": "Kết nối lại Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music cần được kết nối lại để luôn cập nhật các bài hát bạn chọn."
     },
     "myDataPreferences": {
       "title": "Sở thích",
@@ -925,6 +926,7 @@
     "signIn": "Đăng nhập",
     "signedOut": "Vui lòng đăng nhập Nomad Karaoke trước, sau đó kết nối Apple Music.",
     "title": "Kết nối Apple Music",
-    "unavailable": "Apple Music hiện không khả dụng. Vui lòng thử lại sau."
+    "unavailable": "Apple Music hiện không khả dụng. Vui lòng thử lại sau.",
+    "account": "Đang kết nối với tài khoản Nomad Karaoke {account}. Không phải bạn? Hãy đóng trang này."
   }
 }

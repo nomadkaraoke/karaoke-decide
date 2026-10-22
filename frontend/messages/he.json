@@ -730,7 +730,8 @@
       "failedToStartSync": "הפעלת הסנכרון נכשלה",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "חיבור ל-Apple Music",
-      "reconnectAppleMusic": "חיבור מחדש של Apple Music"
+      "reconnectAppleMusic": "חיבור מחדש של Apple Music",
+      "appleMusicNeedsReconnect": "יש לחבר מחדש את Apple Music כדי לשמור על השירים שבחרתם מעודכנים."
     },
     "myDataPreferences": {
       "title": "העדפות",
@@ -925,6 +926,7 @@
     "signIn": "התחברות",
     "signedOut": "התחברו תחילה ל-Nomad Karaoke, ואז חברו את Apple Music.",
     "title": "חיבור ל-Apple Music",
-    "unavailable": "Apple Music אינו זמין כרגע. נסו שוב מאוחר יותר."
+    "unavailable": "Apple Music אינו זמין כרגע. נסו שוב מאוחר יותר.",
+    "account": "מתחבר לחשבון Nomad Karaoke של {account}. זה לא החשבון שלכם? סגרו את הדף הזה."
   }
 }

@@ -730,7 +730,8 @@
       "failedToStartSync": "Nepodařilo se spustit synchronizaci",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Připojit Apple Music",
-      "reconnectAppleMusic": "Znovu připojit Apple Music"
+      "reconnectAppleMusic": "Znovu připojit Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music je potřeba znovu připojit, aby byly tvoje výběry aktuální."
     },
     "myDataPreferences": {
       "title": "Preference",
@@ -925,6 +926,7 @@
     "signIn": "Přihlásit se",
     "signedOut": "Nejprve se přihlas k Nomad Karaoke, potom připoj Apple Music.",
     "title": "Připojit Apple Music",
-    "unavailable": "Apple Music momentálně není k dispozici. Zkus to prosím znovu později."
+    "unavailable": "Apple Music momentálně není k dispozici. Zkus to prosím znovu později.",
+    "account": "Připojování k Nomad Karaoke účtu {account}. Nejsi to ty? Zavři tuto stránku."
   }
 }

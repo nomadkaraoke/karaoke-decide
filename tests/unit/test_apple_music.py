@@ -126,6 +126,28 @@ class TestAppleMusicClient:
         assert len(tracks) == 101
         assert tracks[-1].artist == "Last" and tracks[-1].duration_ms == 200_000
 
+    async def test_short_page_with_next_keeps_reading(self, ec_key: ec.EllipticCurvePrivateKey) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.params["offset"] == "0":
+                songs = [_song(f"A{i}", f"S{i}", kind="songs") for i in range(28)]  # Apple sometimes returns 28 of 30
+                return httpx.Response(200, json={"data": songs, "next": "more"})
+            return httpx.Response(200, json={"data": [_song("B", "Last", kind="songs")]})
+
+        tracks = await _client(ec_key, handler).get_recent_tracks("t")
+
+        assert len(tracks) == 29
+
+    async def test_empty_page_stops_even_with_next(self, ec_key: ec.EllipticCurvePrivateKey) -> None:
+        calls = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            return httpx.Response(200, json={"data": [], "next": "more"})
+
+        assert await _client(ec_key, handler).get_library_songs("t") == []
+        assert calls == 1
+
     async def test_respects_limit(self, ec_key: ec.EllipticCurvePrivateKey) -> None:
         def handler(request: httpx.Request) -> httpx.Response:
             songs = [_song(f"A{i}", f"S{i}", kind="songs") for i in range(30)]

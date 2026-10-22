@@ -730,7 +730,8 @@
       "failedToStartSync": "Failed to start sync",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Connect Apple Music",
-      "reconnectAppleMusic": "Reconnect Apple Music"
+      "reconnectAppleMusic": "Reconnect Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music needs reconnecting to keep your picks up to date."
     },
     "myDataPreferences": {
       "title": "Preferences",
@@ -925,6 +926,7 @@
     "unavailable": "Apple Music isn't available right now. Please try again later.",
     "cancelled": "Apple Music sign-in was cancelled. Tap Connect to try again.",
     "error": "Something went wrong connecting Apple Music. Please try again.",
-    "privacy": "We only read your library and listening history. We never play, change or share anything."
+    "privacy": "We only read your library and listening history. We never play, change or share anything.",
+    "account": "Connecting to the Nomad Karaoke account {account}. Not you? Close this page."
   }
 }

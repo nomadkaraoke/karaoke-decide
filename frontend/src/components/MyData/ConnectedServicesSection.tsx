@@ -462,8 +462,8 @@ export function ConnectedServicesSection({
                   </div>
                   <div className="flex-1">
                     <h3 className="font-medium text-[var(--text)]">{t('appleMusic')}</h3>
-                    {appleMusic?.sync_error ? (
-                      <p className="text-xs text-[var(--error)]">{appleMusic.sync_error}</p>
+                    {appleMusic?.sync_status === "error" ? (
+                      <p className="text-xs text-[var(--error)]">{t('appleMusicNeedsReconnect')}</p>
                     ) : null}
                   </div>
                   {appleMusicConnected ? (

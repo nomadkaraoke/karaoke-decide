@@ -730,7 +730,8 @@
       "failedToStartSync": "Αποτυχία έναρξης συγχρονισμού",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Σύνδεση Apple Music",
-      "reconnectAppleMusic": "Επανασύνδεση Apple Music"
+      "reconnectAppleMusic": "Επανασύνδεση Apple Music",
+      "appleMusicNeedsReconnect": "Το Apple Music χρειάζεται επανασύνδεση για να παραμένουν οι επιλογές σου ενημερωμένες."
     },
     "myDataPreferences": {
       "title": "Προτιμήσεις",
@@ -925,6 +926,7 @@
     "signIn": "Σύνδεση",
     "signedOut": "Συνδέσου πρώτα στο Nomad Karaoke και μετά σύνδεσε το Apple Music.",
     "title": "Σύνδεση Apple Music",
-    "unavailable": "Το Apple Music δεν είναι διαθέσιμο αυτή τη στιγμή. Δοκίμασε ξανά αργότερα."
+    "unavailable": "Το Apple Music δεν είναι διαθέσιμο αυτή τη στιγμή. Δοκίμασε ξανά αργότερα.",
+    "account": "Σύνδεση στον λογαριασμό {account} του Nomad Karaoke. Δεν είσαι εσύ; Κλείσε αυτή τη σελίδα."
   }
 }

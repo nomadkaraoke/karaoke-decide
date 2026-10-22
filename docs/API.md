@@ -696,8 +696,12 @@ service `error` with "reconnect". Keys: Secret Manager `apple-musickit-private-k
   one-time `state` (10 min) in `connect_url` (`{FRONTEND_URL}/{locale}/connect/apple-music?state=…&return=app`),
   so the page works in an in-app browser that isn't signed in to decide. The page returns to
   `nomadkaraoke://music-connected?service=apple_music`.
+- `GET /api/services/apple-music/link-info?state=` (public) → `{account}`: the link owner's masked
+  email (`a•••@example.com`), shown on the page so a forwarded link can't take your music. 404 when
+  expired. Doesn't consume the state.
 - `POST /api/services/apple-music/connect` `{music_user_token, state?}` → `{service, sync_job_id}`.
-  Signed in, or with `state` from `/link` (consumed). Checks the token against Apple
+  Signed in, or with `state` from `/link` (consumed only after Apple accepts the token, so a refused
+  attempt can be retried). Checks the token against Apple
   (`/v1/me/storefront`), stores it and starts a sync job. 401 no user / bad or expired state; 422
   Apple refused the token; 503 not configured. `sync_job_id` is null if the job couldn't be queued.
 

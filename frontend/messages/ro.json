@@ -730,7 +730,8 @@
       "failedToStartSync": "Pornirea sincronizării a eșuat",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Conectează Apple Music",
-      "reconnectAppleMusic": "Reconectează Apple Music"
+      "reconnectAppleMusic": "Reconectează Apple Music",
+      "appleMusicNeedsReconnect": "Apple Music trebuie reconectat pentru a-ți păstra selecțiile la zi."
     },
     "myDataPreferences": {
       "title": "Preferințe",
@@ -925,6 +926,7 @@
     "signIn": "Conectează-te",
     "signedOut": "Conectează-te mai întâi la Nomad Karaoke, apoi conectează Apple Music.",
     "title": "Conectează Apple Music",
-    "unavailable": "Apple Music nu este disponibil acum. Te rugăm să încerci din nou mai târziu."
+    "unavailable": "Apple Music nu este disponibil acum. Te rugăm să încerci din nou mai târziu.",
+    "account": "Se conectează la contul Nomad Karaoke {account}. Nu ești tu? Închide această pagină."
   }
 }

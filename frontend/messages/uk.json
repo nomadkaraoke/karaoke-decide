@@ -730,7 +730,8 @@
       "failedToStartSync": "Не вдалося розпочати синхронізацію",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Підключити Apple Music",
-      "reconnectAppleMusic": "Повторно підключити Apple Music"
+      "reconnectAppleMusic": "Повторно підключити Apple Music",
+      "appleMusicNeedsReconnect": "Потрібно знову підключити Apple Music, щоб твої збережені пісні залишалися актуальними."
     },
     "myDataPreferences": {
       "title": "Вподобання",
@@ -925,6 +926,7 @@
     "signIn": "Увійти",
     "signedOut": "Спершу увійди в Nomad Karaoke, а потім підключи Apple Music.",
     "title": "Підключити Apple Music",
-    "unavailable": "Apple Music зараз недоступний. Будь ласка, спробуй пізніше."
+    "unavailable": "Apple Music зараз недоступний. Будь ласка, спробуй пізніше.",
+    "account": "Підключення до акаунта Nomad Karaoke {account}. Це не ти? Закрий цю сторінку."
   }
 }

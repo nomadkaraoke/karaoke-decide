@@ -730,7 +730,8 @@
       "failedToStartSync": "同期の開始に失敗しました",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Apple Musicに接続",
-      "reconnectAppleMusic": "Apple Musicに再接続"
+      "reconnectAppleMusic": "Apple Musicに再接続",
+      "appleMusicNeedsReconnect": "選択した曲を最新の状態に保つには、Apple Musicへの再接続が必要です。"
     },
     "myDataPreferences": {
       "title": "好み",
@@ -925,6 +926,7 @@
     "signIn": "サインイン",
     "signedOut": "まずNomad Karaokeにサインインしてから、Apple Musicを接続してください。",
     "title": "Apple Musicに接続",
-    "unavailable": "現在Apple Musicをご利用いただけません。後でもう一度お試しください。"
+    "unavailable": "現在Apple Musicをご利用いただけません。後でもう一度お試しください。",
+    "account": "Nomad Karaokeアカウント（{account}）に接続しています。ご自身のアカウントではない場合は、このページを閉じてください。"
   }
 }

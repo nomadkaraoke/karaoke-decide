@@ -730,7 +730,8 @@
       "failedToStartSync": "Senkronizasyon başlatılamadı",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Apple Music'i Bağla",
-      "reconnectAppleMusic": "Apple Music'i Yeniden Bağla"
+      "reconnectAppleMusic": "Apple Music'i Yeniden Bağla",
+      "appleMusicNeedsReconnect": "Seçimlerini güncel tutmak için Apple Music'e yeniden bağlanman gerekiyor."
     },
     "myDataPreferences": {
       "title": "Tercihler",
@@ -925,6 +926,7 @@
     "signIn": "Giriş yap",
     "signedOut": "Önce Nomad Karaoke'ye giriş yap, ardından Apple Music'i bağla.",
     "title": "Apple Music'i Bağla",
-    "unavailable": "Apple Music şu anda kullanılamıyor. Lütfen daha sonra tekrar dene."
+    "unavailable": "Apple Music şu anda kullanılamıyor. Lütfen daha sonra tekrar dene.",
+    "account": "{account} Nomad Karaoke hesabına bağlanılıyor. Sen değil misin? Bu sayfayı kapatabilirsin."
   }
 }

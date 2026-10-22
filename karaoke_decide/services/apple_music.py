@@ -135,7 +135,8 @@ class AppleMusicClient:
             body = await self._get(path, user_token, {"limit": page_size, "offset": offset})
             items = body.get("data") or []
             tracks.extend(t for t in (_to_track(item) for item in items) if t is not None)
-            if len(items) < page_size or not body.get("next"):
+            # Follow Apple's `next` link: pages can come back short with more still to read.
+            if not items or not body.get("next"):
                 break
             offset += page_size
         return tracks[:limit]

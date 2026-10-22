@@ -730,7 +730,8 @@
       "failedToStartSync": "Nem sikerült elindítani a szinkronizálást",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Apple Music csatlakoztatása",
-      "reconnectAppleMusic": "Apple Music újracsatlakoztatása"
+      "reconnectAppleMusic": "Apple Music újracsatlakoztatása",
+      "appleMusicNeedsReconnect": "Az Apple Musicot újra össze kell kapcsolni, hogy a kiválasztott dalaid mindig naprakészek legyenek."
     },
     "myDataPreferences": {
       "title": "Preferenciák",
@@ -925,6 +926,7 @@
     "signIn": "Bejelentkezés",
     "signedOut": "Először jelentkezz be a Nomad Karaoke-ba, majd csatlakoztasd az Apple Musicot.",
     "title": "Apple Music csatlakoztatása",
-    "unavailable": "Az Apple Music jelenleg nem érhető el. Kérjük, próbáld újra később."
+    "unavailable": "Az Apple Music jelenleg nem érhető el. Kérjük, próbáld újra később.",
+    "account": "Csatlakozás a(z) {account} Nomad Karaoke fiókhoz. Nem te vagy az? Zárd be ezt az oldalt."
   }
 }

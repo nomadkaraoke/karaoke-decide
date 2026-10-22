@@ -32,6 +32,7 @@ function ConnectAppleMusic() {
   const state = params.get("state");
   const fromApp = params.get("return") === "app";
   const [phase, setPhase] = useState<Phase>("loading");
+  const [account, setAccount] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +42,15 @@ function ConnectAppleMusic() {
         return;
       }
       try {
+        if (state) {
+          // Show whose account this link connects to, so a forwarded link can't take your music.
+          const link = await api.services.appleMusicLinkAccount(state);
+          if (!link) {
+            if (!cancelled) setPhase("expired");
+            return;
+          }
+          if (!cancelled) setAccount(link.account);
+        }
         const { developer_token } = await api.services.appleMusicDeveloperToken();
         await loadMusicKit(developer_token);
         if (!cancelled) setPhase("ready");
@@ -122,6 +132,11 @@ function ConnectAppleMusic() {
         ) : (
           <>
             <p className="text-[var(--text-muted)]">{t("intro")}</p>
+            {account && (
+              <p className="text-sm text-[var(--text)]" data-testid="apple-music-account">
+                {t("account", { account })}
+              </p>
+            )}
             {message[phase] && (
               <p
                 className="p-3 rounded-xl bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm"

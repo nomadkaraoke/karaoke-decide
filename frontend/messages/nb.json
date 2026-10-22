@@ -730,7 +730,8 @@
       "failedToStartSync": "Kunne ikke starte synkronisering",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Koble til Apple Music",
-      "reconnectAppleMusic": "Koble til Apple Music på nytt"
+      "reconnectAppleMusic": "Koble til Apple Music på nytt",
+      "appleMusicNeedsReconnect": "Apple Music må kobles til på nytt for å holde valgene dine oppdatert."
     },
     "myDataPreferences": {
       "title": "Preferanser",
@@ -925,6 +926,7 @@
     "signIn": "Logg på",
     "signedOut": "Logg inn på Nomad Karaoke først, og koble deretter til Apple Music.",
     "title": "Koble til Apple Music",
-    "unavailable": "Apple Music er ikke tilgjengelig akkurat nå. Prøv igjen senere."
+    "unavailable": "Apple Music er ikke tilgjengelig akkurat nå. Prøv igjen senere.",
+    "account": "Kobler til Nomad Karaoke-kontoen {account}. Ikke deg? Lukk denne siden."
   }
 }

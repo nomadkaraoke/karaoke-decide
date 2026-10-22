@@ -730,7 +730,8 @@
       "failedToStartSync": "동기화를 시작하지 못했습니다",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Apple Music 연결",
-      "reconnectAppleMusic": "Apple Music 다시 연결"
+      "reconnectAppleMusic": "Apple Music 다시 연결",
+      "appleMusicNeedsReconnect": "선곡 목록을 최신 상태로 유지하려면 Apple Music을 다시 연결해 주세요."
     },
     "myDataPreferences": {
       "title": "환경설정",
@@ -925,6 +926,7 @@
     "signIn": "로그인",
     "signedOut": "먼저 Nomad Karaoke에 로그인한 후 Apple Music을 연결해 주세요.",
     "title": "Apple Music 연결",
-    "unavailable": "지금은 Apple Music을 이용할 수 없습니다. 나중에 다시 시도해 주세요."
+    "unavailable": "지금은 Apple Music을 이용할 수 없습니다. 나중에 다시 시도해 주세요.",
+    "account": "Nomad Karaoke 계정 {account}에 연결 중입니다. 본인의 계정이 아닌가요? 이 페이지를 닫아주세요."
   }
 }

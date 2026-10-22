@@ -461,6 +461,10 @@ REQUIRED_SECRETS = [
     "spotipy-client-secret",
     "lastfm-api-key",
     "postmark-server-token",
+    # Apple MusicKit (Apple Music connect), created by hand 2026-10-22 from the Apple Developer account.
+    "apple-musickit-private-key",
+    "apple-musickit-key-id",
+    "apple-team-id",
     # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 

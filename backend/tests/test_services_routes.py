@@ -616,7 +616,29 @@ class TestAppleMusic:
             "connect_url": "http://localhost:3000/de/connect/apple-music?state=test-oauth-state&return=app",
             "expires_in": 600,
         }
-        mock_music_service_service.create_oauth_state.assert_called_once_with("user_test123", "apple_music")
+        mock_music_service_service.create_oauth_state.assert_called_once_with(
+            "user_test123", "apple_music", account_hint="t•••@example.com"
+        )
+
+    def test_link_info_shows_the_masked_account(
+        self, auth_client: TestClient, mock_music_service_service: MagicMock
+    ) -> None:
+        mock_music_service_service.peek_oauth_state = AsyncMock(
+            return_value={"user_id": "u", "service_type": "apple_music", "account_hint": "t•••@example.com"}
+        )
+
+        response = auth_client.get("/api/services/apple-music/link-info", params={"state": "s"})
+
+        assert response.status_code == 200
+        assert response.json() == {"account": "t•••@example.com"}
+
+    @pytest.mark.parametrize("link", [None, {"user_id": "u", "service_type": "spotify", "account_hint": None}])
+    def test_link_info_404_for_expired_or_other_links(
+        self, auth_client: TestClient, mock_music_service_service: MagicMock, link: dict | None
+    ) -> None:
+        mock_music_service_service.peek_oauth_state = AsyncMock(return_value=link)
+
+        assert auth_client.get("/api/services/apple-music/link-info", params={"state": "s"}).status_code == 404
 
     def test_link_requires_auth(self, auth_client: TestClient) -> None:
         assert auth_client.post("/api/services/apple-music/link").status_code in (401, 403)
@@ -650,8 +672,8 @@ class TestAppleMusic:
         mock_music_service_service: MagicMock,
         sample_apple_music_service: MusicService,
     ) -> None:
-        mock_music_service_service.verify_oauth_state = AsyncMock(
-            return_value={"user_id": "user_from_link", "service_type": "apple_music"}
+        mock_music_service_service.peek_oauth_state = AsyncMock(
+            return_value={"user_id": "user_from_link", "service_type": "apple_music", "account_hint": None}
         )
         mock_music_service_service.create_apple_music_service = AsyncMock(return_value=sample_apple_music_service)
 
@@ -660,14 +682,29 @@ class TestAppleMusic:
         )
 
         assert response.status_code == 200
-        mock_music_service_service.verify_oauth_state.assert_called_once_with("link-state")
         mock_music_service_service.create_apple_music_service.assert_called_once_with("user_from_link", "mut")
+        mock_music_service_service.verify_oauth_state.assert_called_once_with("link-state")  # consumed
+
+    def test_refused_token_keeps_the_link_for_a_retry(
+        self, auth_client: TestClient, mock_music_service_service: MagicMock
+    ) -> None:
+        mock_music_service_service.peek_oauth_state = AsyncMock(
+            return_value={"user_id": "user_from_link", "service_type": "apple_music", "account_hint": None}
+        )
+        mock_music_service_service.create_apple_music_service = AsyncMock(side_effect=ValidationError("refused"))
+
+        response = auth_client.post(
+            "/api/services/apple-music/connect", json={"music_user_token": "bad", "state": "link-state"}
+        )
+
+        assert response.status_code == 422
+        mock_music_service_service.verify_oauth_state.assert_not_called()
 
     @pytest.mark.parametrize("link", [None, {"user_id": "u", "service_type": "spotify"}])
     def test_connect_rejects_bad_state(
         self, auth_client: TestClient, mock_music_service_service: MagicMock, link: dict | None
     ) -> None:
-        mock_music_service_service.verify_oauth_state = AsyncMock(return_value=link)
+        mock_music_service_service.peek_oauth_state = AsyncMock(return_value=link)
         mock_music_service_service.create_apple_music_service = AsyncMock()
 
         response = auth_client.post("/api/services/apple-music/connect", json={"music_user_token": "m", "state": "s"})
@@ -713,3 +750,13 @@ class TestAppleMusic:
 
         assert response.status_code == 200
         mock_music_service_service.delete_service.assert_called_once_with("user_test123", "apple_music")
+
+
+@pytest.mark.parametrize(
+    ("email", "masked"),
+    [("andrew@example.com", "a•••@example.com"), ("x@y.z", "x•••@y.z"), (None, None), ("not-an-email", None)],
+)
+def test_mask_email(email: str | None, masked: str | None) -> None:
+    from backend.api.routes.services import mask_email
+
+    assert mask_email(email) == masked

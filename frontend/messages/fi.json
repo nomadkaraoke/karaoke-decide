@@ -730,7 +730,8 @@
       "failedToStartSync": "Synkronoinnin aloittaminen epäonnistui",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Yhdistä Apple Music",
-      "reconnectAppleMusic": "Yhdistä Apple Music uudelleen"
+      "reconnectAppleMusic": "Yhdistä Apple Music uudelleen",
+      "appleMusicNeedsReconnect": "Apple Music on yhdistettävä uudelleen, jotta valintasi pysyvät ajan tasalla."
     },
     "myDataPreferences": {
       "title": "Mieltymykset",
@@ -925,6 +926,7 @@
     "signIn": "Kirjaudu sisään",
     "signedOut": "Kirjaudu ensin sisään Nomad Karaokeen ja yhdistä sitten Apple Music.",
     "title": "Yhdistä Apple Music",
-    "unavailable": "Apple Music ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen."
+    "unavailable": "Apple Music ei ole juuri nyt saatavilla. Yritä myöhemmin uudelleen.",
+    "account": "Yhdistetään Nomad Karaoke -tiliin {account}. Eikö tili ole sinun? Sulje tämä sivu."
   }
 }

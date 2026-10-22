@@ -730,7 +730,8 @@
       "failedToStartSync": "启动同步失败",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "连接 Apple Music",
-      "reconnectAppleMusic": "重新连接 Apple Music"
+      "reconnectAppleMusic": "重新连接 Apple Music",
+      "appleMusicNeedsReconnect": "需要重新连接 Apple Music，以保持你的精选内容同步更新。"
     },
     "myDataPreferences": {
       "title": "偏好",
@@ -925,6 +926,7 @@
     "signIn": "登录",
     "signedOut": "请先登录 Nomad Karaoke，然后再连接 Apple Music。",
     "title": "连接 Apple Music",
-    "unavailable": "Apple Music 目前不可用，请稍后重试。"
+    "unavailable": "Apple Music 目前不可用，请稍后重试。",
+    "account": "正在连接到 Nomad Karaoke 账户 {account}。不是你？请关闭此页面。"
   }
 }

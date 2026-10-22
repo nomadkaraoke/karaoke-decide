@@ -730,7 +730,8 @@
       "failedToStartSync": "Error al iniciar la sincronización",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Conectar Apple Music",
-      "reconnectAppleMusic": "Reconectar Apple Music"
+      "reconnectAppleMusic": "Reconectar Apple Music",
+      "appleMusicNeedsReconnect": "Es necesario volver a conectar Apple Music para mantener tus selecciones actualizadas."
     },
     "myDataPreferences": {
       "title": "Preferencias",
@@ -925,6 +926,7 @@
     "signIn": "Iniciar sesión",
     "signedOut": "Inicia sesión primero en Nomad Karaoke y luego conecta Apple Music.",
     "title": "Conectar Apple Music",
-    "unavailable": "Apple Music no está disponible en este momento. Por favor, inténtalo de nuevo más tarde."
+    "unavailable": "Apple Music no está disponible en este momento. Por favor, inténtalo de nuevo más tarde.",
+    "account": "Conectando a la cuenta de Nomad Karaoke {account}. ¿No eres tú? Cierra esta página."
   }
 }

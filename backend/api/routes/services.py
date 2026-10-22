@@ -466,10 +466,37 @@ async def apple_music_link(
     to Apple Music with MusicKit JS and posts the token back with this link's one-time state,
     then returns to the app at `nomadkaraoke://music-connected`. The state expires in 10 minutes.
     """
-    state = await music_service.create_oauth_state(user.id, "apple_music")
+    state = await music_service.create_oauth_state(user.id, "apple_music", account_hint=mask_email(user.email))
     prefix = get_locale_prefix(get_locale_from_request(request))
     url = f"{settings.frontend_url.rstrip('/')}{prefix}/connect/apple-music?state={quote(state)}&return=app"
     return AppleMusicLinkResponse(connect_url=url, expires_in=music_service.STATE_EXPIRATION_MINUTES * 60)
+
+
+class AppleMusicLinkInfoResponse(BaseModel):
+    """Which Nomad Karaoke account a hand-off link connects Apple Music to (masked email)."""
+
+    account: str | None
+
+
+def mask_email(email: str | None) -> str | None:
+    """`andrew@example.com` -> `a•••@example.com`: enough to recognise your own account, not to harvest it."""
+    if not email or "@" not in email:
+        return None
+    name, domain = email.split("@", 1)
+    return f"{name[:1]}•••@{domain}"
+
+
+@router.get("/apple-music/link-info", response_model=AppleMusicLinkInfoResponse)
+async def apple_music_link_info(
+    music_service: MusicServiceServiceDep,
+    state: str = Query(..., max_length=128),
+) -> AppleMusicLinkInfoResponse:
+    """The account a hand-off link belongs to, shown before connecting so nobody connects their
+    Apple Music to someone else's account from a forwarded link. 404 when expired or unknown."""
+    link = await music_service.peek_oauth_state(state)
+    if link is None or link["service_type"] != "apple_music":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link expired - start again")
+    return AppleMusicLinkInfoResponse(account=link.get("account_hint"))
 
 
 @router.post("/apple-music/connect", response_model=AppleMusicConnectResponse)
@@ -483,15 +510,17 @@ async def connect_apple_music(
     """Connect Apple Music with a Music User Token and start syncing it.
 
     Signed-in callers (decide web) send their own token. The app's browser hand-off sends the
-    `state` from /apple-music/link instead; it identifies the user once and is then consumed.
+    `state` from /apple-music/link instead; it's consumed once Apple accepts the token.
 
     - 401: neither a signed-in user nor a valid, unexpired state
     - 422: Apple refused the Music User Token
     - 503: Apple Music isn't configured on this server
     """
     if request_body.state:
-        link = await music_service.verify_oauth_state(request_body.state)
-        if link is None or link["service_type"] != "apple_music":
+        # Peek first and consume only once Apple has accepted the token, so a refused or failed
+        # attempt can be retried from the same page.
+        link = await music_service.peek_oauth_state(request_body.state)
+        if link is None or link["service_type"] != "apple_music" or not link["user_id"]:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Link expired - start again")
         user_id = link["user_id"]
     elif user is not None and not user.is_guest:
@@ -505,6 +534,8 @@ async def connect_apple_music(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Apple Music is not available")
     except ValidationError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    if request_body.state:
+        await music_service.verify_oauth_state(request_body.state)  # one connection per link
 
     try:
         job_id: str | None = await _start_sync_job(user_id, settings, firestore)

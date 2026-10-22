@@ -123,12 +123,13 @@ class MusicServiceService:
         """
         return f"{user_id}_{service_type}"
 
-    async def create_oauth_state(self, user_id: str, service_type: str) -> str:
+    async def create_oauth_state(self, user_id: str, service_type: str, account_hint: str | None = None) -> str:
         """Create and store OAuth state for CSRF protection.
 
         Args:
             user_id: User initiating OAuth flow.
             service_type: Service type (e.g., "spotify").
+            account_hint: Masked email shown to whoever opens a hand-off link (Apple Music).
 
         Returns:
             State token to include in OAuth redirect.
@@ -143,12 +144,24 @@ class MusicServiceService:
             {
                 "user_id": user_id,
                 "service_type": service_type,
+                "account_hint": account_hint,
                 "created_at": now.isoformat(),
                 "expires_at": expires_at.isoformat(),
             },
         )
 
         return state
+
+    async def peek_oauth_state(self, state: str) -> dict[str, str | None] | None:
+        """Read a valid, unexpired state without consuming it (user_id, service_type, account_hint)."""
+        doc = await self.firestore.get_document(self.OAUTH_STATES_COLLECTION, state)
+        if doc is None or datetime.now(UTC) > datetime.fromisoformat(doc["expires_at"]):
+            return None
+        return {
+            "user_id": doc["user_id"],
+            "service_type": doc["service_type"],
+            "account_hint": doc.get("account_hint"),
+        }
 
     async def verify_oauth_state(self, state: str) -> dict[str, str] | None:
         """Verify and consume OAuth state atomically.

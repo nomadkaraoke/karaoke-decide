@@ -730,7 +730,8 @@
       "failedToStartSync": "Nabigong simulan ang pag-sync",
       "appleMusic": "Apple Music",
       "connectAppleMusic": "Ikonekta ang Apple Music",
-      "reconnectAppleMusic": "Muling ikonekta ang Apple Music"
+      "reconnectAppleMusic": "Muling ikonekta ang Apple Music",
+      "appleMusicNeedsReconnect": "Kailangang ikonekta muli ang Apple Music para mapanatiling updated ang iyong mga napili."
     },
     "myDataPreferences": {
       "title": "Mga Kagustuhan",
@@ -925,6 +926,7 @@
     "signIn": "Mag-sign in",
     "signedOut": "Mag-sign in muna sa Nomad Karaoke, pagkatapos ay ikonekta ang Apple Music.",
     "title": "Ikonekta ang Apple Music",
-    "unavailable": "Hindi available ang Apple Music sa ngayon. Pakisubukan muli mamaya."
+    "unavailable": "Hindi available ang Apple Music sa ngayon. Pakisubukan muli mamaya.",
+    "account": "Kumokonekta sa Nomad Karaoke account na {account}. Hindi ikaw? Isara ang page na ito."
   }
 }
