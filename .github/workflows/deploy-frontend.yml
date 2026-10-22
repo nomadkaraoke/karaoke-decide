@@ -42,6 +42,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: 718638054799-fush0smd1e4icq9pt0immp8n59jjlebh.apps.googleusercontent.com
         run: npm run build
 
       - name: Upload artifact

@@ -256,6 +256,9 @@ jobs:
         working-directory: frontend
         # NEXT_PUBLIC_API_URL is intentionally not set - uses relative URLs
         # which are proxied to Cloud Run via Cloudflare Worker
+        env:
+          # Public web OAuth client (gen's); decide.nomadkaraoke.com is an authorised origin
+          NEXT_PUBLIC_GOOGLE_CLIENT_ID: 718638054799-fush0smd1e4icq9pt0immp8n59jjlebh.apps.googleusercontent.com
         run: npm run build
 
       - name: Setup Pages
