@@ -241,7 +241,8 @@ def test_no_karaoke_skips_songs_whose_loose_key_matches_a_kn_song():
         {"recording_mbid": "c", "title": "I'm Good (Blue)", "artist": "David Guetta, Bebe Rexha", "listeners": 790},
         {"recording_mbid": "d", "title": "One More Night", "artist": "BTS", "listeners": 700},
     ]
-    out = src._no_karaoke_songs(iter(rows), src._kn_title_keys(kn), {})
+    known = frozenset({"miley cyrus", "david guetta", "bebe rexha", "maroon 5", "bts"})
+    out = src._no_karaoke_songs(iter(rows), src._kn_title_keys(kn, known), {}, known)
     assert [(s.artist, s.title) for s in out] == [("BTS", "One More Night")]
 
 

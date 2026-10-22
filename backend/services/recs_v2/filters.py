@@ -54,8 +54,8 @@ def _in(col: str, values: list[str], params: list[object]) -> str:
 
 
 # catalog.db (BigQuery KN) and availability.db (KN exports) can spell a title differently, so a song
-# has a karaoke version when availability.db has its key OR catalog.db says it came from KN.
-HAS_KARAOKE_SQL = "EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key) OR COALESCE({a}.in_kn, 0) = 1"
+# has a karaoke version when catalog.db says it came from KN (cheap column first) OR availability.db has its key.
+HAS_KARAOKE_SQL = "COALESCE({a}.in_kn, 0) = 1 OR EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)"
 
 
 def where_sql(f: RecFilters, alias: str = "s", *, has_availability: bool = True) -> tuple[str, list[object]]:

@@ -27,11 +27,33 @@ def test_loose_keys_ignore_punctuation_spacing_and_apostrophes() -> None:
     )
 
 
-def test_loose_keys_include_bracket_free_title_and_primary_artist() -> None:
+KNOWN = frozenset(
+    {"david guetta", "bebe rexha", "simon", "garfunkel", "simon and garfunkel", "earth", "wind", "fire"}
+) | {"earth wind and fire"}
+
+
+def test_loose_keys_primary_artist_only_for_real_multi_artist_credits() -> None:
     from karaoke_decide.catalog.keys import loose_keys
 
-    # Credit lists collapse to the primary artist; bracketed qualifiers are dropped.
-    assert loose_keys("David Guetta & Bebe Rexha", "I'm Good (Blue)") & loose_keys("David Guetta", "I'm Good")
+    assert loose_keys("David Guetta & Bebe Rexha", "I'm Good", KNOWN) & loose_keys("David Guetta", "I'm Good", KNOWN)
+    # Acts whose name contains "and"/"&"/"," are not collapsed to their first word, even when the
+    # first word is itself a known artist.
+    assert not loose_keys("Simon and Garfunkel", "The Boxer", KNOWN) & loose_keys("Simon", "The Boxer", KNOWN)
+    assert not loose_keys("Earth, Wind & Fire", "September", KNOWN) & loose_keys("Earth", "September", KNOWN)
+    # Without a known-artist set nothing is collapsed.
+    assert not loose_keys("David Guetta & Bebe Rexha", "I'm Good") & loose_keys("David Guetta", "I'm Good")
+
+
+def test_loose_keys_bracket_free_title_pins_what_is_stripped() -> None:
+    from karaoke_decide.catalog.keys import loose_keys
+
+    # Every bracketed qualifier is dropped (the song, not the version, is what has a karaoke track)...
+    assert loose_keys("A", "Song (Live)") & loose_keys("A", "Song")
+    assert loose_keys("A", "Song [From The Vault]") & loose_keys("A", "Song")
+    # ...but the unbracketed title is kept too, so a bracket-only title is not erased...
+    assert loose_keys("A", "(Untitled)") == frozenset({"a:untitled"})
+    # ...and unbracketed qualifiers still separate songs.
+    assert not loose_keys("A", "Song - Part Two") & loose_keys("A", "Song")
     assert loose_keys("Taylor Swift", "22 (Taylor's Version)") & loose_keys("Taylor Swift", "22")
     assert loose_keys("Metallica", "The Unforgiven") & loose_keys("Metallica", "Unforgiven")
 
@@ -40,7 +62,7 @@ def test_loose_keys_do_not_merge_different_songs_or_artists() -> None:
     from karaoke_decide.catalog.keys import loose_keys
 
     assert not loose_keys("Maroon 5", "One More Night") & loose_keys("BTS", "One More Night")
-    assert not loose_keys("AC/DC", "Thunderstruck") & loose_keys("AC", "Thunderstruck")  # "/" is not a credit split
+    assert not loose_keys("AC/DC", "Thunderstruck", KNOWN) & loose_keys("AC", "Thunderstruck", KNOWN)
     assert not loose_keys("Muse", "Hysteria") & loose_keys("Muse", "Uprising")
 
 
