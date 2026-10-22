@@ -320,7 +320,7 @@ class QuizService:
         artists: list[tuple[QuizArtist, int]] = []
         for key in keys:
             summary = summaries.get(key)
-            if summary is None:
+            if summary is None or summary.song_count == 0:  # the quiz is about artists you can sing
                 continue
             artist = QuizArtist(
                 mbid=summary.mbid,

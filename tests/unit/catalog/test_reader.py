@@ -156,6 +156,7 @@ def _artist_catalog(tmp_path: Path) -> CatalogReader:
             *songs("delta", "Delta", "2000s", 1, 1),
             SongRow("delta|old one", "Delta", "Old One", "delta", decade="1980s", lb_listeners=1),
             SongRow("delta|older one", "Delta", "Older One", "delta", decade="1980s", lb_listeners=1),
+            SongRow("zeta|no karaoke", "Zeta", "No Karaoke", "zeta", decade="1980s", lb_listeners=1, in_kn=0),
         ],
         artists=[
             ArtistRow("alpha", "Alpha", mbid="mbid-a", popularity=90, genres=("rock",)),
@@ -163,6 +164,7 @@ def _artist_catalog(tmp_path: Path) -> CatalogReader:
             ArtistRow("gamma ray", "Gamma Ray", popularity=70, genres=("metal", "rock")),
             ArtistRow("delta", "Delta", popularity=60, genres=("pop",)),
             ArtistRow("echo", "Echo", popularity=99, genres=("rock",)),
+            ArtistRow("zeta", "Zeta", popularity=100, genres=("rock",)),
         ],
         similar=[SimilarRow("alpha", "gamma ray", 0.9, "test")],
         kn=[],
@@ -175,7 +177,7 @@ def _artist_catalog(tmp_path: Path) -> CatalogReader:
 
 def test_popular_artist_keys_filters_and_orders(tmp_path: Path) -> None:
     r = _artist_catalog(tmp_path)
-    # Echo is the most popular artist but has no songs, so it never appears.
+    # Echo has no songs and Zeta no karaoke song (in_kn=0), so neither appears.
     assert r.popular_artist_keys(limit=10) == ["alpha", "beta band", "gamma ray", "delta"]
     assert r.popular_artist_keys(limit=2) == ["alpha", "beta band"]
     assert r.popular_artist_keys(limit=10, genres=["rock"]) == ["alpha", "gamma ray"]
@@ -187,8 +189,9 @@ def test_popular_artist_keys_filters_and_orders(tmp_path: Path) -> None:
 
 def test_artist_summaries(tmp_path: Path) -> None:
     r = _artist_catalog(tmp_path)
-    got = r.artist_summaries(["delta", "alpha", "nobody"])
-    assert list(got) == ["delta", "alpha"]
+    got = r.artist_summaries(["delta", "alpha", "nobody", "zeta"])
+    assert list(got) == ["delta", "alpha", "zeta"]
+    assert got["zeta"].song_count == 0  # only karaoke (in_kn) songs count
     alpha = got["alpha"]
     assert (alpha.name, alpha.mbid, alpha.popularity, alpha.genres) == ("Alpha", "mbid-a", 90, ("rock",))
     assert (alpha.song_count, alpha.brand_total, alpha.primary_decade) == (3, 6, "1980s")
@@ -203,8 +206,8 @@ def test_search_artists_ranks_exact_prefix_word_substring(tmp_path: Path) -> Non
     r = _artist_catalog(tmp_path)
     assert [a.name for a in r.search_artists("alpha")] == ["Alpha"]
     assert [a.name for a in r.search_artists("BAND")] == ["Beta Band"]  # word prefix, case-folded
-    assert [a.name for a in r.search_artists("ta")] == ["Beta Band", "Delta"]  # substring, by popularity
-    assert [a.name for a in r.search_artists("e")] == ["Echo", "Beta Band", "Delta"]  # prefix tier first
+    assert [a.name for a in r.search_artists("ta")] == ["Zeta", "Beta Band", "Delta"]  # substring, by popularity
+    assert [a.name for a in r.search_artists("e")] == ["Echo", "Zeta", "Beta Band", "Delta"]  # prefix tier first
     assert [a.name for a in r.search_artists("a", limit=1)] == ["Alpha"]
     assert r.search_artists("%") == [] and r.search_artists("_") == [] and r.search_artists("  ") == []
     r.close()

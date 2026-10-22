@@ -45,7 +45,7 @@ class ArtistSummary:
     mbid: str | None
     popularity: int
     genres: tuple[str, ...]
-    song_count: int = 0
+    song_count: int = 0  # karaoke songs (in_kn); brand_total sums theirs
     brand_total: int = 0
     top_songs: tuple[str, ...] = ()
     primary_decade: str | None = None
@@ -229,7 +229,7 @@ class CatalogReader:
         decades: Sequence[str] = (),
         exclude_keys: Sequence[str] = (),
     ) -> list[str]:
-        """The most popular artists with at least one catalog song, best first.
+        """The most popular artists with at least one karaoke song (``in_kn``), best first.
 
         ``genres`` (our genre ids) keeps artists tagged with any of them; ``decades`` ("1980s")
         keeps artists with a song from any of them; ``exclude_keys`` are dropped."""
@@ -248,7 +248,7 @@ class CatalogReader:
         rows = self.conn().execute(
             f"""
             SELECT a.artist_key FROM artists a
-            WHERE EXISTS (SELECT 1 FROM songs s WHERE s.artist_key = a.artist_key{song_filter})
+            WHERE EXISTS (SELECT 1 FROM songs s WHERE s.artist_key = a.artist_key AND s.in_kn = 1{song_filter})
             {genre_filter}
             ORDER BY COALESCE(a.popularity, 0) DESC, COALESCE(a.lb_listeners, 0) DESC, a.artist_key
             LIMIT ?
@@ -273,7 +273,7 @@ class CatalogReader:
         for chunk in _chunks(list(artists)):
             for r in self.conn().execute(
                 f"SELECT artist_key, COUNT(*), COALESCE(SUM(brand_count), 0) FROM songs "
-                f"WHERE artist_key IN ({_marks(len(chunk))}) GROUP BY artist_key",
+                f"WHERE artist_key IN ({_marks(len(chunk))}) AND in_kn = 1 GROUP BY artist_key",
                 tuple(chunk),
             ):
                 stats[r[0]] = (int(r[1]), int(r[2]))

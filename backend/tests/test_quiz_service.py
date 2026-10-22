@@ -1174,6 +1174,7 @@ def real_catalog(tmp_path: Any) -> Any:
             *songs("neon tide", "Neon Tide", "1980s"),
             *songs("paper moons", "Paper Moons", "2010s"),
             *songs("velvet static", "Velvet Static", "1990s"),
+            SongRow("ghost act|demo", "Ghost Act", "Demo", "ghost act", decade="2010s", lb_listeners=1, in_kn=0),
         ],
         artists=[
             ArtistRow("muse", "Muse", popularity=95, genres=("rock",)),
@@ -1181,8 +1182,13 @@ def real_catalog(tmp_path: Any) -> Any:
             ArtistRow("neon tide", "Neon Tide", popularity=70, genres=("rock",)),
             ArtistRow("paper moons", "Paper Moons", popularity=90, genres=("rock",)),
             ArtistRow("velvet static", "Velvet Static", popularity=99, genres=("jazz",)),
+            ArtistRow("ghost act", "Ghost Act", popularity=100, genres=("rock",)),  # no karaoke song
         ],
-        similar=[SimilarRow("muse", "glass harbor", 0.8, "test"), SimilarRow("muse", "neon tide", 0.3, "test")],
+        similar=[
+            SimilarRow("muse", "ghost act", 0.95, "test"),
+            SimilarRow("muse", "glass harbor", 0.8, "test"),
+            SimilarRow("muse", "neon tide", 0.3, "test"),
+        ],
         kn=[],
         genre_map={},
     )
@@ -1218,6 +1224,7 @@ class TestSmartArtistsCatalogFallback:
         # Similar to the pick first (best score first), then the genre/decade popular artists.
         assert [a.name for a in artists] == ["Glass Harbor", "Neon Tide", "Paper Moons"]
         assert "Muse" not in by_name  # a pick is never suggested back
+        assert "Ghost Act" not in by_name  # similar and popular, but nothing to sing
         glass = by_name["Glass Harbor"].suggestion_reason
         assert glass is not None and glass.type == "fans_also_like" and glass.display_text == "Fans of Muse also like"
         paper = by_name["Paper Moons"].suggestion_reason
