@@ -10,12 +10,15 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from google.cloud.firestore_v1 import ArrayRemove, ArrayUnion
-
 from backend.services.firestore_service import FirestoreService
+from karaoke_decide.core.lazy_import import lazy_module
 
 if TYPE_CHECKING:
+    from google.cloud import firestore_v1
+
     from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+else:  # imported on first use (API cold start)
+    firestore_v1 = lazy_module("google.cloud.firestore_v1")
 
 logger = logging.getLogger(__name__)
 
@@ -432,7 +435,7 @@ class UserDataService:
                 .document(doc_id)
                 .update(
                     {
-                        "quiz_artists_known": ArrayUnion([artist_name]),
+                        "quiz_artists_known": firestore_v1.ArrayUnion([artist_name]),
                         "updated_at": datetime.now(UTC).isoformat(),
                     }
                 )
@@ -537,7 +540,7 @@ class UserDataService:
                     .document(doc_id)
                     .update(
                         {
-                            "quiz_artists_known": ArrayRemove(matching),
+                            "quiz_artists_known": firestore_v1.ArrayRemove(matching),
                             "updated_at": datetime.now(UTC).isoformat(),
                         }
                     )
@@ -590,7 +593,7 @@ class UserDataService:
                     .document(doc_id)
                     .update(
                         {
-                            "excluded_artists": ArrayUnion([artist_lower]),
+                            "excluded_artists": firestore_v1.ArrayUnion([artist_lower]),
                             "updated_at": datetime.now(UTC).isoformat(),
                         }
                     )
@@ -645,7 +648,7 @@ class UserDataService:
                 .document(doc_id)
                 .update(
                     {
-                        "excluded_artists": ArrayRemove(matching),
+                        "excluded_artists": firestore_v1.ArrayRemove(matching),
                         "updated_at": datetime.now(UTC).isoformat(),
                     }
                 )

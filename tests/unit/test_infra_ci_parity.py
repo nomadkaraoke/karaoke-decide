@@ -301,10 +301,12 @@ def test_main_startup_probe_matches(pulumi_main: dict[str, Any], ci_main_deploy:
     ci = _kv(str(ci_main_deploy["--startup-probe"]))
     assert probe["http_get"]["path"] == ci["httpGet.path"] == "/api/ready"
     assert str(probe["http_get"]["port"]) == ci["httpGet.port"] == "8000"
-    assert str(probe["timeout_seconds"]) == ci["timeoutSeconds"] == "5"
-    assert str(probe["period_seconds"]) == ci["periodSeconds"] == "10"
-    assert str(probe["failure_threshold"]) == ci["failureThreshold"] == "24"
-    assert probe["failure_threshold"] * probe["period_seconds"] <= 240  # Cloud Run startup-probe cap
+    assert str(probe["initial_delay_seconds"]) == ci["initialDelaySeconds"] == "0"
+    # 1 s: a ready instance takes traffic within a second (10 s wasted up to 10 s of cold start).
+    assert str(probe["period_seconds"]) == ci["periodSeconds"] == "1"
+    assert str(probe["timeout_seconds"]) == ci["timeoutSeconds"] == "1"  # Cloud Run: timeout <= period
+    assert str(probe["failure_threshold"]) == ci["failureThreshold"] == "240"
+    assert probe["failure_threshold"] * probe["period_seconds"] == 240  # the whole 240 s startup window
 
 
 # --------------------------------------------------------------------------

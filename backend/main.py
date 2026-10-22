@@ -3,7 +3,6 @@
 import asyncio
 import importlib
 import logging
-import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -12,23 +11,27 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import internal_api_router, router
 from backend.config import BackendSettings, get_backend_settings
+from backend.logging_config import configure_logging
 from backend.services.catalog_store import get_catalog_store
+from karaoke_decide.core.lazy_import import preload
 
-# Configure logging to output to stdout for Cloud Run
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(levelname)s:%(name)s:%(message)s",
-    stream=sys.stdout,
-)
-# httpx/httpcore log every request URL at INFO, which leaks query-string API
-# keys (e.g. Last.fm api_key) into Cloud Logging.
-for _noisy_logger in ("httpx", "httpcore"):
-    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
 # The lifespan's outer bound on the catalog load, beyond the store's own budget.
 LIFESPAN_SLACK_S = 5.0
+
+# Client libraries the services import lazily (cold start). The lifespan imports them in a
+# thread alongside the catalog load, so the first requests don't pay for them.
+PRELOAD_MODULES = (
+    "google.cloud.firestore",
+    "google.api_core.exceptions",
+    "jose.jwt",
+    "google.cloud.tasks_v2",
+    "google.protobuf.timestamp_pb2",
+)
+PRELOAD_WAIT_S = 20.0
 
 
 @asynccontextmanager
@@ -38,16 +41,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_backend_settings()
     logger.info(f"Starting Karaoke Decide API ({settings.environment})")
 
+    preloading = preload(PRELOAD_MODULES)
+
     # catalog.db + availability.db for recommendations v2 and sync matching. Loaded before
-    # the port opens (Cloud Run throttles CPU after), behind the /api/ready startup probe.
+    # the port opens (Cloud Run throttles CPU after), behind the /api/ready startup probe;
+    # in production backend.serve already started the download before importing this app.
     # A missing, corrupt or hung catalog never blocks startup: the store stays warming_up.
     store = get_catalog_store()
     try:
         await asyncio.wait_for(
-            asyncio.to_thread(store.load, settings), settings.catalog_load_timeout_s + LIFESPAN_SLACK_S
+            asyncio.to_thread(store.load_at_startup, settings), settings.catalog_load_timeout_s + LIFESPAN_SLACK_S
         )
     except TimeoutError:
         logger.warning("Recommendations catalog load overran its startup budget; starting warming_up")
+    # Usually done by now (it ran alongside the catalog load); bounded so it can't hold startup.
+    await asyncio.to_thread(preloading.join, PRELOAD_WAIT_S)
 
     yield
 

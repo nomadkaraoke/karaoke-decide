@@ -1,12 +1,19 @@
 """Firestore database service."""
 
-from collections.abc import Callable
-from typing import Any
+from __future__ import annotations
 
-from google.api_core.exceptions import AlreadyExists
-from google.cloud import firestore
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from backend.config import BackendSettings
+from karaoke_decide.core.lazy_import import lazy_module
+
+if TYPE_CHECKING:
+    from google.api_core import exceptions as api_exceptions
+    from google.cloud import firestore
+else:  # imported on first use (cold start: grpc + protobuf + firestore are ~1/4 of app import)
+    api_exceptions = lazy_module("google.api_core.exceptions")
+    firestore = lazy_module("google.cloud.firestore")
 
 
 class FirestoreService:
@@ -55,7 +62,7 @@ class FirestoreService:
         doc_ref = self.collection(collection).document(doc_id)
         try:
             await doc_ref.create(data)
-        except AlreadyExists:
+        except api_exceptions.AlreadyExists:
             return False
         return True
 

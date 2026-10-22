@@ -1,14 +1,21 @@
 """Cloud Tasks service for enqueueing background jobs."""
 
+from __future__ import annotations
+
 import json
 import logging
 import threading
-from typing import Any
-
-from google.cloud import tasks_v2
-from google.protobuf import timestamp_pb2
+from typing import TYPE_CHECKING, Any
 
 from backend.config import BackendSettings
+from karaoke_decide.core.lazy_import import lazy_module
+
+if TYPE_CHECKING:
+    from google.cloud import tasks_v2
+    from google.protobuf import timestamp_pb2
+else:  # imported on first use (API cold start)
+    tasks_v2 = lazy_module("google.cloud.tasks_v2")
+    timestamp_pb2 = lazy_module("google.protobuf.timestamp_pb2")
 
 logger = logging.getLogger(__name__)
 

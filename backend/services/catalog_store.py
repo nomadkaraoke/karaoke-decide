@@ -143,6 +143,7 @@ class CatalogStore:
         self._client: Any = None
         self._attempt_running = False
         self._last_attempt_end: float | None = None
+        self._early: threading.Thread | None = None  # start_load's thread (backend.serve)
 
     @property
     def status(self) -> CatalogStatus:
@@ -190,6 +191,23 @@ class CatalogStore:
             ).start()
 
     # ------------------------------------------------------------------ loading
+
+    def start_load(self, settings: Settings) -> None:
+        """Begin ``load`` in a daemon thread now, before the app is imported (``backend.serve``),
+        so the download overlaps the import; the lifespan's ``load_at_startup`` joins it."""
+        with self._lock:
+            if self._early is not None:
+                return
+            self._early = threading.Thread(target=self.load, args=(settings,), name="catalog-early-load", daemon=True)
+        self._early.start()
+
+    def load_at_startup(self, settings: Settings) -> None:
+        """Finish the load ``start_load`` began (``load`` bounds it by its budget), else load now."""
+        early = self._early
+        if early is None:
+            self.load(settings)
+            return
+        early.join(float(settings.catalog_load_timeout_s) + 1.0)
 
     def load(self, settings: Settings, *, client: Any = None) -> None:
         """Load both databases, within ``settings.catalog_load_timeout_s``. Never raises."""

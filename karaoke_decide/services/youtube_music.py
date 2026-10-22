@@ -8,14 +8,21 @@ are always private and cannot be read this way - users must copy their likes
 into a regular playlist first.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
-from ytmusicapi import YTMusic
+from karaoke_decide.core.lazy_import import lazy_module
+
+if TYPE_CHECKING:
+    import ytmusicapi
+else:  # imported on first use (API cold start)
+    ytmusicapi = lazy_module("ytmusicapi")
 
 logger = logging.getLogger(__name__)
 
@@ -133,13 +140,13 @@ class YouTubeMusicClient:
     FETCH_ATTEMPTS = 2
     RETRY_DELAY_SECONDS = 1.0
 
-    def __init__(self, ytmusic: YTMusic | None = None):
+    def __init__(self, ytmusic: ytmusicapi.YTMusic | None = None):
         self._ytmusic = ytmusic
 
     @property
-    def ytmusic(self) -> YTMusic:
+    def ytmusic(self) -> ytmusicapi.YTMusic:
         if self._ytmusic is None:
-            self._ytmusic = YTMusic()
+            self._ytmusic = ytmusicapi.YTMusic()
         return self._ytmusic
 
     async def _fetch_raw_playlist(self, playlist_id: str, limit: int) -> dict[str, Any]:

@@ -345,14 +345,18 @@ cloud_run_service = gcp.cloudrunv2.Service(
                     "cpu_idle": True,
                     "startup_cpu_boost": True,
                 },
-                # /api/ready answers once the lifespan (catalog + availability load) has finished.
-                # 24 x 10 s = 240 s, Cloud Run's cap on a startup probe window. Keep in step with
-                # CI --startup-probe (tests/unit/test_infra_ci_parity.py).
+                # /api/ready answers once the lifespan (catalog + availability load) has finished;
+                # until then uvicorn isn't listening and each probe is refused at once. Probe every
+                # 1 s (Cloud Run's minimum) so a ready instance takes traffic within a second rather
+                # than up to 10 s later; 240 x 1 s keeps the 240 s window. timeout_seconds can't
+                # exceed period_seconds. Keep in step with CI --startup-probe
+                # (tests/unit/test_infra_ci_parity.py).
                 "startup_probe": {
                     "http_get": {"path": "/api/ready", "port": 8000},
-                    "timeout_seconds": 5,
-                    "period_seconds": 10,
-                    "failure_threshold": 24,
+                    "initial_delay_seconds": 0,
+                    "timeout_seconds": 1,
+                    "period_seconds": 1,
+                    "failure_threshold": 240,
                 },
             }
         ],

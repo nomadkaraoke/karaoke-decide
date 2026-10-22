@@ -1,7 +1,9 @@
-"""Main API cold start: no KaraokeNerds preload, no BigQuery import, /api/ready."""
+"""Main API cold start: no KaraokeNerds preload, no heavy client imports, early catalog load, /api/ready."""
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -66,6 +68,7 @@ def test_lifespan_survives_load_that_overruns(fresh_store: None, monkeypatch: py
     monkeypatch.setenv("CATALOG_LOAD_TIMEOUT_S", "0.1")
     get_backend_settings.cache_clear()
     monkeypatch.setattr(main, "LIFESPAN_SLACK_S", 0.2)
+    monkeypatch.setattr(main, "PRELOAD_MODULES", ())  # this test times the catalog bound only
     monkeypatch.setattr(catalog_store.CatalogStore, "load", lambda self, settings, **kw: time.sleep(1))
 
     started = time.monotonic()
@@ -74,15 +77,74 @@ def test_lifespan_survives_load_that_overruns(fresh_store: None, monkeypatch: py
         assert client.get("/api/ready").json()["catalog"] is False
 
 
-def test_main_import_does_not_import_bigquery() -> None:
-    out = subprocess.run(
-        [sys.executable, "-c", "import backend.main, sys; print('google.cloud.bigquery' in sys.modules)"],
-        capture_output=True,
-        text=True,
-        cwd=REPO,
-        check=True,
-    )
-    assert out.stdout.strip() == "False", out.stderr
+# Client libraries importing backend.main must not pull in (cold start): the services import
+# them lazily (karaoke_decide.core.lazy_import) and the lifespan preloads them off the critical
+# path. Measured in the production image: they were ~1/3 of the app's import time.
+HEAVY_MODULES = (
+    "google.cloud.bigquery",
+    "google.cloud.storage",
+    "google.cloud.firestore",
+    "google.cloud.firestore_v1",
+    "google.cloud.tasks_v2",
+    "google.api_core",
+    "grpc",
+    "ytmusicapi",
+    "jose.jwt",
+    "cryptography",
+)
+
+
+def _imported_after(module: str) -> set[str]:
+    code = f"import json, sys; import {module}; print(json.dumps(sorted(sys.modules)))"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO, check=True)
+    return set(json.loads(out.stdout.strip().splitlines()[-1]))
+
+
+def test_main_import_does_not_import_heavy_client_libraries() -> None:
+    assert not {m for m in HEAVY_MODULES if m in _imported_after("backend.main")}
+
+
+def test_main_preloads_what_the_services_import_lazily() -> None:
+    from backend import main
+
+    assert set(main.PRELOAD_MODULES) <= {
+        "google.cloud.firestore",
+        "google.api_core.exceptions",
+        "jose.jwt",
+        "google.cloud.tasks_v2",
+        "google.protobuf.timestamp_pb2",
+    }
+    assert {"google.cloud.firestore", "jose.jwt"} <= set(main.PRELOAD_MODULES)
+
+
+def test_serve_starts_the_catalog_load_before_importing_the_app(tmp_path: Path, index_dir: Path) -> None:
+    """backend.serve (the Dockerfile CMD) kicks off the download, then imports backend.main."""
+    fixtures.build(tmp_path)
+    code = """
+import sys
+from backend.services import catalog_store
+seen = []
+original = catalog_store.CatalogStore.start_load
+def spy(self, settings):
+    seen.append("backend.main" in sys.modules)
+    original(self, settings)
+catalog_store.CatalogStore.start_load = spy
+import backend.serve
+from backend.config import get_backend_settings
+store = catalog_store.get_catalog_store()
+store.load_at_startup(get_backend_settings())
+print(seen, store.status, backend.serve.app is sys.modules["backend.main"].app)
+"""
+    env = {**os.environ, "CATALOG_LOCAL_DIR": str(tmp_path), "SONG_INDEX_LOCAL_DIR": str(index_dir)}
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=REPO, env=env, check=True)
+    assert out.stdout.strip().splitlines()[-1] == "[False] ready True", out.stderr
+
+
+def test_dockerfile_runs_the_serve_entrypoint() -> None:
+    dockerfile = (REPO / "Dockerfile").read_text()
+    assert 'CMD ["uvicorn", "backend.serve:app"' in dockerfile
+    # Bytecode is compiled at build time: appuser can't write __pycache__ to site-packages.
+    assert dockerfile.count("python -m compileall") == 2
 
 
 def test_main_does_not_preload_karaokenerds() -> None:
