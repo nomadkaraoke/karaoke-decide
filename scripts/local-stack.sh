@@ -211,8 +211,11 @@ up_api() {
 cmd_up() {
     if [ "$SEARCH_ONLY" = 1 ]; then up_search; return; fi
     # The api's availability.db comes from the fixture index, so search builds it first.
-    up_search
-    up_api || { stop_server search "$SEARCH_PID" search_alive >&2; return 1; }
+    local search_was_up=0
+    search_healthy && search_alive && search_was_up=1
+    up_search || return 1
+    # A failed api start only takes search down with it if this run started search.
+    up_api || { [ "$search_was_up" = 1 ] || stop_server search "$SEARCH_PID" search_alive >&2; return 1; }
 }
 
 cmd_down() {
