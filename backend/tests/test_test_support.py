@@ -162,6 +162,7 @@ def test_seed_then_read(client: TestClient, fs: FakeFirestore) -> None:
         "artists": [{"name": "Invented Band", "affinity": "love"}, {"name": "Other Act", "affinity": "like"}],
         "loved": ["invented band|first song"],
         "hidden": ["other act|second song"],
+        "voice_profile": None,
     }
 
 
