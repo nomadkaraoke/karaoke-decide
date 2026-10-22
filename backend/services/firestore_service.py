@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from backend.config import BackendSettings
 from karaoke_decide.core.lazy_import import lazy_module
@@ -14,6 +14,30 @@ if TYPE_CHECKING:
 else:  # imported on first use (cold start: grpc + protobuf + firestore are ~1/4 of app import)
     api_exceptions = lazy_module("google.api_core.exceptions")
     firestore = lazy_module("google.cloud.firestore")
+
+
+_T = TypeVar("_T")
+
+
+class TransactionView:
+    """Document reads and writes inside one Firestore transaction.
+
+    Firestore requires every read to happen before the first write.
+    """
+
+    def __init__(self, service: FirestoreService, transaction: firestore.AsyncTransaction) -> None:
+        self._service = service
+        self._transaction = transaction
+
+    async def get(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        snap = await self._service.collection(collection).document(doc_id).get(transaction=self._transaction)
+        return (snap.to_dict() or {}) if snap.exists else None
+
+    def set(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        self._transaction.set(self._service.collection(collection).document(doc_id), data)
+
+    def delete(self, collection: str, doc_id: str) -> None:
+        self._transaction.delete(self._service.collection(collection).document(doc_id))
 
 
 class FirestoreService:
@@ -237,4 +261,18 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await transform_in_transaction(transaction)
+        return result
+
+    async def run_transaction(self, fn: Callable[[TransactionView], Awaitable[_T]]) -> _T:
+        """Run ``fn`` in a Firestore transaction spanning any number of documents.
+
+        ``fn`` must do all its reads before its first write and be free of other side
+        effects: Firestore retries the whole transaction (calling ``fn`` again) on contention.
+        """
+
+        @firestore.async_transactional
+        async def in_transaction(transaction: firestore.AsyncTransaction) -> _T:
+            return await fn(TransactionView(self, transaction))
+
+        result: _T = await in_transaction(self.client.transaction())
         return result
