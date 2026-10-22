@@ -9,8 +9,6 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
-from google.auth.transport import requests as google_requests
-from google.oauth2 import id_token
 
 from backend.api.deps import Settings
 from backend.config import BackendSettings
@@ -29,6 +27,10 @@ async def verify_internal_request(request: Request, settings: BackendSettings) -
         return False
 
     try:
+        # Lazy: google.auth.transport.requests pulls in cryptography (API cold start budget).
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token
+
         auth = request.headers.get("Authorization", "")
         scheme, _, token = auth.partition(" ")
         if scheme.lower() != "bearer" or not token.strip():

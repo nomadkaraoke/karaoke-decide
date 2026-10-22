@@ -12,7 +12,7 @@ from backend.config import BackendSettings
 
 URL = "https://karaoke-decide-123.us-central1.run.app"
 EMAIL = "123-compute@developer.gserviceaccount.com"
-VERIFY = "backend.api.internal_auth.id_token.verify_oauth2_token"
+VERIFY = "google.oauth2.id_token.verify_oauth2_token"
 
 
 def _client(settings: BackendSettings) -> TestClient:
