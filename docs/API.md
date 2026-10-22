@@ -443,6 +443,8 @@ Search artists by name for autocomplete. Returns artists sorted by popularity.
 
 **MBID-first:** Uses MusicBrainz as primary identifier with Spotify enrichment.
 
+**Fallback:** with `BIGQUERY_DISABLED` (local stack) or when BigQuery errors, results come from catalog.db's `artists` table (exact, then prefix, then word-prefix, then substring match; popularity order; no `spotify_id`/`disambiguation`). Empty while catalog.db is warming up; never a 500.
+
 **Query Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -798,6 +800,8 @@ Get smart quiz artists informed by user's preferences and previous quiz step sel
 - Manual song artists: Use genres from songs user enjoys singing
 
 Each returned artist includes a `suggestion_reason` explaining why they were suggested.
+
+**Fallback:** with `BIGQUERY_DISABLED` (local stack) or when the BigQuery path errors, suggestions come from catalog.db: `artist_similar` of the picks (`fans_also_like`, "Fans of X also like"), then the most popular catalog artists in the chosen genres/decades (`genre_match` / `decade_match`), padded with any popular artists (`popular_choice`). Empty while catalog.db is warming up; never a 500.
 
 **Requires:** Bearer token
 

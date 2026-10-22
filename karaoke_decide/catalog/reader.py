@@ -7,8 +7,10 @@ every thread's connection is registered so ``close()`` can reach them all.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
+from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +34,33 @@ class KnMatch:
     title: str
     brands: str
     brand_count: int
+
+
+@dataclass(frozen=True)
+class ArtistSummary:
+    """A catalog.db artist with its karaoke-song aggregates (the quiz/search fallback when BigQuery is off)."""
+
+    artist_key: str
+    name: str
+    mbid: str | None
+    popularity: int
+    genres: tuple[str, ...]
+    song_count: int = 0  # karaoke songs (in_kn); brand_total sums theirs
+    brand_total: int = 0
+    top_songs: tuple[str, ...] = ()
+    primary_decade: str | None = None
+
+
+def _like_escape(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _genres(raw: str | None) -> tuple[str, ...]:
+    try:
+        value = json.loads(raw) if raw else []
+    except ValueError:
+        return ()
+    return tuple(str(g) for g in value) if isinstance(value, list) else ()
 
 
 def _chunks(items: Sequence[_T]) -> Iterator[Sequence[_T]]:
@@ -191,3 +220,122 @@ class CatalogReader:
                 )
             )
         return out
+
+    def popular_artist_keys(
+        self,
+        *,
+        limit: int,
+        genres: Sequence[str] = (),
+        decades: Sequence[str] = (),
+        exclude_keys: Sequence[str] = (),
+    ) -> list[str]:
+        """The most popular artists with at least one karaoke song (``in_kn``), best first.
+
+        ``genres`` (our genre ids) keeps artists tagged with any of them; ``decades`` ("1980s")
+        keeps artists with a song from any of them; ``exclude_keys`` are dropped."""
+        song_filter = ""
+        params: list[object] = []
+        if decades:
+            song_filter = f" AND s.decade IN ({_marks(len(decades))})"
+            params.extend(decades)
+        genre_filter = ""
+        if genres:
+            genre_filter = (
+                f"AND EXISTS (SELECT 1 FROM json_each(a.genres_json) g WHERE g.value IN ({_marks(len(genres))}))"
+            )
+            params.extend(genres)
+        excluded = set(exclude_keys)
+        rows = self.conn().execute(
+            f"""
+            SELECT a.artist_key FROM artists a
+            WHERE EXISTS (SELECT 1 FROM songs s WHERE s.artist_key = a.artist_key AND s.in_kn = 1{song_filter})
+            {genre_filter}
+            ORDER BY COALESCE(a.popularity, 0) DESC, COALESCE(a.lb_listeners, 0) DESC, a.artist_key
+            LIMIT ?
+            """,
+            (*params, limit + len(excluded)),
+        )
+        return [r[0] for r in rows if r[0] not in excluded][:limit]
+
+    def artist_summaries(self, artist_keys: Sequence[str], top_songs: int = 3) -> dict[str, ArtistSummary]:
+        """``{artist_key: ArtistSummary}`` for the keys catalog.db has an artist row for."""
+        keys = list(dict.fromkeys(artist_keys))
+        artists: dict[str, sqlite3.Row] = {}
+        for chunk in _chunks(keys):
+            for r in self.conn().execute(
+                f"SELECT artist_key, name, mbid, popularity, genres_json FROM artists "
+                f"WHERE artist_key IN ({_marks(len(chunk))})",
+                tuple(chunk),
+            ):
+                artists[r["artist_key"]] = r
+        stats: dict[str, tuple[int, int]] = {}
+        decades: dict[str, Counter[str]] = {}
+        for chunk in _chunks(list(artists)):
+            for r in self.conn().execute(
+                f"SELECT artist_key, COUNT(*), COALESCE(SUM(brand_count), 0) FROM songs "
+                f"WHERE artist_key IN ({_marks(len(chunk))}) AND in_kn = 1 GROUP BY artist_key",
+                tuple(chunk),
+            ):
+                stats[r[0]] = (int(r[1]), int(r[2]))
+            for r in self.conn().execute(
+                f"SELECT artist_key, decade, COUNT(*) FROM songs "
+                f"WHERE artist_key IN ({_marks(len(chunk))}) AND in_kn = 1 AND decade IS NOT NULL "
+                f"GROUP BY artist_key, decade",
+                tuple(chunk),
+            ):
+                decades.setdefault(r[0], Counter())[r[1]] = int(r[2])
+        titles: dict[str, list[str]] = {}
+        for r in self.top_songs_for_artists(list(artists), top_songs):
+            titles.setdefault(r["artist_key"], []).append(r["title"])
+        out: dict[str, ArtistSummary] = {}
+        for key in keys:
+            a = artists.get(key)
+            if a is None:
+                continue
+            count, brands = stats.get(key, (0, 0))
+            # Most songs wins; ties go to the earlier decade, so the answer is deterministic.
+            by_decade = sorted(decades.get(key, Counter()).items(), key=lambda d: (-d[1], d[0]))
+            out[key] = ArtistSummary(
+                artist_key=key,
+                name=a["name"] or key,
+                mbid=a["mbid"] or None,
+                popularity=int(a["popularity"] or 0),
+                genres=_genres(a["genres_json"]),
+                song_count=count,
+                brand_total=brands,
+                top_songs=tuple(titles.get(key, ())),
+                primary_decade=by_decade[0][0] if by_decade else None,
+            )
+        return out
+
+    def search_artists(self, query: str, limit: int = 10) -> list[ArtistSummary]:
+        """Artists whose name matches ``query`` (normalised like ``artist_key``): exact, then
+        prefix, then word-prefix, then substring; most popular first within each tier."""
+        q = artist_key(query)
+        if not q:
+            return []
+        esc = _like_escape(q)
+        rows = self.conn().execute(
+            r"""
+            SELECT artist_key, name, mbid, popularity, genres_json,
+                   CASE WHEN artist_key = ? THEN 0
+                        WHEN artist_key LIKE ? ESCAPE '\' THEN 1
+                        WHEN artist_key LIKE ? ESCAPE '\' THEN 2
+                        ELSE 3 END AS tier
+            FROM artists
+            WHERE artist_key LIKE ? ESCAPE '\'
+            ORDER BY tier, COALESCE(popularity, 0) DESC, artist_key
+            LIMIT ?
+            """,
+            (q, f"{esc}%", f"% {esc}%", f"%{esc}%", limit),
+        )
+        return [
+            ArtistSummary(
+                artist_key=r["artist_key"],
+                name=r["name"] or r["artist_key"],
+                mbid=r["mbid"] or None,
+                popularity=int(r["popularity"] or 0),
+                genres=_genres(r["genres_json"]),
+            )
+            for r in rows
+        ]

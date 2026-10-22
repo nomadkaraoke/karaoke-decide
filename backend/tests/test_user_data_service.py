@@ -300,6 +300,33 @@ class TestGetAllArtists:
         assert "quiz" in all_sources
 
     @pytest.mark.asyncio
+    async def test_includes_quiz_affinity(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
+        """Quiz affinity is attached by case-insensitive name; absent -> None."""
+        user_doc = {
+            "id": "email_hash_123",
+            "user_id": "user123",
+            "quiz_artists_known": ["Queen", "Abba"],
+            "quiz_artist_affinities": [
+                {"artist_name": "queen", "affinity": "love"},
+                {"artist_name": "Bogus", "affinity": "nonsense"},
+            ],
+        }
+        mock_firestore.query_documents.side_effect = [
+            [user_doc],
+            [
+                {"artist_name": "Queen", "source": "spotify", "rank": 1},
+                {"artist_name": "Cher", "source": "spotify", "rank": 2},
+            ],
+        ]
+
+        result = await user_data_service.get_all_artists("user123")
+        by_name = {a["artist_name"]: a for a in result["artists"]}
+
+        assert by_name["Queen"]["affinity"] == "love"
+        assert by_name["Abba"]["affinity"] is None
+        assert by_name["Cher"]["affinity"] is None
+
+    @pytest.mark.asyncio
     async def test_merges_artists_from_multiple_sources(
         self, user_data_service: UserDataService, mock_firestore: MagicMock
     ) -> None:

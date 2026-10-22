@@ -98,6 +98,7 @@ class UserArtistResponse(BaseModel):
     # User preferences
     is_excluded: bool = False  # Whether hidden from recommendations
     is_manual: bool = False  # Whether added manually (vs synced)
+    affinity: Literal["love", "like", "occasionally"] | None = None  # Quiz affinity, if set
 
 
 class AllArtistsResponse(BaseModel):

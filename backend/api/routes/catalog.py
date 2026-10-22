@@ -1,15 +1,22 @@
 """Catalog routes for browsing karaoke songs."""
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, computed_field
 from starlette.requests import Request
 
 from backend.i18n import get_locale_from_request, t
+from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
 from backend.services.karaoke_link_service import (
     KaraokeLinkService,
     get_karaoke_link_service,
 )
+from karaoke_decide.core.config import get_settings
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -384,7 +391,35 @@ async def search_artists(
     but are deprecated and will be removed in a future version.
 
     This endpoint is public (no auth required) for quick autocomplete.
+
+    Answered from catalog.db when BigQuery is disabled (local stack) or fails.
     """
+    if get_settings().bigquery_disabled:
+        return await _search_artists_catalog(q, limit)
+    try:
+        return _search_artists_bigquery(q, limit)
+    except Exception:
+        logger.warning("Artist search: BigQuery failed, answering from catalog.db", exc_info=True)
+        return await _search_artists_catalog(q, limit)
+
+
+async def _search_artists_catalog(q: str, limit: int) -> ArtistSearchResponse:
+    """Artist search over catalog.db's artists (empty while catalog.db is warming up)."""
+    try:
+        reader = await asyncio.to_thread(get_catalog_store().require)
+        found = await asyncio.to_thread(reader.search_artists, q, limit)
+    except CatalogUnavailable:
+        found = []
+    except Exception:
+        logger.warning("Artist search: catalog.db fallback failed", exc_info=True)
+        found = []
+    artists = [
+        ArtistSearchResult(mbid=a.mbid, name=a.name, popularity=a.popularity, genres=list(a.genres)) for a in found
+    ]
+    return ArtistSearchResponse(artists=artists, total=len(artists))
+
+
+def _search_artists_bigquery(q: str, limit: int) -> ArtistSearchResponse:
     # Use MBID-first search (MusicBrainz with Spotify enrichment)
     mbid_results = get_catalog_service().search_artists_mbid(q, limit=limit)
 
