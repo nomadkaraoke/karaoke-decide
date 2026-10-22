@@ -671,6 +671,14 @@ Save the candidates the user kept (`source: "screenshot"`). Body `{"items":[{"ki
 
 **Response:** `{"source":"screenshot","artists_added":0,"songs_added":0,"songs_updated":0,"tracks_matched":0}`
 
+### POST /api/services/spotify-export and /api/services/apple-export
+
+One chunk of a privacy-export import; the phone parses the zip and posts aggregates (at most 20,000 tracks per chunk, `chunk_count` 1..50). Body: `{generated_at, chunk_index, chunk_count, tracks:[{artist,title,ms_played,plays,first_ts,last_ts}]}`; Spotify adds `kind: "account"|"extended"`, `liked:[{artist,title}]` (at most 20,000) and `playlists:[{name,tracks:[{artist,title}]}]` (at most 500). Ingested with max play counts, so re-importing an export, or an Account then an Extended export, never doubles plays. A chunk already recorded for `(kind, generated_at)` is a no-op returning the stored totals with `duplicate: true`. Import status is `importing` until every chunk is in, then `ok`.
+
+**Response:** `{"source":"spotify_export","artists_added":0,"songs_added":0,"songs_updated":0,"tracks_matched":0,"duplicate":false,"chunks_done":1,"chunk_count":1}` (totals are cumulative over the export's chunks).
+
+**Errors:** `400` `bad_chunk` (index >= count, or count differs from the export's first chunk) · `422` validation.
+
 ### POST /api/services/youtube-music/import
 
 Import songs from a public or unlisted YouTube Music / YouTube playlist (no YouTube login).

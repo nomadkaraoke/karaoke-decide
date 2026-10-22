@@ -971,3 +971,9 @@ async def get_sync_status(
         ],
         active_job=active_job,
     )
+
+
+# Imported last: imports_export reuses ImportResultResponse defined above.
+from backend.api.routes.imports_export import router as _imports_export_router  # noqa: E402
+
+router.include_router(_imports_export_router)
