@@ -74,3 +74,22 @@ def to_int(v: object) -> int | None:
         return int(v)
     except ValueError:
         return None
+
+
+# --- scoring (scoring.score) ------------------------------------------------
+# score = sum(weight * feature); every feature is in [0, 1].
+SCORE_AFFINITY = 0.30  # artist affinity (the artist's context weight)
+SCORE_SIMILAR = 0.15  # max over seeds of weight(seed) * similarity(seed, artist)
+SCORE_KNOWN = 0.15  # known-song weight (a boost and a label, never an exclusion)
+SCORE_GENRE = 0.12  # song shares a quiz genre (ignoring "other")
+SCORE_DECADE = 0.08  # song's decade is a quiz decade
+SCORE_ENERGY = 0.08  # closeness to the quiz energy preference
+SCORE_POPULARITY = 0.07  # popularity / 100
+SCORE_BRANDS = 0.05  # min(brand_count, BRAND_CAP) / BRAND_CAP
+BRAND_CAP = 20
+ENERGY_MEDIUM_CENTER = 0.55  # "medium" peaks here and reaches 0 at +-0.5
+
+# quiz crowd-pleaser preference
+HITS_POPULARITY_BONUS = 0.05  # "hits": + bonus * pop
+DEEP_CUTS_OBSCURITY_BONUS = 0.03  # "deep_cuts": + bonus * (1 - pop) ...
+DEEP_CUTS_POPULARITY_PENALTY = 0.05  # ... - penalty * pop
