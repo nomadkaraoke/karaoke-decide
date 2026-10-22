@@ -6,8 +6,8 @@ quiz submission to create personalized song recommendations.
 
 from typing import Literal
 
-from fastapi import APIRouter, Query, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Query, Response, status
+from pydantic import BaseModel, Field, ValidationError
 
 from backend.api.deps import CurrentUser, KnownSongsServiceDep, QuizServiceDep
 from backend.services.quiz_service import ManualArtist
@@ -612,6 +612,24 @@ async def save_quiz_progress(
         crowd_pleaser_pref=request.crowd_pleaser_pref,
     )
     return {"saved": True}
+
+
+@router.get("/progress", response_model=QuizProgressRequest, responses={204: {"description": "No saved progress"}})
+async def get_quiz_progress(
+    user: CurrentUser,
+    quiz_service: QuizServiceDep,
+) -> QuizProgressRequest | Response:
+    """The progress saved by ``PUT /progress`` (same shape), or 204 if there is none.
+
+    Lets a returning user (or the mobile app) resume where they left off.
+    """
+    doc = await quiz_service.get_progress(user.id)
+    if not doc:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    try:
+        return QuizProgressRequest.model_validate({k: v for k, v in doc.items() if v is not None})
+    except ValidationError:  # an old or hand-edited doc: treat as "nothing to resume"
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # -----------------------------------------------------------------------------

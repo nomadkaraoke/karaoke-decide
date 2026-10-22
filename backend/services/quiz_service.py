@@ -6,6 +6,7 @@ to create UserSong records and update user profiles.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import random
 from dataclasses import dataclass
@@ -13,9 +14,11 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 from backend.config import BackendSettings
+from backend.services.catalog_store import CatalogStore, CatalogUnavailable, get_catalog_store
 from backend.services.firestore_service import FirestoreService
 from backend.services.listenbrainz_service import ListenBrainzService
 from karaoke_decide.catalog.genres import map_genres
+from karaoke_decide.catalog.keys import artist_key, song_key
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 from karaoke_decide.services.bq_limits import make_client
@@ -24,6 +27,17 @@ from karaoke_decide.services.bq_limits import make_client
 # ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
 if TYPE_CHECKING:
     from google.cloud import bigquery
+
+    from karaoke_decide.catalog.reader import CatalogReader
+
+# Smart-quiz ordering: the strongest explanation first (spec §5.6).
+REASON_PRIORITY: dict[str, int] = {
+    "fans_also_like": 0,
+    "similar_artist": 1,
+    "genre_match": 2,
+    "decade_match": 3,
+    "popular_choice": 4,
+}
 
 
 @dataclass
@@ -87,8 +101,7 @@ class QuizService:
     MIN_SIMILAR_USERS = 5  # Minimum similar users needed to show "fans_also_like"
     MLHD_MIN_SHARED_USERS = 500  # Minimum shared users in MLHD data to suggest
 
-    # Query limits for collaborative filtering (tuned to avoid OOM; most of the 1Gi Cloud Run limit is the in-memory catalog)
-    MAX_ORGANIC_USERS = 500  # Max organic users to query for collaborative filtering
+    # Query limit for collaborative filtering (tuned to avoid OOM on the 1Gi Cloud Run instance)
     MAX_LASTFM_USERS = 200  # Max Last.fm users to query for collaborative filtering
 
     def __init__(
@@ -97,6 +110,7 @@ class QuizService:
         firestore: FirestoreService,
         bigquery_client: bigquery.Client | None = None,
         listenbrainz: ListenBrainzService | None = None,
+        catalog_store: CatalogStore | None = None,
     ):
         """Initialize the quiz service.
 
@@ -105,11 +119,13 @@ class QuizService:
             firestore: Firestore service for user data.
             bigquery_client: Optional BigQuery client (created lazily).
             listenbrainz: Optional ListenBrainz service for similar artists.
+            catalog_store: Where catalog.db comes from (default: the process-wide store).
         """
         self.settings = settings
         self.firestore = firestore
         self._bigquery_client = bigquery_client
         self._listenbrainz = listenbrainz
+        self._catalog_store = catalog_store
         self._catalog_service: BigQueryCatalogService | None = None
 
     @property
@@ -123,8 +139,16 @@ class QuizService:
     def listenbrainz(self) -> ListenBrainzService:
         """Get or create ListenBrainz service."""
         if self._listenbrainz is None:
-            self._listenbrainz = ListenBrainzService(self.settings, self.firestore)
+            self._listenbrainz = ListenBrainzService(self.settings, self.firestore, self._catalog_store)
         return self._listenbrainz
+
+    async def _catalog_reader(self) -> CatalogReader | None:
+        """catalog.db's reader, or None while it is still warming up (callers degrade)."""
+        store = self._catalog_store or get_catalog_store()
+        try:
+            return await asyncio.to_thread(store.require)
+        except CatalogUnavailable:
+            return None
 
     @property
     def catalog(self) -> BigQueryCatalogService:
@@ -278,14 +302,22 @@ class QuizService:
             exclude_artists=all_exclusions if all_exclusions else None,
         )
 
-        # Get ListenBrainz similar artist matches (candidate -> seed artists)
+        # "People also like": catalog.db artist_similar (candidate -> seed artists + best score),
+        # then ListenBrainz Labs for candidates the catalog doesn't link.
         listenbrainz_matches: dict[str, list[str]] = {}
+        similarity_scores: dict[str, float] = {}
         candidate_names = [c.name for c in candidates]
         if all_seed_artists:
-            listenbrainz_matches = await self.listenbrainz.find_similar_artist_matches(
-                seed_artists=all_seed_artists,
-                candidate_names=candidate_names,
-            )
+            listenbrainz_matches, similarity_scores = await self._catalog_similar_matches(all_seed_artists, candidates)
+            remaining = [n for n in candidate_names if n not in listenbrainz_matches]
+            if remaining:
+                for name, seeds in (
+                    await self.listenbrainz.find_similar_artist_matches(
+                        seed_artists=all_seed_artists,
+                        candidate_names=remaining,
+                    )
+                ).items():
+                    listenbrainz_matches[name] = seeds
 
         # Get MLHD+ similar artist matches (from 583K Last.fm users)
         mlhd_matches: dict[str, list[str]] = {}
@@ -307,11 +339,44 @@ class QuizService:
             collaborative_suggestions=collaborative_suggestions,
         )
 
-        # Randomly select final set
-        if len(candidates_with_reasons) > count:
-            candidates_with_reasons = random.sample(candidates_with_reasons, count)
+        # Strongest explanation first, then similarity score, then karaoke popularity; the name makes
+        # the order (and so the quiz) deterministic. Every artist carries a reason (popular_choice at worst).
+        candidates_with_reasons.sort(
+            key=lambda a: (
+                REASON_PRIORITY[a.suggestion_reason.type if a.suggestion_reason else "popular_choice"],
+                -similarity_scores.get(a.name, 0.0),
+                -a.total_brand_count,
+                a.name.lower(),
+            )
+        )
+        return candidates_with_reasons[:count]
 
-        return candidates_with_reasons
+    async def _catalog_similar_matches(
+        self, seed_artists: list[str], candidates: list[QuizArtist]
+    ) -> tuple[dict[str, list[str]], dict[str, float]]:
+        """Which candidates catalog.db's ``artist_similar`` links to which seed artists.
+
+        Returns ``(candidate name -> seed names (best score first), candidate name -> best score)``;
+        both empty while the catalog is warming up.
+        """
+        reader = await self._catalog_reader()
+        if reader is None or not seed_artists or not candidates:
+            return {}, {}
+        seed_by_key = {artist_key(s): s for s in seed_artists}
+        by_key = {artist_key(c.name): c.name for c in candidates}
+        rows = await asyncio.to_thread(reader.similar, list(seed_by_key))
+        matches: dict[str, list[str]] = {}
+        scores: dict[str, float] = {}
+        for seed_key, similar_key, score in rows:  # best score first
+            name = by_key.get(similar_key)
+            seed = seed_by_key.get(seed_key)
+            if name is None or seed is None or similar_key in seed_by_key:
+                continue
+            seeds = matches.setdefault(name, [])
+            if seed not in seeds:
+                seeds.append(seed)
+            scores[name] = max(scores.get(name, 0.0), score)
+        return matches, scores
 
     def _get_artist_genres_detailed(self, artist_names: list[str]) -> dict[str, list[str]]:
         """Get genres for given artists from BigQuery, returning a dict by artist.
@@ -630,10 +695,9 @@ class QuizService:
     ) -> dict[str, list[str]]:
         """Find artists liked by users with similar taste.
 
-        MBID-First Architecture: Queries two data sources in parallel:
-        1. Organic users (decide_users) - by artist name (quiz_artists_known)
-        2. Last.fm users (lastfm_users) - by MBID if available, else artist name
-           Uses artist_mbids array for efficient MBID-based matching.
+        Last.fm users (lastfm_users) are matched by MBID if available, else artist name, using
+        the artist_mbids array. ("People also like" from catalog.db is added by the caller; it
+        never scans decide_users.)
 
         Args:
             user_selected_artists: Artists the current user has selected.
@@ -655,8 +719,7 @@ class QuizService:
         # Filter to valid MBIDs (non-empty)
         valid_mbids = [m for m in (user_artist_mbids or []) if m]
 
-        # Query both user collections in parallel
-        organic_users, lastfm_users = await self._query_collaborative_sources(
+        lastfm_users = await self._query_collaborative_sources(
             user_artists_lower,
             user_artist_mbids=valid_mbids if valid_mbids else None,
         )
@@ -664,25 +727,6 @@ class QuizService:
         # Find similar users and collect their artists
         # Structure: artist_name_lower -> list of (shared_artists, user_artists, source)
         artist_supporters: dict[str, list[tuple[list[str], list[str], str]]] = {}
-
-        # Process organic users (from quiz)
-        for user_doc in organic_users:
-            their_artists = user_doc.get("quiz_artists_known", [])
-            if not their_artists or len(their_artists) < self.MIN_SHARED_ARTISTS:
-                continue
-
-            their_artists_lower = {a.lower() for a in their_artists}
-            shared = user_artists_lower & their_artists_lower
-
-            if len(shared) >= self.MIN_SHARED_ARTISTS:
-                shared_display = [a for a in their_artists if a.lower() in shared][:3]
-                for artist in their_artists:
-                    artist_lower = artist.lower()
-                    if artist_lower in user_artists_lower or artist_lower in exclude_lower:
-                        continue
-                    if artist_lower not in artist_supporters:
-                        artist_supporters[artist_lower] = []
-                    artist_supporters[artist_lower].append((shared_display, their_artists, "organic"))
 
         # Process Last.fm users (MBID-first source)
         for user_doc in lastfm_users:
@@ -819,40 +863,20 @@ class QuizService:
         self,
         user_artists_lower: set[str],
         user_artist_mbids: list[str] | None = None,
-    ) -> tuple[list[dict], list[dict]]:
-        """Query both organic and Last.fm users for collaborative filtering.
+    ) -> list[dict]:
+        """Query Last.fm users who share artists with this user.
 
         MBID-First: When MBIDs are available, uses them for more accurate
         Last.fm user matching. Falls back to name-based matching otherwise.
-
-        Queries in parallel for efficiency:
-        1. Organic users: Full scan of decide_users (small collection)
-        2. Last.fm users: Uses array_contains_any on artist_mbids (preferred)
-           or artist_names_lower (fallback)
+        Uses array_contains_any on artist_mbids (preferred) or artist_names_lower (fallback).
 
         Args:
             user_artists_lower: Set of lowercased artist names for matching.
             user_artist_mbids: Optional list of MBIDs for MBID-based matching.
 
         Returns:
-            Tuple of (organic_users, lastfm_users) document lists.
+            Last.fm user documents.
         """
-        import asyncio
-
-        async def query_organic() -> list[dict]:
-            """Query organic users (our quiz users).
-
-            Limited to MAX_ORGANIC_USERS to avoid OOM on memory-constrained Cloud Run (1Gi, most taken by the in-memory catalog).
-            We only need a representative sample for collaborative filtering.
-            """
-            try:
-                return await self.firestore.query_documents(
-                    self.USERS_COLLECTION,
-                    filters=[],
-                    limit=self.MAX_ORGANIC_USERS,
-                )
-            except Exception:
-                return []
 
         async def query_lastfm() -> list[dict]:
             """Query Last.fm users.
@@ -896,13 +920,7 @@ class QuizService:
             except Exception:
                 return []
 
-        # Run both queries in parallel
-        organic_users, lastfm_users = await asyncio.gather(
-            query_organic(),
-            query_lastfm(),
-        )
-
-        return organic_users, lastfm_users
+        return await query_lastfm()
 
     def _map_spotify_genres_to_ids(self, spotify_genres: list[str]) -> list[str]:
         """Map Spotify genre strings to our genre IDs.
@@ -1325,7 +1343,6 @@ class QuizService:
             QuizSubmitResult with counts.
         """
         now = datetime.now(UTC)
-        songs_added = 0
         known_song_ids = known_song_ids or []
         known_artists = known_artists or []
 
@@ -1340,73 +1357,42 @@ class QuizService:
                     known_artists.append(artist)
                     all_artists_lower.add(artist.lower())
 
-        # If artists were selected, get their top songs
+        # Top songs for the chosen artists (catalog.db; BigQuery while it warms up) plus any legacy
+        # direct song picks, written with one read and one batch rather than a round trip per song.
+        songs: list[dict] = []
         if known_artists:
-            artist_songs = self._get_songs_by_artists(known_artists, limit_per_artist=5)
-            for song in artist_songs:
-                user_song_id = f"{user_id}:{song['id']}"
-
-                # Check if already exists
-                existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
-
-                if existing is None:
-                    user_song_data = {
-                        "id": user_song_id,
-                        "user_id": user_id,
-                        "song_id": song["id"],
-                        "source": "quiz",
-                        "play_count": 1,
-                        "last_played_at": None,
-                        "is_saved": False,
-                        "times_sung": 0,
-                        "last_sung_at": None,
-                        "average_rating": None,
-                        "notes": None,
-                        "artist": song["artist"],
-                        "title": song["title"],
-                        "created_at": now.isoformat(),
-                        "updated_at": now.isoformat(),
-                    }
-                    await self.firestore.set_document(
-                        self.USER_SONGS_COLLECTION,
-                        user_song_id,
-                        user_song_data,
-                    )
-                    songs_added += 1
-
-        # Also handle direct song selections (legacy support)
+            songs.extend(await self._top_songs_for_artists(known_artists, per_artist=5))
         if known_song_ids:
-            song_details = self._get_songs_by_ids(known_song_ids)
+            for song in await asyncio.to_thread(self._get_songs_by_ids, known_song_ids):
+                songs.append({**song, "song_key": song_key(song["artist"], song["title"])})
 
-            for song in song_details:
-                user_song_id = f"{user_id}:{song['id']}"
-
-                existing = await self.firestore.get_document(self.USER_SONGS_COLLECTION, user_song_id)
-
-                if existing is None:
-                    user_song_data = {
-                        "id": user_song_id,
-                        "user_id": user_id,
-                        "song_id": song["id"],
-                        "source": "quiz",
-                        "play_count": 1,
-                        "last_played_at": None,
-                        "is_saved": False,
-                        "times_sung": 0,
-                        "last_sung_at": None,
-                        "average_rating": None,
-                        "notes": None,
-                        "artist": song["artist"],
-                        "title": song["title"],
-                        "created_at": now.isoformat(),
-                        "updated_at": now.isoformat(),
-                    }
-                    await self.firestore.set_document(
-                        self.USER_SONGS_COLLECTION,
-                        user_song_id,
-                        user_song_data,
-                    )
-                    songs_added += 1
+        candidates = {f"{user_id}:{song['id']}": song for song in songs}
+        existing = await self.firestore.get_many(self.USER_SONGS_COLLECTION, list(candidates))
+        new_docs = {
+            doc_id: {
+                "id": doc_id,
+                "user_id": user_id,
+                "song_id": song["id"],
+                "song_key": song["song_key"],
+                "source": "quiz",
+                "play_count": 1,
+                "last_played_at": None,
+                "is_saved": False,
+                "times_sung": 0,
+                "last_sung_at": None,
+                "average_rating": None,
+                "notes": None,
+                "artist": song["artist"],
+                "title": song["title"],
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+            }
+            for doc_id, song in candidates.items()
+            if doc_id not in existing
+        }
+        if new_docs:
+            await self.firestore.batch_set(self.USER_SONGS_COLLECTION, new_docs)
+        songs_added = len(new_docs)
 
         # Update user profile with quiz data
         await self._update_user_quiz_data(
@@ -1431,6 +1417,35 @@ class QuizService:
             or len(manual_artists or []) > 0
             or len(artist_affinities or []) > 0,
         )
+
+    async def _top_songs_for_artists(self, artist_names: list[str], per_artist: int) -> list[dict]:
+        """Top songs per artist as ``{id, song_key, artist, title}``.
+
+        ``id`` is the KaraokeNerds id when catalog.db maps one (so docs written by earlier quizzes
+        are recognised), else a digest of the song_key. BigQuery answers while the catalog warms up.
+        """
+        reader = await self._catalog_reader()
+        if reader is None:
+            rows = await asyncio.to_thread(self._get_songs_by_artists, artist_names, per_artist)
+            return [{**r, "song_key": song_key(r["artist"], r["title"])} for r in rows]
+
+        def lookup() -> list[dict]:
+            keys = list(dict.fromkeys(artist_key(a) for a in artist_names))
+            found = reader.top_songs_for_artists(keys, per_artist)
+            kn_ids = reader.kn_ids_for_song_keys([r["song_key"] for r in found])
+            return [
+                {
+                    "id": str(kn_ids[r["song_key"]])
+                    if r["song_key"] in kn_ids
+                    else "sk:" + hashlib.sha1(r["song_key"].encode()).hexdigest()[:24],  # noqa: S324
+                    "song_key": r["song_key"],
+                    "artist": r["artist"],
+                    "title": r["title"],
+                }
+                for r in found
+            ]
+
+        return await asyncio.to_thread(lookup)
 
     def _get_songs_by_artists(self, artist_names: list[str], limit_per_artist: int = 5) -> list[dict]:
         """Get top songs for given artists from BigQuery.
@@ -1739,6 +1754,10 @@ class QuizService:
             user_id,
             progress_data,
         )
+
+    async def get_progress(self, user_id: str) -> dict[str, Any] | None:
+        """The auto-saved quiz progress document, or None if nothing was saved."""
+        return await self.firestore.get_document("quiz_progress", user_id)
 
     async def get_quiz_status(self, user_id: str) -> QuizStatus:
         """Get user's quiz completion status.

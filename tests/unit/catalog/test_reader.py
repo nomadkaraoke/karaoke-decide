@@ -101,6 +101,12 @@ def test_kn_song_keys(reader: CatalogReader) -> None:
     assert reader.kn_song_keys([]) == {}
 
 
+def test_kn_ids_for_song_keys(reader: CatalogReader) -> None:
+    ids = reader.kn_ids_for_song_keys(["toto|africa", "toto|hold the line", "nobody|nothing"])
+    assert ids == {"toto|africa": 1, "toto|hold the line": 2}
+    assert reader.kn_ids_for_song_keys([]) == {}
+
+
 def test_similar_limits_per_artist(reader: CatalogReader) -> None:
     (key,) = reader.conn().execute("SELECT artist_key FROM artist_similar LIMIT 1").fetchone()
     rows = reader.similar([key, key], limit_per=1)

@@ -399,3 +399,51 @@ class TestQuizEnjoySinging:
         )
 
         assert response.status_code == 401
+
+
+class TestGetQuizProgress:
+    """GET /api/quiz/progress returns the saved auto-save payload, or 204."""
+
+    def test_get_progress_roundtrip(self, quiz_client: TestClient, mock_quiz_service: MagicMock) -> None:
+        saved: dict = {}
+
+        async def save(user_id: str, **kwargs: object) -> None:
+            saved.update(kwargs)
+            saved["updated_at"] = "2026-10-21T00:00:00+00:00"
+            saved["artist_affinities"] = [
+                {"artist_name": n, "affinity": a}
+                for n, a in kwargs["artist_affinities"]  # type: ignore[attr-defined]
+            ]
+
+        async def get(user_id: str) -> dict | None:
+            return dict(saved) if saved else None
+
+        mock_quiz_service.save_progress = AsyncMock(side_effect=save)
+        mock_quiz_service.get_progress = AsyncMock(side_effect=get)
+        body = {
+            "step": 3,
+            "genres": ["rock"],
+            "artist_affinities": [{"artist_name": "Queen", "affinity": "love"}],
+            "energy_preference": "high",
+        }
+        headers = {"Authorization": "Bearer test-token"}
+        assert quiz_client.put("/api/quiz/progress", json=body, headers=headers).status_code == 200
+
+        response = quiz_client.get("/api/quiz/progress", headers=headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["step"] == 3
+        assert data["genres"] == ["rock"]
+        assert data["artist_affinities"] == [{"artist_name": "Queen", "affinity": "love"}]
+        assert data["energy_preference"] == "high"
+        assert data["decades"] == [] and data["manual_artists"] == [] and data["enjoy_songs"] == []
+        assert "updated_at" not in data
+
+    def test_get_progress_none_204(self, quiz_client: TestClient, mock_quiz_service: MagicMock) -> None:
+        mock_quiz_service.get_progress = AsyncMock(return_value=None)
+        response = quiz_client.get("/api/quiz/progress", headers={"Authorization": "Bearer test-token"})
+        assert response.status_code == 204
+        assert response.content == b""
+
+    def test_get_progress_requires_auth(self, quiz_client: TestClient) -> None:
+        assert quiz_client.get("/api/quiz/progress").status_code == 401

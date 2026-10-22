@@ -119,6 +119,22 @@ class CatalogReader:
             out.update((int(r[0]), r[1]) for r in rows)
         return out
 
+    def kn_ids_for_song_keys(self, song_keys: Sequence[str]) -> dict[str, int]:
+        """``{song_key: kn_id}``; with several KaraokeNerds rows per song the one with the most brands wins."""
+        keys = list(dict.fromkeys(song_keys))
+        out: dict[str, int] = {}
+        for chunk in _chunks(keys):
+            rows = self.conn().execute(
+                f"""
+                SELECT song_key, kn_id FROM kn_song_map WHERE song_key IN ({_marks(len(chunk))})
+                ORDER BY brand_count DESC, kn_id DESC
+                """,
+                tuple(chunk),
+            )
+            for r in rows:  # rows arrive best first
+                out.setdefault(r[0], int(r[1]))
+        return out
+
     def match_kn(self, artist: str, title: str) -> KnMatch | None:
         """The KaraokeNerds song for a listening-history track (legacy ``CatalogLookup`` key).
 

@@ -837,6 +837,12 @@ Get quiz songs for onboarding (legacy). Returns popular karaoke songs for users 
 }
 ```
 
+### GET /api/quiz/progress
+
+Returns the progress last saved by `PUT /api/quiz/progress`, in the same shape as that request (missing lists default to `[]`), or `204 No Content` when nothing was saved.
+
+**Requires:** Bearer token
+
 ### PUT /api/quiz/progress
 
 Save partial quiz progress for auto-save functionality. Allows frontend to persist quiz progress as the user fills in the form, enabling resume if they close the browser.
