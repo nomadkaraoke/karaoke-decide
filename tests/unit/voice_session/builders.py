@@ -2,9 +2,20 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 
-from karaoke_decide.voice_session.model import Context, Evidence, PitchSummary, Quiz, SongDemand
+from karaoke_decide.voice_session.model import (
+    HYPOTHESES,
+    Context,
+    Evidence,
+    Hyp,
+    PitchSummary,
+    Posterior,
+    Quiz,
+    SongDemand,
+)
+from karaoke_decide.voice_session.select import CandidateSong
 
 
 def song(p10: float, p90: float, *, spread: float = 2.0) -> SongDemand:
@@ -40,3 +51,33 @@ def evidence(
     stopped_early: bool = False,
 ) -> Evidence:
     return Evidence(song=s, quiz=q or quiz(), ctx=c or ctx(), pitch=pitch, stopped_early=stopped_early)
+
+
+def posterior(weights: dict[Hyp, float]) -> Posterior:
+    """A posterior with the given relative weights; hypotheses not listed get a negligible share."""
+    raw = {h: weights.get(h, 1e-9) for h in HYPOTHESES}
+    z = sum(raw.values())
+    return Posterior({h: math.log(w / z) for h, w in raw.items()})
+
+
+def candidate(
+    key: str,
+    s: SongDemand,
+    *,
+    artist: str | None = None,
+    stratum: str = "pop",
+    know: float = 0.4,
+    pref: float = 0.0,
+    popularity: int = 50,
+    loved: bool = False,
+) -> CandidateSong:
+    return CandidateSong(
+        song_key=key,
+        artist_key=artist or f"artist-{key}",
+        demand=s,
+        stratum=stratum,
+        know=know,
+        pref=pref,
+        popularity=popularity,
+        loved=loved,
+    )
