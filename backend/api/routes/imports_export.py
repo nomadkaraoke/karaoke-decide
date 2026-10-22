@@ -14,11 +14,16 @@ from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.api.deps import ImportIngestServiceDep, VerifiedUser
-from backend.api.routes.services import ImportResultResponse
-from backend.services.import_ingest_service import ImportIngestService, ImportSource, IngestTrack
+from backend.api.routes.import_models import ImportResultResponse
+from backend.services.import_ingest_service import (
+    ImportIngestService,
+    ImportSource,
+    IngestArtist,
+    IngestTrack,
+)
 from karaoke_decide.song_search.text_normalize import identity_normalize
 
 logger = logging.getLogger(__name__)
@@ -29,6 +34,9 @@ MAX_TRACKS = 20000
 MAX_PLAYLIST_TRACKS = 10000
 MAX_PLAYLISTS = 500
 MAX_CHUNKS = 50
+MAX_PLAYLIST_REFS = 20000  # across all playlists of one request
+MAX_EXPORT_ARTISTS = 2000
+EXPORT_ARTISTS_COLLECTION = "user_import_artists"
 _TOTAL_FIELDS = ("artists_added", "songs_added", "songs_updated", "tracks_matched")
 
 
@@ -63,6 +71,12 @@ class SpotifyExportRequest(AppleExportRequest):
     liked: list[ExportRef] = Field(max_length=MAX_TRACKS)
     playlists: list[ExportPlaylist] = Field(max_length=MAX_PLAYLISTS)
 
+    @model_validator(mode="after")
+    def _cap_playlist_refs(self) -> SpotifyExportRequest:
+        if sum(len(p.tracks) for p in self.playlists) > MAX_PLAYLIST_REFS:
+            raise ValueError(f"at most {MAX_PLAYLIST_REFS} playlist tracks per request")
+        return self
+
 
 class ExportImportResponse(ImportResultResponse):
     duplicate: bool
@@ -85,6 +99,51 @@ def _ingest_tracks(body: AppleExportRequest) -> list[IngestTrack]:
             seen.add(key)
             out.append(IngestTrack(r.artist, r.title, plays=None))
     return out
+
+
+def _chunk_artist_plays(tracks: list[IngestTrack]) -> dict[str, tuple[str, int]]:
+    """``{identity_normalize(artist): (display name, plays)}`` for one chunk (liked-only artists: 0)."""
+    out: dict[str, tuple[str, int]] = {}
+    for t in tracks:
+        key = identity_normalize(t.artist)
+        if key:
+            name, plays = out.get(key, (t.artist.strip(), 0))
+            out[key] = (name, plays + (t.plays or 0))
+    return out
+
+
+async def _cumulative_artists(
+    ingest: ImportIngestService,
+    user_id: str,
+    source: ImportSource,
+    export_key: str,
+    chunk_index: int,
+    chunk: dict[str, tuple[str, int]],
+) -> list[IngestArtist]:
+    """Add this chunk's per-artist plays to the export's running sums (once per chunk: a retried chunk
+    adds nothing) and return the cumulative top artists, ranked by plays."""
+    doc_id = f"{user_id}:{source}:{export_key}"
+    final: dict[str, Any] = {}
+
+    def add(cur: dict[str, Any] | None) -> dict[str, Any]:
+        doc = dict(cur or {})
+        done = list(doc.get("chunks_added", []))
+        artists = {k: dict(v) for k, v in (doc.get("artists") or {}).items()}
+        if chunk_index not in done:
+            for key, (name, plays) in chunk.items():
+                entry = artists.setdefault(key, {"n": name, "p": 0})
+                entry["p"] = int(entry["p"]) + plays
+            top = sorted(artists, key=lambda k: (-artists[k]["p"], k))[:MAX_EXPORT_ARTISTS]
+            artists = {k: artists[k] for k in top}
+            done = sorted([*done, chunk_index])
+        doc.update(user_id=user_id, source=source, chunks_added=done, artists=artists)
+        final.clear()
+        final.update(artists)
+        return doc
+
+    await ingest.db.transform_document_atomically(EXPORT_ARTISTS_COLLECTION, doc_id, add)
+    ranked = sorted(final, key=lambda k: (-final[k]["p"], k))
+    return [IngestArtist(name=final[k]["n"], plays=final[k]["p"] or None, rank=i) for i, k in enumerate(ranked, 1)]
 
 
 async def _ingest_chunk(
@@ -117,7 +176,11 @@ async def _ingest_chunk(
 
     # Ingest first, record after: a failed ingest leaves the chunk unrecorded so the phone's retry
     # re-sends it. Two racing posts of one chunk both ingest, which "max" mode makes harmless.
-    result = await ingest.ingest(user_id, source, _ingest_tracks(body), play_mode="max")
+    tracks = _ingest_tracks(body)
+    artists = await _cumulative_artists(
+        ingest, user_id, source, export_key, body.chunk_index, _chunk_artist_plays(tracks)
+    )
+    result = await ingest.ingest(user_id, source, tracks, artists=artists, play_mode="max")
     outcome: dict[str, Any] = {}
 
     def record(cur: dict[str, Any] | None) -> dict[str, Any]:

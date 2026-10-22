@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable, Iterator
 from typing import Any
 from unittest.mock import AsyncMock
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_current_user, get_import_ingest_service_dep
 from backend.main import app
 from backend.services.import_ingest_service import ImportIngestService, IngestResult
+from backend.tests.test_import_ingest_service import USER, FakeFirestore, FakeMatcher
 from karaoke_decide.core.models import User
 
 
@@ -123,16 +125,6 @@ def test_status_importing_until_last_chunk(env: Any) -> None:
     assert e.doc()["songs"] == 10 and e.doc()["artists"] == 2
 
 
-def test_account_then_extended_no_double_count(env: Any) -> None:
-    client, e = env
-    client.post("/api/services/spotify-export", json=spotify(kind="account"))
-    client.post("/api/services/spotify-export", json=spotify(kind="extended", generated_at="2026-10-05"))
-    assert e.ingest.ingest.await_count == 2
-    assert all(c.kwargs["play_mode"] == "max" for c in e.ingest.ingest.call_args_list)
-    assert set(e.doc()["exports"]) == {"account:2026-10-01", "extended:2026-10-05"}
-    assert e.doc()["status"] == "ok"
-
-
 def test_apple_export_source_apple_export(env: Any) -> None:
     client, e = env
     body = {"generated_at": "2026-10-01", "chunk_index": 0, "chunk_count": 1, "tracks": [track()]}
@@ -171,3 +163,95 @@ def test_ingest_failure_leaves_chunk_unrecorded(env: Any) -> None:
     with pytest.raises(RuntimeError):
         client.post("/api/services/spotify-export", json=spotify())
     assert ("user_imports", "fixture-user:spotify_export") not in e.fs.docs
+
+
+def test_playlist_refs_capped_at_20000_422(env: Any) -> None:
+    client, _ = env
+    refs = [{"artist": f"a{i}", "title": "t"} for i in range(10001)]
+    body = spotify(playlists=[{"name": "a", "tracks": refs[:10000]}, {"name": "b", "tracks": refs[:10000]}])
+    assert client.post("/api/services/spotify-export", json=body).status_code == 200
+    body = spotify(playlists=[{"name": f"p{i}", "tracks": refs[:10000]} for i in range(3)])
+    assert client.post("/api/services/spotify-export", json=body).status_code == 422
+
+
+# ---- real ImportIngestService over an in-memory Firestore -------------------------------------
+
+
+class RealFirestore(FakeFirestore):
+    async def transform_document_atomically(
+        self, collection: str, doc_id: str, fn: Callable[[dict[str, Any] | None], dict[str, Any] | None]
+    ) -> dict[str, Any] | None:
+        new = fn(copy.deepcopy(self.col(collection).get(doc_id)))
+        self.col(collection)[doc_id] = new  # type: ignore[assignment]
+        return new
+
+
+@pytest.fixture
+def real() -> Iterator[tuple[TestClient, RealFirestore]]:
+    fs = RealFirestore()
+    svc = ImportIngestService(fs, FakeMatcher(), lambda: None)  # type: ignore[arg-type]
+    app.dependency_overrides[get_current_user] = lambda: User(id=USER)
+    app.dependency_overrides[get_import_ingest_service_dep] = lambda: svc
+    yield TestClient(app), fs
+    app.dependency_overrides.clear()
+
+
+def artist_plays(fs: RealFirestore, name: str = "e2e-band") -> int:
+    docs = [d for d in fs.col("user_artists").values() if d["artist_name"] == name]
+    assert len(docs) == 1
+    return docs[0]["playcount"]
+
+
+def song_plays(fs: RealFirestore, title: str) -> int:
+    return next(d["playcount"] for d in fs.col("user_songs").values() if d["title"] == title)
+
+
+def post(client: TestClient, idx: int, count: int, tracks: list[dict[str, Any]], **over: Any) -> Any:
+    r = client.post("/api/services/spotify-export", json=spotify(idx, count, tracks=tracks, **over))
+    assert r.status_code == 200, r.text
+    return r
+
+
+def test_artist_spanning_two_chunks_sums_and_repost_is_stable(real: Any) -> None:
+    client, fs = real
+    post(client, 0, 2, [track("e2e-band", "Song One", 5), track("other-act", "Song Z", 1)])
+    assert artist_plays(fs) == 5
+    post(client, 1, 2, [track("e2e-band", "Song Two", 4)])
+    assert artist_plays(fs) == 9
+    post(client, 1, 2, [track("e2e-band", "Song Two", 4)])  # duplicate chunk
+    post(client, 0, 2, [track("e2e-band", "Song One", 5), track("other-act", "Song Z", 1)])
+    assert artist_plays(fs) == 9
+    ranks = {d["artist_name"]: d["rank"] for d in fs.col("user_artists").values()}
+    assert ranks == {"e2e-band": 1, "other-act": 2}
+    assert fs.col("user_imports")[f"{USER}:spotify_export"]["status"] == "ok"
+
+
+def test_account_then_extended_no_double_count(real: Any) -> None:
+    client, fs = real
+    tracks = [track("e2e-band", "Song One", 5), track("e2e-band", "Song Two", 4)]
+    post(client, 0, 1, tracks, kind="account")
+    post(client, 0, 1, tracks, kind="extended", generated_at="2026-10-05")
+    assert artist_plays(fs) == 9
+    assert song_plays(fs, "Song One") == 5
+    post(client, 0, 1, tracks, kind="extended", generated_at="2026-10-05")
+    assert artist_plays(fs) == 9 and song_plays(fs, "Song Two") == 4
+
+
+def test_failed_ingest_retry_does_not_double_artist_sums(real: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, fs = real
+    svc = app.dependency_overrides[get_import_ingest_service_dep]()
+    real_ingest = svc.ingest
+    calls = {"n": 0}
+
+    async def flaky(*a: Any, **k: Any) -> IngestResult:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return await real_ingest(*a, **k)
+
+    monkeypatch.setattr(svc, "ingest", flaky)
+    body = spotify(0, 1, tracks=[track("e2e-band", "Song One", 5)])
+    with pytest.raises(RuntimeError):
+        client.post("/api/services/spotify-export", json=body)
+    assert client.post("/api/services/spotify-export", json=body).status_code == 200
+    assert artist_plays(fs) == 5

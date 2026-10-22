@@ -26,13 +26,14 @@ from backend.api.deps import (
     get_catalog_lookup_dep,
     get_firestore,
 )
+from backend.api.routes.import_models import ImportResultResponse
+from backend.api.routes.imports_export import router as _imports_export_router
 from backend.config import BackendSettings
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
 from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
-from backend.services.import_ingest_service import IngestResult
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -194,26 +195,6 @@ async def get_capabilities(settings: Settings) -> Capabilities:
 # -----------------------------------------------------------------------------
 # Screenshot import (Gemini Flash reads the screenshot; the user confirms; ingest saves)
 # -----------------------------------------------------------------------------
-
-
-class ImportResultResponse(BaseModel):
-    """Outcome of one import, shared by every import source."""
-
-    source: str
-    artists_added: int
-    songs_added: int
-    songs_updated: int
-    tracks_matched: int
-
-    @classmethod
-    def from_result(cls, source: str, r: IngestResult) -> "ImportResultResponse":
-        return cls(
-            source=source,
-            artists_added=r.artists_added,
-            songs_added=r.songs_added,
-            songs_updated=r.songs_updated,
-            tracks_matched=r.tracks_matched,
-        )
 
 
 class ScreenshotExtractResponse(BaseModel):
@@ -972,8 +953,5 @@ async def get_sync_status(
         active_job=active_job,
     )
 
-
-# Imported last: imports_export reuses ImportResultResponse defined above.
-from backend.api.routes.imports_export import router as _imports_export_router  # noqa: E402
 
 router.include_router(_imports_export_router)
