@@ -6,9 +6,10 @@ Handles OAuth flows, service connections, and sync operations.
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
@@ -16,17 +17,33 @@ from starlette.requests import Request
 from backend.api.deps import (
     CurrentUser,
     FirestoreServiceDep,
+    ImportIngestServiceDep,
     MusicServiceServiceDep,
     OptionalUser,
     Settings,
     SyncServiceDep,
     VerifiedUser,
+    get_catalog_lookup_dep,
+    get_firestore,
 )
 from backend.config import BackendSettings
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
+from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import IngestResult
+from backend.services.screenshot_import_service import (
+    MAX_CONFIRM_ITEMS,
+    MAX_IMAGE_BYTES,
+    MAX_IMAGES_PER_REQUEST,
+    Candidate,
+    ConfirmItem,
+    DailyLimitError,
+    ScreenshotImportService,
+    ScreenshotUnavailableError,
+    get_screenshot_extractor,
+)
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
@@ -166,6 +183,93 @@ async def get_capabilities(settings: Settings) -> Capabilities:
         screenshot_import=settings.screenshot_import_enabled,
         listenbrainz_oauth=settings.listenbrainz_oauth_active,
     )
+
+
+# -----------------------------------------------------------------------------
+# Screenshot import (Gemini Flash reads the screenshot; the user confirms; ingest saves)
+# -----------------------------------------------------------------------------
+
+
+class ImportResultResponse(BaseModel):
+    """Outcome of one import, shared by every import source."""
+
+    source: str
+    artists_added: int
+    songs_added: int
+    songs_updated: int
+    tracks_matched: int
+
+    @classmethod
+    def from_result(cls, source: str, r: IngestResult) -> "ImportResultResponse":
+        return cls(
+            source=source,
+            artists_added=r.artists_added,
+            songs_added=r.songs_added,
+            songs_updated=r.songs_updated,
+            tracks_matched=r.tracks_matched,
+        )
+
+
+class ScreenshotExtractResponse(BaseModel):
+    candidates: list[Candidate]
+
+
+class ScreenshotConfirmRequest(BaseModel):
+    items: list[ConfirmItem] = Field(max_length=MAX_CONFIRM_ITEMS)
+
+
+async def get_screenshot_import_service(
+    settings: Settings,
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    ingest: ImportIngestServiceDep,
+    catalog: Annotated[CatalogLookup, Depends(get_catalog_lookup_dep)],
+) -> ScreenshotImportService:
+    extractor = get_screenshot_extractor(settings) if settings.screenshot_import_enabled else None
+    return ScreenshotImportService(firestore, ingest, catalog, extractor)
+
+
+ScreenshotImportServiceDep = Annotated[ScreenshotImportService, Depends(get_screenshot_import_service)]
+
+
+@router.post("/screenshot/extract", response_model=ScreenshotExtractResponse)
+async def extract_screenshot(
+    user: CurrentUser, service: ScreenshotImportServiceDep, images: Annotated[list[UploadFile] | None, File()] = None
+) -> ScreenshotExtractResponse:
+    """Read artists/songs off 1-5 screenshots (each at most 4 MiB, image/*).
+
+    Errors: 400 no_images / too_many_images / not_an_image, 413 image_too_large,
+    429 daily_limit (10 images per UTC day), 503 screenshot_unavailable.
+    """
+    if not images:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_images")
+    if len(images) > MAX_IMAGES_PER_REQUEST:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "too_many_images")
+    if any(not (f.content_type or "").startswith("image/") for f in images):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_an_image")
+    if service.extractor is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "screenshot_unavailable")
+    blobs: list[tuple[bytes, str]] = []
+    for f in images:
+        data = await f.read(MAX_IMAGE_BYTES + 1)
+        if len(data) > MAX_IMAGE_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "image_too_large")
+        blobs.append((data, f.content_type or "image/png"))
+    try:
+        candidates = await service.extract(user.id, blobs)
+    except DailyLimitError:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily_limit")
+    except ScreenshotUnavailableError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "screenshot_unavailable")
+    return ScreenshotExtractResponse(candidates=candidates)
+
+
+@router.post("/screenshot/confirm", response_model=ImportResultResponse)
+async def confirm_screenshot(
+    body: ScreenshotConfirmRequest, user: CurrentUser, service: ScreenshotImportServiceDep
+) -> ImportResultResponse:
+    """Save the candidates the user kept (source ``screenshot``)."""
+    result = await service.confirm(user.id, body.items)
+    return ImportResultResponse.from_result("screenshot", result)
 
 
 @router.get("", response_model=list[ConnectedServiceResponse])

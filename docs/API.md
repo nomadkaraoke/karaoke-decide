@@ -657,6 +657,20 @@ Connect Last.fm account by username.
 No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, "listenbrainz_oauth": bool, "listenbrainz_upload_max_bytes": 31457280}`.
 `screenshot_import` is true when `GEMINI_API_KEY` is set (or fakes are on); `listenbrainz_oauth` needs the MetaBrainz client id/secret, `DECIDE_TOKEN_KEY` and `LISTENBRAINZ_OAUTH_ENABLED`.
 
+### POST /api/services/screenshot/extract
+
+Read artists and songs off 1-5 music-app screenshots with Gemini Flash. Multipart field `images` (each at most 4 MiB, `image/*`). Limit: 10 images per user per UTC day (reserved atomically, released if Gemini fails). Nothing is saved yet.
+
+**Requires:** Bearer token. **Response:** `{"candidates":[{"kind":"artist"|"song","artist":"Muse","title":"Hysteria"|null,"confidence":0.9,"matched":true,"song_key":"muse|hysteria"|null}]}` (deduped, matched first).
+
+**Errors:** `400` `no_images` / `too_many_images` / `not_an_image` · `413` `image_too_large` · `429` `daily_limit` · `503` `screenshot_unavailable` (disabled, or Gemini error).
+
+### POST /api/services/screenshot/confirm
+
+Save the candidates the user kept (`source: "screenshot"`). Body `{"items":[{"kind":"artist"|"song","artist":"...","title":"..."}]}` (at most 200).
+
+**Response:** `{"source":"screenshot","artists_added":0,"songs_added":0,"songs_updated":0,"tracks_matched":0}`
+
 ### POST /api/services/youtube-music/import
 
 Import songs from a public or unlisted YouTube Music / YouTube playlist (no YouTube login).
