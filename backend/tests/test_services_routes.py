@@ -601,6 +601,20 @@ class TestAppleMusic:
 
         assert auth_client.get("/api/services/apple-music/developer-token").status_code == 503
 
+    def test_app_developer_token_needs_sign_in_and_has_no_origin(
+        self, auth_client: TestClient, mock_music_service_service: MagicMock
+    ) -> None:
+        mock_music_service_service.apple_music_signer.token = MagicMock(return_value=("app-token", 1_900_000_000))
+
+        assert auth_client.get("/api/services/apple-music/app-developer-token").status_code in (401, 403)
+        response = auth_client.get(
+            "/api/services/apple-music/app-developer-token", headers={"Authorization": "Bearer test-token"}
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"developer_token": "app-token", "expires_at": 1_900_000_000}
+        mock_music_service_service.apple_music_signer.token.assert_called_once_with()
+
     def test_link_returns_localized_connect_url(
         self, auth_client: TestClient, mock_music_service_service: MagicMock
     ) -> None:
