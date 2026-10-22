@@ -26,6 +26,7 @@ RUN poetry config virtualenvs.create false \
 # Copy application code
 COPY karaoke_decide/ ./karaoke_decide/
 COPY backend/ ./backend/
+COPY data/vocal_range/ ./data/vocal_range/
 RUN python -m compileall -q -j 0 --invalidation-mode unchecked-hash karaoke_decide backend
 
 # Create non-root user
