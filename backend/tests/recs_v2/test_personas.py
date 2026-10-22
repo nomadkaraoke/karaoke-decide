@@ -90,6 +90,21 @@ def test_heavy_profile_leads_with_songs_you_know(reader: CatalogReader) -> None:
     assert all(s.reason_type == "known_song" for s in sections[0].songs)
 
 
+def test_heavy_profile_still_discovers(reader: CatalogReader) -> None:
+    """Known songs stay in "Songs you know" (or Make it); the rest of the page is new to the user."""
+    ctx = persona_c(reader)
+    _, sections = _run(reader, ctx)
+    by_id = {s.id: s for s in sections}
+    for sid in ("artists_you_love", "crowd_pleasers"):
+        assert by_id[sid].songs, sid
+        assert not [s.c.song_key for s in by_id[sid].songs if s.c.song_key in ctx.known_songs], sid
+    for sec in sections:
+        if sec.id.startswith("because_"):
+            assert not [s for s in sec.songs if s.c.song_key in ctx.known_songs]
+    unknown = {s.c.song_key for sec in sections for s in sec.songs if s.c.song_key not in ctx.known_songs}
+    assert len(unknown) >= 25
+
+
 def test_every_persona_gets_crowd_pleasers(reader: CatalogReader) -> None:
     for ctx in (persona_a(reader), persona_b(), persona_c(reader)):
         _, sections = _run(reader, ctx)

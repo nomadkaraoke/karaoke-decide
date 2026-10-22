@@ -169,3 +169,36 @@ def test_real_catalog_sections(reader: CatalogReader) -> None:
     assert [s.id for s in sections] == sorted((s.id for s in sections), key=_rank)
     for sec in sections:
         assert max(Counter(s.c.artist_key for s in sec.songs).values()) <= 3
+
+
+def test_known_songs_only_in_songs_you_know_or_make_it() -> None:
+    ctx = _ctx()
+    ctx.known_songs |= {"loved1|m0": 1.0, "crowd0|s": 1.0, "nearloved10|s": 1.0}
+    sections = build_sections(_scored(ctx), ctx, "best")
+    for sec in sections:
+        known = [s.c.song_key for s in sec.songs if ctx.known_songs.get(s.c.song_key, 0) > 0]
+        if sec.id not in ("songs_you_know", "make_it"):
+            assert known == [], sec.id
+    make = next(s for s in sections if s.id == "make_it")
+    assert "loved1|m0" in {s.c.song_key for s in make.songs}  # a known song with no karaoke version yet
+    # loved1|k3..k5 overflowed songs_you_know's per-artist cap and are dropped, not moved to artists_you_love
+    assert not {"loved1|k3", "loved1|k4", "loved1|k5"} & set(_keys(sections))
+
+
+def test_because_counts_only_songs_left_after_earlier_sections() -> None:
+    ctx = _ctx()
+    ctx.known_songs |= {"nearloved20|s": 1.0, "nearloved21|s": 1.0}  # loved2: 4 similar, 2 known -> 2 left
+    ids = [s.id for s in build_sections(_scored(ctx), ctx, "best")]
+    assert "because_loved2" not in ids
+    assert ids[2:4] == ["because_loved1", "because_loved3"]
+
+
+def test_because_counts_per_artist_cap() -> None:
+    ctx = _ctx()
+    scored = _scored(ctx)
+    scored = [s for s in scored if not s.c.song_key.startswith("nearloved2")]
+    one_artist = [cand(f"nearloved2x|s{i}", "NearLoved2x", similar_via="loved2", similar_score=0.5) for i in range(5)]
+    scored += [score(c, ctx) for c in one_artist]
+    sections = build_sections(scored, ctx, "best")
+    sec = next(s for s in sections if s.id == "because_loved2")  # 5 songs by one artist count as 3: eligible
+    assert len(sec.songs) == 3

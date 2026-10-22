@@ -182,7 +182,7 @@ def _quiz(g: _Gatherer, ctx: UserContextV2) -> None:
     narrow_sql = " AND ".join(f"({c})" for c in narrow)
     got = g.top(f"({base}) AND {narrow_sql}", [*base_p, *narrow_p], QUIZ_SONGS)
     if got < QUIZ_SONGS and genres:
-        g.top(f"({base}) AND NOT ({narrow_sql})", [*base_p, *narrow_p], QUIZ_SONGS - got)
+        g.top(f"({base}) AND NOT COALESCE(({narrow_sql}), 0)", [*base_p, *narrow_p], QUIZ_SONGS - got)
 
 
 def _candidate(r: sqlite3.Row, avail: dict[str, tuple[bool, bool, bool]]) -> Candidate:

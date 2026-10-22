@@ -62,62 +62,90 @@ def _section(sid: str, key: str | None = None, **params: str) -> Section:
     )
 
 
-def because_seeds(scored: list[Scored], ctx: UserContextV2) -> list[str]:
-    """The ``BECAUSE_SECTIONS`` highest-weight seed artists with enough similar karaoke candidates."""
-    counts = Counter(s.c.similar_via for s in scored if s.c.similar_via and s.c.has_karaoke)
+def because_seeds(remaining: list[Scored], ctx: UserContextV2) -> list[str]:
+    """The ``BECAUSE_SECTIONS`` highest-weight seeds with at least ``BECAUSE_MIN_CANDIDATES``
+    distinct eligible songs left once earlier sections took theirs (``PER_ARTIST`` cap applied)."""
+    per_artist: Counter[tuple[str, str]] = Counter()
+    counts: Counter[str] = Counter()
+    for s in remaining:
+        seed = s.c.similar_via
+        if not seed or not _discovery(s, ctx) or per_artist[(seed, s.c.artist_key)] >= PER_ARTIST:
+            continue
+        per_artist[(seed, s.c.artist_key)] += 1
+        counts[seed] += 1
     eligible = [k for k, n in counts.items() if n >= BECAUSE_MIN_CANDIDATES and k in ctx.artists]
     eligible.sort(key=lambda k: (-ctx.artists[k].weight, k))
     return eligible[:BECAUSE_SECTIONS]
 
 
-def _similar_to(seed: str) -> Callable[[Scored], bool]:
-    return lambda s: s.c.has_karaoke and s.c.similar_via == seed
+def _known(s: Scored, ctx: UserContextV2) -> bool:
+    return ctx.known_songs.get(s.c.song_key, 0) > 0
+
+
+def _discovery(s: Scored, ctx: UserContextV2) -> bool:
+    """Karaoke songs the user doesn't know yet (discovery shelves never repeat known songs)."""
+    return s.c.has_karaoke and not _known(s, ctx)
+
+
+def _similar_to(seed: str, ctx: UserContextV2) -> Callable[[Scored], bool]:
+    return lambda s: _discovery(s, ctx) and s.c.similar_via == seed
+
+
+def _fill(slots: list[_Slot], songs: list[Scored]) -> list[Scored]:
+    """Offer each song, in order, to the first slot that takes it; return the songs no slot took."""
+    left: list[Scored] = []
+    for s in songs:
+        if not any(slot.offer(s) for slot in slots):
+            left.append(s)
+    return left
 
 
 def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
+    """Greedy placement in score order. Known songs only go to ``songs_you_know`` (or ``make_it``
+    when there is no karaoke version); the other shelves are for discovery.
+
+    Two passes give the same result as one (a song's fate in the first two shelves never depends on
+    later ones), and the second pass picks ``because_*`` seeds from what is actually left."""
     cold = ctx.is_cold
 
     def crowd(s: Scored) -> bool:
-        if not s.c.has_karaoke:
+        if not _discovery(s, ctx):
             return False
         return cold or s.c.is_classic or (s.c.popularity or 0) >= CROWD_MIN_POPULARITY
 
-    slots = [
+    ordered = [s for s in sorted(scored, key=lambda s: (-s.score, s.c.song_key)) if s.c.song_key not in ctx.hidden]
+    first = [
         _Slot(
             _section("songs_you_know"),
             SECTION_LIMITS["songs_you_know"],
-            lambda s: s.c.has_karaoke and ctx.known_songs.get(s.c.song_key, 0) > 0,
+            lambda s: s.c.has_karaoke and _known(s, ctx),
         ),
         _Slot(
             _section("artists_you_love"),
             SECTION_LIMITS["artists_you_love"],
-            lambda s: s.c.has_karaoke and s.c.artist_key in ctx.artists and ctx.artists[s.c.artist_key].weight > 0,
+            lambda s: _discovery(s, ctx) and s.c.artist_key in ctx.artists and ctx.artists[s.c.artist_key].weight > 0,
         ),
     ]
-    for seed in because_seeds(scored, ctx):
-        slots.append(
-            _Slot(
-                _section(f"because_{seed}", "because", artist=ctx.artists[seed].name),
-                SECTION_LIMITS["because"],
-                _similar_to(seed),
-            )
+    remaining = _fill(first, ordered)
+
+    rest = [
+        _Slot(
+            _section(f"because_{seed}", "because", artist=ctx.artists[seed].name),
+            SECTION_LIMITS["because"],
+            _similar_to(seed, ctx),
         )
-    slots.append(
+        for seed in because_seeds(remaining, ctx)
+    ]
+    rest.append(
         _Slot(
             _section("crowd_pleasers"),
             COLD_CROWD_PLEASERS if cold else SECTION_LIMITS["crowd_pleasers"],
             crowd,
         )
     )
-    slots.append(_Slot(_section("make_it"), SECTION_LIMITS["make_it"], lambda s: not s.c.has_karaoke))
-
-    for s in sorted(scored, key=lambda s: (-s.score, s.c.song_key)):
-        if s.c.song_key in ctx.hidden:
-            continue
-        for slot in slots:
-            if slot.offer(s):
-                break
-    return [slot.section for slot in slots if slot.section.songs]
+    rest.append(_Slot(_section("make_it"), SECTION_LIMITS["make_it"], lambda s: not s.c.has_karaoke))
+    _fill(rest, remaining)
+    return [slot.section for slot in [*first, *rest] if slot.section.songs]
 
 
 def _flat_key(sort: Sort) -> Callable[[Scored], tuple[object, ...]]:
