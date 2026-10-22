@@ -129,3 +129,18 @@ def test_prune_ignores_non_run_objects(tmp_path, make_rows):
         pub.publish_catalog(bucket, db, stats, run)
     assert "catalog/notes/readme.txt" in bucket.objects
     assert "catalog/20261001-000000/catalog.db.gz" not in bucket.objects
+
+
+def test_prune_failure_after_publish_warns_and_does_not_raise(tmp_path, make_rows, monkeypatch, caplog):
+    db, stats = _db(tmp_path, make_rows)
+    bucket = FakeBucket()
+
+    def boom(_bucket):
+        raise RuntimeError("gcs list failed")
+
+    monkeypatch.setattr(pub, "_prune", boom)
+    with caplog.at_level("WARNING", logger=pub.logger.name):
+        ptr = pub.publish_catalog(bucket, db, stats, "20261021-010101")
+    assert json.loads(bucket.objects["catalog/latest.json"]) == ptr
+    prune_logs = [r for r in caplog.records if "prune" in r.getMessage()]
+    assert prune_logs and all(r.levelname == "WARNING" for r in prune_logs)

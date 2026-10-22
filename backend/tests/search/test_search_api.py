@@ -329,7 +329,7 @@ def test_identified_song_lookup_error_degrades(client: TestClient, monkeypatch: 
 
     from karaoke_decide.song_search.availability import AvailabilityIndex
 
-    def no_search(self: object, q: str, limit: int = 60) -> list[dict[str, Any]]:
+    def no_search(self: object, q: str, limit: int = 60, library: str = "any") -> list[dict[str, Any]]:
         return []
 
     def broken(self: object, key: str) -> None:
@@ -340,3 +340,50 @@ def test_identified_song_lookup_error_degrades(client: TestClient, monkeypatch: 
     body = _search(client, "starlite muse")
     assert body["identification"]["status"] == "confident"
     assert body["groups"] == []
+
+
+# --- library filter ------------------------------------------------------------------
+
+
+def _libs(group: dict[str, Any]) -> tuple[set[str], set[str]]:
+    return {v["kind"] for v in group["versions"]}, {v["brand_code"] for v in group["versions"]}
+
+
+def test_popular_library_karafun(client: TestClient) -> None:
+    any_groups = client.get("/api/search/popular", params={"limit": 60}).json()
+    groups = client.get("/api/search/popular", params={"limit": 60, "library": "karafun"}).json()
+    assert groups and len(groups) < len(any_groups)
+    detail = [client.get("/api/search/song", params={"key": g["song_key"]}).json() for g in groups]
+    assert all("KV" in {v["brand_code"] for v in d["versions"]} for d in detail)
+
+
+def test_popular_library_community(client: TestClient) -> None:
+    groups = client.get("/api/search/popular", params={"limit": 60, "library": "community"}).json()
+    assert groups
+    for g in groups:
+        detail = client.get("/api/search/song", params={"key": g["song_key"]}).json()
+        assert "community" in {v["kind"] for v in detail["versions"]}
+
+
+def test_search_library_keeps_identification(client: TestClient) -> None:
+    base = _search(client, "starlite muse")
+    for library in ("karafun", "community"):
+        body = _search(client, "starlite muse", library=library)
+        assert body["identification"] == base["identification"]
+        # Muse "Starlight" has KV and community (CC, NOMAD) versions, so it stays in both.
+        assert STARLIGHT in [g["song_key"] for g in body["groups"]]
+
+
+def test_search_library_filters_groups_out(client: TestClient) -> None:
+    for library, want in (("karafun", "KV"), ("community", None)):
+        body = _search(client, "baby", library=library)
+        for g in body["groups"]:
+            detail = client.get("/api/search/song", params={"key": g["song_key"]}).json()
+            if want:
+                assert want in {v["brand_code"] for v in detail["versions"]}
+            else:
+                assert "community" in {v["kind"] for v in detail["versions"]}
+
+
+def test_library_invalid_value_is_422(client: TestClient) -> None:
+    assert client.get("/api/search/popular", params={"library": "nope"}).status_code == 422

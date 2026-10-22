@@ -29,11 +29,11 @@ COMMUNITY_BRANDS = [
 ]
 
 COMMERCIAL_BRANDS = [
-    ("KV", ["KV", "KVD", "KCD", "Karaoke Version", "Karaoke Cloud Digitrax", "Karafun"], "Karaoke Version"),
+    ("KV", ["KV", "KVD", "KCD", "Karaoke Version", "Karafun"], "Karaoke Version"),
     ("SC", ["SC", "Sound Choice"], "Sound Choice"),
     ("SBI", ["SBI", "SBI Karaoke"], "SBI Karaoke"),
     ("SF", ["SF", "Sunfly"], "Sunfly"),
-    ("CB", ["CB", "CBD", "Chart Buster", "Chartbuster"], "Chart Buster"),
+    ("CB", ["CB", "CBD", "Chart Buster", "Chartbuster", "Karaoke Cloud Digitrax"], "Chart Buster"),
     ("ZM", ["ZM", "ZOOM", "Zoom"], "Zoom"),
     # high-frequency unlisted
     ("VS", ["VS", "Vocal Star"], "Vocal Star"),

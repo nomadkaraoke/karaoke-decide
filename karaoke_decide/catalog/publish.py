@@ -89,7 +89,11 @@ def publish_catalog(bucket: Any, db_path: Path, stats: CatalogStats, run: str) -
     }
     with bucket.blob(CATALOG_LATEST).open("wb") as out:
         out.write(json.dumps(pointer, sort_keys=True).encode())
-    _prune(bucket)
+    try:
+        _prune(bucket)
+    except Exception:
+        # The new catalog is already live; a failed cleanup is retried next run, not page-worthy.
+        logger.warning("catalog prune failed after publish (old runs kept)", exc_info=True)
     return pointer
 
 
