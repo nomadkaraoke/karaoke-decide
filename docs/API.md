@@ -652,6 +652,18 @@ Connect Last.fm account by username.
 }
 ```
 
+### GET /api/services/listenbrainz/oauth/start
+
+Verified users. Start connecting ListenBrainz through MetaBrainz OAuth (authorization code + PKCE S256, scopes `profile listenbrainz:submit-listens`). Query `return_to=app|web` (required). Response `{"auth_url": "https://metabrainz.org/oauth2/authorize?..."}`; `404 {"detail":"oauth_disabled"}` when `capabilities.listenbrainz_oauth` is false.
+
+### GET /api/services/listenbrainz/oauth/callback
+
+No auth (MetaBrainz redirects here; the one-time state identifies the user). Query `code`, `state`, `error`. Stores the connection (`auth: "oauth"`, tokens encrypted with `DECIDE_TOKEN_KEY`) and answers `302` with `Cache-Control: no-store`:
+- `return_to=app`: `nomadkaraoke://services/listenbrainz?status=connected` or `?status=error&reason=<code>` (tiny HTML body with a "Return to the app" link);
+- `return_to=web` (also used when the state is unknown): `{frontend_url}/en/music-i-know?listenbrainz=connected` or `?listenbrainz=error&reason=<code>`.
+
+Reason codes: `denied`, `missing_params`, `invalid_state`, `exchange_failed`, `validate_failed` (no ListenBrainz account for that MetaBrainz user). The Worker proxies with `redirect: "manual"` so the 302 reaches the browser.
+
 ### GET /api/services/capabilities
 
 No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, "listenbrainz_oauth": bool, "listenbrainz_upload_max_bytes": 31457280}`.

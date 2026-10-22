@@ -5,9 +5,10 @@ connected music services (Spotify, Last.fm).
 """
 
 import asyncio
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
@@ -17,7 +18,13 @@ from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
+from karaoke_decide.services.metabrainz_oauth import MetaBrainzInvalidGrantError, MetaBrainzOAuth
 from karaoke_decide.services.spotify import SpotifyClient
+
+if TYPE_CHECKING:
+    from backend.services.token_cipher import TokenCipher
+
+logger = logging.getLogger(__name__)
 
 
 class MusicServiceError(Exception):
@@ -48,6 +55,7 @@ class MusicServiceService:
         lastfm_client: LastFmClient | None = None,
         listenbrainz_client: ListenBrainzClient | None = None,
         apple_music_client: AppleMusicClient | None = None,
+        metabrainz_oauth: MetaBrainzOAuth | None = None,
     ):
         """Initialize the music service service.
 
@@ -65,6 +73,7 @@ class MusicServiceService:
         self._listenbrainz_client = listenbrainz_client
         self._apple_music_signer: DeveloperTokenSigner | None = None
         self._apple_music_client = apple_music_client
+        self._metabrainz_oauth = metabrainz_oauth
 
     @property
     def spotify(self) -> SpotifyClient:
@@ -93,6 +102,22 @@ class MusicServiceService:
         if self._apple_music_signer is None:
             self._apple_music_signer = DeveloperTokenSigner(self.settings)
         return self._apple_music_signer
+
+    @property
+    def _cipher(self) -> "TokenCipher":
+        """Tokens are encrypted on every write and decrypted in _doc_to_music_service; with no
+        DECIDE_TOKEN_KEY the cipher is the identity, and legacy plaintext rows read as-is.
+        Imported lazily: ``cryptography`` stays off the cold-start import path."""
+        from backend.services.token_cipher import get_token_cipher
+
+        return get_token_cipher(self.settings)
+
+    @property
+    def metabrainz(self) -> MetaBrainzOAuth:
+        """Get or create the MetaBrainz OAuth client (ListenBrainz connect)."""
+        if self._metabrainz_oauth is None:
+            self._metabrainz_oauth = MetaBrainzOAuth(self.settings)
+        return self._metabrainz_oauth
 
     @property
     def apple_music(self) -> AppleMusicClient:
@@ -125,13 +150,20 @@ class MusicServiceService:
         """
         return f"{user_id}_{service_type}"
 
-    async def create_oauth_state(self, user_id: str, service_type: str, account_hint: str | None = None) -> str:
+    async def create_oauth_state(
+        self,
+        user_id: str,
+        service_type: str,
+        account_hint: str | None = None,
+        extra: dict[str, str] | None = None,
+    ) -> str:
         """Create and store OAuth state for CSRF protection.
 
         Args:
             user_id: User initiating OAuth flow.
             service_type: Service type (e.g., "spotify").
             account_hint: Masked email shown to whoever opens a hand-off link (Apple Music).
+            extra: Flow data returned by verify_oauth_state (e.g. PKCE verifier, return target).
 
         Returns:
             State token to include in OAuth redirect.
@@ -147,6 +179,7 @@ class MusicServiceService:
                 "user_id": user_id,
                 "service_type": service_type,
                 "account_hint": account_hint,
+                "extra": dict(extra or {}),
                 "created_at": now.isoformat(),
                 "expires_at": expires_at.isoformat(),
             },
@@ -175,7 +208,7 @@ class MusicServiceService:
             state: State token from OAuth callback.
 
         Returns:
-            Dict with user_id and service_type if valid, None otherwise.
+            Dict with user_id, service_type and the state's ``extra`` fields if valid, else None.
         """
         # Atomically delete and retrieve the state document
         # This ensures the state can only be consumed once
@@ -189,7 +222,9 @@ class MusicServiceService:
         if datetime.now(UTC) > expires_at:
             return None
 
+        extra = doc.get("extra") or {}
         return {
+            **{str(k): str(v) for k, v in extra.items()},
             "user_id": doc["user_id"],
             "service_type": doc["service_type"],
         }
@@ -337,14 +372,14 @@ class MusicServiceService:
         if existing:
             # Update existing service
             update_data = {
-                "access_token": tokens.get("access_token"),
+                "access_token": self._cipher.encrypt(tokens.get("access_token")),
                 "token_expires_at": token_expires_at.isoformat(),
                 "updated_at": now.isoformat(),
             }
 
             # Only update refresh_token if provided (Spotify doesn't always return it)
             if tokens.get("refresh_token"):
-                update_data["refresh_token"] = tokens["refresh_token"]
+                update_data["refresh_token"] = self._cipher.encrypt(tokens["refresh_token"])
 
             await self.firestore.update_document(
                 self.SERVICES_COLLECTION,
@@ -376,8 +411,8 @@ class MusicServiceService:
             "service_type": "spotify",
             "service_user_id": spotify_user_id,
             "service_username": spotify_username,
-            "access_token": tokens.get("access_token"),
-            "refresh_token": tokens.get("refresh_token"),
+            "access_token": self._cipher.encrypt(tokens.get("access_token")),
+            "refresh_token": self._cipher.encrypt(tokens.get("refresh_token")),
             "token_expires_at": token_expires_at.isoformat(),
             "last_sync_at": None,
             "sync_status": "idle",
@@ -520,6 +555,13 @@ class MusicServiceService:
                 service_id,
                 {
                     "service_username": lb_username,
+                    "service_user_id": lb_username,
+                    # A username connection replaces an OAuth one.
+                    "auth": "username",
+                    "access_token": None,
+                    "refresh_token": None,
+                    "token_expires_at": None,
+                    "error_code": None,
                     "updated_at": now.isoformat(),
                 },
             )
@@ -547,6 +589,7 @@ class MusicServiceService:
             "service_type": "listenbrainz",
             "service_user_id": lb_username,
             "service_username": lb_username,
+            "auth": "username",
             "access_token": None,
             "refresh_token": None,
             "token_expires_at": None,
@@ -564,6 +607,47 @@ class MusicServiceService:
             service_data,
         )
 
+        return self._doc_to_music_service(service_data)
+
+    async def create_listenbrainz_oauth_service(
+        self, user_id: str, tokens: dict[str, Any], username: str
+    ) -> MusicService:
+        """Store a ListenBrainz connection authorised through MetaBrainz OAuth.
+
+        Tokens are encrypted at rest. Reconnecting replaces the tokens, clears a
+        ``needs_reconnect`` error and keeps the sync history.
+        """
+        service_id = self._get_service_id(user_id, "listenbrainz")
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(seconds=int(tokens.get("expires_in") or 3600))
+        fields: dict[str, Any] = {
+            "service_user_id": username,
+            "service_username": username,
+            "auth": "oauth",
+            "access_token": self._cipher.encrypt(tokens.get("access_token")),
+            "refresh_token": self._cipher.encrypt(tokens.get("refresh_token")),
+            "token_expires_at": expires_at.isoformat(),
+            "sync_status": "idle",
+            "sync_error": None,
+            "error_code": None,
+            "updated_at": now.isoformat(),
+        }
+
+        existing = await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
+        if existing:
+            await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
+            return self._doc_to_music_service({**existing, **fields})
+
+        service_data: dict[str, Any] = {
+            "id": service_id,
+            "user_id": user_id,
+            "service_type": "listenbrainz",
+            "last_sync_at": None,
+            "tracks_synced": 0,
+            "created_at": now.isoformat(),
+            **fields,
+        }
+        await self.firestore.set_document(self.SERVICES_COLLECTION, service_id, service_data)
         return self._doc_to_music_service(service_data)
 
     async def create_apple_music_service(self, user_id: str, music_user_token: str) -> MusicService:
@@ -585,7 +669,7 @@ class MusicServiceService:
         fields: dict[str, Any] = {
             "service_user_id": storefront,
             "service_username": "Apple Music",
-            "access_token": music_user_token,
+            "access_token": self._cipher.encrypt(music_user_token),
             "sync_status": "idle",
             "sync_error": None,
             "updated_at": now.isoformat(),
@@ -784,14 +868,14 @@ class MusicServiceService:
         token_expires_at = now + timedelta(seconds=expires_in)
 
         update_data: dict[str, Any] = {
-            "access_token": tokens.get("access_token"),
+            "access_token": self._cipher.encrypt(tokens.get("access_token")),
             "token_expires_at": token_expires_at.isoformat(),
             "updated_at": now.isoformat(),
         }
 
         # Spotify may return a new refresh token
         if tokens.get("refresh_token"):
-            update_data["refresh_token"] = tokens["refresh_token"]
+            update_data["refresh_token"] = self._cipher.encrypt(tokens["refresh_token"])
 
         await self.firestore.update_document(
             self.SERVICES_COLLECTION,
@@ -833,9 +917,71 @@ class MusicServiceService:
             raise MusicServiceError("No access token available")
         return refreshed.access_token
 
+    async def get_listenbrainz_token(self, service: MusicService) -> str:
+        """A valid MetaBrainz OAuth access token for a ListenBrainz connection.
+
+        Refreshes when the token expires within TOKEN_REFRESH_BUFFER_MINUTES and stores the
+        rotated tokens (MetaBrainz revokes the old refresh token). A dead refresh token marks
+        the connection ``sync_status="error"``, ``error_code="needs_reconnect"``.
+
+        Raises:
+            MusicServiceError: No OAuth token (username connection), or refresh failed.
+        """
+        if service.service_type != "listenbrainz" or not service.access_token:
+            raise MusicServiceError("ListenBrainz is not connected with OAuth")
+
+        now = datetime.now(UTC)
+        buffer = timedelta(minutes=self.TOKEN_REFRESH_BUFFER_MINUTES)
+        if service.token_expires_at and service.token_expires_at > now + buffer:
+            return service.access_token
+        if not service.refresh_token:
+            raise MusicServiceError("No refresh token available")
+
+        service_id = self._get_service_id(service.user_id, "listenbrainz")
+        try:
+            tokens = await self.metabrainz.refresh(service.refresh_token)
+        except MetaBrainzInvalidGrantError:
+            logger.warning("ListenBrainz refresh token rejected for user %s; needs reconnect", service.user_id)
+            await self.firestore.update_document(
+                self.SERVICES_COLLECTION,
+                service_id,
+                {
+                    "sync_status": "error",
+                    "sync_error": "ListenBrainz access expired. Reconnect ListenBrainz.",
+                    "error_code": "needs_reconnect",
+                    "updated_at": now.isoformat(),
+                },
+            )
+            raise MusicServiceError("ListenBrainz needs to be reconnected")
+        except ExternalServiceError as e:
+            raise MusicServiceError(f"Failed to refresh ListenBrainz token: {e}")
+
+        access_token = str(tokens["access_token"])
+        update_data: dict[str, Any] = {
+            "access_token": self._cipher.encrypt(access_token),
+            "token_expires_at": (now + timedelta(seconds=int(tokens.get("expires_in") or 3600))).isoformat(),
+            "updated_at": now.isoformat(),
+        }
+        if tokens.get("refresh_token"):
+            update_data["refresh_token"] = self._cipher.encrypt(tokens["refresh_token"])
+        await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, update_data)
+        return access_token
+
     # -------------------------------------------------------------------------
     # Helper Methods
     # -------------------------------------------------------------------------
+
+    def _decrypt(self, value: str | None, doc: dict[str, Any]) -> str | None:
+        """Decrypt a stored token; an undecryptable one (key missing or rotated) reads as None."""
+        try:
+            return self._cipher.decrypt(value)
+        except Exception:
+            logger.warning(
+                "Could not decrypt a %s token for %s (DECIDE_TOKEN_KEY missing or changed?)",
+                doc.get("service_type"),
+                doc.get("user_id"),
+            )
+            return None
 
     def _doc_to_music_service(self, doc: dict[str, Any]) -> MusicService:
         """Convert Firestore document to MusicService model.
@@ -852,8 +998,8 @@ class MusicServiceService:
             service_type=doc.get("service_type", "spotify"),
             service_user_id=doc.get("service_user_id", ""),
             service_username=doc.get("service_username", ""),
-            access_token=doc.get("access_token"),
-            refresh_token=doc.get("refresh_token"),
+            access_token=self._decrypt(doc.get("access_token"), doc),
+            refresh_token=self._decrypt(doc.get("refresh_token"), doc),
             token_expires_at=(datetime.fromisoformat(doc["token_expires_at"]) if doc.get("token_expires_at") else None),
             last_sync_at=(datetime.fromisoformat(doc["last_sync_at"]) if doc.get("last_sync_at") else None),
             sync_status=doc.get("sync_status", "idle"),

@@ -55,9 +55,10 @@ class ListenBrainzClient:
         """Initialize the ListenBrainz client.
 
         Args:
-            settings: Backend settings (not required for ListenBrainz as it's public API).
+            settings: Backend settings (API base; none needed for public data).
         """
         self.settings = settings
+        self.api_base = (settings.listenbrainz_api_base if settings else self.API_BASE).rstrip("/")
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -92,7 +93,7 @@ class ListenBrainzClient:
         client = await self._get_client()
 
         try:
-            response = await client.get(f"{self.API_BASE}/user/{username}/listen-count")
+            response = await client.get(f"{self.api_base}/user/{username}/listen-count")
 
             if response.status_code == 404:
                 raise ExternalServiceError("ListenBrainz", f"User '{username}' not found")
@@ -106,6 +107,32 @@ class ListenBrainzClient:
 
         except httpx.HTTPError as e:
             raise ExternalServiceError("ListenBrainz", f"Failed to connect: {e}")
+
+    async def validate_token(self, token: str) -> str:
+        """Return the username a ListenBrainz *user token* belongs to.
+
+        Only LB user tokens (from listenbrainz.org/settings) validate here: LB's
+        ``/1/validate-token`` looks the token up in its own table, so a MetaBrainz OAuth
+        (``meba_``) token reports ``valid: false``. Use MetaBrainz userinfo for those.
+
+        Raises:
+            ExternalServiceError: Token not valid, or API error.
+        """
+        client = await self._get_client()
+        try:
+            response = await client.get(
+                f"{self.api_base}/validate-token",
+                headers={"Authorization": f"Token {token}"},
+            )
+        except httpx.HTTPError as e:
+            raise ExternalServiceError("ListenBrainz", f"Failed to connect: {type(e).__name__}")
+        if response.status_code != 200:
+            raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
+        data = response.json()
+        user_name = data.get("user_name")
+        if not data.get("valid") or not user_name:
+            raise ExternalServiceError("ListenBrainz", "Token is not valid")
+        return str(user_name)
 
     async def get_user_info(self, username: str) -> ListenBrainzUserInfo:
         """Get user information.
@@ -133,7 +160,7 @@ class ListenBrainzClient:
 
         Args:
             username: ListenBrainz username.
-            count: Number of listens to fetch (max 100).
+            count: Number of listens to fetch (max 1000, LB's MAX_ITEMS_PER_GET).
             max_ts: Only return listens before this timestamp.
             min_ts: Only return listens after this timestamp.
 
@@ -145,7 +172,7 @@ class ListenBrainzClient:
         """
         client = await self._get_client()
 
-        params: dict = {"count": min(count, 100)}
+        params: dict = {"count": min(count, 1000)}
         if max_ts is not None:
             params["max_ts"] = max_ts
         if min_ts is not None:
@@ -153,7 +180,7 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.API_BASE}/user/{username}/listens",
+                f"{self.api_base}/user/{username}/listens",
                 params=params,
             )
 
@@ -257,7 +284,7 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.API_BASE}/stats/user/{username}/artists",
+                f"{self.api_base}/stats/user/{username}/artists",
                 params={"count": min(count, 100), "range": range_},
             )
 
@@ -302,7 +329,7 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.API_BASE}/stats/user/{username}/recordings",
+                f"{self.api_base}/stats/user/{username}/recordings",
                 params={"count": min(count, 100), "range": range_},
             )
 

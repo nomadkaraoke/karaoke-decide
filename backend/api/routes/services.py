@@ -3,6 +3,7 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import html
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -10,7 +11,7 @@ from typing import Annotated, Any, Literal, cast, get_args
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
@@ -47,8 +48,9 @@ from backend.services.screenshot_import_service import (
     get_screenshot_extractor,
 )
 from backend.services.sync_service import ImportRateLimitedError
-from karaoke_decide.core.exceptions import NotFoundError, ValidationError
+from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
+from karaoke_decide.services.metabrainz_oauth import new_pkce_pair
 from karaoke_decide.services.spotify_embed import (
     InvalidSpotifyPlaylistUrlError,
     SpotifyEmbedFetchError,
@@ -536,6 +538,112 @@ async def connect_listenbrainz(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e),
         )
+
+
+# -----------------------------------------------------------------------------
+# ListenBrainz via MetaBrainz OAuth (authorization code + PKCE)
+# -----------------------------------------------------------------------------
+
+ListenBrainzReturnTo = Literal["app", "web"]
+ListenBrainzOAuthReason = Literal["denied", "missing_params", "invalid_state", "exchange_failed", "validate_failed"]
+
+_APP_RETURN_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nomad Karaoke</title></head>
+<body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 16px">
+<p><a href="{url}">Return to the app</a></p></body></html>"""
+
+
+class ListenBrainzOAuthStartResponse(BaseModel):
+    auth_url: str
+
+
+@router.get("/listenbrainz/oauth/start", response_model=ListenBrainzOAuthStartResponse)
+async def listenbrainz_oauth_start(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    return_to: ListenBrainzReturnTo = Query(...),
+) -> ListenBrainzOAuthStartResponse:
+    """Start connecting ListenBrainz through MetaBrainz OAuth (404 ``oauth_disabled`` when off)."""
+    if not settings.listenbrainz_oauth_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="oauth_disabled")
+    code_verifier, code_challenge = new_pkce_pair()
+    state = await music_service.create_oauth_state(
+        user.id, "listenbrainz", extra={"return_to": return_to, "code_verifier": code_verifier}
+    )
+    return ListenBrainzOAuthStartResponse(auth_url=music_service.metabrainz.authorize_url(state, code_challenge))
+
+
+def _listenbrainz_oauth_return(
+    settings: BackendSettings, return_to: str, reason: ListenBrainzOAuthReason | None = None
+) -> HTMLResponse | RedirectResponse:
+    """302 to the app scheme (with a tiny HTML fallback link) or to the web Music I Know page."""
+    headers = {"Cache-Control": "no-store"}
+    if return_to == "app":
+        query = "status=connected" if reason is None else f"status=error&reason={reason}"
+        url = f"{settings.mobile_app_scheme}://services/listenbrainz?{query}"
+        return HTMLResponse(
+            _APP_RETURN_PAGE.format(url=html.escape(url, quote=True)),
+            status_code=status.HTTP_302_FOUND,
+            headers={"Location": url, **headers},
+        )
+    query = "listenbrainz=connected" if reason is None else f"listenbrainz=error&reason={reason}"
+    url = f"{settings.frontend_url}{get_locale_prefix(DEFAULT_LOCALE)}/music-i-know?{query}"
+    return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND, headers=headers)
+
+
+@router.get("/listenbrainz/oauth/callback", response_model=None)
+async def listenbrainz_oauth_callback(
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+) -> HTMLResponse | RedirectResponse:
+    """MetaBrainz redirects here (no auth; the state identifies the user and the return target).
+
+    Errors redirect with a fixed reason code, never exception text. An unknown state can't
+    say where the user came from, so it returns to the web page.
+    """
+    state_data = await music_service.verify_oauth_state(state) if state else None
+    if state_data is not None and state_data.get("service_type") != "listenbrainz":
+        state_data = None
+    return_to = state_data.get("return_to", "web") if state_data else "web"
+
+    def fail(reason: ListenBrainzOAuthReason) -> HTMLResponse | RedirectResponse:
+        return _listenbrainz_oauth_return(settings, return_to, reason)
+
+    if error:
+        return fail("denied")
+    if not code or not state:
+        return fail("missing_params")
+    if state_data is None or not state_data.get("code_verifier"):
+        return fail("invalid_state")
+    if not settings.listenbrainz_oauth_active:  # switched off mid-flow: never store unencrypted tokens
+        return fail("exchange_failed")
+
+    try:
+        tokens = await music_service.metabrainz.exchange_code(code, state_data["code_verifier"])
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz OAuth code exchange failed: %s", e)
+        return fail("exchange_failed")
+
+    try:
+        # LB's /1/validate-token doesn't know MetaBrainz OAuth tokens, so the username comes
+        # from MetaBrainz userinfo; the listen-count lookup confirms a ListenBrainz account exists.
+        username = await music_service.metabrainz.userinfo(str(tokens["access_token"]))
+        await music_service.listenbrainz.get_user_listen_count(username)
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz OAuth account check failed: %s", e)
+        return fail("validate_failed")
+
+    try:
+        await music_service.create_listenbrainz_oauth_service(state_data["user_id"], tokens, username)
+    except Exception:
+        logger.exception("Storing the ListenBrainz OAuth connection failed")
+        return fail("exchange_failed")
+    return _listenbrainz_oauth_return(settings, return_to)
 
 
 # -----------------------------------------------------------------------------
