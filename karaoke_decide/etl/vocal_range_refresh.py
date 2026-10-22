@@ -25,10 +25,14 @@ Outputs, in this order (``latest.json`` LAST, so a failure leaves last week's po
 
 1. BigQuery load jobs (WRITE_TRUNCATE) of ``song_vocal_range_sources``, ``song_vocal_range`` and
    ``artist_vocal_range`` into ``musicbrainz_staging``; a failed load touches no prod table.
-2. ``vocal-range/latest/{song,artist}_vocal_range.tsv.gz`` + ``latest/summary.json``.
+2. ``vocal-range/<run>/{song,artist}_vocal_range.tsv.gz`` + ``<run>/summary.json``, and the
+   same three under ``vocal-range/latest/`` (kept for compatibility).
 3. Copy jobs (WRITE_TRUNCATE, retried) staging -> ``karaoke_decide``, as for the MB tables.
-4. ``vocal-range/latest.json`` = ``{run, sha256_song, sha256_artist}`` (sha256 of the .tsv.gz bytes),
-   then the staging tables are dropped.
+4. ``vocal-range/latest.json`` = ``{run, song_path, artist_path, sha256_song, sha256_artist}``
+   (the per-run copies' names; sha256 of the .tsv.gz bytes), then the staging tables are
+   dropped. Readers use the named per-run paths, so a refresh dying between the uploads and
+   the pointer can't leave the pointer and the files it names disagreeing.
+5. Prune: keep the newest ``KEEP_RUNS`` run dirs (best effort, WARNING on failure).
 
 Everything is computed in memory before the first write. A failure anywhere logs ONE ERROR
 (``run_step_safe``) and never fails the MB refresh.
@@ -81,6 +85,17 @@ SONG_TSV_BLOB = f"{PREFIX}/latest/song_vocal_range.tsv.gz"
 ARTIST_TSV_BLOB = f"{PREFIX}/latest/artist_vocal_range.tsv.gz"
 SUMMARY_BLOB = f"{PREFIX}/latest/summary.json"
 POINTER_BLOB = f"{PREFIX}/latest.json"
+# Per-run copies (the pointer names them, so readers never pair a pointer with another run's
+# TSVs); latest/ above is kept for older readers. Keep the newest KEEP_RUNS run dirs.
+KEEP_RUNS = 4
+_RUN_DIR_RE = re.compile(rf"^{re.escape(PREFIX)}/(\d{{8}}-\d{{6}})/")
+
+
+def run_blobs(run: str) -> tuple[str, str, str]:
+    """(song TSV, artist TSV, summary) object names for ``run``."""
+    d = f"{PREFIX}/{run}"
+    return f"{d}/song_vocal_range.tsv.gz", f"{d}/artist_vocal_range.tsv.gz", f"{d}/summary.json"
+
 
 # archive.org item usdb_20250204 (metadata API, checked 2026-10-22): usdb.zip, sha1 + size below.
 USDB_ZIP_URL = "https://archive.org/download/usdb_20250204/usdb.zip"
@@ -569,17 +584,45 @@ def publish(bq: Any, bucket: Any, result: Result, run: str, now: datetime) -> No
 
     song_tsv = tsv_gz(result.songs, [f.name for f in dataclasses.fields(MergedSong)])
     artist_tsv = tsv_gz(result.artists, [f.name for f in dataclasses.fields(ArtistRange)])
-    _put(bucket, SONG_TSV_BLOB, song_tsv, "application/gzip")
-    _put(bucket, ARTIST_TSV_BLOB, artist_tsv, "application/gzip")
-    _put(bucket, SUMMARY_BLOB, json.dumps(result.summary, sort_keys=True, indent=1).encode(), "application/json")
+    summary = json.dumps(result.summary, sort_keys=True, indent=1).encode()
+    song_path, artist_path, summary_path = run_blobs(run)
+    for song_name, artist_name, summary_name in ((song_path, artist_path, summary_path), LATEST_BLOBS):
+        _put(bucket, song_name, song_tsv, "application/gzip")
+        _put(bucket, artist_name, artist_tsv, "application/gzip")
+        _put(bucket, summary_name, summary, "application/json")
     publish_tables(bq, list(TABLE_NAMES), STAGING_DATASET, PROD_DATASET, "vocal_range_run", run)
     pointer = {
         "run": run,
+        "song_path": song_path,
+        "artist_path": artist_path,
         "sha256_song": hashlib.sha256(song_tsv).hexdigest(),
         "sha256_artist": hashlib.sha256(artist_tsv).hexdigest(),
     }
     _put(bucket, POINTER_BLOB, json.dumps(pointer, sort_keys=True).encode(), "application/json")  # LAST
     _drop_staging(bq)
+    prune_runs(bucket, keep=run)
+
+
+LATEST_BLOBS = (SONG_TSV_BLOB, ARTIST_TSV_BLOB, SUMMARY_BLOB)
+
+
+def prune_runs(bucket: Any, keep: str) -> None:
+    """Delete run dirs older than the newest ``KEEP_RUNS`` (``keep`` always stays). Best effort:
+    a failure is one WARNING (the next run prunes again); latest/, ultrastar/ etc. are never touched."""
+    try:
+        runs: dict[str, list[Any]] = {}
+        for blob in bucket.list_blobs(prefix=f"{PREFIX}/"):
+            m = _RUN_DIR_RE.match(blob.name)
+            if m:
+                runs.setdefault(m.group(1), []).append(blob)
+        doomed = [r for r in sorted(runs)[:-KEEP_RUNS] if r != keep]
+        for r in doomed:
+            for blob in runs[r]:
+                blob.delete()
+        if doomed:
+            logger.info(f"vocal_range: pruned old runs {doomed}")
+    except Exception:  # noqa: BLE001 - housekeeping only
+        logger.warning("vocal_range: pruning old vocal-range/<run>/ dirs failed (retried next run)", exc_info=True)
 
 
 # --------------------------------------------------------------------------

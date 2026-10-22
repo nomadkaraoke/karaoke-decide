@@ -242,11 +242,19 @@ def test_tables_written_and_pointer_last(tmp_path: Path) -> None:
     assert bucket.writes[-1] == vr.POINTER_BLOB
     assert set(bucket.writes[-4:-1]) == {vr.SONG_TSV_BLOB, vr.ARTIST_TSV_BLOB, vr.SUMMARY_BLOB}
     pointer = json.loads(bucket.objects[vr.POINTER_BLOB])
+    run_song, run_artist, run_summary = vr.run_blobs("20261025-030000")
     assert pointer == {
         "run": "20261025-030000",
-        "sha256_song": hashlib.sha256(bucket.objects[vr.SONG_TSV_BLOB]).hexdigest(),
-        "sha256_artist": hashlib.sha256(bucket.objects[vr.ARTIST_TSV_BLOB]).hexdigest(),
+        "song_path": run_song,
+        "artist_path": run_artist,
+        "sha256_song": hashlib.sha256(bucket.objects[run_song]).hexdigest(),
+        "sha256_artist": hashlib.sha256(bucket.objects[run_artist]).hexdigest(),
     }
+    # per-run copies written before latest/ (kept for compatibility), byte-identical
+    assert bucket.writes.index(run_song) < bucket.writes.index(vr.SONG_TSV_BLOB)
+    assert bucket.objects[run_song] == bucket.objects[vr.SONG_TSV_BLOB]
+    assert bucket.objects[run_artist] == bucket.objects[vr.ARTIST_TSV_BLOB]
+    assert json.loads(bucket.objects[run_summary]) == summary
     song_rows = _tsv(bucket.objects[vr.SONG_TSV_BLOB])
     assert {r["song_key"] for r in song_rows} == {r["song_key"] for r in songs}
     lalas = next(r for r in song_rows if r["song_key"] == LALAS_KEY)
@@ -465,3 +473,30 @@ def test_summary_log_line_has_duration(tmp_path: Path, caplog: pytest.LogCapture
     _step(tmp_path)
     line = next(r.getMessage() for r in caplog.records if "vocal_range published run" in r.getMessage())
     assert re.search(r"published run 20261025-030000 in \d+s: \{", line)
+
+
+def test_prune_runs_keeps_the_newest_four_and_never_other_prefixes() -> None:
+    from tests.unit.fake_gcs import FakeBucket
+
+    bucket = FakeBucket()
+    runs = [f"2026101{d}-030000" for d in range(6)]
+    for r in runs:
+        for name in vr.run_blobs(r):
+            bucket.objects[name] = b"x"
+    others = [vr.ZIP_BLOB, vr.SONG_TSV_BLOB, vr.POINTER_BLOB, f"{vr.GEN_MEASURED_PREFIX}20261001-000000/part-0.csv"]
+    for name in others:
+        bucket.objects[name] = b"x"
+    vr.prune_runs(bucket, keep=runs[-1])
+    left = {n.split("/")[1] for n in bucket.objects if n.count("/") == 2 and n.split("/")[1][:4] == "2026"}
+    assert left == set(runs[-4:])
+    assert all(n in bucket.objects for n in others)
+
+
+def test_prune_failure_is_a_warning(caplog: pytest.LogCaptureFixture) -> None:
+    class Broken:
+        def list_blobs(self, prefix: str = "") -> list[Any]:
+            raise RuntimeError("403 list denied")
+
+    caplog.set_level(logging.INFO)
+    vr.prune_runs(Broken(), keep="20261025-030000")
+    assert [r.levelno for r in caplog.records if r.levelno >= logging.WARNING] == [logging.WARNING]

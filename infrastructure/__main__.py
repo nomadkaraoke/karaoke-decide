@@ -1042,7 +1042,9 @@ gcp.storage.BucketIAMMember(
     condition={
         "title": "vocal-range prefix only",
         "description": "song-index-build may only read vocal-range/ objects by name",
-        "expression": 'resource.name.startsWith("projects/_/buckets/nomadkaraoke-musicbrainz-data/objects/vocal-range/")',
+        "expression": pulumi.Output.concat(
+            'resource.name.startsWith("projects/_/buckets/', musicbrainz_bucket.name, '/objects/vocal-range/")'
+        ),
     },
 )
 gcp.storage.BucketIAMMember(

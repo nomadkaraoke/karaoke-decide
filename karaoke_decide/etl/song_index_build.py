@@ -12,8 +12,8 @@ Runs as the ``song-index-build`` Cloud Run Job (daily, after kn-data-sync). Step
              community exports, ``offline.db`` (gzipped to ``offline.db.gz``) with the
              per-song vocal ranges (``vr_*``) from mb-refresh's vocal_range step:
              ``gs://nomadkaraoke-musicbrainz-data/vocal-range/latest.json`` (read by
-             name, no listing), then both ``latest/*.tsv.gz``, sha256-checked against
-             it. Missing, forbidden or a sha mismatch (a half-done publish) -> one
+             name, no listing), then the two per-run TSVs it names (``song_path`` /
+             ``artist_path``; else ``latest/*.tsv.gz``), sha256-checked against it. Missing, forbidden or a sha mismatch (a half-done publish) -> one
              WARNING and NULL ``vr_*``. A new vocal-range run also triggers a rebuild.
 3. EVAL      ``run_eval`` (cloud matcher, labelled set) and ``dual_eval`` (offline vs
              cloud, labelled + frozen synthetic set). Gates: ``wrong_auto`` may rise by
@@ -618,9 +618,18 @@ def _vocal_range_run(storage: Storage) -> str:
     return str(pointer["run"]) if pointer else ""
 
 
+class _ShaMismatchError(ValueError):
+    """A TSV doesn't match the pointer's sha256 (a half-done publish: final until the next one)."""
+
+
 def _fetch_vocal_range(storage: Storage, inputs: Path) -> tuple[str, VocalRangeFiles | None]:
-    """(pointer run, the two sha-verified TSVs or None). Never raises: any problem is one
-    WARNING and no vocal-range data, never a mix of two publishes."""
+    """(pointer run recorded as "seen", the two sha-verified TSVs or None). Never raises: any
+    problem is one WARNING and no vocal-range data, never a mix of two publishes.
+
+    The TSVs are the per-run copies the pointer names (``song_path`` / ``artist_path``),
+    falling back to ``latest/`` for pointers written before those keys existed. A sha
+    mismatch records the pointer run (retrying can't help until the next publish); any
+    other failure (a transient download error, a 403) records "" so the next build retries."""
     pointer = _vocal_range_pointer(storage)
     if pointer is None:
         return "", None
@@ -628,21 +637,25 @@ def _fetch_vocal_range(storage: Storage, inputs: Path) -> tuple[str, VocalRangeF
     files = VocalRangeFiles(run, inputs / "song_vocal_range.tsv.gz", inputs / "artist_vocal_range.tsv.gz")
     try:
         for name, dest, sha_key in (
-            (VOCAL_RANGE_SONG_TSV, files.songs, "sha256_song"),
-            (VOCAL_RANGE_ARTIST_TSV, files.artists, "sha256_artist"),
+            (str(pointer.get("song_path") or VOCAL_RANGE_SONG_TSV), files.songs, "sha256_song"),
+            (str(pointer.get("artist_path") or VOCAL_RANGE_ARTIST_TSV), files.artists, "sha256_artist"),
         ):
             storage.download(VOCAL_RANGE_BUCKET, name, dest)
             actual = _sha256(dest)
             if actual != pointer.get(sha_key):
-                raise ValueError(
+                raise _ShaMismatchError(
                     f"sha256 of gs://{VOCAL_RANGE_BUCKET}/{name} is {actual}, latest.json {sha_key} says "
                     f"{pointer.get(sha_key)} (publish in progress or half done)"
                 )
     except Exception as exc:  # noqa: BLE001 - optional input
-        logger.warning(f"Vocal ranges for run {run} not used ({exc}); offline.db vr_* stay NULL")
         files.songs.unlink(missing_ok=True)
         files.artists.unlink(missing_ok=True)
-        return run, None
+        retry = not isinstance(exc, _ShaMismatchError)
+        logger.warning(
+            f"Vocal ranges for run {run} not used ({exc}); offline.db vr_* stay NULL"
+            + ("; the next build retries" if retry else "")
+        )
+        return ("" if retry else run), None
     return run, files
 
 

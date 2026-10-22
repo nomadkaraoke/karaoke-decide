@@ -539,20 +539,40 @@ def _vr_row(db: Path, key: str) -> tuple[Any, ...]:
 
 
 def test_offline_vr_columns_song_then_artist_fallback(built_vr: Path) -> None:
+    """Song-level vr_* only (tiers 4/3/2); artists in their own table, the phone falls back."""
     assert _vr_row(built_vr, "muse|uprising") == (48.0, 70.0, 52.0, 59.0, 66.0, 3, 0.92)
     assert _vr_row(built_vr, "muse|starlight")[5] == 4
     hello = _vr_row(built_vr, "adele|hello")
     assert hello[5] == 2 and hello[6] is None  # Gemini confidence never becomes octave confidence
-    assert _vr_row(built_vr, "taylor swift|shake it off") == (57.0, 76.0, 60.0, 66.0, 72.0, 1, None)  # rough
+    # no per-song rough copies
+    assert _vr_row(built_vr, "taylor swift|shake it off") == (None,) * 7
+    assert _vr_row(built_vr, "muse|hysteria") == (None,) * 7
     assert _vr_row(built_vr, "lady gaga|shallow") == (None,) * 7
-    # the artist fallback covers every song of the artist without its own row
-    assert _vr_row(built_vr, "muse|hysteria")[5] == 1
+    assert {r[0] for r in _rows(built_vr, "SELECT DISTINCT vr_tier FROM songs WHERE vr_tier IS NOT NULL")} <= {4, 3, 2}
+    artists = {r[0]: r[1:] for r in _rows(built_vr, "SELECT * FROM artist_vocal_range")}
+    assert artists["taylor swift"] == (57.0, 76.0, 60.0, 66.0, 72.0)
+    assert {"muse", "adele", "taylor swift"} <= set(artists) and "lady gaga" not in artists
+    cols = [(r[1], r[2], r[5]) for r in _rows(built_vr, "PRAGMA table_info(artist_vocal_range)")]
+    assert cols == [("artist_key", "TEXT", 1), ("low", "REAL", 0), ("high", "REAL", 0),
+                    ("p10", "REAL", 0), ("p50", "REAL", 0), ("p90", "REAL", 0)]  # fmt: skip
+
+
+def test_offline_artist_table_only_has_artists_with_songs(sources: tuple[Path, Path], tmp_path: Path) -> None:
+    from karaoke_decide.vocal_range.tsv import ArtistRange, VocalRanges
+
+    vr = VocalRanges(
+        artists={"muse": ArtistRange(1, 2, 3, 4, 5, "songs"), "nobody here": ArtistRange(1, 2, 3, 4, 5, "x")}
+    )
+    out = tmp_path / "offline.db"
+    build_offline_db(sources[0], sources[1], out, run="r", vocal_range=vr)
+    assert _rows(out, "SELECT artist_key FROM artist_vocal_range") == [("muse",)]
 
 
 def test_offline_builds_without_vocal_range(built: tuple[Path, Any]) -> None:
     meta = dict(_rows(built[0], "SELECT key, value FROM meta"))
     assert meta["vocal_range_run"] == ""
     assert _rows(built[0], "SELECT count(*) FROM songs WHERE vr_p50 IS NOT NULL OR vr_tier IS NOT NULL") == [(0,)]
+    assert _rows(built[0], "SELECT count(*) FROM artist_vocal_range") == [(0,)]
     r = SongIdentifier(built[0], margin_bonus=OFFLINE_MARGIN_BONUS).identify("starlite muse")
     assert r["status"] == "confident"
 

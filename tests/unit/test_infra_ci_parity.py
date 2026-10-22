@@ -536,7 +536,9 @@ def test_song_index_build_reads_vocal_range_by_name() -> None:
     expr = kw["condition"]["expression"]
     if not isinstance(expr, str):
         expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
-    assert "nomadkaraoke-musicbrainz-data/objects/vocal-range/" in expr
+    # built from the bucket resource's name, not a hardcoded bucket string
+    assert "musicbrainz_bucket.name" in expr and "/objects/vocal-range/" in expr
+    assert "nomadkaraoke-musicbrainz-data" not in expr
     assert "objectListPrefix" not in expr  # by-name reads only
 
     from karaoke_decide.etl import song_index_build as sib

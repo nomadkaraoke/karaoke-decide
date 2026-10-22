@@ -26,7 +26,13 @@ def test_load_reads_plain_and_gz(tmp_path: Path) -> None:
     gz_s.write_bytes(gzip.compress(SONGS.read_bytes()))
     gz_a.write_bytes(gzip.compress(ARTISTS.read_bytes()))
     assert tsv.load(gz_s, gz_a) == plain
-    assert set(plain.songs) == {"muse|starlight", "muse|uprising", "adele|hello", "brandy and monica|the boy is mine"}
+    assert set(plain.songs) == {
+        "muse|starlight",
+        "muse|uprising",
+        "muse|supermassive black hole",
+        "adele|hello",
+        "brandy and monica|the boy is mine",
+    }
     assert set(plain.artists) == {"muse", "adele", "taylor swift"}
 
 
@@ -53,20 +59,29 @@ def test_records_with_missing_numbers_are_dropped() -> None:
     assert tsv.artist_range({"artist_key": "x", "low_midi": None}) is None
 
 
+# The baritone buckets the Maestro flows (voice-3-singable) rely on: song_key -> (bucket, transpose, octave).
+BARITONE_FITS = {
+    "muse|starlight": ("fits", 0, 0),  # Muse "Starlight", measured
+    "muse|uprising": ("fitsIn", -2, 0),  # Muse "Uprising", notes
+    "muse|supermassive black hole": ("stretch", -1, 0),  # Muse "Supermassive Black Hole", measured
+    "adele|hello": ("outside", 0, -12),  # Adele "Hello", estimated, wide soprano-ish range
+    "brandy and monica|the boy is mine": ("fitsIn", 4, -12),  # duet, notes
+}
+
+
 def test_fixture_fits_for_a_baritone() -> None:
-    """The fit each fixture song is meant to show for a baritone preset (45-69, comfort 50-64)."""
+    """Each fixture song's fit for a baritone preset (45-69, comfort 50-64); every bucket present."""
     r = tsv.load(SONGS, ARTISTS)
 
-    def fit(key: str, artist: str) -> tuple[str, int, int]:
-        s = r.lookup(key, artist)
-        assert s is not None
+    def fit(key: str) -> tuple[str, int, int]:
+        s = r.songs[key]
         res = fit_song(BARITONE, SongVocalRange(s.low, s.high, s.p10, s.p50, s.p90, s.tier, s.octave_confidence))  # type: ignore[arg-type]
         return res.bucket, res.transpose, res.octave
 
-    assert fit("muse|starlight", "muse") == ("fits", 0, 0)
-    assert fit("muse|uprising", "muse") == ("fitsIn", -2, 0)
-    assert fit("adele|hello", "adele")[0] == "fitsIn" and fit("adele|hello", "adele")[2] == -12  # soprano: octave down
-    assert r.songs["adele|hello"].p10 >= 60 and r.songs["adele|hello"].p90 <= 84
+    assert {k: fit(k) for k in r.songs} == BARITONE_FITS
+    assert {b for b, _, _ in BARITONE_FITS.values()} == {"fits", "fitsIn", "stretch", "outside"}
+    assert fit_song(BARITONE, SongVocalRange(55, 84, 58, 71, 79, "estimated")).cost == 6.5
+    assert {s.tier for s in r.songs.values()} == {"measured", "notes", "estimated"}
 
 
 def test_constants_match_the_publisher() -> None:

@@ -98,6 +98,7 @@ def test_fixture_catalog_carries_vocal_ranges(tmp_path):
         assert vr("muse|starlight") == (51.0, 57.3, 63.0, "measured", None, 0)
         assert vr("muse|uprising")[3:] == ("notes", 0.92, 0)
         assert vr("adele|hello")[3:] == ("estimated", None, 0)
+        assert vr("muse|supermassive black hole")[3:] == ("measured", None, 0)
         assert vr("brandy and monica|the boy is mine")[5] == 1
         assert vr("taylor swift|shake it off")[3:] == ("rough", None, None)
         assert vr("lady gaga|shallow") == (None,) * 6

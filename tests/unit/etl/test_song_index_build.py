@@ -812,13 +812,26 @@ VR_FIXTURES = FIXTURES.parent / "vocal_range"
 VRB = sib.VOCAL_RANGE_BUCKET
 
 
-def seed_vocal_range(store: FakeStore, run: str = "20261020-010000", *, corrupt: bool = False) -> None:
+def seed_vocal_range(
+    store: FakeStore, run: str = "20261020-010000", *, corrupt: bool = False, per_run: bool = True
+) -> None:
+    """Publish like vocal_range_refresh: per-run copies + latest/, pointer naming the per-run paths
+    (``per_run=False``: an older pointer without paths, files only under latest/)."""
+    from karaoke_decide.etl import vocal_range_refresh as vrr
+
     song = _gz((VR_FIXTURES / "song_vocal_range_fixture.tsv").read_bytes())
     artist = _gz((VR_FIXTURES / "artist_vocal_range_fixture.tsv").read_bytes())
     store.put(VRB, sib.VOCAL_RANGE_SONG_TSV, song)
     store.put(VRB, sib.VOCAL_RANGE_ARTIST_TSV, artist)
+    paths: dict[str, str] = {}
+    if per_run:
+        song_path, artist_path, _summary = vrr.run_blobs(run)
+        store.put(VRB, song_path, song)
+        store.put(VRB, artist_path, artist)
+        paths = {"song_path": song_path, "artist_path": artist_path}
     pointer = {
         "run": run,
+        **paths,
         "sha256_song": hashlib.sha256(song).hexdigest(),
         "sha256_artist": "0" * 64 if corrupt else hashlib.sha256(artist).hexdigest(),
     }
@@ -877,16 +890,51 @@ def test_previous_manifest_without_vocal_range_key_is_not_rebuilt(store: FakeSto
 
 def test_index_build_missing_tsv_is_warning(store: FakeStore, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     seed_vocal_range(store)
-    del store.objects[(VRB, sib.VOCAL_RANGE_SONG_TSV)]
+    from karaoke_decide.etl import vocal_range_refresh as vrr
+
+    del store.objects[(VRB, vrr.run_blobs("20261020-010000")[0])]
     with caplog.at_level(logging.INFO):
         out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
     assert out["published"] is True
     assert _errors(caplog) == []
     assert any(r.levelno == logging.WARNING and "vocal" in r.getMessage().lower() for r in caplog.records)
     m = manifest_of(store, out["index_run"])
-    assert m["vocal_range_run"] == ""
+    assert m["vocal_range_run"] == "" and m["vocal_range_pointer_run"] == ""  # not recorded as done
     meta, n = _offline_vr(store, out, tmp_path)
     assert meta["vocal_range_run"] == "" and n == 0
+
+
+def test_transient_download_failure_is_retried_next_build(store: FakeStore, tmp_path: Path) -> None:
+    seed_vocal_range(store)
+    real = store.download
+    calls = {"n": 0}
+
+    def flaky(bucket: str, name: str, dest: Path) -> None:
+        if bucket == VRB and calls["n"] == 0:
+            calls["n"] += 1
+            raise ConnectionError("503 backend error")
+        real(bucket, name, dest)
+
+    store.download = flaky  # type: ignore[method-assign]
+    first = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "a")
+    assert manifest_of(store, first["index_run"])["vocal_range_pointer_run"] == ""
+    second = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path / "b")
+    assert second["published"] is True  # not skipped
+    assert manifest_of(store, second["index_run"])["vocal_range_run"] == "20261020-010000"
+
+
+def test_reads_the_per_run_paths_the_pointer_names(store: FakeStore, tmp_path: Path) -> None:
+    seed_vocal_range(store)
+    # latest/ already overwritten by a newer refresh that died before its pointer
+    store.put(VRB, sib.VOCAL_RANGE_SONG_TSV, b"newer, not yet pointed at")
+    out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert manifest_of(store, out["index_run"])["vocal_range_run"] == "20261020-010000"
+
+
+def test_pointer_without_paths_falls_back_to_latest(store: FakeStore, tmp_path: Path) -> None:
+    seed_vocal_range(store, per_run=False)
+    out = sib.build_and_publish(storage=store, run_admin=FakeAdmin(), workdir=tmp_path)
+    assert manifest_of(store, out["index_run"])["vocal_range_run"] == "20261020-010000"
 
 
 def test_index_build_sha_mismatch_uses_no_vocal_range(

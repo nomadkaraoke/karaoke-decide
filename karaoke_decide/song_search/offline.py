@@ -25,12 +25,18 @@ availability's ``versions``, ``libraries`` and ``song_libraries`` for the karaok
 songs. ``songs.song_key`` is ``text_normalize.song_key(artist, title)`` of the
 song-id display spelling, the key availability stores versions under (ruling R9).
 
-Vocal range (Phase 3c), additive columns on ``songs`` (no schema bump: the app requires an
-exact ``offline_schema_version`` and ignores extra columns): ``vr_low``, ``vr_high``,
-``vr_p10``, ``vr_p50``, ``vr_p90``, ``vr_octave_conf`` (REAL) and ``vr_tier`` (INTEGER,
-``vocal_range.tsv.TIER_CODES``: measured 4, notes 3, estimated 2, rough 1). Filled from the
-song's own range, else its artist's (``identity_normalize(artist)``) as tier rough, else NULL.
-``meta.vocal_range_run`` names the vocal-range run used ("" = none).
+Vocal range (Phase 3c), additive (no schema bump: the app requires an exact
+``offline_schema_version`` and ignores extra columns/tables). The phone's contract:
+
+  * ``songs.vr_low``, ``vr_high``, ``vr_p10``, ``vr_p50``, ``vr_p90``, ``vr_octave_conf``
+    (REAL) and ``vr_tier`` (INTEGER): the song's OWN range only. ``vr_tier`` is 4 measured,
+    3 notes or 2 estimated (``vocal_range.tsv.TIER_CODES``); NULL = no song-level range.
+  * ``artist_vocal_range(artist_key TEXT PRIMARY KEY, low, high, p10, p50, p90 REAL)``,
+    keyed by ``identity_normalize(artist)``, only for artists that have songs here. A song
+    with NULL ``vr_tier`` whose artist has a row uses that row as tier 1 ("rough", no
+    octave confidence); the phone does this fallback (no per-song rough copies, to keep
+    the download small). catalog.db, server-side, stores the fallback per song instead.
+  * ``meta.vocal_range_run``: the vocal-range run used ("" = none, every vr_* NULL).
 
 On top of the smaller index, the offline matcher raises the confident margin by
 ``OFFLINE_MARGIN_BONUS``: offline asks "Which one?" a little more often rather than
@@ -48,7 +54,7 @@ from typing import Any
 from karaoke_decide.song_search.build_song_id import build as build_song_id
 from karaoke_decide.song_search.identify import base_title, song_norm
 from karaoke_decide.song_search.text_normalize import identity_normalize, song_key
-from karaoke_decide.vocal_range.tsv import TIER_CODES, VocalRanges
+from karaoke_decide.vocal_range.tsv import ROUGH, TIER_CODES, VocalRanges
 
 OFFLINE_SCHEMA_VERSION = 1
 OFFLINE_MARGIN_BONUS = 0.03
@@ -181,34 +187,53 @@ _VR_COLUMNS = (
     ("vr_tier", "INTEGER"),
     ("vr_octave_conf", "REAL"),
 )
+_ARTIST_VR_SQL = """
+    CREATE TABLE artist_vocal_range(artist_key TEXT PRIMARY KEY, low REAL, high REAL,
+                                    p10 REAL, p50 REAL, p90 REAL) WITHOUT ROWID;
+"""
 
 
-def _song_rows(conn: sqlite3.Connection, vocal_range: VocalRanges) -> list[tuple[Any, ...]]:
-    """(song_key, *vr_*, rowid) per song row."""
+def _song_rows(conn: sqlite3.Connection, vocal_range: VocalRanges) -> tuple[list[tuple[Any, ...]], set[str]]:
+    """([(song_key, *song-level vr_*, rowid)], artist keys of every song)."""
     out = []
+    artist_keys: set[str] = set()
     for rid, artist, title in conn.execute("SELECT rowid, artist, title FROM songs").fetchall():
         key = song_key(artist, title)
-        r = vocal_range.lookup(key, identity_normalize(artist))
+        artist_keys.add(identity_normalize(artist))
+        r = vocal_range.songs.get(key)
+        if r is not None and r.tier == ROUGH:  # contract: song-level tiers are 4/3/2 only
+            r = None
         vr = (
             (None,) * len(_VR_COLUMNS)
             if r is None
             else (r.low, r.high, r.p10, r.p50, r.p90, TIER_CODES[r.tier], r.octave_confidence)
         )
         out.append((key, *vr, rid))
-    return out
+    return out, artist_keys
 
 
 def _add_offline_tables(
     db_path: Path, song_id_db: Path, availability_db: Path, *, n_rivals: int, vocal_range: VocalRanges
 ) -> int:
-    """song_key + vr_* columns, cloud artist popularity, versions/libraries; → version rows."""
+    """song_key + song-level vr_* columns, artist_vocal_range, cloud artist popularity,
+    versions/libraries; → version rows."""
     conn = sqlite3.connect(_uri(db_path), uri=True)  # URI mode: the ATTACHes below are read-only
     try:
         conn.execute("ALTER TABLE songs ADD COLUMN song_key TEXT")
         for name, kind in _VR_COLUMNS:
             conn.execute(f"ALTER TABLE songs ADD COLUMN {name} {kind}")
         sets = ", ".join(f"{name} = ?" for name, _ in (("song_key", ""), *_VR_COLUMNS))
-        conn.executemany(f"UPDATE songs SET {sets} WHERE rowid = ?", _song_rows(conn, vocal_range))
+        rows, artist_keys = _song_rows(conn, vocal_range)
+        conn.executemany(f"UPDATE songs SET {sets} WHERE rowid = ?", rows)
+        conn.executescript(_ARTIST_VR_SQL)
+        conn.executemany(
+            "INSERT INTO artist_vocal_range VALUES (?,?,?,?,?,?)",
+            [
+                (k, a.low, a.high, a.p10, a.p50, a.p90)
+                for k, a in sorted(vocal_range.artists.items())
+                if k in artist_keys
+            ],
+        )
         conn.execute("CREATE INDEX songs_song_key ON songs(song_key)")
         conn.executescript(_VERSIONS_SQL)
         conn.execute("ATTACH DATABASE ? AS cloud", (f"{_uri(song_id_db)}?mode=ro",))
