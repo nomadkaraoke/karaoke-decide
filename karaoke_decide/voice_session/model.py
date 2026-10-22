@@ -1,8 +1,9 @@
 """Voice model: a posterior over (voice type, register shift) updated from per-song evidence.
 
 Pure Python. Each song tried yields quiz answers (position, difficulty) and optionally an
-on-device pitch summary; these become likelihoods per hypothesis, weighted by context
-(see ``weights.py``) and folded into log-probabilities, renormalised with log-sum-exp.
+on-device pitch summary; these become likelihoods per hypothesis (marginalised over the
+octave sung when pitch doesn't tell us), weighted by context (see ``weights.py``) and
+folded into log-probabilities, renormalised with log-sum-exp.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from typing import Literal, Protocol
 from karaoke_decide.voice_session.weights import (
     EPS_DIFFICULTY,
     EPS_POSITION,
+    OCTAVE_PRIOR,
     TEMP,
     evidence_weight,
 )
@@ -145,9 +147,13 @@ def _demands(h: Hyp, song: SongDemand, o: int) -> tuple[float, float, float, flo
     )
 
 
-def _octave_for(h: Hyp, song: SongDemand, known: int | None) -> int:
-    if known is not None:
-        return known
+def likely_octave(h: Hyp, song: SongDemand) -> int:
+    """The single octave hypothesis h would most plausibly sing this song in (0 preferred by 0.5 st).
+
+    Only for places that must *pick* one octave (e.g. expected stretch, reason labels). Likelihoods
+    never use it: under argmin, h and h+12 (baritone/mezzo, tenor/soprano) were exactly symmetric,
+    so quiz-only answers could not tell them apart. Likelihoods marginalise over OCTAVE_PRIOR instead.
+    """
 
     def cost(o: int) -> float:
         d_high, d_low, _, _ = _demands(h, song, o)
@@ -156,8 +162,15 @@ def _octave_for(h: Hyp, song: SongDemand, known: int | None) -> int:
     return min(_OCTAVES, key=cost)
 
 
-def likelihood_position(h: Hyp, song: SongDemand, answer: Position, sung_octave: int | None) -> float:
-    d_high, d_low, _, _ = _demands(h, song, _octave_for(h, song, sung_octave))
+def _octave_mixture(sung_octave: int | None) -> tuple[tuple[int, float], ...]:
+    """Known octave -> that octave alone; unknown -> OCTAVE_PRIOR (own octave most likely)."""
+    if sung_octave is not None:
+        return ((sung_octave, 1.0),)
+    return tuple(OCTAVE_PRIOR.items())
+
+
+def _position_at(h: Hyp, song: SongDemand, answer: Position, o: int) -> float:
+    d_high, d_low, _, _ = _demands(h, song, o)
     hi = _sigmoid((d_high - 1) / TEMP)
     lo = _sigmoid((d_low - 1) / TEMP)
     raw = {
@@ -169,12 +182,22 @@ def likelihood_position(h: Hyp, song: SongDemand, answer: Position, sung_octave:
     return (1 - EPS_POSITION) * raw[answer] / sum(raw.values()) + EPS_POSITION / len(_POSITIONS)
 
 
-def likelihood_difficulty(h: Hyp, song: SongDemand, answer: Difficulty, sung_octave: int | None) -> float:
-    d_high, d_low, x_high, x_low = _demands(h, song, _octave_for(h, song, sung_octave))
+def _difficulty_at(h: Hyp, song: SongDemand, answer: Difficulty, o: int) -> float:
+    d_high, d_low, x_high, x_low = _demands(h, song, o)
     x = _sigmoid((max(x_high, x_low) - 0.5) / 1.0)
     d = _sigmoid((max(d_high, d_low) - 0.5) / 1.0)
     raw = {"couldnt": x, "stretch": d * (1 - x), "easy": (1 - d) * (1 - x)}
     return (1 - EPS_DIFFICULTY) * raw[answer] / sum(raw.values()) + EPS_DIFFICULTY / len(_DIFFICULTIES)
+
+
+def likelihood_position(h: Hyp, song: SongDemand, answer: Position, sung_octave: int | None) -> float:
+    """P(position answer | h): at the sung octave if known, else Σ_o OCTAVE_PRIOR[o]·P(answer | h, o)."""
+    return sum(w * _position_at(h, song, answer, o) for o, w in _octave_mixture(sung_octave))
+
+
+def likelihood_difficulty(h: Hyp, song: SongDemand, answer: Difficulty, sung_octave: int | None) -> float:
+    """P(difficulty answer | h): at the sung octave if known, else marginalised over OCTAVE_PRIOR."""
+    return sum(w * _difficulty_at(h, song, answer, o) for o, w in _octave_mixture(sung_octave))
 
 
 def likelihood_pitch(h: Hyp, pitch: PitchSummary | None) -> float:
