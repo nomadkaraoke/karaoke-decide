@@ -148,6 +148,26 @@ class DisconnectResponse(BaseModel):
 # -----------------------------------------------------------------------------
 
 
+LISTENBRAINZ_UPLOAD_MAX_BYTES = 30 * 1024 * 1024
+
+
+class Capabilities(BaseModel):
+    """Which optional import features this deployment has enabled."""
+
+    screenshot_import: bool
+    listenbrainz_oauth: bool
+    listenbrainz_upload_max_bytes: int = LISTENBRAINZ_UPLOAD_MAX_BYTES
+
+
+@router.get("/capabilities", response_model=Capabilities)
+async def get_capabilities(settings: Settings) -> Capabilities:
+    """Feature flags for the Connect hub (no auth; the app hides cards that are off)."""
+    return Capabilities(
+        screenshot_import=settings.screenshot_import_enabled,
+        listenbrainz_oauth=settings.listenbrainz_oauth_active,
+    )
+
+
 @router.get("", response_model=list[ConnectedServiceResponse])
 async def list_services(
     user: VerifiedUser,

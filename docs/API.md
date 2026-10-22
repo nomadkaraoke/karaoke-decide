@@ -652,6 +652,11 @@ Connect Last.fm account by username.
 }
 ```
 
+### GET /api/services/capabilities
+
+No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, "listenbrainz_oauth": bool, "listenbrainz_upload_max_bytes": 31457280}`.
+`screenshot_import` is true when `GEMINI_API_KEY` is set (or fakes are on); `listenbrainz_oauth` needs the MetaBrainz client id/secret, `DECIDE_TOKEN_KEY` and `LISTENBRAINZ_OAUTH_ENABLED`.
+
 ### POST /api/services/youtube-music/import
 
 Import songs from a public or unlisted YouTube Music / YouTube playlist (no YouTube login).
