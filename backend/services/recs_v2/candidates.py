@@ -13,10 +13,11 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from backend.services.recs_v2.context import UserContextV2
-from backend.services.recs_v2.filters import LIBRARY_CODES, RecFilters, where_sql
+from backend.services.recs_v2.filters import RecFilters, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
 from karaoke_decide.catalog.reader import CatalogReader
+from karaoke_decide.song_search.library_filter import LIBRARY_CODES
 
 # Source caps (task brief B8).
 KNOWN_ARTISTS = 200

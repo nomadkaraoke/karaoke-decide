@@ -375,14 +375,17 @@ def test_search_library_keeps_identification(client: TestClient) -> None:
 
 
 def test_search_library_filters_groups_out(client: TestClient) -> None:
+    nonempty = 0
     for library, want in (("karafun", "KV"), ("community", None)):
         body = _search(client, "baby", library=library)
+        nonempty += bool(body["groups"])
         for g in body["groups"]:
             detail = client.get("/api/search/song", params={"key": g["song_key"]}).json()
             if want:
                 assert want in {v["brand_code"] for v in detail["versions"]}
             else:
                 assert "community" in {v["kind"] for v in detail["versions"]}
+    assert nonempty >= 1
 
 
 def test_library_invalid_value_is_422(client: TestClient) -> None:

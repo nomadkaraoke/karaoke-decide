@@ -15,15 +15,17 @@ LibraryFilter = Literal["any", "community", "karafun"]
 LIBRARY_CODES: dict[str, str] = {"karafun": "KV"}
 
 
-def library_clause(library: LibraryFilter, key_col: str = "song_key") -> tuple[str, list[str]]:
+def library_clause(library: LibraryFilter, key_col: str = "song_key", schema: str = "") -> tuple[str, list[str]]:
     """SQL condition (for ``availability.db``) restricting ``key_col`` to songs in ``library``.
 
-    → ``("1", [])`` for ``any``. ``key_col`` must be a trusted column reference."""
+    → ``("1", [])`` for ``any``. ``key_col`` must be a trusted column reference.
+    ``schema`` prefixes the tables (``"av"`` when availability.db is ATTACHed, as in recs v2)."""
+    pre = f"{schema}." if schema else ""
     if library == "community":
-        return f"EXISTS (SELECT 1 FROM versions lv WHERE lv.song_key = {key_col} AND lv.kind = 'community')", []
+        return f"EXISTS (SELECT 1 FROM {pre}versions lv WHERE lv.song_key = {key_col} AND lv.kind = 'community')", []
     if library == "karafun":
         return (
-            f"EXISTS (SELECT 1 FROM song_libraries sl WHERE sl.song_key = {key_col} AND sl.library_code = ?)",
+            f"EXISTS (SELECT 1 FROM {pre}song_libraries sl WHERE sl.song_key = {key_col} AND sl.library_code = ?)",
             [LIBRARY_CODES["karafun"]],
         )
     return "1", []

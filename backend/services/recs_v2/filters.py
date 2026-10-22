@@ -12,13 +12,12 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from karaoke_decide.catalog.moods import ENERGY_BANDS
+from karaoke_decide.song_search.library_filter import library_clause
 
 # Must stay equal to karaoke_decide.catalog.moods.MOODS (asserted in tests).
 Mood = Literal["happy", "chill", "sad", "intense"]
 Sort = Literal["best", "popular", "newest", "oldest", "shortest", "az"]
 
-# Library filter value -> KaraokeNerds brand code (KaraFun and Karaoke Version are one catalogue).
-LIBRARY_CODES: dict[str, str] = {"karafun": "KV"}
 
 SHORT_MS = 180_000  # short < 180000, medium 180000..300000 inclusive, long > 300000
 LONG_MS = 300_000
@@ -108,15 +107,10 @@ def where_sql(f: RecFilters, alias: str = "s", *, has_availability: bool = True)
             conds.append(f"EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)")
         elif f.has_karaoke == "make":
             conds.append(f"NOT EXISTS (SELECT 1 FROM av.songs x WHERE x.song_key = {a}.song_key)")
-        if f.library == "community":
-            conds.append(
-                f"EXISTS (SELECT 1 FROM av.versions v WHERE v.song_key = {a}.song_key AND v.kind = 'community')"
-            )
-        elif f.library == "karafun":
-            conds.append(
-                f"EXISTS (SELECT 1 FROM av.song_libraries l WHERE l.song_key = {a}.song_key AND l.library_code = ?)"
-            )
-            p.append(LIBRARY_CODES["karafun"])
+        if f.library != "any":
+            clause, lib_params = library_clause(f.library, f"{a}.song_key", schema="av")
+            conds.append(clause)
+            p.extend(lib_params)
     else:
         if f.has_karaoke == "make":
             conds.append(f"COALESCE({a}.in_kn, 0) = 0")
