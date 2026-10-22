@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Wróć do aplikacji",
-    "cancelled": "Logowanie do Apple Music zostało anulowane. Dotknij „Połącz”, aby spróbować ponownie.",
+    "cancelled": "Nie udało się połączyć z Apple Music. Do połączenia wymagana jest subskrypcja Apple Music. Jeśli ją masz, dotknij „Połącz”, aby spróbować ponownie.",
     "connect": "Połącz z Apple Music",
     "connectedTitle": "Połączono z Apple Music",
     "doneApp": "Wczytujemy Twoją bibliotekę. Wróć do aplikacji – Twoje propozycje zaktualizują się za minutę lub dwie.",

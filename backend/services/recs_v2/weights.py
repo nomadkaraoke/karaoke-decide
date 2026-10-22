@@ -65,6 +65,9 @@ def song_weight(doc: dict[str, object]) -> float:
         return SONG_SPOTIFY_TOP if doc.get("rank") is not None else SONG_SPOTIFY_SAVED
     if source in ("youtube_music", "ytmusic"):
         return SONG_YTMUSIC
+    if source == "apple_music":
+        # Recent plays carry a playcount; library-only songs don't (like Spotify top vs saved).
+        return SONG_SPOTIFY_TOP if to_int(doc.get("playcount")) else SONG_SPOTIFY_SAVED
     return SONG_DEFAULT
 
 

@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Vissza az alkalmazásba",
-    "cancelled": "Az Apple Music-bejelentkezés megszakadt. Koppints a Csatlakozás gombra az újbóli próbálkozáshoz.",
+    "cancelled": "Az Apple Music nem kapcsolódott. A csatlakozáshoz Apple Music-előfizetés szükséges; ha van előfizetésed, koppints a Csatlakozás gombra, és próbáld újra.",
     "connect": "Apple Music csatlakoztatása",
     "connectedTitle": "Apple Music csatlakoztatva",
     "doneApp": "Épp beolvassuk a könyvtáradat. Térj vissza az alkalmazásba: a válogatásod egy-két percen belül frissül.",

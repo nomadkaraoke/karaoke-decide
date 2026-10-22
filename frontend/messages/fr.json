@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Retour à l'application",
-    "cancelled": "La connexion à Apple Music a été annulée. Appuie sur Connecter Apple Music pour réessayer.",
+    "cancelled": "Apple Music ne s'est pas connecté. La connexion nécessite un abonnement Apple Music ; si tu en as un, appuie sur Se connecter pour réessayer.",
     "connect": "Connecter Apple Music",
     "connectedTitle": "Apple Music connecté",
     "doneApp": "Nous analysons ta bibliothèque en ce moment. Retourne sur l'application : tes suggestions apparaîtront d'ici une minute ou deux.",

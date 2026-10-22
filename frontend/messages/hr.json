@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Natrag u aplikaciju",
-    "cancelled": "Prijava putem usluge Apple Music je otkazana. Dodirni „Poveži” za ponovni pokušaj.",
+    "cancelled": "Povezivanje s uslugom Apple Music nije uspjelo. Za povezivanje je potrebna pretplata na Apple Music; ako je imaš, dodirni Poveži se i pokušaj ponovno.",
     "connect": "Poveži Apple Music",
     "connectedTitle": "Apple Music je povezan",
     "doneApp": "Upravo učitavamo tvoju zbirku. Vrati se u aplikaciju: tvoji će se odabiri ažurirati za minutu-dvije.",

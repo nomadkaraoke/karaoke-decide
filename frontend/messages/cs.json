@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Zpět do aplikace",
-    "cancelled": "Přihlášení k Apple Music bylo zrušeno. Klepnutím na Připojit to zkus znovu.",
+    "cancelled": "Apple Music se nepodařilo připojit. K propojení je potřeba předplatné Apple Music. Pokud ho máš, klepni na Připojit a zkus to znovu.",
     "connect": "Připojit Apple Music",
     "connectedTitle": "Apple Music je připojeno",
     "doneApp": "Právě načítáme tvou knihovnu. Vrať se do aplikace – tvůj výběr se aktualizuje za minutu nebo dvě.",

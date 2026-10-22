@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Takaisin sovellukseen",
-    "cancelled": "Apple Music -kirjautuminen peruutettiin. Napauta Yhdistä yrittääksesi uudelleen.",
+    "cancelled": "Apple Music -yhteyden muodostaminen epäonnistui. Yhdistäminen vaatii Apple Music -tilauksen. Jos sinulla on tilaus, yritä uudelleen napauttamalla Yhdistä.",
     "connect": "Yhdistä Apple Music",
     "connectedTitle": "Apple Music yhdistetty",
     "doneApp": "Luemme kirjastoasi juuri nyt. Palaa sovellukseen: suosituksesi päivittyvät minuutin tai parin kuluessa.",

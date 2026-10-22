@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Bumalik sa app",
-    "cancelled": "Nakansela ang pag-sign in sa Apple Music. I-tap ang Ikonekta para subukang muli.",
+    "cancelled": "Hindi kumonekta ang Apple Music. Kailangan ng subscription sa Apple Music para makakonekta; kung mayroon ka nito, i-tap ang I-connect para subukan muli.",
     "connect": "Ikonekta ang Apple Music",
     "connectedTitle": "Nakakonekta na ang Apple Music",
     "doneApp": "Binabasa na namin ang iyong library. Bumalik na sa app: mag-a-update ang iyong mga napiling kanta sa loob ng isa o dalawang minuto.",

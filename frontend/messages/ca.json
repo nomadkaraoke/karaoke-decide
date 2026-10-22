@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Torna a l'aplicació",
-    "cancelled": "S'ha cancel·lat l'inici de sessió a Apple Music. Toca «Connecta» per tornar-ho a provar.",
+    "cancelled": "Apple Music no s'ha connectat. Per connectar-te cal tenir una subscripció a Apple Music; si en tens una, toca Connecta per tornar-ho a provar.",
     "connect": "Connecta Apple Music",
     "connectedTitle": "Apple Music connectat",
     "doneApp": "Ara estem llegint la teva biblioteca. Torna a l'aplicació: les teves seleccions s'actualitzaran d'aquí a un parell de minuts.",

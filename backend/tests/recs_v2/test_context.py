@@ -89,6 +89,8 @@ def test_weight_table() -> None:
     assert w.song_weight({"source": "spotify", "rank": 3}) == 0.8
     assert w.song_weight({"source": "spotify", "rank": None}) == 0.9
     assert w.song_weight({"source": "youtube_music"}) == 0.8
+    assert w.song_weight({"source": "apple_music", "playcount": 2}) == 0.8  # recent play
+    assert w.song_weight({"source": "apple_music", "playcount": None}) == 0.9  # in the library
     assert w.song_weight({"source": "quiz"}) == w.song_weight({"source": "listenbrainz"}) == 0.6
 
 
