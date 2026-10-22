@@ -267,3 +267,13 @@ def test_out_of_range_timestamp_is_422(env: tuple[TestClient, Env], field: str, 
     r = client.post("/api/services/spotify-export", json=spotify(tracks=[t]))
     assert r.status_code == 422
     e.ingest.ingest.assert_not_called()
+
+
+def test_abandoned_incomplete_export_does_not_block_ok_status(env: Any) -> None:
+    client, e = env
+    # An earlier export (different generated_at) abandoned after 1 of 3 chunks.
+    assert client.post("/api/services/spotify-export", json=spotify(0, 3, generated_at="2026-09-01")).status_code == 200
+    assert e.doc()["status"] == "importing"
+    # A later, complete export finishes: status reflects this export only.
+    assert client.post("/api/services/spotify-export", json=spotify(0, 1, generated_at="2026-10-01")).status_code == 200
+    assert e.doc()["status"] == "ok"

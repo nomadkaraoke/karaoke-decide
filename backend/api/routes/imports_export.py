@@ -199,7 +199,7 @@ async def _ingest_chunk(
         exports[export_key] = new_entry
         outcome.update(entry=new_entry, duplicate=False)
         # Overall status and the summary figures ``record_import`` writes, kept with the chunk bookkeeping.
-        complete = all(len(e["chunks_done"]) >= int(e["chunk_count"]) for e in exports.values())
+        complete = len(new_entry["chunks_done"]) >= int(new_entry["chunk_count"])
         doc.update(
             user_id=user_id,
             source=source,

@@ -134,3 +134,16 @@ def test_canary_passes_with_10_tracks(capsys: pytest.CaptureFixture[str]) -> Non
     ):
         assert se.main(["m", "canary", PID]) == 0
     assert "ok: 10 tracks" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("subtitle", "expected"),
+    [
+        ("Earth, Wind & Fire", "Earth, Wind & Fire"),
+        ("Tyler, The Creator", "Tyler, The Creator"),
+        ("Muse,\xa0Fixture Guest", "Muse"),
+        ("Tyler, The Creator,\xa0Guest", "Tyler, The Creator"),
+    ],
+)
+def test_first_artist_splits_only_on_embed_separator(subtitle: str, expected: str) -> None:
+    assert se._first_artist(subtitle) == expected

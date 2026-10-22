@@ -62,7 +62,7 @@ def parse_spotify_playlist_id(value: str) -> str:
 
 def _first_artist(subtitle: str) -> str:
     # Artists are joined by "," plus a non-breaking space; the first one is the primary artist.
-    return subtitle.split(",")[0].replace("\xa0", " ").strip()
+    return subtitle.split(",\xa0")[0].replace("\xa0", " ").strip()
 
 
 def parse_embed_html(html: str, limit: int = EMBED_TRACK_LIMIT) -> SpotifyEmbedPlaylist:
