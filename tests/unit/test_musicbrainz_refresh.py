@@ -279,6 +279,11 @@ class TestRun:
     def _everything_staged(self, monkeypatch):
         monkeypatch.setattr(mr, "staged_tables", lambda gcs, dump_id: set(mr.all_raw_tables()))
 
+    @pytest.fixture(autouse=True)
+    def _catalog_step(self, monkeypatch):
+        self.catalog = MagicMock(return_value={"run": "r"})
+        monkeypatch.setattr(mr.catalog_publish, "build_and_publish_catalog", self.catalog)
+
     def _run(self, bq, monkeypatch, load_failures=None, **kwargs):
         extract = MagicMock()
         monkeypatch.setattr(mr, "extract_dump_to_gcs", extract)
@@ -318,6 +323,67 @@ class TestRun:
         self._run(bq, monkeypatch, do_mirror=False)
         copied = [c.args[1] for c in bq.copy_table.call_args_list]
         assert copied == [f"{sql.P}.{name}" for name in sql.MODEL_ORDER]
+
+    def test_catalog_step_runs_after_mirror_and_never_fails_run(self, monkeypatch):
+        bq = _mock_bq()
+        order = []
+        monkeypatch.setattr(
+            mirror, "build_and_publish", lambda *a, **k: order.append("mirror") or mirror.MirrorResult()
+        )
+        self.catalog.side_effect = lambda *a, **k: order.append("catalog") or (_ for _ in ()).throw(
+            RuntimeError("boom")
+        )
+        rc, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        assert order == ["mirror", "catalog"]
+        assert self._statuses(bq) == ["success"]
+
+    def test_catalog_gate_failure_does_not_fail_run(self, monkeypatch):
+        bq = _mock_bq()
+        self.catalog.return_value = None
+        rc, _ = self._run(bq, monkeypatch)
+        assert rc == 0
+        assert self._statuses(bq) == ["success"]
+
+    def test_skip_catalog_flag(self, monkeypatch):
+        bq = _mock_bq()
+        self._run(bq, monkeypatch, do_catalog=False)
+        self.catalog.assert_not_called()
+
+    def test_main_skip_catalog_flag(self, monkeypatch):
+        run = MagicMock(return_value=0)
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        monkeypatch.setattr(mr, "run", run)
+        assert mr.main(["run", "--skip-catalog"]) == 0
+        assert run.call_args.kwargs["do_catalog"] is False
+        mr.main(["run"])
+        assert run.call_args.kwargs["do_catalog"] is True
+
+    def test_publish_existing_builds_catalog_unless_skipped(self, monkeypatch):
+        bq = _mock_bq()
+        monkeypatch.setattr(mirror, "build_and_publish", MagicMock(return_value=mirror.MirrorResult()))
+        mr.publish_existing(bq, MagicMock(), "d")
+        self.catalog.assert_called_once()
+        self.catalog.reset_mock()
+        mr.publish_existing(bq, MagicMock(), "d", do_catalog=False)
+        self.catalog.assert_not_called()
+
+    def test_catalog_subcommand_only_builds_catalog(self, monkeypatch):
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        for name in ("run", "publish_existing", "extract_dump_to_gcs", "load_raw_tables", "publish"):
+            monkeypatch.setattr(mr, name, MagicMock(side_effect=AssertionError(name)))
+        assert mr.main(["catalog"]) == 0
+        self.catalog.assert_called_once()
+
+    def test_catalog_subcommand_exit_code_reflects_gate_and_errors(self, monkeypatch):
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        self.catalog.return_value = None
+        assert mr.main(["catalog"]) == 1
+        self.catalog.side_effect = RuntimeError("boom")
+        assert mr.main(["catalog"]) == 1
 
     def test_mirror_crash_does_not_fail_published_run(self, monkeypatch):
         bq = _mock_bq()
