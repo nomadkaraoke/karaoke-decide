@@ -279,7 +279,8 @@ class CatalogReader:
                 stats[r[0]] = (int(r[1]), int(r[2]))
             for r in self.conn().execute(
                 f"SELECT artist_key, decade, COUNT(*) FROM songs "
-                f"WHERE artist_key IN ({_marks(len(chunk))}) AND decade IS NOT NULL GROUP BY artist_key, decade",
+                f"WHERE artist_key IN ({_marks(len(chunk))}) AND in_kn = 1 AND decade IS NOT NULL "
+                f"GROUP BY artist_key, decade",
                 tuple(chunk),
             ):
                 decades.setdefault(r[0], Counter())[r[1]] = int(r[2])
