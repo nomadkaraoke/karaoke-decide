@@ -11,14 +11,13 @@ from typing import Any
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import IMPORTS_COLLECTION
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.spotify import SpotifyClient
-
-IMPORTS_COLLECTION = "user_imports"  # == ImportIngestService.IMPORTS_COLLECTION
 
 
 class MusicServiceError(Exception):
@@ -218,13 +217,19 @@ class MusicServiceService:
     async def get_source_summaries(self, user_id: str) -> list[dict[str, Any]]:
         """One row per source the user has: every ``music_services`` connection merged with its
         ``user_imports`` doc (if any), plus import-only sources. Counts are Firestore aggregation
-        queries on ``user_artists`` / ``user_songs`` by source."""
-        conns, imports = await asyncio.gather(
-            self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)]),
-            self.firestore.query_documents(IMPORTS_COLLECTION, filters=[("user_id", "==", user_id)]),
-        )
-        conn_by = {c.get("service_type"): c for c in conns if c.get("service_type")}
-        imp_by = {i.get("source"): i for i in imports if i.get("source")}
+        queries on ``user_artists`` / ``user_songs`` by each row's primary ``source``."""
+        conns = await self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)])
+        return await self._summaries(user_id, conns)
+
+    async def get_services_with_summaries(self, user_id: str) -> tuple[list[MusicService], list[dict[str, Any]]]:
+        """``get_user_services`` plus ``get_source_summaries`` from one ``music_services`` query."""
+        conns = await self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)])
+        return [self._doc_to_music_service(c) for c in conns], await self._summaries(user_id, conns)
+
+    async def _summaries(self, user_id: str, conns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        imports = await self.firestore.query_documents(IMPORTS_COLLECTION, filters=[("user_id", "==", user_id)])
+        conn_by = {str(c["service_type"]): c for c in conns if c.get("service_type")}
+        imp_by = {str(i["source"]): i for i in imports if i.get("source")}
         sources = list(conn_by) + [s for s in imp_by if s not in conn_by]
 
         async def count(collection: str, source: str) -> int:

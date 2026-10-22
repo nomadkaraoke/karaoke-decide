@@ -32,5 +32,5 @@ jobs:
           WEBHOOK: ${{ secrets.DISCORD_NOISE_WEBHOOK_URL }}
           REASON: ${{ steps.canary.outputs.reason }}
         run: |
-          payload=$(jq -n --arg r "$REASON" '{content: ("Spotify embed canary failed: " + $r + ". Playlist-link import is degraded (best-effort feature). Check karaoke_decide/services/spotify_embed.py parse_embed_html.")}')
+          payload=$(jq -n --arg r "${REASON:-workflow step failed before the canary ran}" '{content: ("Spotify embed canary failed: " + $r + ". Playlist-link import is degraded (best-effort feature). Check karaoke_decide/services/spotify_embed.py parse_embed_html.")}')
           curl -sf -H 'Content-Type: application/json' -d "$payload" "$WEBHOOK"

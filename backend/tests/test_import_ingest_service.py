@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 from collections.abc import AsyncGenerator, Sequence
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from google.cloud import firestore
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
@@ -45,7 +47,13 @@ class FakeFirestore:
 
     async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
         cur = self.col(collection).get(doc_id) if merge else None
-        self.col(collection)[doc_id] = {**(cur or {}), **copy.deepcopy(data)}
+        out = {**(cur or {})}
+        for field, value in data.items():
+            if isinstance(value, firestore.ArrayUnion):  # server-side union, like Firestore
+                out[field] = list(dict.fromkeys([*out.get(field, []), *value.values]))
+            else:
+                out[field] = copy.deepcopy(value)
+        self.col(collection)[doc_id] = out
 
     async def delete_document(self, collection: str, doc_id: str) -> None:
         self.col(collection).pop(doc_id, None)
@@ -400,3 +408,46 @@ def test_dep_is_exported() -> None:
     from backend.api import deps
 
     assert deps.ImportIngestServiceDep is not None
+
+
+@pytest.mark.asyncio
+async def test_sources_written_as_array_union_so_concurrent_ingests_keep_both() -> None:
+    """Two sources that both read the row before either wrote still end up in ``sources``."""
+    db = FakeFirestore()
+    kn_row = f"{USER}:{KN_ID}"
+    db.col("user_songs")[kn_row] = {"user_id": USER, "song_id": str(KN_ID), "source": "lastfm", "sources": ["lastfm"]}
+    written: list[dict[str, Any]] = []
+    real_batch_set = db.batch_set
+
+    async def spy(collection: str, docs: dict[str, dict[str, Any]], merge: bool = False) -> None:
+        written.extend(docs.values())
+        await real_batch_set(collection, docs, merge=merge)
+
+    db.batch_set = spy  # type: ignore[method-assign]
+    service = make_service(db)
+    # Both ingests have already read the row (sources == ["lastfm"]) when they write.
+    await asyncio.gather(
+        service.ingest(USER, "spotify_export", [IngestTrack(*MATCHED, plays=1)]),
+        service.ingest(USER, "screenshot", [IngestTrack(*MATCHED)]),
+    )
+    song_writes = [d for d in written if "sources" in d]
+    assert song_writes and all(isinstance(d["sources"], firestore.ArrayUnion) for d in song_writes)
+    assert set(songs(db)[kn_row]["sources"]) == {"lastfm", "spotify_export", "screenshot"}
+
+
+@pytest.mark.asyncio
+async def test_legacy_row_without_sources_keeps_its_source_in_the_union() -> None:
+    db = FakeFirestore()
+    kn_row = f"{USER}:{KN_ID}"
+    db.col("user_songs")[kn_row] = {"user_id": USER, "song_id": str(KN_ID), "source": "lastfm"}
+    await make_service(db).ingest(USER, "screenshot", [IngestTrack(*MATCHED)])
+    assert songs(db)[kn_row]["sources"] == ["lastfm", "screenshot"]
+
+
+def test_later_handles_naive_vs_aware_datetimes() -> None:
+    from backend.services.import_ingest_service import _later
+
+    aware, naive = "2026-10-01T00:00:00+00:00", "2026-10-02T00:00:00"
+    assert _later(aware, naive) == naive  # comparing them raises TypeError; the new value wins
+    assert _later(None, aware) == aware
+    assert _later("2026-10-03T00:00:00+00:00", aware) == "2026-10-03T00:00:00+00:00"

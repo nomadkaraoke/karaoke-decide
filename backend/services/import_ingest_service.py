@@ -122,8 +122,15 @@ def _later(a: Any, b: str | None) -> Any:
         return a or b
     try:
         return b if datetime.fromisoformat(str(b)) > datetime.fromisoformat(str(a)) else a
-    except ValueError:
+    except (ValueError, TypeError):  # unparsable, or naive vs aware datetimes
         return b
+
+
+def _array_union(values: list[str]) -> Any:
+    """A Firestore ``ArrayUnion`` (imported here: the client libraries stay off the API's import path)."""
+    from google.cloud import firestore
+
+    return firestore.ArrayUnion(values)
 
 
 def _add(a: int | None, b: int | None) -> int | None:
@@ -161,8 +168,11 @@ def artist_doc_id(user_id: str, source: str, name: str) -> str:
     return f"{user_id}:{source}:{safe}"
 
 
+IMPORTS_COLLECTION = "user_imports"  # doc id f"{user_id}:{source}"
+
+
 class ImportIngestService:
-    IMPORTS_COLLECTION = "user_imports"  # doc id f"{user_id}:{source}"
+    IMPORTS_COLLECTION = IMPORTS_COLLECTION
 
     def __init__(
         self,
@@ -295,7 +305,7 @@ class ImportIngestService:
             "user_id": user_id,
             "song_id": row.song_id,
             "source": source,
-            "sources": [source],
+            "sources": _array_union([source]),
             "sync_count": 1,
             "playcount": row.plays,
             "ms_played": row.ms_played,
@@ -322,8 +332,10 @@ class ImportIngestService:
     @staticmethod
     def _update_doc(cur: dict[str, Any], row: _Row, source: str, mode: PlayMode, now: str) -> dict[str, Any]:
         """The fields merged into an existing row (never times_sung / last_sung_at / loved / hidden / source)."""
-        sources = _sources(cur)
-        patch: dict[str, Any] = {"sources": sources + [source] if source not in sources else sources, "updated_at": now}
+        # ArrayUnion (no read-modify-write): two sources ingesting into one row can't drop each other.
+        # A row from before ``sources`` existed also contributes its ``source``.
+        union = [source] if isinstance(cur.get("sources"), list) else list(dict.fromkeys([*_sources(cur), source]))
+        patch: dict[str, Any] = {"sources": _array_union(union), "updated_at": now}
         playcount = _merge_count(cur.get("playcount"), row.plays, mode)
         if playcount is not None:
             patch["playcount"] = playcount
@@ -387,9 +399,6 @@ class ImportIngestService:
             data["songs"] = result.songs_added + result.songs_updated
         data.update(extra or {})
         await self.db.set_document(self.IMPORTS_COLLECTION, f"{user_id}:{source}", data, merge=True)
-
-    async def list_imports(self, user_id: str) -> list[dict[str, Any]]:
-        return await self.db.query_documents(self.IMPORTS_COLLECTION, filters=[("user_id", "==", user_id)])
 
     async def get_import(self, user_id: str, source: ImportSource) -> dict[str, Any] | None:
         return await self.db.get_document(self.IMPORTS_COLLECTION, f"{user_id}:{source}")

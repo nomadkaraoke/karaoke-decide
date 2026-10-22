@@ -181,3 +181,56 @@ def test_remove_data_without_connection_and_export_sums(client: TestClient, db: 
     assert resp.status_code == 200 and resp.json()["removed_songs"] == 1
     assert list(db.cols["user_import_artists"]) == [f"{USER}:apple_export:k2"]
     assert db.cols["user_imports"] == {}
+
+
+def test_list_services_survives_summary_lookup_failure(
+    client: TestClient, db: FakeDb, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """decide web depends on this route: a failing count lookup returns zeros / None, never 500."""
+    _conn(db, "lastfm", tracks_synced=1, songs_synced=2)
+    _rows(db, "lastfm", songs=3, artists=2)
+
+    async def boom(*_: Any, **__: Any) -> int:
+        raise RuntimeError("aggregation query failed")
+
+    monkeypatch.setattr(db, "count_documents", boom)
+    with caplog.at_level("WARNING", logger="backend.api.routes.services"):
+        resp = client.get("/api/services")
+    assert resp.status_code == 200
+    [svc] = resp.json()
+    assert svc["service_type"] == "lastfm" and svc["tracks_synced"] == 1
+    assert (svc["artists"], svc["songs"], svc["last_import_at"], svc["status"]) == (0, 0, None, "ok")
+    assert any(r.levelname == "WARNING" and "summary lookup failed" in r.getMessage() for r in caplog.records)
+
+
+def test_list_services_queries_connections_once(client: TestClient, db: FakeDb) -> None:
+    _conn(db, "lastfm")
+    calls: list[str] = []
+    real = db.query_documents
+
+    async def spy(collection: str, filters: Any = None, **kw: Any) -> list[dict[str, Any]]:
+        calls.append(collection)
+        return await real(collection, filters, **kw)
+
+    db.query_documents = spy  # type: ignore[method-assign]
+    assert client.get("/api/services").status_code == 200
+    assert calls.count("music_services") == 1
+
+
+def test_guest_cannot_extract_screenshot(client: TestClient) -> None:
+    from backend.main import app
+
+    app.dependency_overrides[get_current_user] = lambda: User(id="e2e-guest", is_guest=True)
+    resp = client.post("/api/services/screenshot/extract", files=[("images", ("s.png", b"\x89PNG fake", "image/png"))])
+    assert resp.status_code == 403
+
+
+def test_guest_cannot_import_spotify_playlist(client: TestClient) -> None:
+    from backend.main import app
+
+    app.dependency_overrides[get_current_user] = lambda: User(id="e2e-guest", is_guest=True)
+    resp = client.post(
+        "/api/services/spotify-playlist/import",
+        json={"url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"},
+    )
+    assert resp.status_code == 403

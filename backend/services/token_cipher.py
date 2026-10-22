@@ -5,9 +5,14 @@ legacy plaintext and returned unchanged, so existing rows keep working. With no 
 the cipher is the identity function (tokens stay plaintext, as before ``DECIDE_TOKEN_KEY``).
 """
 
+import logging
+from functools import lru_cache
+
 from cryptography.fernet import Fernet
 
 from backend.config import BackendSettings
+
+logger = logging.getLogger(__name__)
 
 
 class TokenCipher:
@@ -17,7 +22,14 @@ class TokenCipher:
 
     def __init__(self, key: str | None) -> None:
         key = (key or "").strip()
-        self._fernet = Fernet(key.encode()) if key else None
+        self._fernet: Fernet | None = None
+        if key:
+            try:
+                self._fernet = Fernet(key.encode())
+            except (ValueError, TypeError):
+                # A malformed key must not 500 every caller: run with encryption off (values pass
+                # through) and say so loudly. Decrypting ``enc:v1:`` values still raises ValueError.
+                logger.error("DECIDE_TOKEN_KEY is not a valid Fernet key; token encryption is disabled")
 
     @property
     def enabled(self) -> bool:
@@ -38,5 +50,11 @@ class TokenCipher:
         return self._fernet.decrypt(value[len(self.PREFIX) :].encode()).decode()
 
 
+@lru_cache(maxsize=4)
+def _cipher_for_key(key: str | None) -> TokenCipher:
+    return TokenCipher(key)
+
+
 def get_token_cipher(settings: BackendSettings) -> TokenCipher:
-    return TokenCipher(settings.decide_token_key)
+    """One cipher per distinct key, so a malformed key logs its ERROR once per process."""
+    return _cipher_for_key(settings.decide_token_key)

@@ -145,7 +145,8 @@ def get_screenshot_extractor(settings: BackendSettings) -> ScreenshotExtractor:
     if settings.decide_fake_externals:
         from backend.services.fake_screenshot_extractor import FakeScreenshotExtractor  # Task 13
 
-        return FakeScreenshotExtractor()
+        fake: ScreenshotExtractor = FakeScreenshotExtractor()
+        return fake
     return GeminiScreenshotExtractor(settings.screenshot_llm_model)
 
 
@@ -234,10 +235,10 @@ class ScreenshotImportService:
                 )
         # Catalog names can merge candidates the raw dedupe kept apart ("The Beatles" / "Beatles").
         best: dict[tuple[str, str, str], Candidate] = {}
-        for c in out:
-            k = (c.kind, identity_normalize(c.artist), identity_normalize(c.title or ""))
-            if k not in best or c.confidence > best[k].confidence:
-                best[k] = c
+        for cand in out:
+            k = (cand.kind, identity_normalize(cand.artist), identity_normalize(cand.title or ""))
+            if k not in best or cand.confidence > best[k].confidence:
+                best[k] = cand
         out = list(best.values())
         out.sort(key=lambda x: (not x.matched, -x.confidence))
         return out

@@ -659,11 +659,11 @@ No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, 
 
 ### GET /api/services/summary
 
-Verified users. Every source the user has, for the app's "Connected sources" list: each `music_services` connection merged with its `user_imports` doc, plus import-only sources. Counts are Firestore aggregation queries by source.
+Verified users. Every source the user has, for the app's "Connected sources" list: each `music_services` connection merged with its `user_imports` doc, plus import-only sources. `artists` / `songs` are Firestore aggregation counts of the rows whose primary `source` is that source (a row's `source` is the first source that wrote it; sources that only merged into someone else's row, listed in `sources`, are not counted).
 
 **Response:** `{"sources":[{"source":"lastfm","connected":true,"username":"x","artists":0,"songs":0,"last_import_at":null,"status":"ok","auth":"username"|"oauth"|null,"pending_listenbrainz_import":{"id":"...","status":"..."}|null}],"capabilities":{...same as /capabilities}}`. `status` (first match wins): `importing` (syncing, or import importing) > `needs_reconnect` (`error_code`) > `stale` (`lb_stale`) > `error` > `ok`.
 
-`GET /api/services` keeps its shape and gains `artists`, `songs`, `last_import_at`, `status`.
+`GET /api/services` keeps its shape and gains `artists`, `songs`, `last_import_at`, `status`. If the per-source lookup fails it still answers `200` with those fields as `0`, `0`, `null`, `"ok"`.
 
 ### DELETE /api/services/sources/{source}/data
 

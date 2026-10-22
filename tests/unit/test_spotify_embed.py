@@ -59,6 +59,20 @@ def test_format_changed_raises(html: str) -> None:
         se.parse_embed_html(html)
 
 
+def test_nonempty_track_list_with_zero_parsed_tracks_is_format_change() -> None:
+    renamed = [{"name": "Song", "artists": "Artist"}, "not-a-dict"]
+    data = {"props": {"pageProps": {"state": {"data": {"entity": {"name": "Mix", "trackList": renamed}}}}}}
+    html = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(data)}</script>'
+    with pytest.raises(se.SpotifyEmbedFormatChangedError):
+        se.parse_embed_html(html)
+
+
+def test_genuinely_empty_track_list_is_not_a_format_change() -> None:
+    data = {"props": {"pageProps": {"state": {"data": {"entity": {"name": "Empty", "trackList": []}}}}}}
+    html = f'<script id="__NEXT_DATA__" type="application/json">{json.dumps(data)}</script>'
+    assert se.parse_embed_html(html).tracks == []
+
+
 def _html_with_tracks(n: int) -> str:
     tracks = [{"title": f"Song {i}", "subtitle": f"Artist {i}"} for i in range(n)]
     data = {"props": {"pageProps": {"state": {"data": {"entity": {"name": "Big", "trackList": tracks}}}}}}

@@ -37,6 +37,7 @@ httpx = ">=0.28.1,<1.0"
 aiohttp = "^3.13.2"
 # Auth
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
+cryptography = ">=42"  # token_cipher (Fernet); also a python-jose extra
 # Utilities
 python-slugify = "^8.0.1"
 python-dotenv = "^1.0.0"

@@ -6,7 +6,7 @@ Handles OAuth flows, service connections, and sync operations.
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated, Literal, cast, get_args
+from typing import Annotated, Any, Literal, cast, get_args
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -342,8 +342,14 @@ async def list_services(
     Returns information about each connected service including
     sync status and track counts.
     """
-    services = await music_service.get_user_services(user.id)
-    extra = {r["source"]: r for r in await music_service.get_source_summaries(user.id)}
+    extra: dict[str, dict[str, Any]] = {}
+    try:
+        services, rows = await music_service.get_services_with_summaries(user.id)
+        extra = {r["source"]: r for r in rows}
+    except Exception:
+        # The counts are extras; decide web needs this route, so fall back to zeros / None.
+        logger.warning("per-source summary lookup failed for GET /api/services; returning zeros", exc_info=True)
+        services = await music_service.get_user_services(user.id)
 
     return [
         ConnectedServiceResponse(

@@ -199,11 +199,11 @@ def real() -> Iterator[tuple[TestClient, RealFirestore]]:
 def artist_plays(fs: RealFirestore, name: str = "e2e-band") -> int:
     docs = [d for d in fs.col("user_artists").values() if d["artist_name"] == name]
     assert len(docs) == 1
-    return docs[0]["playcount"]
+    return int(docs[0]["playcount"])
 
 
 def song_plays(fs: RealFirestore, title: str) -> int:
-    return next(d["playcount"] for d in fs.col("user_songs").values() if d["title"] == title)
+    return next(int(d["playcount"]) for d in fs.col("user_songs").values() if d["title"] == title)
 
 
 def post(client: TestClient, idx: int, count: int, tracks: list[dict[str, Any]], **over: Any) -> Any:
@@ -247,7 +247,8 @@ def test_failed_ingest_retry_does_not_double_artist_sums(real: Any, monkeypatch:
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("boom")
-        return await real_ingest(*a, **k)
+        result: IngestResult = await real_ingest(*a, **k)
+        return result
 
     monkeypatch.setattr(svc, "ingest", flaky)
     body = spotify(0, 1, tracks=[track("e2e-band", "Song One", 5)])

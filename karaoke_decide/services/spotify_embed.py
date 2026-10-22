@@ -9,15 +9,12 @@ daily canary (``.github/workflows/spotify-embed-canary.yml``) posts to #noise wh
 from __future__ import annotations
 
 import json
-import logging
 import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
-
-logger = logging.getLogger(__name__)
 
 EMBED_TRACK_LIMIT = 100
 CANARY_MIN_TRACKS = 10
@@ -92,6 +89,9 @@ def parse_embed_html(html: str, limit: int = EMBED_TRACK_LIMIT) -> SpotifyEmbedP
         artist = _first_artist(subtitle)
         if artist and song.strip():
             tracks.append({"artist": artist, "title": song.strip()})
+    if track_list and not tracks:
+        # Entries exist but none parsed: the per-track shape changed, which is not an empty playlist.
+        raise SpotifyEmbedFormatChangedError("trackList has entries but none parsed as title/subtitle")
     return SpotifyEmbedPlaylist(title=title, tracks=tracks[:limit])
 
 
