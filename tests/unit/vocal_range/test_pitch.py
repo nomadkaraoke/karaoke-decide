@@ -36,14 +36,14 @@ def test_sine_scale_stats():
 
 def test_word_windows_exclude_outside_frames():
     inside = np.concatenate([_tone(60, 12), _tone(67, 12)])  # 0-24 s
-    outside = _tone(44.0, 6, amp=0.8)  # ~104 Hz, loud, 24-30 s (<~90 Hz fails pyin prob>=0.5)
+    outside = _tone(38.0, 6, amp=0.8)  # ~74 Hz, loud, 24-30 s
     y = np.concatenate([inside, outside])
     stats = analyze_vocals(y, SR, windows=[(0.0, 24.0)])
     assert stats is not None
     assert stats.low > 58
     # control: without windows the loud low tone is counted
     ctrl = analyze_vocals(y, SR)
-    assert ctrl is not None and ctrl.low < 50
+    assert ctrl is not None and ctrl.low < 45
 
 
 def test_energy_gating_ignores_bleed():
@@ -57,3 +57,11 @@ def test_energy_gating_ignores_bleed():
 def test_short_returns_none():
     y = _tone(60, 10)
     assert analyze_vocals(y, SR) is None
+
+
+def test_e2_bass_note_is_measurable():
+    # E2 = 82.4 Hz = MIDI 40; needs the 2048-sample pyin frame.
+    y = _tone(40, 22)
+    stats = analyze_vocals(y, SR)
+    assert stats is not None
+    assert stats.low == pytest.approx(40, abs=0.3)

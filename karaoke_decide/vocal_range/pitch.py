@@ -16,7 +16,9 @@ import numpy as np
 TARGET_SR = 16000
 FMIN = 65.0
 FMAX = 1100.0
-FRAME_LENGTH = 1024
+# Deviation from the plan (1024): at 1024 samples pyin's voiced_prob stays < 0.5 below
+# ~90 Hz, so bass/baritone lows (E2 = 82 Hz) were never measured. 2048 recovers them.
+PYIN_FRAME_LENGTH = 2048
 HOP_LENGTH = 320  # 20 ms at 16 kHz
 MIN_VOICED_PROB = 0.5
 ENERGY_GATE_DB = 25.0  # keep frames within this many dB of the P95 frame loudness
@@ -52,7 +54,7 @@ def _voiced_midi_frames(
     if sr != TARGET_SR:
         y = librosa.resample(y, orig_sr=sr, target_sr=TARGET_SR)
     empty = (np.empty(0), np.empty(0))
-    if y.size < FRAME_LENGTH:
+    if y.size < PYIN_FRAME_LENGTH:
         return empty
 
     f0, voiced_flag, voiced_prob = librosa.pyin(
@@ -60,7 +62,7 @@ def _voiced_midi_frames(
         fmin=FMIN,
         fmax=FMAX,
         sr=TARGET_SR,
-        frame_length=FRAME_LENGTH,
+        frame_length=PYIN_FRAME_LENGTH,
         hop_length=HOP_LENGTH,
     )
     n = len(f0)
@@ -73,7 +75,7 @@ def _voiced_midi_frames(
             in_win |= (t >= start) & (t <= end)
         keep &= in_win
     else:
-        rms = librosa.feature.rms(y=y, frame_length=FRAME_LENGTH, hop_length=HOP_LENGTH)[0][:n]
+        rms = librosa.feature.rms(y=y, frame_length=PYIN_FRAME_LENGTH, hop_length=HOP_LENGTH)[0][:n]
         db = 20 * np.log10(rms + 1e-10)
         keep[: len(db)] &= db >= (np.percentile(db, 95) - ENERGY_GATE_DB)
         keep[len(db) :] = False
