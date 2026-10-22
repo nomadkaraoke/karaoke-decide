@@ -692,6 +692,9 @@ service `error` with "reconnect". Keys: Secret Manager `apple-musickit-private-k
 - `GET /api/services/apple-music/developer-token` (public) → `{developer_token, expires_at}`. An
   ES256 JWT with an `origin` claim of `FRONTEND_URL`, so it only works from decide web. 503 when the
   key isn't configured.
+- `GET /api/services/apple-music/app-developer-token` (signed in) → `{developer_token, expires_at}`
+  without an `origin` claim, for the iOS app's native MusicKit sign-in (`DefaultMusicTokenProvider`
+  turns it into a Music User Token, which the app posts to `/connect` signed in, no browser).
 - `POST /api/services/apple-music/link` (signed in) → `{connect_url, expires_in}`. For the app: a
   one-time `state` (10 min) in `connect_url` (`{FRONTEND_URL}/{locale}/connect/apple-music?state=…&return=app`),
   so the page works in an in-app browser that isn't signed in to decide. The page returns to

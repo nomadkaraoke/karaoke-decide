@@ -453,6 +453,20 @@ async def apple_music_developer_token(
     return AppleMusicDeveloperTokenResponse(developer_token=token, expires_at=expires_at)
 
 
+@router.get("/apple-music/app-developer-token", response_model=AppleMusicDeveloperTokenResponse)
+async def apple_music_app_developer_token(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+) -> AppleMusicDeveloperTokenResponse:
+    """Developer token for the iOS app's native MusicKit sign-in (no origin claim: native requests send no
+    Origin header). Signed-in users only, since an unrestricted token works from anywhere."""
+    try:
+        token, expires_at = music_service.apple_music_signer.token()
+    except AppleMusicNotConfiguredError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Apple Music is not available")
+    return AppleMusicDeveloperTokenResponse(developer_token=token, expires_at=expires_at)
+
+
 @router.post("/apple-music/link", response_model=AppleMusicLinkResponse)
 async def apple_music_link(
     user: VerifiedUser,
