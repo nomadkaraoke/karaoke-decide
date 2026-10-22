@@ -94,7 +94,7 @@ def test_weight_table() -> None:
 
 async def test_artists_of_known_songs(reader: CatalogReader) -> None:
     fs = FakeFirestore(
-        user_songs=[_song(f"spotify:{i}", "Some Band", f"Tune {i}") for i in range(3)],
+        user_songs=[_song(f"spotify:{i}", "Some Band", f"Tune {i}", source="spotify") for i in range(3)],
     )
     ctx = await _ctx(reader, fs)
     sig = ctx.artists[artist_key("Some Band")]
@@ -172,4 +172,31 @@ async def test_over_1000_user_songs_all_read(reader: CatalogReader) -> None:
     fs = FakeFirestore(user_songs=[_song(f"spotify:{i}", "Band", f"Tune {i}") for i in range(2300)])
     ctx = await _ctx(reader, fs)
     assert len(ctx.known_songs) == 2300
-    assert fs.song_queries == [(1000, 0), (1000, 1000), (1000, 2000)]
+    assert fs.song_queries == [(None, None)]  # one streamed query, no offset paging
+
+
+async def test_quiz_seeded_songs_do_not_override_affinity(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        decide_users=[
+            {"id": "h", "user_id": UID, "quiz_artist_affinities": [{"artist_name": "Cher", "affinity": "occasionally"}]}
+        ],
+        user_songs=[_song(f"q{i}", "Cher", f"Tune {i}", source="quiz") for i in range(5)],
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.artists[artist_key("Cher")].weight == w.QUIZ_OCCASIONALLY
+    assert len(ctx.known_songs) == 5
+
+
+@pytest.mark.parametrize("source", ["manual", "known_songs", "enjoy_singing"])
+def test_explicit_add_sources_are_manual_weight(source: str) -> None:
+    assert w.song_weight({"source": source}) == w.SONG_MANUAL
+
+
+async def test_hidden_keys_failure_degrades(reader: CatalogReader, caplog: pytest.LogCaptureFixture) -> None:
+    class Boom:
+        async def hidden_keys(self, user_id: str) -> set[str]:
+            raise RuntimeError("down")
+
+    ctx = await build_context(FakeFirestore(), reader, Boom(), UID)  # type: ignore[arg-type]
+    assert ctx.hidden == set()
+    assert any(r.levelname == "WARNING" for r in caplog.records)

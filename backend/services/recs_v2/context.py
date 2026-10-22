@@ -10,6 +10,7 @@ wins and ``excluded_artists`` are removed. Songs map to the search service's
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -19,7 +20,7 @@ from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
 
-PAGE_SIZE = 1000
+logger = logging.getLogger(__name__)
 _TOP_SOURCES = {"spotify", "lastfm", "listenbrainz"}
 
 
@@ -75,14 +76,8 @@ async def _user_doc(firestore: FirestoreService, user_id: str) -> dict[str, Any]
 
 
 async def _all_user_songs(firestore: FirestoreService, user_id: str) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    while True:
-        page = await firestore.query_documents(
-            "user_songs", filters=[("user_id", "==", user_id)], limit=PAGE_SIZE, offset=len(out)
-        )
-        out.extend(page)
-        if len(page) < PAGE_SIZE:
-            return out
+    """One unbounded query: the client streams it in batches, and no skipped docs are re-billed."""
+    return await firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
 
 
 def _kn_id(song_id: object) -> int | None:
@@ -111,9 +106,17 @@ def _map_songs(
         known[key] = max(known.get(key, 0.0), w.song_weight(d))
         if not has_karaoke:
             no_karaoke.setdefault(key, (key, artist, title))
-        if artist:
+        if artist and d.get("source") != "quiz":  # quiz seeds 5 songs per liked artist; affinity already covers it
             artist_songs.setdefault(artist_key(artist), set()).add(key)
     return known, list(no_karaoke.values()), {k: len(v) for k, v in artist_songs.items()}
+
+
+async def _hidden(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
+    try:
+        return set(await feedback.hidden_keys(user_id))
+    except Exception:
+        logger.warning("hidden_keys failed for %s; continuing with none hidden", user_id, exc_info=True)
+        return set()
 
 
 async def build_context(
@@ -123,7 +126,7 @@ async def build_context(
         _user_doc(firestore, user_id),
         _all_user_songs(firestore, user_id),
         firestore.query_documents("user_artists", filters=[("user_id", "==", user_id)]),
-        feedback.hidden_keys(user_id),
+        _hidden(feedback, user_id),
     )
     ctx = UserContextV2(user_id=user_id, hidden=set(hidden))
 
@@ -137,7 +140,7 @@ async def build_context(
     for d in song_docs:
         if d.get("artist"):
             names.setdefault(artist_key(d["artist"]), d["artist"])
-    for key, n in songs_per_artist.items():
+    for key, n in songs_per_artist.items():  # quiz-seeded songs are excluded from the count
         if key:
             _add_artist(artists, names.get(key, key), w.artist_from_songs(n), "songs")
 

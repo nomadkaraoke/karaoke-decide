@@ -26,6 +26,8 @@ SONG_SPOTIFY_SAVED = 0.9
 SONG_SPOTIFY_TOP = 0.8
 SONG_MANUAL = 1.0
 SONG_YTMUSIC = 0.8
+# Explicit user adds: known_songs / enjoy_singing (known_songs_service) and "manual" (love endpoint).
+MANUAL_SOURCES = frozenset({"manual", "known_songs", "enjoy_singing"})
 SONG_DEFAULT = 0.6  # quiz or any other source
 
 
@@ -54,7 +56,7 @@ def lastfm_song(playcount: int | None) -> float:
 def song_weight(doc: dict[str, object]) -> float:
     """Weight of one ``user_songs`` doc by its ``source``."""
     source = doc.get("source")
-    if source == "manual":
+    if source in MANUAL_SOURCES:
         return SONG_MANUAL
     if source == "lastfm":
         return lastfm_song(to_int(doc.get("playcount")))
