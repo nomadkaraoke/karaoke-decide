@@ -28,6 +28,10 @@ import sys
 import time
 from pathlib import Path
 
+# Single-threaded math: the box is live (KJ shows). Must be set before numpy/librosa import.
+for _var in ("OMP_NUM_THREADS", "NUMBA_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 COLUMNS = [
     "source_id",
     "artist",
@@ -63,12 +67,30 @@ def done_ids(out: Path) -> set[str]:
         return {row["source_id"] for row in csv.DictReader(f)}
 
 
+def trim_torn_line(out: Path) -> bool:
+    """Drop a partial last line (killed mid-write) so appends start on a clean row."""
+    if not out.exists() or out.stat().st_size == 0:
+        return False
+    data = out.read_bytes()
+    if data.endswith(b"\n"):
+        return False
+    cut = data.rfind(b"\n") + 1  # 0 if no newline at all
+    with out.open("r+b") as f:
+        f.truncate(cut)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--in", dest="indir", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--limit", type=int, default=None, help="max stems to analyze this run")
     args = ap.parse_args(argv)
+
+    if hasattr(os, "nice"):
+        os.nice(19)
+    if trim_torn_line(args.out):
+        print("trimmed torn last line from output", flush=True)
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import soundfile as sf
