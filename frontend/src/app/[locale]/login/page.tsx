@@ -29,11 +29,12 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [next, setNext] = useState("/my-songs");
-
-  useEffect(() => {
-    setNext(safeNext(new URLSearchParams(window.location.search).get("next")));
-  }, []);
+  // Read ?next= before the first render so an already-signed-in redirect honours it.
+  const [next] = useState(() =>
+    typeof window === "undefined"
+      ? "/my-songs"
+      : safeNext(new URLSearchParams(window.location.search).get("next"))
+  );
 
   // Redirect once signed in (including when already signed in on arrival)
   useEffect(() => {
