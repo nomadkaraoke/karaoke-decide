@@ -156,6 +156,10 @@ Measured in the production image (local, `--cpus=1`): uvicorn + app import went 
 - **Ops:** `mb-refresh catalog [--no-publish] [--workdir DIR]` builds only the catalog. `--no-publish --workdir DIR` runs the real BigQuery build locally and leaves `catalog.db` there (nothing uploaded) for size checks. The first prod build (or an ad-hoc rebuild) can be started with the manual `Run catalog build` workflow (`.github/workflows/run-catalog-build.yml`) or `gcloud run jobs execute mb-refresh --region us-central1 --args=catalog --wait`.
 - **Infra:** the main service runtime SA already has project-level `storage.admin`, so no extra bucket IAM is declared. A `decide-api-health-uptime` check pings `/api/health` every 60 s through the Worker (idle CPU is released, so keeping an instance warm costs about nothing).
 
+## Vocal range (Phase 3c)
+
+`mb-refresh` runs a `vocal_range` step just before the catalog build (`karaoke_decide/etl/vocal_range_refresh.py`, skip with `--skip-vocal-range`, alone via `mb-refresh vocal-range`): UltraStar notes (archive.org dump cached in GCS), measured pyin CSVs, Gemini estimates and Wikidata voice types are merged (`karaoke_decide/vocal_range/merge.py`) into BigQuery `song_vocal_range_sources`, `song_vocal_range`, `artist_vocal_range` (staged then copied to prod) plus TSVs and a `latest.json` pointer in GCS. `catalog.db` (schema 2) and `offline.db` (additive) carry `vr_*` columns; `song-index-build` reads the TSVs and degrades to NULL. The on-demand Cloud Run job `vocal-range-gen` (`Dockerfile.vocal-analysis`, own SA, optional poetry group `vocal-analysis`) measures gen's vocals stems. Runbook: [VOCAL-RANGE.md](VOCAL-RANGE.md).
+
 ## Data Flow
 
 ### 1. User Registration & Auth
