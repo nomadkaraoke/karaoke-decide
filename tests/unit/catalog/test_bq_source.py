@@ -160,3 +160,47 @@ def test_no_musicbrainz_http():
     } | {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
     assert not imported & {"httpx", "requests", "urllib", "aiohttp"}
     assert "musicbrainz.org" not in Path(src.__file__).read_text()
+
+
+def test_no_karaoke_listener_floor_fits_listenbrainz_scale():
+    # LB all-time listener counts are small (max ~10k, p99 ~117): a 1000 floor kept only ~3k
+    # recordings worldwide and the catalog got ~200 "make it" songs instead of tens of thousands.
+    assert 10 <= src.NO_KARAOKE_MIN_LISTENERS <= 50
+    assert f"listeners >= {src.NO_KARAOKE_MIN_LISTENERS}" in src.NO_KARAOKE_SQL
+
+
+def test_no_karaoke_sql_dedupes_songs_before_ranking_per_artist():
+    # Several MB recordings of one song (album, single, reissue) must not use up an artist's
+    # candidate slots: keep the most-listened recording per (artist, title) first, then rank.
+    sql = " ".join(src.NO_KARAOKE_SQL.split())
+    per_song = sql.find("PARTITION BY l.artist_normalized, l.base_title")
+    per_artist = sql.find("PARTITION BY artist_normalized ORDER BY")
+    assert per_song != -1 and per_artist != -1
+    assert per_song < per_artist
+
+
+def test_no_karaoke_sql_compares_bracket_free_titles_with_kn():
+    sql = " ".join(src.NO_KARAOKE_SQL.split())
+    assert "k.base_title = l.base_title" in sql
+    assert sql.count("REGEXP_REPLACE(Title, r'[\\[(][^\\])]*[\\])]', '')") == 1
+    assert "REGEXP_REPLACE(r.title, r'[\\[(][^\\])]*[\\])]', '')" in sql
+
+
+def _kn_row(kn_id, artist, title):
+    from karaoke_decide.catalog.build import KnRow
+
+    return KnRow(kn_id, song_key(artist, title), artist, title, "SF", 1, "")
+
+
+def test_no_karaoke_skips_bracketed_variants_of_kn_songs():
+    # KN has "22" and "Fearless (Acoustic)": "22 (Taylor's Version)" and "Fearless" already have a
+    # karaoke version, so they are not "make it" candidates. A genuinely new song still is.
+    kn = [_kn_row(1, "Tay Singer", "22"), _kn_row(2, "Tay Singer", "Fearless (Acoustic)")]
+    rows = [
+        {"recording_mbid": "a", "title": "22 (Taylor’s Version)", "artist": "Tay Singer", "listeners": 600},
+        {"recording_mbid": "b", "title": "Fearless", "artist": "Tay Singer", "listeners": 500},
+        {"recording_mbid": "c", "title": "Brand New [From The Vault]", "artist": "Tay Singer", "listeners": 400},
+        {"recording_mbid": "d", "title": "Brand New", "artist": "Tay Singer", "listeners": 300},
+    ]
+    out = src._no_karaoke_songs(iter(rows), src._kn_title_keys(kn), {})
+    assert [s.title for s in out] == ["Brand New [From The Vault]"]

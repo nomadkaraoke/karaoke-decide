@@ -10,6 +10,7 @@ describe a real recording.
 """
 
 import logging
+import re
 from collections import defaultdict
 from collections.abc import Iterator
 from typing import Any
@@ -30,12 +31,18 @@ MB = "nomadkaraoke.musicbrainz"
 PAGE_SIZE = 50_000
 CLASSIC_BRANDS = 20
 NO_KARAOKE_PER_ARTIST = 10
-NO_KARAOKE_CANDIDATES_PER_ARTIST = 40  # SQL over-fetches; Python drops songs already in KN
-NO_KARAOKE_MIN_LISTENERS = 1000
+NO_KARAOKE_CANDIDATES_PER_ARTIST = 20  # SQL over-fetches; Python drops songs already in KN
+# ListenBrainz all-time listener counts are small (max ~10k, p99 ~117 in Oct 2026). A floor of
+# 1000 kept ~3k recordings worldwide and yielded ~200 songs. 40 yields ~31k songs and keeps
+# catalog.db under the 50 MB gz budget (KN songs alone are ~46.5 MB gz; 20 would give ~54k
+# songs at ~51.8 MB gz).
+NO_KARAOKE_MIN_LISTENERS = 40
 SIMILAR_PER_ARTIST = 30
 
 # Same normalisation as mb_*.name_normalized / artist_normalized (lowercase, non [a-z0-9] -> space).
 _NORM_SQL = "TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER({col}), r'[^a-z0-9 ]', ' '), r' +', ' '))"
+# _NORM_SQL of the title with every bracketed qualifier dropped ("22 (Taylor's Version)" -> "22").
+_BASE_TITLE_SQL = _NORM_SQL.format(col="REGEXP_REPLACE({col}, r'[\\[(][^\\])]*[\\])]', '')")
 
 KN_SQL = f"""
 SELECT Id, Artist, Title, Brands,
@@ -94,30 +101,42 @@ LEFT JOIN listeners lp USING (karaoke_id)
 NO_KARAOKE_SQL = f"""
 WITH kn_norm AS (
   SELECT DISTINCT {_NORM_SQL.format(col="Artist")} AS artist_normalized,
-                  {_NORM_SQL.format(col="Title")} AS name_normalized
+                  {_BASE_TITLE_SQL.format(col="Title")} AS base_title
   FROM `{P}.karaokenerds_raw`
 ),
 kn_artists AS (SELECT DISTINCT artist_normalized FROM kn_norm),
 recordings AS (
   -- mb_recordings_enriched has one row per Spotify track: collapse to one row per recording.
   SELECT recording_mbid, ANY_VALUE(title) AS title, ANY_VALUE(artist_credit) AS artist,
-         ANY_VALUE(artist_normalized) AS artist_normalized, ANY_VALUE(name_normalized) AS name_normalized,
+         ANY_VALUE(artist_normalized) AS artist_normalized,
          MAX(length_ms) AS duration_ms, MAX(spotify_popularity) AS spotify_pop
   FROM `{P}.mb_recordings_enriched`
   WHERE artist_normalized IN (SELECT artist_normalized FROM kn_artists)
   GROUP BY recording_mbid
 ),
-popular AS (
-  SELECT r.recording_mbid, r.title, r.artist, r.duration_ms, r.spotify_pop, p.listeners,
-         ROW_NUMBER() OVER (PARTITION BY r.artist_normalized
-                            ORDER BY p.listeners DESC, r.recording_mbid) AS rn
+listened AS (
+  SELECT r.recording_mbid, r.title, r.artist, r.artist_normalized, r.duration_ms, r.spotify_pop, p.listeners,
+         {_BASE_TITLE_SQL.format(col="r.title")} AS base_title
   FROM `{P}.lb_recording_popularity` p
   JOIN recordings r ON r.recording_mbid = p.recording_mbid
   WHERE p.stats_range = 'all_time'
     AND p.listeners >= {NO_KARAOKE_MIN_LISTENERS}
     AND NOT REGEXP_CONTAINS(LOWER(r.title), r'\\blive\\b|remix|demo')
-    AND NOT EXISTS (SELECT 1 FROM kn_norm k
-                    WHERE k.artist_normalized = r.artist_normalized AND k.name_normalized = r.name_normalized)
+),
+song_best AS (
+  -- One row per song: the most-listened recording of each (artist, bracket-free title), so
+  -- reissues, single/album duplicates and "(Taylor's Version)" re-recordings don't use up an
+  -- artist's candidate slots. A song is "in KN" when its bracket-free title matches a KN one.
+  SELECT l.* EXCEPT (base_title)
+  FROM listened l
+  WHERE NOT EXISTS (SELECT 1 FROM kn_norm k
+                    WHERE k.artist_normalized = l.artist_normalized AND k.base_title = l.base_title)
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY l.artist_normalized, l.base_title
+                             ORDER BY l.listeners DESC, l.recording_mbid) = 1
+),
+popular AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY artist_normalized ORDER BY listeners DESC, recording_mbid) AS rn
+  FROM song_best
 ),
 years AS (
   SELECT mt.recording_mbid, MIN(rg.first_release_year) AS year
@@ -268,18 +287,38 @@ def _kn_songs(kn: list[KnRow], facets: dict[int, dict[str, Any]], artists: dict[
     return songs
 
 
+_BRACKETED_RE = re.compile(r"\s*[\[(][^\])]*[\])]")
+
+
+def _base_key(artist: str, title: str) -> str:
+    """song_key with every bracketed qualifier dropped: "22 (Taylor's Version)" -> "22"."""
+    return song_key(artist, _BRACKETED_RE.sub("", title).strip() or title)
+
+
+def _kn_title_keys(kn: list[KnRow]) -> set[str]:
+    """Exact and bracket-free song keys of every KN song (what counts as "has a karaoke version")."""
+    return {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
+
+
 def _no_karaoke_songs(
     rows: Iterator[dict[str, Any]], kn_keys: set[str], artists: dict[str, ArtistRow]
 ) -> list[SongRow]:
-    """Top listened songs per KN artist that have no KN version (in_kn = 0)."""
+    """Top listened songs per KN artist that have no KN version (in_kn = 0).
+
+    ``kn_keys`` comes from ``_kn_title_keys``: a candidate is skipped when its exact or
+    bracket-free key matches a KN song, so "22 (Taylor's Version)" doesn't duplicate KN's "22".
+    """
     candidates: dict[str, list[SongRow]] = defaultdict(list)
     seen: set[str] = set()
     for r in sorted(rows, key=lambda r: -(r.get("listeners") or 0)):
         key = song_key(r["artist"], r["title"])
+        base = _base_key(r["artist"], r["title"])
         a_key = artist_key(r["artist"])
-        if key in kn_keys or key in seen or len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
+        if key in kn_keys or base in kn_keys or len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
             continue
-        seen.add(key)
+        if key in seen or base in seen:
+            continue
+        seen.update((key, base))
         artist = artists.get(a_key)
         year = _as_int(r.get("year"))
         candidates[a_key].append(
@@ -340,8 +379,7 @@ def fetch_catalog_rows(bq: bigquery.Client, *, dry_run: bool = False) -> Catalog
     }  # best listened wins
 
     kn_songs = _kn_songs(kn, facets, artists)
-    kn_keys = {s.song_key for s in kn_songs}
-    extra = _no_karaoke_songs(_run(bq, NO_KARAOKE_SQL, dry_run=dry_run), kn_keys, artists)
+    extra = _no_karaoke_songs(_run(bq, NO_KARAOKE_SQL, dry_run=dry_run), _kn_title_keys(kn), artists)
     songs = [*kn_songs, *extra]
 
     wanted = {s.artist_key for s in songs}
