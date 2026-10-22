@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Tillbaka till appen",
-    "cancelled": "Inloggningen på Apple Music avbröts. Tryck på Anslut för att försöka igen.",
+    "cancelled": "Apple Music anslöts inte. För att ansluta krävs ett Apple Music-abonnemang. Om du har ett trycker du på Anslut för att försöka igen.",
     "connect": "Anslut Apple Music",
     "connectedTitle": "Apple Music är anslutet",
     "doneApp": "Vi läser in ditt bibliotek nu. Gå tillbaka till appen så uppdateras dina val om någon minut.",

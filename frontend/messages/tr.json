@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Uygulamaya geri dön",
-    "cancelled": "Apple Music girişi iptal edildi. Tekrar denemek için Bağla'ya dokun.",
+    "cancelled": "Apple Music bağlanamadı. Bağlanmak için bir Apple Music aboneliği gerekir; eğer aboneliğin varsa tekrar denemek için Bağlan'a dokun.",
     "connect": "Apple Music'i Bağla",
     "connectedTitle": "Apple Music bağlandı",
     "doneApp": "Şimdi arşivini inceliyoruz. Uygulamaya dönebilirsin; seçimlerin bir iki dakika içinde güncellenir.",

@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Înapoi la aplicație",
-    "cancelled": "Conectarea la Apple Music a fost anulată. Apasă pe Conectează pentru a încerca din nou.",
+    "cancelled": "Apple Music nu s-a conectat. Conectarea necesită un abonament Apple Music; dacă ai unul, apasă pe Conectează-te pentru a încerca din nou.",
     "connect": "Conectează Apple Music",
     "connectedTitle": "Apple Music a fost conectat",
     "doneApp": "Îți citim biblioteca acum. Întoarce-te în aplicație: recomandările tale se vor actualiza într-un minut sau două.",

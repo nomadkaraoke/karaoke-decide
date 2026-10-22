@@ -112,7 +112,15 @@ class UserSong(BaseModel):
 
     # Source tracking
     source: Literal[
-        "spotify", "lastfm", "listenbrainz", "youtube_music", "quiz", "known_songs", "enjoy_singing", "manual"
+        "spotify",
+        "lastfm",
+        "listenbrainz",
+        "youtube_music",
+        "apple_music",
+        "quiz",
+        "known_songs",
+        "enjoy_singing",
+        "manual",
     ] = "spotify"
 
     # From listening history

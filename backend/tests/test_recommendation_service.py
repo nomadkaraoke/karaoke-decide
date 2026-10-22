@@ -311,6 +311,36 @@ class TestGetUserSongs:
         assert total == 1
         assert songs[0].artist == "Queen"
 
+    # Found in prod: an Apple Music sync wrote source "apple_music", which UserSong didn't allow, and
+    # GET /api/my/songs answered 500 for that user. Every source a sync writes must load.
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("source", ["spotify", "lastfm", "listenbrainz", "youtube_music", "apple_music"])
+    async def test_loads_every_synced_source(
+        self,
+        recommendation_service: RecommendationService,
+        mock_firestore: MagicMock,
+        source: str,
+    ) -> None:
+        mock_firestore.query_documents = AsyncMock(
+            return_value=[
+                {
+                    "id": "user_123:x",
+                    "user_id": "user_123",
+                    "song_id": "x",
+                    "source": source,
+                    "artist": "Queen",
+                    "title": "Bohemian Rhapsody",
+                    "created_at": "2024-01-01T00:00:00+00:00",
+                    "updated_at": "2024-01-01T00:00:00+00:00",
+                }
+            ]
+        )
+        mock_firestore.count_documents = AsyncMock(return_value=1)
+
+        songs, _ = await recommendation_service.get_user_songs(user_id="user_123", limit=20)
+
+        assert songs[0].source == source
+
     @pytest.mark.asyncio
     async def test_returns_empty_for_new_user(
         self,

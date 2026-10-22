@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Volver a la app",
-    "cancelled": "Se canceló el inicio de sesión con Apple Music. Toca Conectar para intentarlo de nuevo.",
+    "cancelled": "Apple Music no se conectó. Para conectarte necesitas una suscripción a Apple Music; si ya tienes una, toca Conectar para intentarlo de nuevo.",
     "connect": "Conectar Apple Music",
     "connectedTitle": "Apple Music conectado",
     "doneApp": "Estamos leyendo tu biblioteca. Vuelve a la app: tus selecciones se actualizarán en uno o dos minutos.",

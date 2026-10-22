@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Tilbage til appen",
-    "cancelled": "Login med Apple Music blev annulleret. Tryk på Forbind for at prøve igen.",
+    "cancelled": "Apple Music blev ikke forbundet. Forbindelsen kræver et Apple Music-abonnement. Hvis du har et, kan du trykke på Forbind for at prøve igen.",
     "connect": "Forbind Apple Music",
     "connectedTitle": "Apple Music er forbundet",
     "doneApp": "Vi indlæser dit bibliotek nu. Gå tilbage til appen: dine anbefalinger opdateres om et minut eller to.",

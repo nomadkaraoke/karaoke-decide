@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Terug naar de app",
-    "cancelled": "Aanmelden bij Apple Music is geannuleerd. Tik op Verbinden om het opnieuw te proberen.",
+    "cancelled": "Apple Music is niet verbonden. Om te verbinden heb je een Apple Music-abonnement nodig. Heb je een abonnement? Tik dan op Verbinden om het opnieuw te proberen.",
     "connect": "Apple Music verbinden",
     "connectedTitle": "Apple Music verbonden",
     "doneApp": "We lezen nu je bibliotheek uit. Ga terug naar de app: je aanbevelingen worden over een minuut of twee bijgewerkt.",

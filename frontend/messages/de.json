@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Zurück zur App",
-    "cancelled": "Die Anmeldung bei Apple Music wurde abgebrochen. Tippe auf „Verbinden“, um es erneut zu versuchen.",
+    "cancelled": "Apple Music wurde nicht verbunden. Für die Verbindung ist ein Apple Music-Abo erforderlich. Wenn du eines hast, tippe auf „Verbinden“, um es erneut zu versuchen.",
     "connect": "Apple Music verbinden",
     "connectedTitle": "Apple Music verbunden",
     "doneApp": "Wir lesen jetzt deine Mediathek ein. Wechsle zurück zur App: Deine Auswahl wird in ein, zwei Minuten aktualisiert.",

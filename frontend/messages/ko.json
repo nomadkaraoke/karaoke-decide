@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "앱으로 돌아가기",
-    "cancelled": "Apple Music 로그인이 취소되었습니다. 다시 시도하려면 '연결'을 탭하세요.",
+    "cancelled": "Apple Music이 연결되지 않았습니다. 연결하려면 Apple Music 구독이 필요합니다. 구독 중이시라면 '연결'을 눌러 다시 시도해 주세요.",
     "connect": "Apple Music 연결",
     "connectedTitle": "Apple Music 연결됨",
     "doneApp": "보관함을 불러오는 중입니다. 앱으로 돌아가 보세요. 추천 곡이 1~2분 내에 업데이트됩니다.",

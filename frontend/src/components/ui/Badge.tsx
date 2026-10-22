@@ -54,6 +54,7 @@ const SOURCE_BADGES: Record<string, { variant: BadgeProps["variant"]; label: str
   lastfm: { variant: "lastfm", label: "Last.fm" },
   listenbrainz: { variant: "default", label: "ListenBrainz" },
   youtube_music: { variant: "youtube", label: "YouTube Music" },
+  apple_music: { variant: "default", label: "Apple Music" },
 };
 
 export function SourceBadge({ source }: { source: string }) {

@@ -924,7 +924,7 @@
     "expired": "This link has expired. Go back to the app and tap Apple Music again.",
     "refused": "Apple Music didn't share your library. Connecting needs an active Apple Music subscription.",
     "unavailable": "Apple Music isn't available right now. Please try again later.",
-    "cancelled": "Apple Music sign-in was cancelled. Tap Connect to try again.",
+    "cancelled": "Apple Music didn't connect. Connecting needs an Apple Music subscription; if you have one, tap Connect to try again.",
     "error": "Something went wrong connecting Apple Music. Please try again.",
     "privacy": "We only read your library and listening history. We never play, change or share anything.",
     "account": "Connecting to the Nomad Karaoke account {account}. Not you? Close this page."

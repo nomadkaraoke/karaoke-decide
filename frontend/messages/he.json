@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "חזרה לאפליקציה",
-    "cancelled": "ההתחברות ל-Apple Music בוטלה. לחצו על \"חיבור ל-Apple Music\" כדי לנסות שוב.",
+    "cancelled": "החיבור ל-Apple Music לא הצליח. כדי להתחבר דרוש מנוי ל-Apple Music; אם יש לך מנוי, אפשר להקיש על 'התחברות' כדי לנסות שוב.",
     "connect": "חיבור ל-Apple Music",
     "connectedTitle": "Apple Music חובר בהצלחה",
     "doneApp": "אנחנו סורקים את הספרייה שלכם עכשיו. חזרו לאפליקציה: ההמלצות שלכם יתעדכנו בעוד דקה או שתיים.",

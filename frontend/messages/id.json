@@ -912,7 +912,7 @@
   },
   "appleMusicConnect": {
     "backToApp": "Kembali ke aplikasi",
-    "cancelled": "Proses masuk ke Apple Music dibatalkan. Ketuk Hubungkan untuk mencoba lagi.",
+    "cancelled": "Apple Music tidak terhubung. Anda memerlukan langganan Apple Music untuk menghubungkannya. Jika sudah berlangganan, ketuk Hubungkan untuk mencoba lagi.",
     "connect": "Hubungkan Apple Music",
     "connectedTitle": "Apple Music terhubung",
     "doneApp": "Kami sedang membaca perpustakaan Anda. Silakan kembali ke aplikasi: lagu pilihan Anda akan diperbarui dalam satu atau dua menit.",
