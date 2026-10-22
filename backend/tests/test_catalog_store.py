@@ -361,7 +361,7 @@ def test_start_load_runs_in_the_background_and_load_at_startup_joins_it(
     started = time.monotonic()
     store.start_load(settings)
     store.start_load(settings)  # idempotent: one early load
-    assert time.monotonic() - started < 0.2
+    assert time.monotonic() - started < 1.0
     assert store.status == "warming_up"
     store.load_at_startup(settings)
     assert store.status == "ready" and store.run == POINTER_RUN

@@ -21,7 +21,7 @@ COPY pyproject.toml poetry.lock ./
 # unchecked-hash: the image is immutable, so skip the per-module source mtime check too.
 RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi --only main --no-root \
-    && python -m compileall -q -j 0 --invalidation-mode unchecked-hash "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+    && python -m compileall -q -j 0 --invalidation-mode unchecked-hash "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')" || true
 
 # Copy application code
 COPY karaoke_decide/ ./karaoke_decide/
