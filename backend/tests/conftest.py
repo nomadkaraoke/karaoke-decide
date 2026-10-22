@@ -18,6 +18,9 @@ import backend.api.routes.catalog  # noqa: E402, F401
 from backend.config import BackendSettings  # noqa: E402
 from backend.services.playlist_service import PlaylistInfo  # noqa: E402
 from backend.services.quiz_service import QuizStatus, QuizSubmitResult  # noqa: E402
+
+# The search fixture index (availability.db), shared with the catalog store / cold start tests.
+from backend.tests.search.conftest import index_dir  # noqa: E402, F401
 from karaoke_decide.core.models import QuizSong, Recommendation, User, UserSong  # noqa: E402
 
 
@@ -151,7 +154,7 @@ def mock_firestore_client() -> Generator[MagicMock, None, None]:
 @pytest.fixture
 def mock_bigquery_client() -> Generator[MagicMock, None, None]:
     """Mock BigQuery client for catalog tests."""
-    with patch("karaoke_decide.services.bigquery_catalog.bigquery.Client") as mock:
+    with patch("google.cloud.bigquery.Client") as mock:
         yield mock
 
 

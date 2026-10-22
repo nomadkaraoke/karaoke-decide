@@ -82,7 +82,7 @@ class TrackMatcher:
 
         Args:
             catalog_service: BigQuery catalog service for searching songs (fallback).
-            catalog_lookup: Optional in-memory catalog for instant matching.
+            catalog_lookup: Optional catalog.db lookup for instant matching.
         """
         self.catalog_service = catalog_service
         self.catalog_lookup = catalog_lookup
@@ -279,9 +279,9 @@ class TrackMatcher:
             for artist, title in sample:
                 logger.info(f"Track matcher sample: '{artist}' - '{title}'")
 
-        # Use in-memory lookup if available (instant), otherwise fall back to BigQuery
-        if self.catalog_lookup and self.catalog_lookup.is_loaded:
-            logger.info("Track matcher: using in-memory catalog lookup (instant)")
+        # Use catalog.db (indexed SQLite, instant) once it's loaded, otherwise fall back to BigQuery
+        if self.catalog_lookup and self.catalog_lookup.store.status == "ready":
+            logger.info("Track matcher: using catalog.db lookup (instant)")
             matched_songs: dict[tuple[str, str], SongResult] = {}
             for norm_artist, norm_title in unique_normalized:
                 entry = self.catalog_lookup.match(norm_artist, norm_title)
@@ -294,9 +294,9 @@ class TrackMatcher:
                         brands=entry.brands,
                         brand_count=entry.brand_count,
                     )
-            logger.info(f"Track matcher: in-memory lookup found {len(matched_songs)} matches")
+            logger.info(f"Track matcher: catalog.db lookup found {len(matched_songs)} matches")
         else:
-            # Fallback to BigQuery (slower but works if catalog not loaded)
+            # Fallback to BigQuery (slower; catalog.db not loaded yet)
             logger.info("Track matcher: falling back to BigQuery (catalog not loaded)")
             matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
             logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
@@ -369,7 +369,7 @@ def get_track_matcher(
 
     Args:
         catalog_service: Optional catalog service override (for testing).
-        catalog_lookup: Optional in-memory catalog for instant matching.
+        catalog_lookup: Optional catalog.db lookup for instant matching.
 
     Returns:
         TrackMatcher instance.

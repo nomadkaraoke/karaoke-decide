@@ -1,17 +1,23 @@
 """BigQuery-based song catalog service."""
 
+from __future__ import annotations
+
 import logging
 import re
 import time
 import unicodedata
 from dataclasses import dataclass
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING
 
 from karaoke_decide.services.bq_limits import (
     MAX_BYTES_RECORDING_SEARCH,
     make_client,
 )
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 
@@ -150,8 +156,8 @@ class BigQueryCatalogService:
     DATASET_ID = "karaoke_decide"
 
     # Cache for artist search results (key: query_prefix, value: (timestamp, results))
-    _artist_search_cache: dict[str, tuple[float, list["ArtistSearchResult"]]] = {}
-    _track_search_cache: dict[str, tuple[float, list["TrackSearchResult"]]] = {}
+    _artist_search_cache: dict[str, tuple[float, list[ArtistSearchResult]]] = {}
+    _track_search_cache: dict[str, tuple[float, list[TrackSearchResult]]] = {}
     CACHE_TTL = 300  # 5 minutes
 
     def __init__(self, client: bigquery.Client | None = None):
@@ -184,6 +190,8 @@ class BigQueryCatalogService:
         Returns:
             List of matching songs
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -225,6 +233,8 @@ class BigQueryCatalogService:
 
     def get_song_by_id(self, song_id: int) -> SongResult | None:
         """Get a single song by ID."""
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 Id as id,
@@ -264,6 +274,8 @@ class BigQueryCatalogService:
 
         Songs covered by more karaoke brands are more popular.
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT * FROM (
                 SELECT
@@ -304,6 +316,8 @@ class BigQueryCatalogService:
         limit: int = 50,
     ) -> list[SongResult]:
         """Get all songs by an artist."""
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 Id as id,
@@ -580,6 +594,8 @@ class BigQueryCatalogService:
         Returns:
             ArtistMetadata if found, None otherwise
         """
+        from google.cloud import bigquery
+
         if not artist_name:
             return None
 
@@ -633,6 +649,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping normalized artist name -> ArtistMetadata
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return {}
 
@@ -716,6 +734,8 @@ class BigQueryCatalogService:
         simply absent. Both source arrays are already capped at ~5 in the
         pre-joined view, which is ample for substring genre filtering.
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return {}
 
@@ -795,6 +815,8 @@ class BigQueryCatalogService:
         Returns:
             List of ArtistSearchResult sorted by popularity (highest first)
         """
+        from google.cloud import bigquery
+
         logger.info(f"Loading artist index with min_popularity={min_popularity}")
 
         sql = f"""
@@ -843,6 +865,8 @@ class BigQueryCatalogService:
         Returns:
             List of ArtistSearchResultMBID sorted by popularity (highest first)
         """
+        from google.cloud import bigquery
+
         logger.info(f"Loading MBID artist index with min_popularity={min_popularity}")
 
         sql = f"""
@@ -906,6 +930,8 @@ class BigQueryCatalogService:
         Returns:
             List of ArtistSearchResult sorted by popularity
         """
+        from google.cloud import bigquery
+
         if not query or len(query) < 2:
             return []
 
@@ -990,6 +1016,8 @@ class BigQueryCatalogService:
         Returns:
             List of TrackSearchResult sorted by popularity
         """
+        from google.cloud import bigquery
+
         if not query or len(query) < 2:
             return []
 
@@ -1155,7 +1183,7 @@ class BigQueryCatalogService:
     # =========================================================================
 
     # Cache for MBID search
-    _mbid_search_cache: dict[str, tuple[float, list["ArtistSearchResultMBID"]]] = {}
+    _mbid_search_cache: dict[str, tuple[float, list[ArtistSearchResultMBID]]] = {}
 
     def search_artists_mbid(
         self,
@@ -1176,6 +1204,8 @@ class BigQueryCatalogService:
         Returns:
             List of ArtistSearchResultMBID sorted by popularity
         """
+        from google.cloud import bigquery
+
         if not query or len(query) < 2:
             return []
 
@@ -1260,6 +1290,8 @@ class BigQueryCatalogService:
         Returns:
             ArtistSearchResultMBID or None if not found
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 artist_mbid,
@@ -1328,6 +1360,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping Spotify artist ID to MusicBrainz artist UUID
         """
+        from google.cloud import bigquery
+
         if not spotify_artist_ids:
             return {}
 
@@ -1364,6 +1398,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping normalized artist name to MBID
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return {}
 
@@ -1400,7 +1436,7 @@ class BigQueryCatalogService:
     # =========================================================================
 
     # Cache for recording search
-    _recording_search_cache: dict[str, tuple[float, list["RecordingSearchResult"]]] = {}
+    _recording_search_cache: dict[str, tuple[float, list[RecordingSearchResult]]] = {}
 
     def search_recordings(
         self,
@@ -1425,6 +1461,8 @@ class BigQueryCatalogService:
         Returns:
             List of RecordingSearchResult sorted by popularity
         """
+        from google.cloud import bigquery
+
         if not query or len(query) < 2:
             return []
 
@@ -1520,6 +1558,8 @@ class BigQueryCatalogService:
         Returns:
             RecordingSearchResult or None if not found
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 recording_mbid,
@@ -1591,6 +1631,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping ISRC to RecordingSearchResult
         """
+        from google.cloud import bigquery
+
         if not isrcs:
             return {}
 
@@ -1670,6 +1712,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping Spotify track ID to MusicBrainz recording UUID
         """
+        from google.cloud import bigquery
+
         if not spotify_track_ids:
             return {}
 
@@ -1714,6 +1758,8 @@ class BigQueryCatalogService:
         Returns:
             Dict mapping karaoke_id to KaraokeRecordingLink
         """
+        from google.cloud import bigquery
+
         if not karaoke_ids:
             return {}
 

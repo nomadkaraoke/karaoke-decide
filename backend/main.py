@@ -1,5 +1,7 @@
 """FastAPI application for Karaoke Decide."""
 
+import asyncio
+import importlib
 import logging
 import sys
 from collections.abc import AsyncGenerator
@@ -9,9 +11,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api.routes import internal_api_router, router
-from backend.config import get_backend_settings
-from backend.services.catalog_lookup import get_catalog_lookup
-from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
+from backend.config import BackendSettings, get_backend_settings
+from backend.services.catalog_store import get_catalog_store
 
 # Configure logging to output to stdout for Cloud Run
 logging.basicConfig(
@@ -34,21 +35,28 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_backend_settings()
     logger.info(f"Starting Karaoke Decide API ({settings.environment})")
 
-    # Pre-load karaoke catalog into memory for instant matching
-    # This makes sync ~100x faster by avoiding BigQuery queries per track
+    # catalog.db + availability.db for recommendations v2 and sync matching. Loaded before
+    # the port opens (Cloud Run throttles CPU after), behind the /api/ready startup probe.
+    # A missing, corrupt or hung catalog never blocks startup: the store stays warming_up.
+    store = get_catalog_store()
     try:
-        catalog_lookup = get_catalog_lookup()
-        bigquery_service = BigQueryCatalogService()
-        catalog_lookup.load_from_bigquery(bigquery_service)
-        logger.info(f"Catalog loaded: {catalog_lookup.entry_count:,} songs ready for instant matching")
-    except Exception as e:
-        logger.error(f"Failed to load catalog: {e}")
-        # Don't fail startup - sync will fall back to BigQuery queries
+        await asyncio.wait_for(asyncio.to_thread(store.load, settings), settings.catalog_load_timeout_s + 5)
+    except TimeoutError:
+        logger.warning("Recommendations catalog load overran its startup budget; starting warming_up")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Karaoke Decide API")
+    store.close()
+
+
+def _mount_test_support(app: FastAPI, settings: BackendSettings) -> None:
+    """Task C1's local-stack test API: only with DECIDE_TEST_API on, never in production."""
+    if not getattr(settings, "decide_test_api", False) or settings.is_production:
+        return
+    test_support = importlib.import_module("backend.api.routes.test_support")
+    app.include_router(test_support.router, prefix="/api/test", tags=["test"])
 
 
 def create_app() -> FastAPI:
@@ -82,6 +90,8 @@ def create_app() -> FastAPI:
 
     # Include internal routes (for Cloud Tasks callbacks)
     app.include_router(internal_api_router, prefix="/internal", tags=["internal"])
+
+    _mount_test_support(app, settings)
 
     return app
 

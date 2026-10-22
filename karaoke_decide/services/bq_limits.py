@@ -13,7 +13,15 @@ query, check its estimate with ``bq query --dry_run`` and keep it well under
 the cap for its class.
 """
 
-from google.cloud import bigquery
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
+
 
 GIB = 1024**3
 
@@ -39,9 +47,19 @@ MAX_BYTES_CATALOG = 70 * GIB
 
 def default_query_job_config() -> bigquery.QueryJobConfig:
     """Client-wide default job config (merged into every query's config)."""
+    from google.cloud import bigquery
+
     return bigquery.QueryJobConfig(maximum_bytes_billed=MAX_BYTES_DEFAULT)
 
 
 def make_client(project: str) -> bigquery.Client:
-    """Create a BigQuery client with the default bytes-billed cap applied."""
+    """Create a BigQuery client with the default bytes-billed cap applied.
+
+    Raises ``RuntimeError("bigquery disabled")`` under ``BIGQUERY_DISABLED`` (local stack, tests)."""
+    from karaoke_decide.core.config import get_settings
+
+    if get_settings().bigquery_disabled:
+        raise RuntimeError("bigquery disabled")
+    from google.cloud import bigquery
+
     return bigquery.Client(project=project, default_query_job_config=default_query_job_config())

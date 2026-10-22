@@ -10,7 +10,7 @@ from karaoke_decide.services.bigquery_catalog import SongResult
 @pytest.fixture
 def mock_bigquery_client():
     """Mock BigQuery client for testing."""
-    with patch("karaoke_decide.services.bigquery_catalog.bigquery.Client") as mock_client:
+    with patch("google.cloud.bigquery.Client") as mock_client:
         yield mock_client
 
 

@@ -1,10 +1,16 @@
 """Tests for track matcher service."""
 
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 
 from backend.services.track_matcher import MatchedTrack, TrackMatcher
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from backend.services.catalog_lookup import CatalogLookup
 
 
 @pytest.fixture
@@ -343,3 +349,45 @@ class TestGetMatchStats:
         assert stats["matched"] == 0
         assert stats["unmatched"] == 0
         assert stats["match_rate"] == 0.0
+
+
+class TestCatalogDbMatching:
+    """batch_match_tracks reads catalog.db when the store is ready, BigQuery otherwise."""
+
+    @pytest.fixture(scope="class")
+    def ready_lookup(self, tmp_path_factory: pytest.TempPathFactory) -> "Iterator[CatalogLookup]":
+        from backend.config import BackendSettings
+        from backend.services.catalog_lookup import CatalogLookup
+        from backend.services.catalog_store import CatalogStore
+        from karaoke_decide.catalog import fixtures
+
+        d = tmp_path_factory.mktemp("catalog")
+        fixtures.build(d)
+        store = CatalogStore()
+        store.load(BackendSettings(catalog_local_dir=str(d), song_index_local_dir=str(d / "no-index")))
+        yield CatalogLookup(store)
+        store.close()
+
+    @pytest.mark.asyncio
+    async def test_track_matcher_uses_catalog_when_ready(
+        self, mock_catalog_service: MagicMock, ready_lookup: "CatalogLookup"
+    ) -> None:
+        matcher = TrackMatcher(mock_catalog_service, ready_lookup)
+        results = await matcher.batch_match_tracks(
+            [{"artist": "Toto", "title": "Africa (Remastered 2011)"}, {"artist": "Nobody", "title": "Nothing"}]
+        )
+        assert results[0].catalog_song is not None
+        assert results[0].catalog_song.id == 1 and results[0].catalog_song.brand_count == 2
+        assert results[1].catalog_song is None
+        mock_catalog_service.batch_match_tracks.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_track_matcher_falls_back_to_bigquery_while_warming_up(self, mock_catalog_service: MagicMock) -> None:
+        from backend.services.catalog_lookup import CatalogLookup
+        from backend.services.catalog_store import CatalogStore
+
+        mock_catalog_service.batch_match_tracks.return_value = {}
+        matcher = TrackMatcher(mock_catalog_service, CatalogLookup(CatalogStore()))
+        results = await matcher.batch_match_tracks([{"artist": "Toto", "title": "Africa"}])
+        assert results[0].catalog_song is None
+        mock_catalog_service.batch_match_tracks.assert_called_once_with([("toto", "africa")])

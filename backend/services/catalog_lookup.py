@@ -1,18 +1,16 @@
-"""In-memory catalog lookup for instant track matching.
+"""Catalog lookup for instant track matching during sync.
 
-Loads the entire karaoke catalog into a dictionary on startup,
-enabling O(1) lookups instead of BigQuery queries during sync.
+Matches listening-history tracks to KaraokeNerds songs through ``catalog.db``'s
+``kn_song_map`` (indexed by ``match_key``), via the startup-loaded ``CatalogStore``.
+There is no in-memory copy of ``karaokenerds_raw`` any more (it cost ~34 s of cold
+start); while the store is warming up, ``TrackMatcher`` falls back to BigQuery.
 """
 
 import logging
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
+from backend.services.catalog_store import CatalogStore, get_catalog_store
 from karaoke_decide.catalog.keys import match_key, normalize_artist, normalize_text, normalize_title
-
-if TYPE_CHECKING:
-    from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,7 @@ _normalize_artist = normalize_artist
 
 @dataclass
 class CatalogEntry:
-    """Lightweight catalog entry for in-memory storage."""
+    """A matched KaraokeNerds catalog song."""
 
     id: int
     artist: str
@@ -35,79 +33,31 @@ class CatalogEntry:
 
 
 class CatalogLookup:
-    """In-memory catalog for instant track matching.
+    """Track matching against ``catalog.db`` (one indexed SQLite lookup per track)."""
 
-    Loads the entire karaoke catalog (~275K songs) into a dictionary,
-    enabling O(1) lookups during sync instead of BigQuery queries.
+    def __init__(self, store: CatalogStore | None = None) -> None:
+        self._store = store if store is not None else get_catalog_store()
 
-    Memory footprint: ~55 MB for 275K entries.
-    """
-
-    def __init__(self) -> None:
-        """Initialize empty catalog lookup."""
-        self._lookup: dict[str, CatalogEntry] = {}
-        self._loaded = False
-        self._entry_count = 0
+    @property
+    def store(self) -> CatalogStore:
+        return self._store
 
     @property
     def is_loaded(self) -> bool:
-        """Check if catalog is loaded."""
-        return self._loaded
-
-    @property
-    def entry_count(self) -> int:
-        """Number of entries in catalog."""
-        return self._entry_count
-
-    def load_from_bigquery(self, bigquery_service: "BigQueryCatalogService") -> None:
-        """Load entire catalog from BigQuery into memory.
-
-        Args:
-            bigquery_service: BigQuery catalog service.
-        """
-        if self._loaded:
-            logger.info("Catalog already loaded, skipping")
-            return
-
-        start_time = time.time()
-        logger.info("Loading karaoke catalog into memory...")
-
-        # Get all songs from BigQuery
-        all_songs = bigquery_service.get_all_songs()
-
-        # Build lookup dictionary
-        for song in all_songs:
-            key = self._make_key(song.artist, song.title)
-            self._lookup[key] = CatalogEntry(
-                id=song.id,
-                artist=song.artist,
-                title=song.title,
-                brands=song.brands,
-                brand_count=song.brand_count,
-            )
-
-        self._entry_count = len(self._lookup)
-        self._loaded = True
-
-        elapsed = time.time() - start_time
-        logger.info(f"Loaded {self._entry_count:,} songs into catalog lookup in {elapsed:.2f}s")
+        """True once catalog.db is loaded (the store is ``ready``)."""
+        return self._store.status == "ready"
 
     def match(self, artist: str, title: str) -> CatalogEntry | None:
-        """Look up a track in the catalog.
-
-        Args:
-            artist: Track artist name.
-            title: Track title.
-
-        Returns:
-            CatalogEntry if found, None otherwise.
-        """
-        if not self._loaded:
-            logger.warning("Catalog not loaded, returning None")
+        """Look up a track in the catalog; None when unmatched or still warming up."""
+        reader = self._store.reader
+        if reader is None:
             return None
-
-        key = self._make_key(artist, title)
-        return self._lookup.get(key)
+        hit = reader.match_kn(artist, title)
+        if hit is None:
+            return None
+        return CatalogEntry(
+            id=hit.kn_id, artist=hit.artist, title=hit.title, brands=hit.brands, brand_count=hit.brand_count
+        )
 
     def _make_key(self, artist: str, title: str) -> str:
         """Create normalized lookup key from artist and title."""

@@ -4,16 +4,21 @@ Analyzes user's listening history and quiz responses to recommend
 karaoke songs they might enjoy singing.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING, Any, Literal
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.models import Recommendation, UserSong
 from karaoke_decide.services.bq_limits import MAX_BYTES_RECOMMENDATION, make_client
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 
 @dataclass
@@ -66,9 +71,9 @@ class ScoredSong:
 class CategorizedRecommendations:
     """Recommendations organized into categories."""
 
-    from_artists_you_know: list["Recommendation"]
-    create_your_own: list["Recommendation"]
-    crowd_pleasers: list["Recommendation"]
+    from_artists_you_know: list[Recommendation]
+    create_your_own: list[Recommendation]
+    crowd_pleasers: list[Recommendation]
     total_count: int
     filters_applied: dict[str, Any]
 
@@ -820,6 +825,8 @@ class RecommendationService:
         Returns:
             List of song dicts.
         """
+        from google.cloud import bigquery
+
         if not artists:
             return []
 
@@ -884,6 +891,8 @@ class RecommendationService:
         """
         # GROUP BY to avoid duplicates from Spotify join
         # (one karaoke song can match many Spotify tracks for different releases)
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 CAST(k.Id AS STRING) as id,

@@ -4,15 +4,21 @@ Allows users to manually add songs they know they like singing,
 which helps improve recommendation quality.
 """
 
+from __future__ import annotations
+
 import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from karaoke_decide.services.bq_limits import make_client
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 
 @dataclass
@@ -716,6 +722,8 @@ class KnownSongsService:
         Returns:
             Dict with id, artist, title or None if not found.
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 CAST(Id AS STRING) as id,
@@ -752,6 +760,8 @@ class KnownSongsService:
         Returns:
             Dict with track details or None if not found.
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 track_id,

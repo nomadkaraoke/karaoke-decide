@@ -20,7 +20,7 @@ def test_default_query_job_config_sets_cap() -> None:
     assert bq_limits.default_query_job_config().maximum_bytes_billed == bq_limits.MAX_BYTES_DEFAULT
 
 
-@patch("karaoke_decide.services.bq_limits.bigquery.Client")
+@patch("google.cloud.bigquery.Client")
 def test_make_client_applies_default_cap(mock_client_class: MagicMock) -> None:
     client = bq_limits.make_client("proj")
 
@@ -28,6 +28,23 @@ def test_make_client_applies_default_cap(mock_client_class: MagicMock) -> None:
     kwargs = mock_client_class.call_args.kwargs
     assert kwargs["project"] == "proj"
     assert kwargs["default_query_job_config"].maximum_bytes_billed == bq_limits.MAX_BYTES_DEFAULT
+
+
+@patch("google.cloud.bigquery.Client")
+def test_make_client_refuses_when_bigquery_disabled(mock_client_class: MagicMock, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import pytest
+
+    from karaoke_decide.core.config import get_settings
+
+    monkeypatch.setenv("BIGQUERY_DISABLED", "true")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="bigquery disabled"):
+            bq_limits.make_client("proj")
+    finally:
+        monkeypatch.delenv("BIGQUERY_DISABLED")
+        get_settings.cache_clear()
+    mock_client_class.assert_not_called()
 
 
 def test_default_cap_merges_into_per_query_config() -> None:

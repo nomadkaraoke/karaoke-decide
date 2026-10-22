@@ -4,13 +4,13 @@ Provides quiz artists/songs for data-light users and handles quiz submission
 to create UserSong records and update user profiles.
 """
 
+from __future__ import annotations
+
 import hashlib
 import random
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING, Any, Literal
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
@@ -19,6 +19,11 @@ from karaoke_decide.catalog.genres import map_genres
 from karaoke_decide.core.models import QuizArtist, QuizSong, SuggestionReason
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 from karaoke_decide.services.bq_limits import make_client
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 
 @dataclass
@@ -319,6 +324,8 @@ class QuizService:
         Returns:
             Dict mapping artist name to list of genre IDs.
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return {}
 
@@ -583,6 +590,8 @@ class QuizService:
         Returns:
             List of genre IDs that map to these artists.
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return []
 
@@ -733,6 +742,8 @@ class QuizService:
         Returns:
             Dict mapping candidate artist name -> list of seed artists they're similar to.
         """
+        from google.cloud import bigquery
+
         if not seed_artist_names or not candidate_names:
             return {}
 
@@ -938,6 +949,8 @@ class QuizService:
             List of QuizArtist candidates.
         """
         # Build genre filter clause if genres provided
+        from google.cloud import bigquery
+
         genre_filter = ""
         genre_join = ""
         genre_patterns: list[str] = []
@@ -1049,6 +1062,8 @@ class QuizService:
 
         Used when spotify_artist_genres table doesn't exist yet.
         """
+        from google.cloud import bigquery
+
         exclude_clause = ""
         params = [
             bigquery.ScalarQueryParameter("min_brands", "INT64", self.MIN_BRAND_COUNT),
@@ -1238,6 +1253,8 @@ class QuizService:
         Returns:
             List of QuizSong candidates.
         """
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 CAST(Id AS STRING) as id,
@@ -1425,6 +1442,8 @@ class QuizService:
         Returns:
             List of dicts with id, artist, title.
         """
+        from google.cloud import bigquery
+
         if not artist_names:
             return []
 
@@ -1465,6 +1484,8 @@ class QuizService:
         Returns:
             List of dicts with id, artist, title.
         """
+        from google.cloud import bigquery
+
         if not song_ids:
             return []
 
