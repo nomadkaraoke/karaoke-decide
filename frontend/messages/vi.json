@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Đang kiểm tra quyền...",
       "checkingAuth": "Đang kiểm tra xác thực..."
+    },
+    "sourceBadge": {
+      "screenshot": "Ảnh chụp màn hình"
     }
   },
   "common": {

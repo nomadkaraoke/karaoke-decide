@@ -340,6 +340,42 @@ class TestFirestoreServiceBatchAndGetMany:
         assert result == {"a": {"n": 1}}
         assert await firestore_service.get_many("things", []) == {}
 
+    @pytest.mark.asyncio
+    @patch("backend.services.firestore_service.firestore.AsyncClient")
+    async def test_get_many_reads_in_chunks_of_300(
+        self, mock_async_client: MagicMock, firestore_service: FirestoreService
+    ) -> None:
+        calls: list[int] = []
+
+        async def get_all(refs: list[MagicMock]) -> AsyncGenerator[MagicMock, None]:
+            calls.append(len(refs))
+            for _ in refs:
+                s = MagicMock()
+                s.id, s.exists = f"x{sum(calls)}-{len(refs)}", False
+                yield s
+
+        mock_async_client.return_value.get_all = get_all
+        await firestore_service.get_many("things", [f"d{i}" for i in range(700)])
+        assert calls == [300, 300, 100]
+
+    @pytest.mark.asyncio
+    @patch("backend.services.firestore_service.firestore.AsyncClient")
+    async def test_batch_delete_chunks_400(
+        self, mock_async_client: MagicMock, firestore_service: FirestoreService
+    ) -> None:
+        batches = []
+
+        def new_batch() -> MagicMock:
+            b = MagicMock()
+            b.commit = AsyncMock()
+            batches.append(b)
+            return b
+
+        mock_async_client.return_value.batch.side_effect = new_batch
+        await firestore_service.batch_delete("things", [f"d{i}" for i in range(450)])
+        assert [b.delete.call_count for b in batches] == [400, 50]
+        assert all(b.commit.await_count == 1 for b in batches)
+
 
 class TestRunTransaction:
     """run_transaction: reads and writes across several documents in one transaction."""

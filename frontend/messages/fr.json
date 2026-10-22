@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Vérification des permissions...",
       "checkingAuth": "Vérification de l'authentification..."
+    },
+    "sourceBadge": {
+      "screenshot": "Capture d'écran"
     }
   },
   "common": {

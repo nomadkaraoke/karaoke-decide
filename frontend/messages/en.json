@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Checking permissions...",
       "checkingAuth": "Checking authentication..."
+    },
+    "sourceBadge": {
+      "screenshot": "Screenshot"
     }
   },
   "common": {

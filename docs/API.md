@@ -652,6 +652,47 @@ Connect Last.fm account by username.
 }
 ```
 
+### GET /api/services/capabilities
+
+No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, "listenbrainz_oauth": bool, "listenbrainz_upload_max_bytes": 31457280}`.
+`screenshot_import` is true when `GEMINI_API_KEY` is set (or fakes are on); `listenbrainz_oauth` needs the MetaBrainz client id/secret, `DECIDE_TOKEN_KEY` and `LISTENBRAINZ_OAUTH_ENABLED`.
+
+### GET /api/services/summary
+
+Verified users. Every source the user has, for the app's "Connected sources" list: each `music_services` connection merged with its `user_imports` doc, plus import-only sources. `artists` / `songs` are Firestore aggregation counts of the rows whose primary `source` is that source (a row's `source` is the first source that wrote it; sources that only merged into someone else's row, listed in `sources`, are not counted).
+
+**Response:** `{"sources":[{"source":"lastfm","connected":true,"username":"x","artists":0,"songs":0,"last_import_at":null,"status":"ok","auth":"username"|"oauth"|null,"pending_listenbrainz_import":{"id":"...","status":"..."}|null}],"capabilities":{...same as /capabilities}}`. `status` (first match wins): `importing` (syncing, or import importing) > `needs_reconnect` (`error_code`) > `stale` (`lb_stale`) > `error` > `ok`.
+
+`GET /api/services` keeps its shape and gains `artists`, `songs`, `last_import_at`, `status`. If the per-source lookup fails it still answers `200` with those fields as `0`, `0`, `null`, `"ok"`.
+
+### DELETE /api/services/sources/{source}/data
+
+Verified users. Remove what a source contributed and its connection, if any. Rows that were sung or loved, or are held by another source, are kept. `source` is one of `screenshot, spotify_playlist, spotify_export, apple_export, youtube_music, listenbrainz, lastfm, spotify, apple_music` (else `400`). Export sources also drop their running artist sums.
+
+**Response:** `{"removed_songs":0,"removed_artists":0}`
+
+### POST /api/services/screenshot/extract
+
+Read artists and songs off 1-5 music-app screenshots with Gemini Flash. Multipart field `images` (each at most 4 MiB, `image/*`). Limit: 10 images per user per UTC day (reserved atomically, released if Gemini fails). Nothing is saved yet.
+
+**Requires:** Bearer token. **Response:** `{"candidates":[{"kind":"artist"|"song","artist":"Muse","title":"Hysteria"|null,"confidence":0.9,"matched":true,"song_key":"muse|hysteria"|null}]}` (deduped, matched first).
+
+**Errors:** `400` `no_images` / `too_many_images` / `not_an_image` · `413` `image_too_large` · `429` `daily_limit` · `503` `screenshot_unavailable` (disabled, or Gemini error).
+
+### POST /api/services/screenshot/confirm
+
+Save the candidates the user kept (`source: "screenshot"`). Body `{"items":[{"kind":"artist"|"song","artist":"...","title":"..."}]}` (at most 200).
+
+**Response:** `{"source":"screenshot","artists_added":0,"songs_added":0,"songs_updated":0,"tracks_matched":0}`
+
+### POST /api/services/spotify-export and /api/services/apple-export
+
+One chunk of a privacy-export import; the phone parses the zip and posts aggregates (at most 20,000 tracks per chunk, `chunk_count` 1..50). Body: `{generated_at, chunk_index, chunk_count, tracks:[{artist,title,ms_played,plays,first_ts,last_ts}]}`; Spotify adds `kind: "account"|"extended"`, `liked:[{artist,title}]` (at most 20,000) and `playlists:[{name,tracks:[{artist,title}]}]` (at most 500). Ingested with max play counts, so re-importing an export, or an Account then an Extended export, never doubles plays. A chunk already recorded for `(kind, generated_at)` is a no-op returning the stored totals with `duplicate: true`. Import status is `importing` until every chunk is in, then `ok`.
+
+**Response:** `{"source":"spotify_export","artists_added":0,"songs_added":0,"songs_updated":0,"tracks_matched":0,"duplicate":false,"chunks_done":1,"chunk_count":1}` (totals are cumulative over the export's chunks).
+
+**Errors:** `400` `bad_chunk` (index >= count, or count differs from the export's first chunk) · `422` validation.
+
 ### POST /api/services/youtube-music/import
 
 Import songs from a public or unlisted YouTube Music / YouTube playlist (no YouTube login).
@@ -680,6 +721,24 @@ Liked Music. Tracks (up to 1000; 500 for guests) are matched to the catalog and 
 **Errors:** `400` not a YouTube playlist link · `422` the always-private Liked Music (`LM`) /
 Liked videos (`LL`) playlist was shared · `404` playlist missing or private · `429` rate limited
 (one successful import per 30s, 20/day per user — checked and reserved atomically in a Firestore transaction) · `503` YouTube unreachable (after one automatic retry).
+
+### POST /api/services/spotify-playlist/import
+
+Import up to 100 tracks from a public Spotify playlist link (no Spotify login). Best-effort: it reads
+the undocumented `open.spotify.com/embed/playlist/{id}` page (`__NEXT_DATA__`), so a Spotify layout
+change degrades it. A daily GitHub workflow (`spotify-embed-canary.yml`) posts to Discord #noise when
+parsing breaks. Tracks are ingested with `source: "spotify_playlist"`.
+
+**Requires:** Bearer token (verified user)
+
+**Request:** `{"url": "https://open.spotify.com/playlist/..."}` (also `spotify:playlist:` URIs, bare
+22-char ids, or share text containing a link)
+
+**Response:** `{"playlist_title": "...", "tracks_fetched": 50, "tracks_matched": 20}`
+
+**Errors:** `400` not a Spotify playlist link · `404` missing or private · `422` Spotify changed its
+embed page · `429` rate limited (same 30s cooldown / 20 per day as YouTube Music, separate counter) ·
+`503` Spotify unreachable.
 
 ### Apple Music (MusicKit)
 

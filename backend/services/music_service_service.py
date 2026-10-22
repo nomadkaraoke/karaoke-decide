@@ -4,12 +4,14 @@ Handles OAuth flows, token management, and CRUD operations for
 connected music services (Spotify, Last.fm).
 """
 
+import asyncio
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import IMPORTS_COLLECTION
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
@@ -211,6 +213,78 @@ class MusicServiceService:
         )
 
         return [self._doc_to_music_service(doc) for doc in docs]
+
+    async def get_source_summaries(self, user_id: str) -> list[dict[str, Any]]:
+        """One row per source the user has: every ``music_services`` connection merged with its
+        ``user_imports`` doc (if any), plus import-only sources. Counts are Firestore aggregation
+        queries on ``user_artists`` / ``user_songs`` by each row's primary ``source``."""
+        conns = await self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)])
+        return await self._summaries(user_id, conns)
+
+    async def get_services_with_summaries(self, user_id: str) -> tuple[list[MusicService], list[dict[str, Any]]]:
+        """``get_user_services`` plus ``get_source_summaries`` from one ``music_services`` query."""
+        conns = await self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)])
+        return [self._doc_to_music_service(c) for c in conns], await self._summaries(user_id, conns)
+
+    async def _summaries(self, user_id: str, conns: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        imports = await self.firestore.query_documents(IMPORTS_COLLECTION, filters=[("user_id", "==", user_id)])
+        conn_by = {str(c["service_type"]): c for c in conns if c.get("service_type")}
+        imp_by = {str(i["source"]): i for i in imports if i.get("source")}
+        sources = list(conn_by) + [s for s in imp_by if s not in conn_by]
+
+        async def count(collection: str, source: str) -> int:
+            return await self.firestore.count_documents(
+                collection, filters=[("user_id", "==", user_id), ("source", "==", source)]
+            )
+
+        counts = await asyncio.gather(
+            *(asyncio.gather(count("user_artists", s), count("user_songs", s)) for s in sources)
+        )
+        return [
+            self._summary_row(s, conn_by.get(s), imp_by.get(s), artists, songs)
+            for s, (artists, songs) in zip(sources, counts, strict=True)
+        ]
+
+    @staticmethod
+    def _summary_row(
+        source: str, conn: dict[str, Any] | None, imp: dict[str, Any] | None, artists: int, songs: int
+    ) -> dict[str, Any]:
+        conn, imp = conn or {}, imp or {}
+
+        def field(name: str) -> Any:
+            return conn.get(name) if conn.get(name) is not None else imp.get(name)
+
+        if conn.get("sync_status") == "syncing" or imp.get("status") == "importing":
+            status = "importing"
+        elif field("error_code") == "needs_reconnect":
+            status = "needs_reconnect"
+        elif field("lb_stale"):
+            status = "stale"
+        elif conn.get("sync_status") == "error" or imp.get("status") == "error":
+            status = "error"
+        else:
+            status = "ok"
+        auth = field("auth")
+        if auth not in ("username", "oauth"):
+            auth = {"spotify": "oauth", "apple_music": "oauth", "lastfm": "username", "listenbrainz": "username"}.get(
+                source
+            )
+        pending = field("pending_listenbrainz_import")
+        return {
+            "source": source,
+            "connected": bool(conn),
+            "username": conn.get("service_username") or None,
+            "artists": artists,
+            "songs": songs,
+            "last_import_at": imp.get("last_import_at") or conn.get("last_sync_at"),
+            "status": status,
+            "auth": auth if conn else None,
+            "pending_listenbrainz_import": (
+                {"id": str(pending["id"]), "status": str(pending.get("status", ""))}
+                if isinstance(pending, dict) and pending.get("id")
+                else None
+            ),
+        }
 
     async def get_service(self, user_id: str, service_type: str) -> MusicService | None:
         """Get a specific service connection.

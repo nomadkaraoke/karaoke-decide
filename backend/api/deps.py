@@ -13,6 +13,7 @@ from backend.services.catalog_store import CatalogStore, get_catalog_store
 from backend.services.firestore_service import FirestoreService
 from backend.services.gen_session import GenSessionError, get_gen_session_validator, is_gen_token
 from backend.services.guest_claim_service import GuestClaimService
+from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import KaraokeLogService
 from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
@@ -257,6 +258,13 @@ async def get_guest_claim_service_dep(
     return GuestClaimService(firestore, auth_service)
 
 
+async def get_import_ingest_service_dep(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> ImportIngestService:
+    """The one write path every music import goes through."""
+    return ImportIngestService(firestore)
+
+
 async def get_catalog_lookup_dep() -> CatalogLookup:
     """Artist + title matching against catalog.db (tests override this)."""
     return get_catalog_lookup()
@@ -323,3 +331,4 @@ KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_serv
 UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]
 GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
+ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]

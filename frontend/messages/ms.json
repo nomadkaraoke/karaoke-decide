@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Memeriksa kebenaran...",
       "checkingAuth": "Memeriksa pengesahan..."
+    },
+    "sourceBadge": {
+      "screenshot": "Tangkapan Skrin"
     }
   },
   "common": {

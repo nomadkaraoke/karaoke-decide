@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Έλεγχος δικαιωμάτων...",
       "checkingAuth": "Έλεγχος ταυτοποίησης..."
+    },
+    "sourceBadge": {
+      "screenshot": "Στιγμιότυπο οθόνης"
     }
   },
   "common": {

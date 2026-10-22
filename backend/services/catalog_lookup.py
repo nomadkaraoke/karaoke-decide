@@ -54,6 +54,22 @@ class CatalogLookup:
             id=hit.kn_id, artist=hit.artist, title=hit.title, brands=hit.brands, brand_count=hit.brand_count
         )
 
+    def lookup_song_keys(self, keys: list[str]) -> set[str]:
+        """The subset of ``keys`` (song_keys) that catalog.db has karaoke for (blocking SQLite).
+
+        Empty while the catalog is still warming up."""
+        reader = self._store.reader
+        if reader is None:
+            return set()
+        return {k for k in dict.fromkeys(keys) if reader.has_karaoke_key(k)}
+
+    def lookup_artist_keys(self, keys: list[str]) -> dict[str, str]:
+        """``{artist_key: display name}`` for the artist keys catalog.db knows (blocking SQLite)."""
+        reader = self._store.reader
+        if reader is None:
+            return {}
+        return {k: s.name for k, s in reader.artist_summaries(keys, top_songs=0).items()}
+
 
 # Global singleton instance
 _catalog_lookup: CatalogLookup | None = None

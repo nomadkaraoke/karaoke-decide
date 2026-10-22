@@ -46,6 +46,7 @@ from backend.services.song_feedback_service import (
     choose_user_song_row,
     is_loved,
     kn_id_for_song_key,
+    resolve_song_keys,
 )
 from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
@@ -363,14 +364,8 @@ class KaraokeLogService:
         reader = self.catalog.store.reader
         if reader is None:  # catalog.db still loading
             return None, "unresolved"
-        kn_key: str | None = None
         hit = self.catalog.match(artist, title)
-        if hit is not None:
-            kn_key = reader.kn_song_keys([hit.id]).get(hit.id)
-        direct = make_song_key(artist, title)
-        # The exact identity key is the most precise answer ("Song (Live)" stays the live song even
-        # though the looser KaraokeNerds match_key lands on the studio row), so it wins.
-        key = direct if reader.has_karaoke_key(direct) else kn_key
+        (key,) = resolve_song_keys(reader, [(artist, title, hit.id if hit is not None else None)])
         return (key, "resolved") if key else (None, "unresolved")
 
     async def resolve(self, artist: str, title: str, budget_s: float | None = None) -> tuple[str | None, str]:

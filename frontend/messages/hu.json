@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Jogosultságok ellenőrzése...",
       "checkingAuth": "Hitelesítés ellenőrzése..."
+    },
+    "sourceBadge": {
+      "screenshot": "Képernyőkép"
     }
   },
   "common": {

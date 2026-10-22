@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Перевірка дозволів...",
       "checkingAuth": "Перевірка автентифікації..."
+    },
+    "sourceBadge": {
+      "screenshot": "Скриншот"
     }
   },
   "common": {

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.20.4"
+version = "0.21.0"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"
@@ -37,11 +37,14 @@ httpx = ">=0.28.1,<1.0"
 aiohttp = "^3.13.2"
 # Auth
 python-jose = { extras = ["cryptography"], version = "^3.3.0" }
+cryptography = ">=42"  # token_cipher (Fernet); also a python-jose extra
 # Utilities
 python-slugify = "^8.0.1"
 python-dotenv = "^1.0.0"
 ytmusicapi = ">=1.11"
 rapidfuzz = "^3.14"
+python-multipart = ">=0.0.20"
+google-auth = ">=2.49.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"

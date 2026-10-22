@@ -101,6 +101,7 @@ def mock_music_service_service(
     mock.create_or_update_spotify_service = AsyncMock(return_value=sample_spotify_service)
     mock.create_lastfm_service = AsyncMock(return_value=sample_lastfm_service)
     mock.delete_service = AsyncMock(return_value=None)
+    mock.get_source_summaries = AsyncMock(return_value=[])
 
     # Mock spotify client on the service
     mock.spotify = MagicMock()
@@ -554,6 +555,50 @@ class TestYouTubeMusicImport:
     def test_rejects_empty_url(self, auth_client: TestClient) -> None:
         response = auth_client.post(self.URL, json={"playlist_url": ""}, headers=self.AUTH)
         assert response.status_code == 422
+
+
+class TestSpotifyPlaylistImport:
+    """Tests for POST /api/services/spotify-playlist/import."""
+
+    URL = "/api/services/spotify-playlist/import"
+    AUTH = {"Authorization": "Bearer test-token"}
+
+    def test_imports_playlist(self, auth_client: TestClient, mock_sync_service: MagicMock, sample_user: User) -> None:
+        mock_sync_service.import_spotify_playlist = AsyncMock(
+            return_value={"playlist_title": "Mix", "tracks_fetched": 50, "tracks_matched": 20, "songs_added": 50}
+        )
+
+        response = auth_client.post(self.URL, json={"url": "spotify:playlist:abc"}, headers=self.AUTH)
+
+        assert response.status_code == 200
+        assert response.json() == {"playlist_title": "Mix", "tracks_fetched": 50, "tracks_matched": 20}
+        mock_sync_service.import_spotify_playlist.assert_awaited_once_with(sample_user.id, "spotify:playlist:abc")
+
+    @pytest.mark.parametrize(
+        ("error", "expected_status"),
+        [
+            ("InvalidSpotifyPlaylistUrlError", 400),
+            ("SpotifyPlaylistNotFoundError", 404),
+            ("SpotifyEmbedFormatChangedError", 422),
+            ("ImportRateLimitedError", 429),
+            ("SpotifyEmbedFetchError", 503),
+        ],
+    )
+    def test_spotify_playlist_maps_errors(
+        self, auth_client: TestClient, mock_sync_service: MagicMock, error: str, expected_status: int
+    ) -> None:
+        from backend.services import sync_service
+        from karaoke_decide.services import spotify_embed
+
+        error_cls = getattr(spotify_embed, error, None) or getattr(sync_service, error)
+        mock_sync_service.import_spotify_playlist = AsyncMock(side_effect=error_cls("x"))
+
+        response = auth_client.post(self.URL, json={"url": "anything"}, headers=self.AUTH)
+
+        assert response.status_code == expected_status
+
+    def test_requires_auth(self, auth_client: TestClient) -> None:
+        assert auth_client.post(self.URL, json={"url": "x"}).status_code == 401
 
 
 @pytest.fixture

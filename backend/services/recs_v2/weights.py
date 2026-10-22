@@ -29,6 +29,8 @@ SONG_YTMUSIC = 0.8
 # Explicit user adds: known_songs / enjoy_singing (known_songs_service) and "manual" (love endpoint).
 MANUAL_SOURCES = frozenset({"manual", "known_songs", "enjoy_singing"})
 SONG_DEFAULT = 0.6  # quiz or any other source
+# Sources whose playcount is real listens (Last.fm, Spotify / Apple privacy exports): weighed alike.
+PLAY_COUNT_SOURCES = frozenset({"lastfm", "spotify_export", "apple_export"})
 
 
 def artist_top(rank: int | None) -> float:
@@ -59,11 +61,11 @@ def song_weight(doc: dict[str, object]) -> float:
     loved = doc.get("loved")  # "Love it" marker (song_feedback_service.is_loved); None on legacy rows
     if loved is True or (source in MANUAL_SOURCES and not (source == "manual" and loved is False)):
         return SONG_MANUAL
-    if source == "lastfm":
+    if source in PLAY_COUNT_SOURCES:
         return lastfm_song(to_int(doc.get("playcount")))
     if source == "spotify":
         return SONG_SPOTIFY_TOP if doc.get("rank") is not None else SONG_SPOTIFY_SAVED
-    if source in ("youtube_music", "ytmusic"):
+    if source in ("youtube_music", "ytmusic", "spotify_playlist", "screenshot"):
         return SONG_YTMUSIC
     if source == "apple_music":
         # Recent plays carry a playcount; library-only songs don't (like Spotify top vs saved).

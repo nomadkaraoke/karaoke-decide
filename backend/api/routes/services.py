@@ -6,9 +6,10 @@ Handles OAuth flows, service connections, and sync operations.
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Annotated, Any, Literal, cast, get_args
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
@@ -16,20 +17,44 @@ from starlette.requests import Request
 from backend.api.deps import (
     CurrentUser,
     FirestoreServiceDep,
+    ImportIngestServiceDep,
     MusicServiceServiceDep,
     OptionalUser,
     Settings,
     SyncServiceDep,
     VerifiedUser,
+    get_catalog_lookup_dep,
+    get_firestore,
 )
+from backend.api.routes.import_models import ImportResultResponse
+from backend.api.routes.imports_export import router as _imports_export_router
 from backend.config import BackendSettings
 from backend.i18n import DEFAULT_LOCALE, get_locale_from_request, get_locale_prefix, t
 from backend.models.sync_job import SyncJob, SyncJobStatus
+from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import ImportSource
+from backend.services.screenshot_import_service import (
+    MAX_CONFIRM_ITEMS,
+    MAX_IMAGE_BYTES,
+    MAX_IMAGES_PER_REQUEST,
+    Candidate,
+    ConfirmItem,
+    DailyLimitError,
+    ScreenshotImportService,
+    ScreenshotUnavailableError,
+    get_screenshot_extractor,
+)
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
+from karaoke_decide.services.spotify_embed import (
+    InvalidSpotifyPlaylistUrlError,
+    SpotifyEmbedFetchError,
+    SpotifyEmbedFormatChangedError,
+    SpotifyPlaylistNotFoundError,
+)
 from karaoke_decide.services.youtube_music import (
     InvalidPlaylistUrlError,
     PlaylistFetchError,
@@ -61,6 +86,11 @@ class ConnectedServiceResponse(BaseModel):
     sync_error: str | None
     tracks_synced: int  # Karaoke-matched tracks
     songs_synced: int  # Total unique songs synced
+    # Added in 3b (decide web ignores them): rows stored for this source, last import, summary status.
+    artists: int = 0
+    songs: int = 0
+    last_import_at: str | None = None
+    status: str = "ok"
 
 
 class SpotifyConnectResponse(BaseModel):
@@ -148,6 +178,160 @@ class DisconnectResponse(BaseModel):
 # -----------------------------------------------------------------------------
 
 
+LISTENBRAINZ_UPLOAD_MAX_BYTES = 30 * 1024 * 1024
+
+
+class Capabilities(BaseModel):
+    """Which optional import features this deployment has enabled."""
+
+    screenshot_import: bool
+    listenbrainz_oauth: bool
+    listenbrainz_upload_max_bytes: int = LISTENBRAINZ_UPLOAD_MAX_BYTES
+
+
+@router.get("/capabilities", response_model=Capabilities)
+async def get_capabilities(settings: Settings) -> Capabilities:
+    """Feature flags for the Connect hub (no auth; the app hides cards that are off)."""
+    return _capabilities(settings)
+
+
+# -----------------------------------------------------------------------------
+# Screenshot import (Gemini Flash reads the screenshot; the user confirms; ingest saves)
+# -----------------------------------------------------------------------------
+
+
+class ScreenshotExtractResponse(BaseModel):
+    candidates: list[Candidate]
+
+
+class ScreenshotConfirmRequest(BaseModel):
+    items: list[ConfirmItem] = Field(max_length=MAX_CONFIRM_ITEMS)
+
+
+async def get_screenshot_import_service(
+    settings: Settings,
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    ingest: ImportIngestServiceDep,
+    catalog: Annotated[CatalogLookup, Depends(get_catalog_lookup_dep)],
+) -> ScreenshotImportService:
+    extractor = get_screenshot_extractor(settings) if settings.screenshot_import_enabled else None
+    return ScreenshotImportService(firestore, ingest, catalog, extractor)
+
+
+ScreenshotImportServiceDep = Annotated[ScreenshotImportService, Depends(get_screenshot_import_service)]
+
+
+@router.post("/screenshot/extract", response_model=ScreenshotExtractResponse)
+async def extract_screenshot(
+    user: VerifiedUser, service: ScreenshotImportServiceDep, images: Annotated[list[UploadFile] | None, File()] = None
+) -> ScreenshotExtractResponse:
+    """Read artists/songs off 1-5 screenshots (each at most 4 MiB, image/*).
+
+    Errors: 400 no_images / too_many_images / not_an_image, 413 image_too_large,
+    429 daily_limit (10 images per UTC day), 503 screenshot_unavailable.
+    """
+    if not images:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_images")
+    if len(images) > MAX_IMAGES_PER_REQUEST:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "too_many_images")
+    if any(not (f.content_type or "").startswith("image/") for f in images):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_an_image")
+    if service.extractor is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "screenshot_unavailable")
+    blobs: list[tuple[bytes, str]] = []
+    for f in images:
+        data = await f.read(MAX_IMAGE_BYTES + 1)
+        if len(data) > MAX_IMAGE_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "image_too_large")
+        blobs.append((data, f.content_type or "image/png"))
+    try:
+        candidates = await service.extract(user.id, blobs)
+    except DailyLimitError:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "daily_limit")
+    except ScreenshotUnavailableError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "screenshot_unavailable")
+    return ScreenshotExtractResponse(candidates=candidates)
+
+
+@router.post("/screenshot/confirm", response_model=ImportResultResponse)
+async def confirm_screenshot(
+    body: ScreenshotConfirmRequest, user: VerifiedUser, service: ScreenshotImportServiceDep
+) -> ImportResultResponse:
+    """Save the candidates the user kept (source ``screenshot``)."""
+    result = await service.confirm(user.id, body.items)
+    return ImportResultResponse.from_result("screenshot", result)
+
+
+class PendingListenBrainzImport(BaseModel):
+    id: str
+    status: str
+
+
+class SourceSummary(BaseModel):
+    """One source in the app's "Connected sources" list."""
+
+    source: str
+    connected: bool
+    username: str | None = None
+    artists: int = 0
+    songs: int = 0
+    last_import_at: str | None = None
+    status: Literal["ok", "needs_reconnect", "importing", "stale", "error"] = "ok"
+    auth: Literal["username", "oauth"] | None = None
+    pending_listenbrainz_import: PendingListenBrainzImport | None = None
+
+
+class SourcesSummaryResponse(BaseModel):
+    sources: list[SourceSummary]
+    capabilities: Capabilities
+
+
+class RemoveDataResponse(BaseModel):
+    removed_songs: int
+    removed_artists: int
+
+
+def _capabilities(settings: BackendSettings) -> Capabilities:
+    return Capabilities(
+        screenshot_import=settings.screenshot_import_enabled,
+        listenbrainz_oauth=settings.listenbrainz_oauth_active,
+    )
+
+
+@router.get("/summary", response_model=SourcesSummaryResponse)
+async def get_sources_summary(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+) -> SourcesSummaryResponse:
+    """Every connected or imported source with its counts and status, plus the capability flags."""
+    rows = await music_service.get_source_summaries(user.id)
+    return SourcesSummaryResponse(sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings))
+
+
+@router.delete("/sources/{source}/data", response_model=RemoveDataResponse)
+async def remove_source_data(
+    source: str,
+    user: VerifiedUser,
+    ingest: ImportIngestServiceDep,
+    music_service: MusicServiceServiceDep,
+    request: Request,
+) -> RemoveDataResponse:
+    """Remove what one source contributed (rows sung or loved, or held by another source, are kept)
+    and its connection, if it has one."""
+    if source not in get_args(ImportSource):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=t(get_locale_from_request(request), "services.invalidServiceType", service_type=source),
+        )
+    songs, artists = await ingest.remove_source_data(user.id, cast(ImportSource, source))
+    try:
+        await music_service.delete_service(user.id, source)
+    except NotFoundError:
+        pass
+    return RemoveDataResponse(removed_songs=songs, removed_artists=artists)
+
+
 @router.get("", response_model=list[ConnectedServiceResponse])
 async def list_services(
     user: VerifiedUser,
@@ -158,7 +342,14 @@ async def list_services(
     Returns information about each connected service including
     sync status and track counts.
     """
-    services = await music_service.get_user_services(user.id)
+    extra: dict[str, dict[str, Any]] = {}
+    try:
+        services, rows = await music_service.get_services_with_summaries(user.id)
+        extra = {r["source"]: r for r in rows}
+    except Exception:
+        # The counts are extras; decide web needs this route, so fall back to zeros / None.
+        logger.warning("per-source summary lookup failed for GET /api/services; returning zeros", exc_info=True)
+        services = await music_service.get_user_services(user.id)
 
     return [
         ConnectedServiceResponse(
@@ -169,6 +360,10 @@ async def list_services(
             sync_error=svc.sync_error,
             tracks_synced=svc.tracks_synced,
             songs_synced=svc.songs_synced,
+            artists=extra.get(svc.service_type, {}).get("artists", 0),
+            songs=extra.get(svc.service_type, {}).get("songs", 0),
+            last_import_at=extra.get(svc.service_type, {}).get("last_import_at"),
+            status=extra.get(svc.service_type, {}).get("status", "ok"),
         )
         for svc in services
     ]
@@ -401,6 +596,59 @@ async def import_youtube_music_playlist(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not reach YouTube Music")
 
     return YouTubeMusicImportResponse(
+        playlist_title=result["playlist_title"],
+        tracks_fetched=result["tracks_fetched"],
+        tracks_matched=result["tracks_matched"],
+    )
+
+
+# -----------------------------------------------------------------------------
+# Spotify public playlist import (embed page, best-effort)
+# -----------------------------------------------------------------------------
+
+
+class SpotifyPlaylistImportRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=500, description="Playlist link, URI, id or share text")
+
+
+class SpotifyPlaylistImportResponse(BaseModel):
+    playlist_title: str
+    tracks_fetched: int
+    tracks_matched: int
+
+
+@router.post("/spotify-playlist/import", response_model=SpotifyPlaylistImportResponse)
+async def import_spotify_playlist(
+    request_body: SpotifyPlaylistImportRequest,
+    user: VerifiedUser,
+    sync_service: SyncServiceDep,
+) -> SpotifyPlaylistImportResponse:
+    """Import up to 100 tracks from a public Spotify playlist link (no Spotify login).
+
+    - 400: not a Spotify playlist link
+    - 404: playlist doesn't exist or is private
+    - 422: Spotify changed its embed page and we can't read it (best-effort feature)
+    - 429: too many imports (30 s cooldown / 20 per day)
+    - 503: Spotify couldn't be reached (503, not 502: Cloudflare replaces origin 502 bodies)
+    """
+    try:
+        result = await sync_service.import_spotify_playlist(user.id, request_body.url)
+    except ImportRateLimitedError:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many playlist imports")
+    except InvalidSpotifyPlaylistUrlError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not a Spotify playlist link")
+    except SpotifyPlaylistNotFoundError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found or private")
+    except SpotifyEmbedFormatChangedError as e:
+        logger.warning(f"Spotify embed format changed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Could not read this Spotify playlist right now"
+        )
+    except SpotifyEmbedFetchError as e:
+        logger.warning(f"Spotify embed fetch failed: {e}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Could not reach Spotify")
+
+    return SpotifyPlaylistImportResponse(
         playlist_title=result["playlist_title"],
         tracks_fetched=result["tracks_fetched"],
         tracks_matched=result["tracks_matched"],
@@ -788,3 +1036,6 @@ async def get_sync_status(
         ],
         active_job=active_job,
     )
+
+
+router.include_router(_imports_export_router)

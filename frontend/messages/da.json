@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Tjekker tilladelser...",
       "checkingAuth": "Tjekker godkendelse..."
+    },
+    "sourceBadge": {
+      "screenshot": "Skærmbillede"
     }
   },
   "common": {
