@@ -65,8 +65,16 @@ def test_cold_blocks_stretch_songs() -> None:
         assert pick is not None and pick.song_key == "easy"
     later = choose_next(_state(BARI_TENOR, warmth="cold", attempts=2), cands)
     assert later is not None and later.song_key == "mid"
+    # When the cold filter would leave nothing, the least-stretchy songs are still offered.
+    harder = song(57, 75)
+    assert expected_stretch(BARI_TENOR, harder) > expected_stretch(BARI_TENOR, hard)
+    stretchy = [candidate("a-harder", harder), candidate("b-hard", hard)]
+    first = choose_next(_state(BARI_TENOR, warmth="cold", attempts=0), stretchy)
+    assert first is not None and first.song_key == "b-hard"
+    assert first.reason_type == "comfortable_start"
     only_hard = choose_next(_state(BARI_TENOR, warmth="cold", attempts=5), [candidate("hard", hard)])
-    assert only_hard is None
+    assert only_hard is not None and only_hard.song_key == "hard"
+    assert choose_next(_state(BARI_TENOR, warmth="cold", attempts=5), stretchy) is not None
     warm = choose_next(_state(BARI_TENOR, warmth="bit_warm", attempts=1), [candidate("hard", hard)])
     assert warm is not None and warm.song_key == "hard"
 
@@ -99,6 +107,11 @@ def test_unknown_artist_downweighted_after_two_dont_know() -> None:
     assert know_weight("s", "fav", dont_know_skips={}, **kw) == 0.7
     assert know_weight("s", "x", dont_know_skips={"x": 1}, **kw) == 0.4
     assert know_weight("s", "x", dont_know_skips={"x": 2}, **kw) == 0.2
+    # Two "don't know" skips override artist familiarity, but never a known or loved song.
+    assert know_weight("s", "fav", dont_know_skips={"fav": 1}, **kw) == 0.7
+    assert know_weight("s", "fav", dont_know_skips={"fav": 2}, **kw) == 0.2
+    assert know_weight("k", "fav", dont_know_skips={"fav": 3}, **kw) == 1.0
+    assert know_weight("l", "fav", dont_know_skips={"fav": 3}, **kw) == 1.0
 
     s = song(54, 66)
     cands = [candidate("a", s, artist="skipped", know=0.2), candidate("b", s, artist="other", know=0.4)]

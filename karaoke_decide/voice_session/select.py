@@ -39,6 +39,7 @@ PREFILTER = 300
 COLD_STRETCH_FIRST = 1.0  # attempts 0-1 while cold
 COLD_STRETCH_LATER = 3.0
 COLD_EARLY_ATTEMPTS = 2
+COLD_FALLBACK = 20  # least-stretchy songs kept when the cold filter would empty the list
 PREF_WEIGHT = 0.03
 STRATUM_PENALTY = 0.05
 RECENT_STRATA = 2
@@ -97,15 +98,16 @@ def know_weight(
 ) -> float:
     """How likely the user knows the song well enough to sing it (CandidateSong.know).
 
-    1.0 for a known or loved song, 0.7 for a song by an artist in the user's context, 0.4 otherwise,
-    and 0.2 for an unfamiliar artist the user has already skipped twice as "don't know" this session.
+    1.0 for a known or loved song; otherwise 0.2 once the user has skipped two of the artist's songs as
+    "don't know" this session (even for an artist in their context), else 0.7 for an artist in the user's
+    context and 0.4 for anyone else.
     """
     if song_key in known_songs or song_key in loved_songs:
         return KNOW_SONG
-    if artist_key in artists:
-        return KNOW_ARTIST
     if dont_know_skips.get(artist_key, 0) >= SKIPS_TO_DOWNWEIGHT:
         return KNOW_SKIPPED_ARTIST
+    if artist_key in artists:
+        return KNOW_ARTIST
     return KNOW_UNKNOWN
 
 
@@ -176,7 +178,9 @@ def _familiarity(c: CandidateSong) -> float:
 def _reason(posterior: Posterior, c: CandidateSong) -> ReasonType:
     lo, hi = posterior.comfort_estimate()
     top = max(posterior.log_p, key=lambda h: posterior.log_p[h])
-    o = likely_octave(top, c.demand)  # labels describe the song in the octave the user would likely sing it
+    # Judge the song in the octave the likeliest voice would sing it, so a female-range song a baritone takes
+    # down an octave isn't labelled "upper range" (raw p90/p10 would be).
+    o = likely_octave(top, c.demand)
     if c.demand.p90 + o > hi + REASON_MARGIN:
         return "upper_range"
     if c.demand.p10 + o < lo - REASON_MARGIN:
@@ -192,11 +196,14 @@ def choose_next(state: SessionState, cands: list[CandidateSong]) -> NextPick | N
     """The next song to offer, or None when no candidate is eligible."""
     p = _probs(state.posterior)
     eligible = [c for c in cands if c.song_key not in state.done_keys]
-    if state.warmth == "cold":
-        limit = COLD_STRETCH_FIRST if state.attempts < COLD_EARLY_ATTEMPTS else COLD_STRETCH_LATER
-        eligible = [c for c in eligible if _expected_stretch(p, c.demand) <= limit]
     if not eligible:
         return None
+    if state.warmth == "cold":
+        limit = COLD_STRETCH_FIRST if state.attempts < COLD_EARLY_ATTEMPTS else COLD_STRETCH_LATER
+        stretch = {c.song_key: _expected_stretch(p, c.demand) for c in eligible}
+        gentle = [c for c in eligible if stretch[c.song_key] <= limit]
+        # Nothing gentle enough left: offer the least-stretchy songs rather than ending the session.
+        eligible = gentle or sorted(eligible, key=lambda c: (stretch[c.song_key], c.song_key))[:COLD_FALLBACK]
     familiar = sorted(eligible, key=lambda c: (-_familiarity(c), c.song_key))
 
     if state.attempts == 0:

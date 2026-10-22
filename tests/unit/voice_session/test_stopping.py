@@ -96,5 +96,37 @@ def test_improve_hints() -> None:
     assert warm.improve_hint == "sing_lower"
     sure_not_done = stopping.summary(_state(posterior({("tenor", 0): 1.0}), range_attempts=1))
     assert sure_not_done.improve_hint == "more_songs"
+    assert sure_not_done.confidence_label == "low"  # too few range attempts to claim confidence
     sure_done = stopping.summary(_state(posterior({("tenor", 0): 1.0})))
     assert sure_done.improve_hint is None
+    assert sure_done.confidence_label == "high"
+
+
+SURE = posterior({("tenor", 0): 0.95, ("baritone", 0): 0.05})
+
+
+def test_finish_after_two_attempts_is_low() -> None:
+    s = stopping.summary(_state(SURE, attempts=2, range_attempts=2))
+    assert s.voice_type == "tenor"
+    assert s.top_p > 0.9
+    assert s.confidence_label == "low"
+    assert s.between is None
+
+
+def test_unstable_range_is_low() -> None:
+    moved = [(50.0, 64.0), (53.0, 67.0), (53.0, 67.0)]
+    assert stopping.summary(_state(SURE, comfort_history=moved)).confidence_label == "low"
+
+
+def test_no_candidates_end() -> None:
+    # Ran out of songs after 2 attempts: low confidence, and "more songs" is not a hint we can act on.
+    state = _state(SURE, attempts=2, range_attempts=2)
+    assert stopping.summary(state).improve_hint == "more_songs"
+    ended = stopping.summary(state, done_reason="no_candidates")
+    assert ended.confidence_label == "low"
+    assert ended.improve_hint is None
+    # Range hints still apply when they do.
+    cold = stopping.summary(_state(Posterior.uniform(), warmth="cold", attempts=2), done_reason="no_candidates")
+    assert cold.improve_hint == "sing_higher_warm"
+    warm = stopping.summary(_state(Posterior.uniform(), attempts=2), done_reason="no_candidates")
+    assert warm.improve_hint == "sing_lower"

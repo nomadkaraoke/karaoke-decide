@@ -61,7 +61,12 @@ def _stable(history: list[tuple[float, float]]) -> bool:
     return all(max(b[i] for b in window) - min(b[i] for b in window) <= STABLE_SEMITONES for i in (0, 1))
 
 
-def _label(marg: dict[str, float]) -> ConfidenceLabel:
+def _enough_evidence(state: SessionState) -> bool:
+    """Enough attempts with range evidence, and the comfortable range has settled."""
+    return state.range_attempts >= MIN_RANGE_ATTEMPTS and _stable(state.comfort_history)
+
+
+def _posterior_label(marg: dict[str, float]) -> ConfidenceLabel:
     if _top(marg)[1] >= TOP_THRESHOLD:
         return "high"
     if _best_pair(marg)[1] >= PAIR_THRESHOLD:
@@ -69,10 +74,14 @@ def _label(marg: dict[str, float]) -> ConfidenceLabel:
     return "low"
 
 
+def _label(state: SessionState) -> ConfidenceLabel:
+    """Posterior confidence, capped at 'low' until the evidence gates of the confident stop are met."""
+    return _posterior_label(state.posterior.type_marginal()) if _enough_evidence(state) else "low"
+
+
 def check(state: SessionState) -> DoneReason | None:
     """Why the session is done, or None to keep going."""
-    marg = state.posterior.type_marginal()
-    if _label(marg) != "low" and _stable(state.comfort_history) and state.range_attempts >= MIN_RANGE_ATTEMPTS:
+    if _label(state) != "low":
         return "confident"
     if state.tired_count >= TIRED_LIMIT:
         return "tired"
@@ -89,13 +98,17 @@ def _comfort_sd(state: SessionState) -> tuple[float, float]:
     return math.sqrt(var_lo), math.sqrt(var_hi)
 
 
-def summary(state: SessionState) -> ResultSummary:
-    """The result shown to the user (valid mid-session too, e.g. on Finish)."""
+def summary(state: SessionState, done_reason: DoneReason | None = None) -> ResultSummary:
+    """The result shown to the user (valid mid-session too, e.g. on Finish).
+
+    ``done_reason`` is how the session ended when the caller knows it (e.g. 'no_candidates', which check()
+    can't see); otherwise check(state) decides whether "more songs" is still a useful hint.
+    """
     post = state.posterior
     marg = post.type_marginal()
     voice_type, top_p = _top(marg)
     pair, pair_p = _best_pair(marg)
-    label = _label(marg)
+    label = _label(state)
     between = None
     if label == "medium":
         between = pair[1] if pair[0] == voice_type else pair[0]
@@ -108,7 +121,7 @@ def summary(state: SessionState) -> ResultSummary:
         hint = "sing_higher_warm"
     elif sd_lo > HINT_SD:
         hint = "sing_lower"
-    elif check(state) is None:
+    elif (done_reason or check(state)) is None:
         hint = "more_songs"
 
     c_lo, c_hi = post.comfort_estimate()

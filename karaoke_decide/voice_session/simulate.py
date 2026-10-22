@@ -154,7 +154,7 @@ def simulate(
         state.recent_strata.append(cand.stratum)
         state.comfort_history.append(state.posterior.comfort_estimate())
         state.warmth = warmth_path[min(state.attempts, len(warmth_path) - 1)]
-    return SimResult(attempts=state.attempts, done_reason=done, summary=summary(state))
+    return SimResult(attempts=state.attempts, done_reason=done, summary=summary(state, done))
 
 
 @dataclass
