@@ -23,10 +23,12 @@ Inputs (optional ones missing -> one INFO line each, never louder):
 
 Outputs, in this order (``latest.json`` LAST, so a failure leaves last week's pointer):
 
-1. BigQuery load jobs, WRITE_TRUNCATE: ``song_vocal_range_sources``, ``song_vocal_range``,
-   ``artist_vocal_range`` in ``karaoke_decide``.
+1. BigQuery load jobs (WRITE_TRUNCATE) of ``song_vocal_range_sources``, ``song_vocal_range`` and
+   ``artist_vocal_range`` into ``musicbrainz_staging``; a failed load touches no prod table.
 2. ``vocal-range/latest/{song,artist}_vocal_range.tsv.gz`` + ``latest/summary.json``.
-3. ``vocal-range/latest.json`` = ``{run, sha256_song, sha256_artist}`` (sha256 of the .tsv.gz bytes).
+3. Copy jobs (WRITE_TRUNCATE, retried) staging -> ``karaoke_decide``, as for the MB tables.
+4. ``vocal-range/latest.json`` = ``{run, sha256_song, sha256_artist}`` (sha256 of the .tsv.gz bytes),
+   then the staging tables are dropped.
 
 Everything is computed in memory before the first write. A failure anywhere logs ONE ERROR
 (``run_step_safe``) and never fails the MB refresh.
@@ -43,6 +45,7 @@ import json
 import logging
 import re
 import statistics
+import time
 import zipfile
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
@@ -53,10 +56,11 @@ from typing import Any
 import httpx
 from google.cloud import bigquery
 
-from karaoke_decide.catalog.bq_source import ARTISTS_SQL
+from karaoke_decide.catalog.bq_source import ARTISTS_SQL, _artist_rows
 from karaoke_decide.catalog.bq_source import P as PROD_DATASET
 from karaoke_decide.catalog.keys import artist_key, song_key
-from karaoke_decide.etl.refresh_common import RefreshError, resumable_chunks
+from karaoke_decide.etl.musicbrainz_sql import S as STAGING_DATASET
+from karaoke_decide.etl.refresh_common import RefreshError, publish_tables, resumable_chunks
 from karaoke_decide.services.bq_limits import GIB, MAX_BYTES_CATALOG
 from karaoke_decide.vocal_range import calibrate
 from karaoke_decide.vocal_range.calibrate import ARTIST_BANDS, SONG_BANDS, BandStats
@@ -92,9 +96,10 @@ P412_FILE = "wikidata_p412.csv"
 # appears, add a loader here. Its absence is expected and deliberately not logged.
 USDB_DELTA_FILE = "usdb_delta_stats.csv.gz"
 
-SOURCES_TABLE = f"{PROD_DATASET}.song_vocal_range_sources"
-SONGS_TABLE = f"{PROD_DATASET}.song_vocal_range"
-ARTISTS_TABLE = f"{PROD_DATASET}.artist_vocal_range"
+TABLE_NAMES = ("song_vocal_range_sources", "song_vocal_range", "artist_vocal_range")
+SOURCES_TABLE, SONGS_TABLE, ARTISTS_TABLE = (f"{PROD_DATASET}.{t}" for t in TABLE_NAMES)
+# Loads land in musicbrainz_staging first; prod is only replaced by copy jobs once all three loaded.
+STAGING_SOURCES, STAGING_SONGS, STAGING_ARTISTS = (f"{STAGING_DATASET}.{t}" for t in TABLE_NAMES)
 
 # ARTISTS_SQL is the catalog's own query (same text + config, so the catalog build that follows
 # hits the BigQuery cache); the KN lookups read two small tables.
@@ -160,17 +165,15 @@ def _query(bq: Any, sql: str, max_bytes: int) -> Iterable[dict[str, Any]]:
 
 
 def load_artists(bq: Any) -> tuple[dict[str, str], dict[str, str]]:
-    """(mbid_of, gender_of) keyed by artist_key; the most popular row wins a shared key."""
-    best: dict[str, tuple[int, dict[str, Any]]] = {}
-    for r in _query(bq, ARTISTS_SQL, MAX_BYTES_ARTISTS):
-        key = artist_key(r.get("name"))
-        if not key:
-            continue
-        pop = int(r.get("popularity") or -1)
-        if key not in best or pop > best[key][0]:
-            best[key] = (pop, r)
-    mbid_of = {k: str(r["mbid"]) for k, (_, r) in best.items() if r.get("mbid")}
-    gender_of = {k: str(r["gender"]) for k, (_, r) in best.items() if r.get("gender")}
+    """(mbid_of, gender_of) keyed by artist_key, with the SAME winner per key as the catalog build.
+
+    Mirrors ``bq_source.fetch_catalog_rows``: rows go through ``_artist_rows`` and, sorted by
+    ``(lb_listeners or -1, mbid or "")``, the last one per key wins (most listened, then mbid).
+    """
+    rows = _artist_rows(iter(_query(bq, ARTISTS_SQL, MAX_BYTES_ARTISTS)))
+    best = {a.artist_key: a for a in sorted(rows, key=lambda a: (a.lb_listeners or -1, a.mbid or ""))}
+    mbid_of = {k: a.mbid for k, a in best.items() if a.mbid}
+    gender_of = {k: a.gender for k, a in best.items() if a.gender}
     return mbid_of, gender_of
 
 
@@ -197,10 +200,13 @@ def fetch_ultrastar_zip(bucket: Any, http: httpx.Client) -> bytes:
     if blob.exists():
         blob.reload()
         if (blob.metadata or {}).get("sha1") == USDB_ZIP_SHA1:
-            logger.info(f"Reusing gs://{BUCKET}/{ZIP_BLOB} (no download)")
             with blob.open("rb") as f:
                 data: bytes = f.read()
-            return data
+            if hashlib.sha1(data).hexdigest() == USDB_ZIP_SHA1:  # noqa: S324 - archive.org publishes sha1
+                logger.info(f"Reusing gs://{BUCKET}/{ZIP_BLOB} (no download)")
+                return data
+            # Self-heals below by re-downloading; worth a look but not page-worthy.
+            logger.warning(f"gs://{BUCKET}/{ZIP_BLOB} failed its SHA1 check; re-downloading from archive.org")
     logger.info(f"Downloading {USDB_ZIP_URL} -> gs://{BUCKET}/{ZIP_BLOB}")
     # Buffer in memory (78 MB) and verify BEFORE writing, so a bad download never lands in GCS.
     data = b"".join(resumable_chunks(http, USDB_ZIP_URL))
@@ -536,26 +542,44 @@ def _put(bucket: Any, name: str, data: bytes, content_type: str) -> None:
         out.write(data)
 
 
+def _drop_staging(bq: Any) -> None:
+    for table in (STAGING_SOURCES, STAGING_SONGS, STAGING_ARTISTS):
+        try:
+            bq.delete_table(table, not_found_ok=True)
+        except Exception as e:  # noqa: BLE001 - leftover staging is harmless; next run truncates it
+            logger.warning(f"vocal_range: could not delete {table}: {e}")
+
+
 def publish(bq: Any, bucket: Any, result: Result, run: str, now: datetime) -> None:
+    """Staging loads -> TSVs + summary -> copy staging over prod -> latest.json -> drop staging.
+
+    A failed load leaves every prod table and the pointer as they were; the copy jobs are
+    atomic per table and retried (refresh_common.publish_tables, same as the MB tables).
+    """
     loaded_at = now.isoformat()
     _load(
-        bq, SOURCES_TABLE, [{**dataclasses.asdict(r), "loaded_at": loaded_at} for r in result.sources], SOURCES_SCHEMA
+        bq,
+        STAGING_SOURCES,
+        [{**dataclasses.asdict(r), "loaded_at": loaded_at} for r in result.sources],
+        SOURCES_SCHEMA,
     )
     crowd = dict.fromkeys(CROWD_FIELDS)
-    _load(bq, SONGS_TABLE, [{**dataclasses.asdict(s), **crowd} for s in result.songs], SONGS_SCHEMA)
-    _load(bq, ARTISTS_TABLE, [dataclasses.asdict(a) for a in result.artists], ARTISTS_SCHEMA)
+    _load(bq, STAGING_SONGS, [{**dataclasses.asdict(s), **crowd} for s in result.songs], SONGS_SCHEMA)
+    _load(bq, STAGING_ARTISTS, [dataclasses.asdict(a) for a in result.artists], ARTISTS_SCHEMA)
 
     song_tsv = tsv_gz(result.songs, [f.name for f in dataclasses.fields(MergedSong)])
     artist_tsv = tsv_gz(result.artists, [f.name for f in dataclasses.fields(ArtistRange)])
     _put(bucket, SONG_TSV_BLOB, song_tsv, "application/gzip")
     _put(bucket, ARTIST_TSV_BLOB, artist_tsv, "application/gzip")
     _put(bucket, SUMMARY_BLOB, json.dumps(result.summary, sort_keys=True, indent=1).encode(), "application/json")
+    publish_tables(bq, list(TABLE_NAMES), STAGING_DATASET, PROD_DATASET, "vocal_range_run", run)
     pointer = {
         "run": run,
         "sha256_song": hashlib.sha256(song_tsv).hexdigest(),
         "sha256_artist": hashlib.sha256(artist_tsv).hexdigest(),
     }
     _put(bucket, POINTER_BLOB, json.dumps(pointer, sort_keys=True).encode(), "application/json")  # LAST
+    _drop_staging(bq)
 
 
 # --------------------------------------------------------------------------
@@ -567,6 +591,7 @@ def run_step(
     bq: Any, gcs: Any, http: httpx.Client, *, now: datetime | None = None, data_dir: Path = DATA_DIR
 ) -> dict[str, Any]:
     """Build and publish the vocal-range tables; returns the summary. Raises on failure."""
+    started = time.monotonic()
     now = now or datetime.now(UTC)
     run = now.strftime("%Y%m%d-%H%M%S")
     bucket = gcs.bucket(BUCKET)
@@ -591,7 +616,8 @@ def run_step(
     )
     result.summary["run"] = run
     publish(bq, bucket, result, run, now)
-    logger.info(f"vocal_range published run {run}: {json.dumps(result.summary, sort_keys=True)}")
+    secs = time.monotonic() - started
+    logger.info(f"vocal_range published run {run} in {secs:.0f}s: {json.dumps(result.summary, sort_keys=True)}")
     return result.summary
 
 
