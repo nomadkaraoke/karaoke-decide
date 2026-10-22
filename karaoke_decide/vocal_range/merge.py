@@ -2,17 +2,23 @@
 
 Interpretation notes (where the spec was ambiguous):
 
-* Gemini confidence is carried in ``SourceRow.octave_confidence`` (the Gemini CSV
-  ``confidence`` column); a Gemini row needs ``octave_confidence >= 0.3`` (None fails)
-  AND ``gemini_kept(row)`` (the calibrated popularity band).
+* Gemini's self-reported confidence lives in ``SourceRow.confidence`` /
+  ``MergedSong.confidence`` / ``ArtistRange.confidence``; ``octave_confidence`` keeps only
+  its octave meaning and is None for Gemini rows. A Gemini row needs ``confidence >= 0.3``
+  (None fails) AND ``gemini_kept(row)`` (the calibrated popularity band).
+* Phase 3d: adding ``("pool_measured", "measured")`` to ``SOURCE_PRECEDENCE`` plus the
+  ``'pool_measured'`` Literal value is all that is needed; "measured" is derived from the tier.
 * Duplicates (several UltraStar files, several measured jobs) are resolved per
   ``lead_part``: keep the row whose p50 is closest to the group's median p50
   (ties -> the lower p50).
 * Duet = more than one distinct ``lead_part`` other than ``"all"`` in the winning
   source; the part with the largest ``weight_s`` wins.
 * ``n_sources`` = number of distinct sources that had at least one eligible row.
-* Artist ``songs`` basis counts every merged song whose tier is not ``"rough"``;
-  no merged tier is named "rough", so in practice all songs count.
+* Artist ``songs`` basis counts only merged songs with tier ``measured`` or ``notes``, never
+  ``estimated`` (departs from the plan's "tier != rough" wording): this avoids confidently
+  wrong labels and circular calibration truth. Gemini-only artists fall through to the
+  calibrated ``gemini`` basis. ``calibrate_artists``' measured-artist truth must therefore
+  come only from ``basis == "songs"`` ArtistRanges (Task 11: pass just those).
 * Artist keys: ``artist_of`` values, ``gemini_artists[].song_key``, ``mbid_of`` keys
   and ``gender_of`` keys. Gemini artist rows use ``song_key`` as the artist key.
 """
@@ -64,6 +70,7 @@ class SourceRow:
     lead_part: str
     weight_s: float
     pop_rank: int | None = None
+    confidence: float | None = None  # Gemini self-reported confidence; None for other sources
 
 
 @dataclass
@@ -79,6 +86,7 @@ class MergedSong:
     octave_confidence: float | None
     is_duet: bool
     n_sources: int
+    confidence: float | None = None  # Gemini confidence when source == "gemini"
 
 
 @dataclass
@@ -90,12 +98,16 @@ class ArtistRange:
     p50: float
     p90: float
     basis: Literal["songs", "gemini", "p412", "gender"]
+    confidence: float | None = None  # set for the gemini basis only
+
+
+_TIER_OF = dict(SOURCE_PRECEDENCE)
 
 
 def _eligible(source: str, r: SourceRow, gemini_kept: Callable[[SourceRow], bool]) -> bool:
     if source == "gemini":
-        return r.octave_confidence is not None and r.octave_confidence >= MIN_GEMINI_CONFIDENCE and gemini_kept(r)
-    if source in ("gen_measured", "nomad_measured", "pool_measured"):
+        return r.confidence is not None and r.confidence >= MIN_GEMINI_CONFIDENCE and gemini_kept(r)
+    if _TIER_OF.get(source) == "measured":
         return r.weight_s >= MIN_MEASURED_WEIGHT_S
     return True
 
@@ -141,6 +153,7 @@ def merge_songs(rows: list[SourceRow], gemini_kept: Callable[[SourceRow], bool])
                         best.octave_confidence,
                         duet,
                         len(by_source),
+                        best.confidence,
                     )
                 )
                 break
@@ -164,13 +177,13 @@ def artist_ranges(
     by_artist: dict[str, list[MergedSong]] = defaultdict(list)
     for s in songs:
         a = artist_of.get(s.song_key)
-        if a is not None and s.tier != "rough":
+        if a is not None and s.tier in ("measured", "notes"):
             by_artist[a].append(s)
     gem: dict[str, SourceRow] = {}
     for g in gemini_artists:
-        ok = g.octave_confidence is not None and g.octave_confidence >= MIN_GEMINI_CONFIDENCE and gemini_artist_kept(g)
+        ok = g.confidence is not None and g.confidence >= MIN_GEMINI_CONFIDENCE and gemini_artist_kept(g)
         cur = gem.get(g.song_key)
-        if ok and (cur is None or (g.octave_confidence or 0) > (cur.octave_confidence or 0)):
+        if ok and (cur is None or (g.confidence or 0) > (cur.confidence or 0)):
             gem[g.song_key] = g
     keys = set(artist_of.values()) | {g.song_key for g in gemini_artists} | set(mbid_of) | set(gender_of)
     out: list[ArtistRange] = []
@@ -190,7 +203,7 @@ def artist_ranges(
             )
         elif k in gem:
             g = gem[k]
-            out.append(ArtistRange(k, g.low_midi, g.high_midi, g.p10, g.p50, g.p90, "gemini"))
+            out.append(ArtistRange(k, g.low_midi, g.high_midi, g.p10, g.p50, g.p90, "gemini", g.confidence))
         elif types := p412.get(mbid_of.get(k, ""), set()) & set(VOICE_TYPES):
             vt = next(t for t in VOICE_TYPES if t in types)
             lo, hi = VOICE_TYPES[vt]

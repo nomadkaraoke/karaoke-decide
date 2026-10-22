@@ -29,10 +29,11 @@ def row(
         p10=p50 - 5,
         p50=p50,
         p90=p50 + 5,
-        octave_confidence=conf,
+        octave_confidence=None if source == "gemini" else conf,
         lead_part=part,
         weight_s=weight,
         pop_rank=pop,
+        confidence=conf if source == "gemini" else None,
     )
 
 
@@ -141,3 +142,29 @@ def test_mixed_gender_no_prior():
     out = artist_ranges([], {}, [], lambda r: True, {}, {}, {"x": "mixed", "y": "unknown", "z": "female"})
     assert [r.artist_key for r in out] == ["z"]
     assert out[0].low_midi == 54 and out[0].p90 == 71
+
+
+def test_boundaries_exactly_at_threshold_kept():
+    assert len(merge_songs([row(source="gen_measured", weight=20.0)], ALL)) == 1
+    (m,) = merge_songs([row(source="gemini", conf=0.3)], ALL)
+    assert m.confidence == 0.3 and m.octave_confidence is None
+
+
+def test_mixed_all_and_p1_is_not_duet():
+    (m,) = merge_songs([row(part="all", lo=40, weight=30), row(part="P1", lo=45, weight=50)], ALL)
+    assert not m.is_duet and m.low_midi == 45
+
+
+def test_gemini_only_artist_with_estimated_songs_uses_gemini_basis():
+    songs = [_song(f"s{i}", 60, tier="estimated") for i in range(3)]
+    artist_of = {f"s{i}": "a1" for i in range(3)}
+    g = [row(key="a1", source="gemini", p50=65.0, conf=0.8)]
+    (r,) = artist_ranges(songs, artist_of, g, lambda r: True, {}, {}, {})
+    assert r.basis == "gemini" and r.confidence == 0.8
+    assert artist_ranges(songs, artist_of, g, lambda r: False, {}, {}, {}) == []
+
+
+def test_notes_songs_count_for_songs_basis():
+    songs = [_song(f"s{i}", 60, tier="notes") for i in range(3)]
+    (r,) = artist_ranges(songs, {f"s{i}": "a1" for i in range(3)}, [], lambda r: True, {}, {}, {})
+    assert r.basis == "songs" and r.confidence is None

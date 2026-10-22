@@ -14,10 +14,11 @@ def est(key, p50, pop, conf=0.8, lo=None, hi=None):
         p50 - 5,
         p50,
         p50 + 5,
-        conf,
+        None,
         "all",
         0.0,
         pop,
+        conf,
     )
 
 
