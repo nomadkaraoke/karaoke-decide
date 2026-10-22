@@ -2,10 +2,10 @@
 
 from datetime import date
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LOCAL_STACK_KJBOX_SECRET = "local-stack-secret"
 
@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     # kjbox -> decide karaoke-log partner secret (env DECIDE_KJBOX_SECRET; Secret Manager
     # decide-kjbox-secret). Empty disables the partner routes (503). Use ``kjbox_secret``.
     decide_kjbox_secret: str = ""
+
+    # Static admin tokens for scripts (env ADMIN_TOKENS, comma-separated; sent as X-Admin-Token).
+    admin_tokens: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("admin_tokens", mode="before")
+    @classmethod
+    def _split_admin_tokens(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [t.strip() for t in v.split(",") if t.strip()]
+        return v
 
     # Google Cloud
     google_cloud_project: str = ""

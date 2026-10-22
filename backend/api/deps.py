@@ -1,9 +1,10 @@
 """Dependency injection for API routes."""
 
+import hmac
 from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import BackendSettings, get_backend_settings
@@ -174,6 +175,27 @@ async def get_admin_user(
     return user
 
 
+async def get_admin_access(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    user: Annotated[User | None, Depends(get_optional_user)],
+    x_admin_token: Annotated[str | None, Header()] = None,
+) -> User | None:
+    """Admin decide user, or a configured static ``X-Admin-Token`` (scripts). Otherwise 403.
+
+    Returns the admin user, or None when the caller authenticated with a token.
+    """
+    if x_admin_token:
+        supplied = x_admin_token.encode()
+        matched = False
+        for token in settings.admin_tokens:  # compare against every token: no early exit
+            matched |= hmac.compare_digest(supplied, token.encode())
+        if matched:
+            return None
+    if user is not None and user.is_admin:
+        return user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
 async def get_music_service_service_dep(
     settings: Annotated[BackendSettings, Depends(get_settings)],
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
@@ -324,6 +346,7 @@ async def get_user_data_service_dep(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
 AdminUser = Annotated[User, Depends(get_admin_user)]
+AdminAccess = Annotated[User | None, Depends(get_admin_access)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]

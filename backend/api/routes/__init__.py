@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from backend.api.routes.admin import router as admin_router
+from backend.api.routes.admin_voice import router as admin_voice_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.catalog import router as catalog_router
 from backend.api.routes.health import router as health_router
@@ -35,6 +36,7 @@ router.include_router(karaoke_log_router, prefix="/my/karaoke-log", tags=["karao
 router.include_router(kjbox_partner_router, prefix="/partner/kjbox/karaoke-log", tags=["partner"])
 router.include_router(voice_router, prefix="/my", tags=["voice"])
 router.include_router(admin_router, prefix="/admin", tags=["admin"])
+router.include_router(admin_voice_router, prefix="/admin/voice", tags=["admin-voice"])
 
 # Internal routes (Cloud Tasks callbacks) - separate prefix outside /api
 internal_api_router = internal_router
