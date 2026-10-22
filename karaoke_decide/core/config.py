@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Environment
     environment: Literal["development", "staging", "production"] = "development"
 
+    # Local-stack /api/test/* seeding routes (env DECIDE_TEST_API). The backend refuses to mount
+    # them when environment is production, whatever this says.
+    decide_test_api: bool = False
+
     # Google Cloud
     google_cloud_project: str = ""
     google_cloud_project_number: str = ""  # Required for service account references
