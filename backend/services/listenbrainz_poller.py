@@ -97,6 +97,10 @@ class _RateLimitedTwiceError(Exception):
     """Rate limited twice in a row: leave this user for the next run."""
 
 
+class _IngestFailedError(Exception):
+    """Writing the user's listens into their profile failed (not a ListenBrainz problem)."""
+
+
 class _ConnectionGoneError(Exception):
     """The connection was removed while we polled it: write nothing."""
 
@@ -143,6 +147,9 @@ class ListenBrainzPoller:
                 logger.warning("ListenBrainz rate limited twice; user %s waits for the next poll", doc.get("user_id"))
             except _ConnectionGoneError:
                 logger.debug("ListenBrainz connection for %s removed during the poll", doc.get("user_id"))
+            except _IngestFailedError as e:
+                failed += 1
+                logger.warning("ListenBrainz ingest failed for user %s", doc.get("user_id"), exc_info=e.__cause__)
             except ExternalServiceError as e:  # LB 404 (renamed/deleted user), 5xx, network
                 logger.warning("ListenBrainz poll skipped user %s: %s", doc.get("user_id"), e)
             except Exception:
@@ -173,10 +180,16 @@ class ListenBrainzPoller:
         raw_cursor = doc.get("lb_last_listen_ts")
         cursor = int(raw_cursor) if raw_cursor is not None else None
         first = cursor is None
-        listens = await (self._backfill(username) if cursor is None else self._since(username, cursor))
-        if listens:
-            await self.ingest.ingest(user_id, "listenbrainz", _aggregate(listens), play_mode="max" if first else "add")
+        # Never fails (returns None when it can't tell), and runs before the ingest: nothing that can
+        # fail may sit between an "add" ingest and the cursor write, or the next run adds them again.
         status = await self._check_pending_import(doc)
+        listens = await (self._backfill(username) if cursor is None else self._since(username, cursor))
+        tracks = _aggregate(listens)
+        if tracks:
+            try:
+                await self.ingest.ingest(user_id, "listenbrainz", tracks, play_mode="max" if first else "add")
+            except Exception as e:
+                raise _IngestFailedError from e
 
         now = self._utcnow()
         fields: dict[str, Any] = {"lb_last_polled_at": now.isoformat()}
@@ -202,7 +215,7 @@ class ListenBrainzPoller:
 
         await self.db.transform_document_atomically(SERVICES_COLLECTION, doc_id, write)
         report.users_polled += 1
-        report.listens_added += len(listens)
+        report.listens_added += sum(t.plays or 0 for t in tracks)
         if status:
             report.imports_checked += 1
 
@@ -245,8 +258,17 @@ class ListenBrainzPoller:
             # The per-user refresh lease inside serialises token refreshes with the API.
             token = await self.music_service.get_listenbrainz_token(self.music_service.service_from_doc(doc))
             result = await self._call(partial(self.client.get_import_status, token, str(pending["id"])))
-        except (MusicServiceError, ExternalServiceError) as e:
-            logger.warning("Could not check ListenBrainz import %s for %s: %s", pending["id"], doc.get("user_id"), e)
+        except (MusicServiceError, ExternalServiceError, _RateLimitedTwiceError) as e:
+            logger.warning(
+                "Could not check ListenBrainz import %s for %s: %s: %s",
+                pending["id"],
+                doc.get("user_id"),
+                type(e).__name__,
+                e,
+            )
+            return None
+        except Exception:
+            logger.warning("ListenBrainz import check failed for %s", doc.get("user_id"), exc_info=True)
             return None
         return str(result.get("status") or "") or None
 

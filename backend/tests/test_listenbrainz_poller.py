@@ -518,3 +518,133 @@ def test_job_entry_runs_poller_with_budget(monkeypatch: pytest.MonkeyPatch) -> N
 
     monkeypatch.setattr(lb_poll, "_run", boom)
     assert lb_poll.main([]) == 1
+
+
+# ---------------------------------------------------------------------------- review round 1
+
+
+@pytest.mark.asyncio
+async def test_pending_check_rate_limited_twice_still_writes_cursor_no_double_add(db: PollDb) -> None:
+    doc_id = _conn(
+        db,
+        auth="oauth",
+        lb_last_listen_ts=T0 - 10,
+        lb_pending_import={"id": "42", "status": "waiting", "submitted_at": "T"},
+    )
+    lb, ingest = FakeLB(), FakeIngest()
+    lb.add("e2e-fixture-user", 3, T0 - 2)
+    lb.errors = [ListenBrainzRateLimitedError(1), ListenBrainzRateLimitedError(1)]  # both on get_import_status
+
+    first = await _poller(db, lb, ingest).run(1500)
+    second = await _poller(db, lb, ingest).run(1500)
+
+    assert first.users_polled == 1 and first.listens_added == 3 and first.imports_checked == 0
+    assert len(ingest.calls) == 1  # the second run found nothing new: the plays were added once
+    assert sum(t.plays or 0 for t in ingest.calls[0][2]) == 3
+    assert second.listens_added == 0
+    doc = db.doc("music_services", doc_id)
+    assert doc is not None and doc["lb_last_listen_ts"] == T0
+    assert doc["lb_pending_import"]["status"] == "completed"  # second run's check went through
+
+
+@pytest.mark.asyncio
+async def test_pending_check_unexpected_error_never_stops_the_poll(db: PollDb) -> None:
+    doc_id = _conn(db, auth="oauth", lb_pending_import={"id": "42", "status": "waiting", "submitted_at": "T"})
+    ms = _music_service()
+    ms.service_from_doc.side_effect = ValueError("bad doc")
+    lb = FakeLB()
+    lb.add("e2e-fixture-user", 1, T0)
+    report = await _poller(db, lb, FakeIngest(), ms=ms).run(1500)
+    assert report.users_polled == 1 and db.doc("music_services", doc_id)["lb_last_listen_ts"] == T0  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_listens_added_counts_only_ingestable_listens(db: PollDb) -> None:
+    _conn(db)
+    lb = FakeLB()
+    lb.add("e2e-fixture-user", 2, T0 - 5)
+    lb.add("e2e-fixture-user", 1, T0 - 50, songs=[("", "No Artist")])
+    report = await _poller(db, lb, FakeIngest()).run(1500)
+    assert report.listens_added == 2
+
+
+@pytest.mark.asyncio
+async def test_ingest_failure_logged_as_ingest_failure_and_cursor_kept(
+    db: PollDb, caplog: pytest.LogCaptureFixture
+) -> None:
+    doc_id = _conn(db, lb_last_listen_ts=T0 - 10)
+    lb = FakeLB()
+    lb.add("e2e-fixture-user", 2, T0 - 2)
+
+    class Failing(FakeIngest):
+        async def ingest(self, *args: Any, **kwargs: Any) -> IngestResult:
+            raise ExternalServiceError("BigQuery", "boom")
+
+    with caplog.at_level("INFO", logger="backend.services.listenbrainz_poller"):
+        report = await _poller(db, lb, Failing()).run(1500)
+
+    assert report.users_polled == 0
+    assert db.doc("music_services", doc_id)["lb_last_listen_ts"] == T0 - 10  # type: ignore[index]
+    messages = [(r.levelname, r.getMessage()) for r in caplog.records]
+    assert any(lvl == "WARNING" and "ingest failed" in m for lvl, m in messages)
+    assert not any("skipped" in m for _, m in messages)
+    assert [m for lvl, m in messages if lvl == "ERROR"] == [
+        "lb-poll: 1 of 1 ListenBrainz users failed unexpectedly (see warnings)"
+    ]
+
+
+class _FakeStore:
+    def __init__(self, ready: bool) -> None:
+        self.ready = ready
+        self.timeouts: list[float] = []
+
+    @property
+    def status(self) -> str:
+        return "ready" if self.ready else "warming_up"
+
+    def load(self, settings: BackendSettings) -> None:
+        self.timeouts.append(settings.catalog_load_timeout_s)
+
+
+def _patch_job(monkeypatch: pytest.MonkeyPatch, store: _FakeStore) -> list[int]:
+    import backend.services.catalog_store as catalog_store
+    import backend.services.firestore_service as firestore_service
+    import backend.services.listenbrainz_poller as poller_mod
+    from backend.jobs import lb_poll
+
+    budgets: list[int] = []
+
+    class Poller:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+        async def run(self, budget: int) -> PollReport:
+            budgets.append(budget)
+            return PollReport()
+
+    monkeypatch.setattr(catalog_store, "get_catalog_store", lambda: store)
+    monkeypatch.setattr(firestore_service, "FirestoreService", MagicMock())
+    monkeypatch.setattr(poller_mod, "ListenBrainzPoller", Poller)
+    assert lb_poll.CATALOG_WAIT_S > 60
+    return budgets
+
+
+def test_job_waits_for_catalog_then_polls(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.jobs import lb_poll
+
+    store = _FakeStore(ready=True)
+    budgets = _patch_job(monkeypatch, store)
+    assert lb_poll.main([]) == 0
+    assert store.timeouts == [lb_poll.CATALOG_WAIT_S] and budgets and 1490 <= budgets[0] <= 1500
+
+
+def test_job_fails_without_catalog_and_never_polls(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from backend.jobs import lb_poll
+
+    budgets = _patch_job(monkeypatch, _FakeStore(ready=False))
+    with caplog.at_level("ERROR"):
+        assert lb_poll.main([]) == 1
+    assert budgets == []
+    assert any(r.levelname == "ERROR" and "ListenBrainz poll failed" in r.getMessage() for r in caplog.records)
