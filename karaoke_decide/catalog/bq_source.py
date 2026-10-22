@@ -19,7 +19,7 @@ from google.cloud import bigquery
 
 from karaoke_decide.catalog.build import ArtistRow, CatalogRows, KnRow, SimilarRow, SongRow
 from karaoke_decide.catalog.genres import map_genres
-from karaoke_decide.catalog.keys import artist_key, match_key, song_key
+from karaoke_decide.catalog.keys import artist_key, loose_keys, match_key, song_key
 from karaoke_decide.catalog.moods import mood_for
 from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
 
@@ -296,8 +296,13 @@ def _base_key(artist: str, title: str) -> str:
 
 
 def _kn_title_keys(kn: list[KnRow]) -> set[str]:
-    """Exact and bracket-free song keys of every KN song (what counts as "has a karaoke version")."""
-    return {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
+    """Every key a KN song answers to (what counts as "has a karaoke version"): exact and
+    bracket-free ``song_key`` plus its ``loose_keys`` (punctuation/spacing-insensitive, primary
+    artist). A candidate whose keys hit any of these already has a karaoke version."""
+    keys = {k.song_key for k in kn} | {_base_key(k.artist, k.title) for k in kn}
+    for k in kn:
+        keys |= loose_keys(k.artist, k.title)
+    return keys
 
 
 # Album filler that nobody sings at karaoke (whole-word match, so "Introspection" survives).
@@ -320,11 +325,14 @@ def _no_karaoke_songs(
         key = song_key(r["artist"], r["title"])
         base = _base_key(r["artist"], r["title"])
         a_key = artist_key(r["artist"])
-        if key in kn_keys or base in kn_keys or len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
+        loose = loose_keys(r["artist"], r["title"])
+        if key in kn_keys or base in kn_keys or not kn_keys.isdisjoint(loose):
             continue
-        if key in seen or base in seen:
+        if len(candidates[a_key]) >= NO_KARAOKE_PER_ARTIST:
             continue
-        seen.update((key, base))
+        if key in seen or base in seen or not seen.isdisjoint(loose):
+            continue
+        seen.update((key, base, *loose))
         artist = artists.get(a_key)
         year = _as_int(r.get("year"))
         candidates[a_key].append(
