@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "正在检查权限...",
       "checkingAuth": "正在检查身份验证..."
+    },
+    "sourceBadge": {
+      "screenshot": "截图"
     }
   },
   "common": {

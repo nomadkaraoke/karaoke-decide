@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Kontrolujem oprávnenia...",
       "checkingAuth": "Kontrolujem autentifikáciu..."
+    },
+    "sourceBadge": {
+      "screenshot": "Snímka obrazovky"
     }
   },
   "common": {

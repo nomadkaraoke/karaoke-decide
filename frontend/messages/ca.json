@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Comprovant permisos...",
       "checkingAuth": "Comprovant autenticació..."
+    },
+    "sourceBadge": {
+      "screenshot": "Captura de pantalla"
     }
   },
   "common": {

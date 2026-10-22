@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Tarkistetaan oikeuksia...",
       "checkingAuth": "Tarkistetaan todennusta..."
+    },
+    "sourceBadge": {
+      "screenshot": "Kuvankaappaus"
     }
   },
   "common": {

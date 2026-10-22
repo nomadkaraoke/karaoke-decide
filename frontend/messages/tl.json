@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Sinusuri ang mga pahintulot...",
       "checkingAuth": "Sinusuri ang authentication..."
+    },
+    "sourceBadge": {
+      "screenshot": "Screenshot"
     }
   },
   "common": {

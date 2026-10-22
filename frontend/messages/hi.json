@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "परमिशन्स चेक की जा रही हैं...",
       "checkingAuth": "ऑथेंटिकेशन चेक किया जा रहा है..."
+    },
+    "sourceBadge": {
+      "screenshot": "स्क्रीनशॉट"
     }
   },
   "common": {

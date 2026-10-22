@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Se verifică permisiunile...",
       "checkingAuth": "Se verifică autentificarea..."
+    },
+    "sourceBadge": {
+      "screenshot": "Captură de ecran"
     }
   },
   "common": {

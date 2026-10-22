@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "جاري التحقق من الأذونات...",
       "checkingAuth": "جاري التحقق من المصادقة..."
+    },
+    "sourceBadge": {
+      "screenshot": "لقطة شاشة"
     }
   },
   "common": {

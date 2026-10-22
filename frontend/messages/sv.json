@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Kontrollerar behörigheter...",
       "checkingAuth": "Kontrollerar autentisering..."
+    },
+    "sourceBadge": {
+      "screenshot": "Skärmdump"
     }
   },
   "common": {

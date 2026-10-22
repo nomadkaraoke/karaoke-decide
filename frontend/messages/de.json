@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "Berechtigungen werden überprüft...",
       "checkingAuth": "Authentifizierung wird überprüft..."
+    },
+    "sourceBadge": {
+      "screenshot": "Screenshot"
     }
   },
   "common": {

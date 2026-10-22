@@ -804,6 +804,9 @@
     "adminPage": {
       "checkingPermissions": "İzinler kontrol ediliyor...",
       "checkingAuth": "Kimlik doğrulama kontrol ediliyor..."
+    },
+    "sourceBadge": {
+      "screenshot": "Ekran Görüntüsü"
     }
   },
   "common": {
