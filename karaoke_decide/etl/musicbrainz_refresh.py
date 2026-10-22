@@ -366,16 +366,23 @@ def publish_mirror(bq: bigquery.Client, state: RunState, load_failures: dict[str
     state.row_counts.update(result.summary())
 
 
-def build_catalog(bq: bigquery.Client, gcs: storage.Client) -> dict[str, Any] | None:
+def build_catalog(
+    bq: bigquery.Client, gcs: storage.Client, *, workdir: Path | None = None, publish: bool = True
+) -> dict[str, Any] | None:
     """Build + publish catalog.db. Returns the new pointer, or None if the gate refused it.
 
-    Raises on unexpected failures; callers decide whether that is fatal.
+    An explicit ``workdir`` is created if needed and kept afterwards (size inspection);
+    otherwise a scratch dir is used and removed. Raises on unexpected failures; callers
+    decide whether that is fatal.
     """
-    workdir = Path(tempfile.mkdtemp(prefix="catalog-", dir="/tmp"))  # noqa: S108 - Cloud Run scratch
+    if workdir is not None:
+        workdir.mkdir(parents=True, exist_ok=True)
+        return catalog_publish.build_and_publish_catalog(bq, gcs, workdir, publish=publish)
+    scratch = Path(tempfile.mkdtemp(prefix="catalog-", dir="/tmp"))  # noqa: S108 - Cloud Run scratch
     try:
-        return catalog_publish.build_and_publish_catalog(bq, gcs, workdir)
+        return catalog_publish.build_and_publish_catalog(bq, gcs, scratch, publish=publish)
     finally:
-        shutil.rmtree(workdir, ignore_errors=True)
+        shutil.rmtree(scratch, ignore_errors=True)
 
 
 def publish_catalog_best_effort(bq: bigquery.Client, gcs: storage.Client) -> None:
@@ -504,7 +511,9 @@ def main(argv: list[str] | None = None) -> int:
     p_pub.add_argument("--dump-id", required=True)
     p_pub.add_argument("--skip-mirror", action="store_true", help="Don't build/publish the musicbrainz.* mirror")
     p_pub.add_argument("--skip-catalog", action="store_true", help="Don't build/publish catalog.db")
-    sub.add_parser("catalog", help="Build + publish catalog.db only (no refresh)")
+    p_cat = sub.add_parser("catalog", help="Build + publish catalog.db only (no refresh)")
+    p_cat.add_argument("--no-publish", action="store_true", help="Build + gate only; upload nothing")
+    p_cat.add_argument("--workdir", type=Path, help="Build here and keep catalog.db (default: scratch dir, removed)")
     sub.add_parser("status", help="Show recent runs")
     args = parser.parse_args(argv)
 
@@ -515,7 +524,11 @@ def main(argv: list[str] | None = None) -> int:
             return status(bq)
         gcs = storage.Client(project=sql.PROJECT_ID)
         if args.command == "catalog":
-            return 0 if build_catalog(bq, gcs) else 1
+            if args.no_publish:
+                # Exit 0 when the build+gate completed; there is no pointer to return.
+                build_catalog(bq, gcs, workdir=args.workdir, publish=False)
+                return 0
+            return 0 if build_catalog(bq, gcs, workdir=args.workdir) else 1
         if args.command == "publish":
             return publish_existing(
                 bq, gcs, args.dump_id, do_mirror=not args.skip_mirror, do_catalog=not args.skip_catalog

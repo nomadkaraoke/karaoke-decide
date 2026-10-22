@@ -146,6 +146,10 @@ def _coverage(songs: Sequence[SongRow]) -> dict[str, float]:
     return {name: sum(1 for s in in_kn if check(s)) / len(in_kn) for name, check in checks.items()}
 
 
+def _has_popularity_signal(s: SongRow) -> bool:
+    return s.lb_listeners is not None or s.spotify_pop is not None
+
+
 def build_catalog_db(rows: CatalogRows, dest: Path, run: str) -> CatalogStats:
     """Write catalog.db to ``dest`` (replacing any existing file) and return its stats."""
     songs = _dedupe_songs(rows.songs)
@@ -159,7 +163,13 @@ def build_catalog_db(rows: CatalogRows, dest: Path, run: str) -> CatalogStats:
         current = artists.get(a.artist_key)
         if current is None or (a.lb_listeners or -1) > (current.lb_listeners or -1):
             artists[a.artist_key] = a
+    # Coverage describes the whole KaraokeNerds catalogue; measured before pruning.
     coverage = _coverage(songs)
+    # Size budget (<150 MB raw, <50 MB gz): ~55% of KN songs have neither a ListenBrainz nor a
+    # Spotify popularity signal (and no mood/duration either). They can't rank in any section,
+    # so the recommendation candidate table skips them; they stay in kn_song_map, so id/library
+    # lookups still resolve.
+    songs = [s for s in songs if _has_popularity_signal(s)]
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.unlink(missing_ok=True)

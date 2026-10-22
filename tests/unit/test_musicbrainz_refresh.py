@@ -377,6 +377,15 @@ class TestRun:
         assert mr.main(["catalog"]) == 0
         self.catalog.assert_called_once()
 
+    def test_catalog_no_publish_and_workdir_flags(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        self.catalog.return_value = None  # no-publish never returns a pointer
+        work = tmp_path / "cat"
+        assert mr.main(["catalog", "--no-publish", "--workdir", str(work)]) == 0
+        assert self.catalog.call_args.args[2] == work and self.catalog.call_args.kwargs["publish"] is False
+        assert work.is_dir()  # an explicit workdir is created and kept
+
     def test_catalog_subcommand_exit_code_reflects_gate_and_errors(self, monkeypatch):
         monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
         monkeypatch.setattr(mr.storage, "Client", MagicMock())

@@ -337,16 +337,22 @@ cloud_run_service = gcp.cloudrunv2.Service(
                 "resources": {
                     "limits": {
                         "cpu": "1",
-                        "memory": "1Gi",  # Increased from 512Mi to handle collaborative filtering queries
+                        # 2Gi: availability.db (~213 MB) + catalog.db (<=150 MB) are decompressed into
+                        # /tmp, which is in-memory on Cloud Run, on top of the app itself. Request-billed.
+                        # Must match CI --memory (tests/unit/test_infra_ci_parity.py).
+                        "memory": "2Gi",
                     },
                     "cpu_idle": True,
                     "startup_cpu_boost": True,
                 },
+                # /api/ready answers once the lifespan (catalog + availability load) has finished.
+                # 24 x 10 s = 240 s, Cloud Run's cap on a startup probe window. Keep in step with
+                # CI --startup-probe (tests/unit/test_infra_ci_parity.py).
                 "startup_probe": {
-                    "tcp_socket": {"port": 8000},
-                    "timeout_seconds": 240,
-                    "period_seconds": 240,
-                    "failure_threshold": 1,
+                    "http_get": {"path": "/api/ready", "port": 8000},
+                    "timeout_seconds": 5,
+                    "period_seconds": 10,
+                    "failure_threshold": 24,
                 },
             }
         ],
@@ -978,6 +984,39 @@ if search_service_enabled:
     )
 
     pulumi.export("search_service_url", search_service.uri)
+
+# 60 s ping of the main API through the Worker. With request-based billing and
+# cpu_idle an idle instance costs ~nothing, and a warm instance means recommendations
+# v2 rarely pays the catalog-load cold start. Like search-health-uptime, no alert policy:
+# a hard-down API shows up in ERROR logs, which already page #alerts.
+gcp.monitoring.UptimeCheckConfig(
+    "decide-api-health-uptime",
+    display_name="Decide API - /api/health",
+    project=project,
+    timeout="10s",
+    period="60s",
+    selected_regions=["USA_OREGON", "USA_IOWA", "USA_VIRGINIA"],
+    monitored_resource={
+        "type": "uptime_url",
+        "labels": {"project_id": project, "host": SEARCH_HOST},
+    },
+    http_check={
+        "path": "/api/health",
+        "port": 443,
+        "use_ssl": True,
+        "validate_ssl": True,
+        "request_method": "GET",
+        "accepted_response_status_codes": [{"status_value": 200}],
+    },
+    content_matchers=[{"content": '"status"', "matcher": "CONTAINS_STRING"}],
+)
+
+# Bucket access for the catalog / song-index reads: the main service runs as the default
+# compute SA, which already holds project-level roles/storage.admin (verified 2026-10-21
+# via the project IAM policy), so it can read gs://nomadkaraoke-musicbrainz-data/catalog/
+# and gs://nomadkaraoke-kn-data/song-index/ without extra bucket grants. If that project
+# role is ever narrowed, add roles/storage.objectViewer BucketIAMMembers (with prefix
+# conditions) for {PROJECT_NUMBER}-compute@developer.gserviceaccount.com on both buckets.
 
 pulumi.export("song_index_public_bucket", song_index_public_bucket.name)
 

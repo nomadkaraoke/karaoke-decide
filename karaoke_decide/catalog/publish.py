@@ -121,9 +121,13 @@ def _read_pointer(bucket: Any) -> dict[str, Any] | None:
 
 
 def build_and_publish_catalog(
-    bq: Any, gcs: Any, workdir: Path, *, min_songs: int = MIN_SONGS_PROD
+    bq: Any, gcs: Any, workdir: Path, *, min_songs: int = MIN_SONGS_PROD, publish: bool = True
 ) -> dict[str, Any] | None:
-    """Fetch, build, gate and publish. Returns the new pointer, or None if the gate refused it."""
+    """Fetch, build, gate and publish. Returns the new pointer, or None if the gate refused it.
+
+    ``publish=False`` builds and gates only, leaving ``workdir/catalog.db`` for inspection (size
+    checks); it uploads nothing and moves no pointer, and returns None.
+    """
     run = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     bucket = gcs.bucket(CATALOG_BUCKET)
     db_path = workdir / "catalog.db"
@@ -132,6 +136,9 @@ def build_and_publish_catalog(
     failures = catalog_gate(stats, _read_pointer(bucket), min_songs=min_songs)
     if failures:
         logger.warning("catalog gate failed: " + "; ".join(failures) + " (pointer unchanged)")
+        return None
+    if not publish:
+        logger.info(f"--no-publish: gate passed; {db_path} left in place, nothing uploaded")
         return None
     pointer = publish_catalog(bucket, db_path, stats, run)
     logger.info(f"Catalog published: {pointer['path']} ({pointer['gz_bytes']} gz bytes)")

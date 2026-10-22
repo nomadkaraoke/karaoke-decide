@@ -101,6 +101,14 @@ def test_build_and_publish_success(tmp_path, make_rows, monkeypatch):
     assert json.loads(bucket.objects["catalog/latest.json"])["run"] == ptr["run"]
 
 
+def test_no_publish_builds_but_uploads_nothing(tmp_path, make_rows, monkeypatch):
+    monkeypatch.setattr(pub, "fetch_catalog_rows", lambda bq: make_rows())
+    bucket = FakeBucket()
+    assert pub.build_and_publish_catalog(MagicMock(), _gcs(bucket), tmp_path, min_songs=1, publish=False) is None
+    assert (tmp_path / "catalog.db").stat().st_size > 0
+    assert bucket.objects == {} and bucket.writes == []
+
+
 def test_gate_failure_keeps_old_pointer(tmp_path, make_rows, monkeypatch, caplog):
     monkeypatch.setattr(pub, "fetch_catalog_rows", lambda bq: make_rows())
     bucket = FakeBucket()

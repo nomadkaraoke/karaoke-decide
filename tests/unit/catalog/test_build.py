@@ -62,11 +62,21 @@ def test_popularity_blend():
 
 def test_popularity_uses_lb_percentile(tmp_path, make_rows, song):
     songs = [song(1, lb_listeners=10, spotify_pop=None), song(2, lb_listeners=500, spotify_pop=None)]
-    songs.append(song(3, lb_listeners=None, spotify_pop=None))
+    songs.append(song(3, lb_listeners=None, spotify_pop=80))
     dest = tmp_path / "catalog.db"
     build_catalog_db(make_rows(songs=songs), dest, run="r")
     pops = dict(_rows(dest, "SELECT song_key, popularity FROM songs"))
-    assert pops == {"artist 1|song 1": 0, "artist 2|song 2": 100, "artist 3|song 3": None}
+    assert pops == {"artist 1|song 1": 0, "artist 2|song 2": 100, "artist 3|song 3": 80}
+
+
+def test_songs_without_any_popularity_signal_are_pruned_but_coverage_counts_them(tmp_path, make_rows, song):
+    songs = [song(1, lb_listeners=10), song(2, spotify_pop=40), song(3, lb_listeners=None, spotify_pop=None, mood=None)]
+    dest = tmp_path / "catalog.db"
+    stats = build_catalog_db(make_rows(songs=songs), dest, run="r")
+    assert stats.songs == 2
+    assert {k for (k,) in _rows(dest, "SELECT song_key FROM songs")} == {"artist 1|song 1", "artist 2|song 2"}
+    assert _rows(dest, "SELECT COUNT(*) FROM song_genres WHERE song_key = 'artist 3|song 3'") == [(0,)]
+    assert stats.coverage["mood"] == 2 / 3  # measured over the whole KN catalogue, before pruning
 
 
 def test_coverage(tmp_path, make_rows, song):
