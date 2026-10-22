@@ -27,6 +27,9 @@ for _noisy_logger in ("httpx", "httpcore"):
 
 logger = logging.getLogger(__name__)
 
+# The lifespan's outer bound on the catalog load, beyond the store's own budget.
+LIFESPAN_SLACK_S = 5.0
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -40,7 +43,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # A missing, corrupt or hung catalog never blocks startup: the store stays warming_up.
     store = get_catalog_store()
     try:
-        await asyncio.wait_for(asyncio.to_thread(store.load, settings), settings.catalog_load_timeout_s + 5)
+        await asyncio.wait_for(
+            asyncio.to_thread(store.load, settings), settings.catalog_load_timeout_s + LIFESPAN_SLACK_S
+        )
     except TimeoutError:
         logger.warning("Recommendations catalog load overran its startup budget; starting warming_up")
 

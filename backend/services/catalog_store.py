@@ -13,15 +13,26 @@ download after that can stall:
 
 ``CATALOG_LOCAL_DIR`` / ``SONG_INDEX_LOCAL_DIR`` (already-built files) win when set.
 
-``load`` never raises and never runs past ``catalog_load_timeout_s``: a missing pointer
-(before the first build), a corrupt download or a hung GCS read leaves the store
-``warming_up`` (v2 answers 503) while health and search keep working. A load that is
-still running when the budget runs out keeps going in its daemon thread and makes the
-store ready if it finishes.
+``load`` never raises and never runs past ``catalog_load_timeout_s``: a missing pointer,
+a corrupt download or a hung GCS read leaves the store ``warming_up`` (v2 answers 503)
+while health and search keep working. A load still running when the budget runs out keeps
+going in its daemon thread and makes the store ready if it finishes; availability.db that
+lands after the catalog is attached then.
+
+Log levels follow the workspace alert rule (ERROR pages #alerts): a missing pointer (before
+the first build) and a budget overrun are WARNING; a pointer that exists but whose artifact
+is unusable (sha/size mismatch, not gzip, malformed pointer, a non-404 read failure such as
+403) and "no GCS client" are ERROR, once per load attempt.
+
+Recovery: ``require()`` while warming_up, when the last attempt ended more than
+``RETRY_AFTER_S`` ago and none is running, makes one more attempt. Off the event loop it
+runs inside the request (CPU is allocated, and that request can succeed); on the event
+loop thread it starts in the background instead of blocking it.
 """
 
 from __future__ import annotations
 
+import asyncio
 import gzip
 import hashlib
 import json
@@ -43,6 +54,7 @@ logger = logging.getLogger(__name__)
 # Same object names as karaoke_decide/catalog/publish.py (not imported: it pulls in BigQuery).
 CATALOG_LATEST = "catalog/latest.json"
 AVAILABILITY_FILES = ("availability.db",)
+RETRY_AFTER_S = 300.0
 _CHUNK = 1 << 20
 
 CatalogStatus = Literal["ready", "warming_up"]
@@ -53,7 +65,7 @@ class CatalogUnavailable(RuntimeError):  # noqa: N818  (name fixed by the plan i
 
 
 class CatalogLoadError(RuntimeError):
-    """The published catalog can't be used (no pointer, bad pointer, bad download)."""
+    """The published catalog exists but can't be used (bad pointer, bad download, no GCS client)."""
 
 
 def _storage_client() -> Any:
@@ -98,7 +110,8 @@ def _read_pointer(bucket: Any, bucket_name: str) -> dict[str, Any] | None:
 
 def _download_gunzipped(blob: Any, dest: Path, sha256: str, size: int) -> None:
     """Stream ``blob`` (gzip) into ``dest``, verifying the uncompressed sha256 and size."""
-    part = dest.with_name(dest.name + ".part")
+    # Per-thread part name: an abandoned (hung) attempt and a later retry never share one.
+    part = dest.with_name(f"{dest.name}.{threading.get_ident()}.part")
     h = hashlib.sha256()
     written = 0
     try:
@@ -125,6 +138,11 @@ class CatalogStore:
         self._lock = threading.Lock()
         self._reader: CatalogReader | None = None
         self._run: str | None = None
+        # Retry bookkeeping (guarded by _lock).
+        self._settings: Settings | None = None
+        self._client: Any = None
+        self._attempt_running = False
+        self._last_attempt_end: float | None = None
 
     @property
     def status(self) -> CatalogStatus:
@@ -144,64 +162,125 @@ class CatalogStore:
             self._reader.close()
 
     def require(self) -> CatalogReader:
+        """The loaded reader, or ``CatalogUnavailable`` (after maybe one retry attempt)."""
         reader = self._reader
+        if reader is None:
+            self._maybe_retry()
+            reader = self._reader
         if reader is None:
             raise CatalogUnavailable("warming_up")
         return reader
+
+    def _maybe_retry(self) -> None:
+        with self._lock:
+            if self._settings is None or self._attempt_running or self._last_attempt_end is None:
+                return
+            if time.monotonic() - self._last_attempt_end < RETRY_AFTER_S:
+                return
+            self._attempt_running = True  # claim: one attempt at a time
+            settings, client = self._settings, self._client
+        logger.info("Recommendations catalog still warming_up; retrying the load")
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:  # a worker thread: load inside this request
+            self.load(settings, client=client)
+        else:  # never block the event loop for the load budget
+            threading.Thread(
+                target=self.load, args=(settings,), kwargs={"client": client}, name="catalog-retry", daemon=True
+            ).start()
 
     # ------------------------------------------------------------------ loading
 
     def load(self, settings: Settings, *, client: Any = None) -> None:
         """Load both databases, within ``settings.catalog_load_timeout_s``. Never raises."""
         timeout = float(settings.catalog_load_timeout_s)
+        # Stop waiting for availability.db a little before the budget, so the catalog can
+        # still open (and the store be ready) within it.
+        deadline = time.monotonic() + timeout - min(1.0, timeout * 0.2)
         done = threading.Event()
+        with self._lock:
+            self._settings, self._client, self._attempt_running = settings, client, True
 
         def work() -> None:
             try:
-                self._load(settings, client)
-            except Exception as exc:  # never let startup fail on the catalog
-                logger.warning("Recommendations catalog not loaded: %s", exc)
+                self._load(settings, client, deadline)
+            except Exception as exc:  # never let startup fail on the catalog; one ERROR per attempt
+                logger.error("Recommendations catalog not loaded: %s", exc)
             finally:
                 done.set()
 
-        threading.Thread(target=work, name="catalog-load", daemon=True).start()
-        if not done.wait(timeout):
-            logger.warning(
-                "Recommendations catalog still loading after %.1fs; serving warming_up until it finishes", timeout
-            )
+        try:
+            threading.Thread(target=work, name="catalog-load", daemon=True).start()
+            if not done.wait(timeout):
+                logger.warning(
+                    "Recommendations catalog still loading after %.1fs; serving warming_up until it finishes",
+                    timeout,
+                )
+        finally:
+            with self._lock:
+                self._attempt_running = False
+                self._last_attempt_end = time.monotonic()
 
-    def _load(self, settings: Settings, client: Any) -> None:
+    def _load(self, settings: Settings, client: Any, deadline: float) -> None:
         started = time.monotonic()
         local_catalog = settings.catalog_local_dir.strip()
         local_index = settings.song_index_local_dir.strip()
+        client_error: str | None = None
         if client is None and not (local_catalog and local_index):
             try:
                 client = _storage_client()
             except Exception as exc:
-                logger.warning("No GCS client for the recommendations catalog: %s", exc)
+                client_error = str(exc)
 
-        availability: list[Path | None] = [None]
-        side = threading.Thread(
-            target=lambda: availability.__setitem__(0, self._fetch_availability(settings, client)),
-            name="availability-load",
-            daemon=True,
-        )
+        # availability.db downloads alongside the catalog. If it isn't in by the deadline the
+        # reader opens without it and the side thread attaches it when it lands.
+        handoff: dict[str, Any] = {"availability": None, "late": False, "catalog": None}
+
+        def fetch_availability() -> None:
+            path = self._fetch_availability(settings, client, client_error)
+            with self._lock:
+                if not handoff["late"]:
+                    handoff["availability"] = path
+                    return
+                catalog = handoff["catalog"]
+            if path is not None and catalog is not None:
+                self._attach_late(catalog, path)
+
+        side = threading.Thread(target=fetch_availability, name="availability-load", daemon=True)
         side.start()
-        catalog = self._fetch_catalog(settings, client)
-        side.join()
+        catalog = self._fetch_catalog(settings, client, client_error)
+        side.join(timeout=max(0.0, deadline - time.monotonic()))
         if catalog is None:
+            with self._lock:
+                handoff["late"] = True
             return
         catalog_path, run = catalog
-        reader = self._open(catalog_path, availability[0])
-        run = run or reader.meta().get("run") or catalog_path.parent.name
         with self._lock:
+            if side.is_alive():
+                logger.warning("availability.db not in yet; recommendations start without it and attach it later")
+            reader = self._open(catalog_path, handoff["availability"])
+            run = run or reader.meta().get("run") or catalog_path.parent.name
             self._reader, self._run = reader, run
+            handoff["late"], handoff["catalog"] = True, catalog_path
         logger.info(
             "Recommendations catalog %s loaded in %.1fs (availability: %s)",
             run,
             time.monotonic() - started,
             "yes" if reader.has_availability else "no",
         )
+
+    def _attach_late(self, catalog_path: Path, availability_path: Path) -> None:
+        reader = self._open(catalog_path, availability_path)
+        if not reader.has_availability:
+            return
+        with self._lock:
+            current = self._reader
+            if current is None or current.catalog_path != catalog_path or current.has_availability:
+                reader.close()
+                return
+            # The previous reader is left open: other threads may be mid-query on it.
+            self._reader = reader
+        logger.info("availability.db attached to recommendations catalog %s", self._run)
 
     @staticmethod
     def _open(catalog_path: Path, availability_path: Path | None) -> CatalogReader:
@@ -213,15 +292,16 @@ class CatalogStore:
         return CatalogReader(catalog_path, None)
 
     @staticmethod
-    def _fetch_catalog(settings: Settings, client: Any) -> tuple[Path, str | None] | None:
+    def _fetch_catalog(settings: Settings, client: Any, client_error: str | None) -> tuple[Path, str | None] | None:
         local = settings.catalog_local_dir.strip()
         if local:
             path = Path(local) / "catalog.db"
-            if not path.is_file():
-                raise CatalogLoadError(f"{path} not found")
+            if not path.is_file():  # local stack before building the fixture: expected
+                logger.warning("No %s; recommendations v2 stays warming_up", path)
+                return None
             return path, None
         if client is None:
-            raise CatalogLoadError("no GCS client")
+            raise CatalogLoadError(f"no GCS client: {client_error}")
         bucket = client.bucket(settings.catalog_bucket)
         pointer = _read_pointer(bucket, settings.catalog_bucket)
         if pointer is None:
@@ -235,14 +315,14 @@ class CatalogStore:
         return dest, run
 
     @staticmethod
-    def _fetch_availability(settings: Settings, client: Any) -> Path | None:
+    def _fetch_availability(settings: Settings, client: Any, client_error: str | None) -> Path | None:
         local = settings.song_index_local_dir.strip()
         try:
             if local:
                 paths = index_loader.load_local(Path(local), files=AVAILABILITY_FILES)
             else:
                 if client is None:
-                    raise CatalogLoadError("no GCS client")
+                    raise CatalogLoadError(f"no GCS client: {client_error}")
                 paths = index_loader.load(
                     "",
                     settings.song_index_bucket,

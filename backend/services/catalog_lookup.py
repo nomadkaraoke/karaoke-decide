@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 
 from backend.services.catalog_store import CatalogStore, get_catalog_store
-from karaoke_decide.catalog.keys import match_key, normalize_artist, normalize_text, normalize_title
+from karaoke_decide.catalog.keys import normalize_artist, normalize_text, normalize_title
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +42,6 @@ class CatalogLookup:
     def store(self) -> CatalogStore:
         return self._store
 
-    @property
-    def is_loaded(self) -> bool:
-        """True once catalog.db is loaded (the store is ``ready``)."""
-        return self._store.status == "ready"
-
     def match(self, artist: str, title: str) -> CatalogEntry | None:
         """Look up a track in the catalog; None when unmatched or still warming up."""
         reader = self._store.reader
@@ -58,10 +53,6 @@ class CatalogLookup:
         return CatalogEntry(
             id=hit.kn_id, artist=hit.artist, title=hit.title, brands=hit.brands, brand_count=hit.brand_count
         )
-
-    def _make_key(self, artist: str, title: str) -> str:
-        """Create normalized lookup key from artist and title."""
-        return match_key(artist, title)
 
 
 # Global singleton instance

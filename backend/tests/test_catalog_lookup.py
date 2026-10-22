@@ -44,22 +44,9 @@ class TestNormalizeFunctions:
 class TestCatalogLookup:
     """Tests for CatalogLookup class."""
 
-    def test_not_loaded_while_store_warming_up(self) -> None:
-        lookup = CatalogLookup(CatalogStore())
-        assert not lookup.is_loaded
-
     def test_match_returns_none_when_not_loaded(self) -> None:
         lookup = CatalogLookup(CatalogStore())
         assert lookup.match("Queen", "Bohemian Rhapsody") is None
-
-    def test_make_key_normalizes(self) -> None:
-        """Test _make_key produces consistent normalized keys."""
-        lookup = CatalogLookup(CatalogStore())
-        key1 = lookup._make_key("Queen", "Bohemian Rhapsody")
-        key2 = lookup._make_key("QUEEN", "BOHEMIAN RHAPSODY")
-        key3 = lookup._make_key("Queen feat. Someone", "Bohemian Rhapsody (Remastered)")
-        assert key1 == key2
-        assert key1 == key3  # Patterns should be stripped
 
 
 @pytest.fixture(scope="module")
@@ -78,7 +65,7 @@ class TestCatalogLookupWithData:
 
     def test_match_finds_song(self, ready_store: CatalogStore) -> None:
         lookup = CatalogLookup(ready_store)
-        assert lookup.is_loaded
+        assert lookup.store.status == "ready"
         assert lookup.match("Toto", "Africa") == CatalogEntry(
             id=1, artist="Toto", title="Africa", brands="CC,KV", brand_count=2
         )

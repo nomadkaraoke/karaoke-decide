@@ -61,14 +61,16 @@ def test_lifespan_survives_load_that_overruns(fresh_store: None, monkeypatch: py
     """Even if ``load`` itself overran its own budget, the lifespan's outer timeout lets the app start."""
     import time
 
+    from backend import main
+
     monkeypatch.setenv("CATALOG_LOAD_TIMEOUT_S", "0.1")
     get_backend_settings.cache_clear()
-    monkeypatch.setattr(catalog_store.CatalogStore, "load", lambda self, settings, **kw: time.sleep(6))
-    from backend.main import app
+    monkeypatch.setattr(main, "LIFESPAN_SLACK_S", 0.2)
+    monkeypatch.setattr(catalog_store.CatalogStore, "load", lambda self, settings, **kw: time.sleep(1))
 
     started = time.monotonic()
-    with TestClient(app) as client:
-        assert time.monotonic() - started < 5.9
+    with TestClient(main.app) as client:
+        assert time.monotonic() - started < 0.9
         assert client.get("/api/ready").json()["catalog"] is False
 
 
