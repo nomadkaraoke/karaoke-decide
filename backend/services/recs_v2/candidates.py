@@ -17,7 +17,7 @@ from backend.services.recs_v2.filters import RecFilters, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
 from karaoke_decide.catalog.reader import CatalogReader
-from karaoke_decide.song_search.library_filter import LIBRARY_CODES
+from karaoke_decide.song_search.library_filter import library_clause
 
 # Source caps (task brief B8).
 KNOWN_ARTISTS = 200
@@ -124,15 +124,17 @@ class _Gatherer:
         keys = list(self.rows)
         if not self.has_av:
             return {k: (False, True, False) for k in keys if self.rows[k]["in_kn"]}
+        community_sql, community_params = library_clause("community", "x.song_key", schema="av")
+        karafun_sql, karafun_params = library_clause("karafun", "x.song_key", schema="av")
         for chunk in _chunks(keys):
             sql = f"""
                 SELECT x.song_key,
-                    EXISTS (SELECT 1 FROM av.versions v WHERE v.song_key = x.song_key AND v.kind = 'community'),
+                    {community_sql},
                     EXISTS (SELECT 1 FROM av.versions v WHERE v.song_key = x.song_key AND v.kind = 'commercial'),
-                    EXISTS (SELECT 1 FROM av.song_libraries l WHERE l.song_key = x.song_key AND l.library_code = ?)
+                    {karafun_sql}
                 FROM av.songs x WHERE x.song_key IN ({_marks(len(chunk))})
             """
-            for r in self.conn.execute(sql, (LIBRARY_CODES["karafun"], *chunk)):
+            for r in self.conn.execute(sql, (*community_params, *karafun_params, *chunk)):
                 out[r[0]] = (bool(r[1]), bool(r[2]), bool(r[3]))
         return out
 
