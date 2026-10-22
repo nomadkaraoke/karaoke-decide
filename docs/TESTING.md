@@ -203,6 +203,15 @@ scripts/local-stack.sh status | down | logs [api|search] | env
   curl -H "Authorization: Bearer $T" 127.0.0.1:8030/api/my/recommendations/v2   # sections
   ```
 
+### Playwright against the local stacks
+
+Drive the web app in a real browser against gen's local stack (:8010) and decide's (:8030/:8020), with profiles seeded via `/api/test/profile/seed`.
+
+- Run the dev server on **`localhost:3000`** (`cd frontend && npm run dev`): the local APIs only allow that origin in CORS, so another port or `127.0.0.1` fails with CORS errors.
+- Use locale-prefixed paths (`http://localhost:3000/en/recommendations`); bare paths redirect and lose the dev context.
+- Sign in with gen's local email code (gen's stack returns/logs the code) or mint a session via gen's `/api/users/auth/google` fake id token (see smoke test above) and put it in `localStorage`.
+- **Don't run `npm run build` while `next dev` is running**: both write `.next/` and the dev server breaks (500s, missing chunks). Stop dev first, or restart it after the build.
+
 ## Search local stack
 
 `scripts/search-local-stack.sh` is a thin wrapper for `scripts/local-stack.sh <cmd> --search-only`: just the search service on :8020 (no Firestore, no catalog, gen not required except for `/resolve`). Everything below applies to it and to the full stack's search half.
