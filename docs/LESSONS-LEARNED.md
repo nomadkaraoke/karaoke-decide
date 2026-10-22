@@ -15,6 +15,14 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-10-22: Rolling a Cloud Run service needs read on its image repo
+
+**Context:** song-index-build failed every day from 2026-10-20 with `403 Permission 'artifactregistry.repositories.downloadArtifacts' denied on .../karaoke-repo` while updating karaoke-decide-search. It had `run.developer` on the service and actAs on its runtime SA, but no grant on the image repo.
+
+**Lesson:** Cloud Run checks that the principal deploying a revision can pull its image, even when only an env var changes.
+
+**Recommendation:** Any job or SA that rolls a service needs `roles/artifactregistry.reader` on the repository, alongside `run.developer` and `iam.serviceAccountUser`.
+
 ### 2026-10-02: Postmark blocks some Cloud Run egress IPs (HTML 403); SMTP fallback
 
 **Context:** Guest account upgrades (`POST /api/auth/upgrade`) returned 500 five times in a row on 2026-10-02, because the verification email failed. Postmark's API edge answered our us-central1 Cloud Run egress IP with a bare nginx HTML `403 Forbidden` instead of its usual JSON error. karaoke-gen hit the same thing, and its magic links and order emails were lost for hours.

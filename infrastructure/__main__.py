@@ -832,6 +832,17 @@ gcp.serviceaccount.IAMMember(
     role="roles/iam.serviceAccountUser",
     member=song_index_build_member,
 )
+# Cloud Run checks that whoever deploys a revision can pull its image, so rolling
+# the service needs read on karaoke-repo (without it every rollout 403s with
+# artifactregistry.repositories.downloadArtifacts denied).
+gcp.artifactregistry.RepositoryIamMember(
+    "song-index-build-karaoke-repo-reader",
+    project=project,
+    location=region,
+    repository=artifact_repo.name,
+    role="roles/artifactregistry.reader",
+    member=song_index_build_member,
+)
 
 song_index_build_job = gcp.cloudrunv2.Job(
     "song-index-build-job",
