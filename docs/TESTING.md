@@ -199,6 +199,10 @@ curl -s 'http://127.0.0.1:8020/api/search?q=starlite%20muse' | jq .identificatio
 
   Without it gen rejects the call and `/resolve` answers `{}` (same as when decide has no secret).
 
+## Catalog fixture
+
+Recommendations tests run on a deterministic fixture `catalog.db` (invented facets, built from `tests/fixtures/song_search/kn_full_fixture.json` plus synthetic artists): `python -m karaoke_decide.catalog.fixtures build <dir>` writes `<dir>/catalog.db`, and backend tests pair it with the search fixture index (`availability.db`, the `index_dir` fixture in `backend/tests/search/conftest.py`). Set `CATALOG_LOCAL_DIR` / `SONG_INDEX_LOCAL_DIR` to load already-built files. Builder tests use the factories in `tests/unit/catalog/conftest.py`. For a real size check run `python -m karaoke_decide.etl.musicbrainz_refresh catalog --no-publish --workdir <dir>` (real BigQuery, read-only ADC is enough; nothing is uploaded).
+
 ## CI Pipeline
 
 ### Required Checks (Block PR Merge)

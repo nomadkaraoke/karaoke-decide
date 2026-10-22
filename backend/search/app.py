@@ -53,6 +53,7 @@ from backend.search.models import (
 from backend.search.ratelimit import SEARCH_LIMITS, RateLimiter, RateLimits, device_id, rate_limit
 from backend.search.resolve import RESOLVE_LIMITS, GenResolver
 from backend.search.service import SearchService
+from karaoke_decide.song_search.library_filter import LibraryFilter
 
 logger = logging.getLogger(__name__)
 
@@ -145,19 +146,21 @@ def build_router(limiter: RateLimiter, resolve_limiter: RateLimiter) -> APIRoute
         request: Request,
         q: str = "",
         limit: int = 20,
+        library: LibraryFilter = "any",
         sid: str | None = Query(default=None, max_length=MAX_SID_CHARS),
     ) -> SearchResponse:
         service = _service(request)
         loaded = _loaded(request)
         sid = sid or uuid.uuid4().hex
         started = time.perf_counter()
-        result = service.search(q, limit)
+        result = service.search(q, limit, library)
         ms = round((time.perf_counter() - started) * 1000, 1)
         log_event(
             "search",
             sid=sid,
             device=device_id(request),
             q=q[:200],
+            library=library,
             status=result.identification.status,
             kind=result.identification.kind,
             group_count=len(result.groups),
@@ -171,8 +174,8 @@ def build_router(limiter: RateLimiter, resolve_limiter: RateLimiter) -> APIRoute
         )
 
     @router.get("/popular", response_model=list[SongGroup], dependencies=limited)
-    def popular(request: Request, limit: int = 30) -> list[SongGroup]:
-        return _service(request).popular(limit)
+    def popular(request: Request, limit: int = 30, library: LibraryFilter = "any") -> list[SongGroup]:
+        return _service(request).popular(limit, library)
 
     @router.get("/song", response_model=SongDetail, dependencies=limited)
     def song(request: Request, key: str = Query(min_length=1, max_length=512)) -> SongDetail:

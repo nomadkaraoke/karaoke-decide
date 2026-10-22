@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING, Any
 
 from karaoke_decide.candidates.matching import (
     artist_variants,
@@ -26,6 +24,11 @@ from karaoke_decide.candidates.matching import (
     title_variants,
 )
 from karaoke_decide.services.bq_limits import MAX_BYTES_BATCH, make_client
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 _ALNUM = re.compile(r"[^a-z0-9]+")
 
@@ -111,6 +114,8 @@ class SpotifyFeaturesService:
         returned dict is keyed by the SAME (artist, title) tuples passed in;
         unmatched tracks are simply absent.
         """
+        from google.cloud import bigquery
+
         if not tracks:
             return {}
 

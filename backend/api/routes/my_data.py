@@ -151,6 +151,7 @@ class PreferencesResponse(BaseModel):
     decade_preference: str | None = None
     energy_preference: Literal["chill", "medium", "high"] | None = None
     genres: list[str] = []
+    decades: list[str] = []
 
 
 class UpdatePreferencesRequest(BaseModel):
@@ -159,6 +160,7 @@ class UpdatePreferencesRequest(BaseModel):
     decade_preference: str | None = None
     energy_preference: Literal["chill", "medium", "high"] | None = None
     genres: list[str] | None = None
+    decades: list[str] | None = None
 
 
 # -----------------------------------------------------------------------------
@@ -348,5 +350,6 @@ async def update_preferences(
         decade_preference=request_body.decade_preference,
         energy_preference=request_body.energy_preference,
         genres=request_body.genres,
+        decades=request_body.decades,
     )
     return PreferencesResponse(**updated)

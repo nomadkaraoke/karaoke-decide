@@ -153,3 +153,17 @@ def test_open_index_is_read_only(index_dir: Path) -> None:
             loaded.availability._conn().execute("DELETE FROM songs")
     finally:
         loaded.availability.close()
+
+
+def test_load_only_requested_files(published: FakeBucket, tmp_path: Path, index_dir: Path) -> None:
+    # The main API needs availability.db only; song_id.db stays the search service's.
+    paths = load("", "b", tmp_path, client=FakeClient(published), files=("availability.db",))
+    assert published.downloads == [f"song-index/{RUN_ID}/availability.db"]
+    assert paths.availability.read_bytes() == (index_dir / "availability.db").read_bytes()
+
+
+def test_load_local_only_requested_files(index_dir: Path, tmp_path: Path) -> None:
+    shutil.copy(index_dir / "availability.db", tmp_path / "availability.db")
+    with pytest.raises(IndexLoadError):
+        load_local(tmp_path)
+    assert load_local(tmp_path, files=("availability.db",)).availability == tmp_path / "availability.db"

@@ -1,5 +1,6 @@
 """Track matching service for normalizing and matching listening history to catalog."""
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -82,7 +83,7 @@ class TrackMatcher:
 
         Args:
             catalog_service: BigQuery catalog service for searching songs (fallback).
-            catalog_lookup: Optional in-memory catalog for instant matching.
+            catalog_lookup: Optional catalog.db lookup for instant matching.
         """
         self.catalog_service = catalog_service
         self.catalog_lookup = catalog_lookup
@@ -279,24 +280,14 @@ class TrackMatcher:
             for artist, title in sample:
                 logger.info(f"Track matcher sample: '{artist}' - '{title}'")
 
-        # Use in-memory lookup if available (instant), otherwise fall back to BigQuery
-        if self.catalog_lookup and self.catalog_lookup.is_loaded:
-            logger.info("Track matcher: using in-memory catalog lookup (instant)")
-            matched_songs: dict[tuple[str, str], SongResult] = {}
-            for norm_artist, norm_title in unique_normalized:
-                entry = self.catalog_lookup.match(norm_artist, norm_title)
-                if entry:
-                    # Convert CatalogEntry to SongResult for compatibility
-                    matched_songs[(norm_artist, norm_title)] = SongResult(
-                        id=entry.id,
-                        artist=entry.artist,
-                        title=entry.title,
-                        brands=entry.brands,
-                        brand_count=entry.brand_count,
-                    )
-            logger.info(f"Track matcher: in-memory lookup found {len(matched_songs)} matches")
+        # Use catalog.db (indexed SQLite, instant) once it's loaded, otherwise fall back to BigQuery
+        if self.catalog_lookup and self.catalog_lookup.store.status == "ready":
+            logger.info("Track matcher: using catalog.db lookup (instant)")
+            # One indexed SQLite lookup per track: off the event loop.
+            matched_songs = await asyncio.to_thread(self._match_with_catalog, unique_normalized)
+            logger.info(f"Track matcher: catalog.db lookup found {len(matched_songs)} matches")
         else:
-            # Fallback to BigQuery (slower but works if catalog not loaded)
+            # Fallback to BigQuery (slower; catalog.db not loaded yet)
             logger.info("Track matcher: falling back to BigQuery (catalog not loaded)")
             matched_songs = self.catalog_service.batch_match_tracks(unique_normalized)
             logger.info(f"Track matcher: BigQuery returned {len(matched_songs)} matches")
@@ -336,6 +327,23 @@ class TrackMatcher:
 
         return results
 
+    def _match_with_catalog(self, unique_normalized: list[tuple[str, str]]) -> dict[tuple[str, str], SongResult]:
+        """Match normalized (artist, title) pairs against catalog.db (blocking SQLite)."""
+        assert self.catalog_lookup is not None
+        matched: dict[tuple[str, str], SongResult] = {}
+        for norm_artist, norm_title in unique_normalized:
+            entry = self.catalog_lookup.match(norm_artist, norm_title)
+            if entry:
+                # Convert CatalogEntry to SongResult for compatibility
+                matched[(norm_artist, norm_title)] = SongResult(
+                    id=entry.id,
+                    artist=entry.artist,
+                    title=entry.title,
+                    brands=entry.brands,
+                    brand_count=entry.brand_count,
+                )
+        return matched
+
     def get_match_stats(self, matches: list[MatchedTrack]) -> dict[str, int | float]:
         """Get statistics about a batch of matches.
 
@@ -369,7 +377,7 @@ def get_track_matcher(
 
     Args:
         catalog_service: Optional catalog service override (for testing).
-        catalog_lookup: Optional in-memory catalog for instant matching.
+        catalog_lookup: Optional catalog.db lookup for instant matching.
 
     Returns:
         TrackMatcher instance.

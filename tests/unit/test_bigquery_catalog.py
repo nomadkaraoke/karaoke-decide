@@ -51,7 +51,7 @@ class TestSongResult:
 class TestBigQueryCatalogService:
     """Tests for BigQueryCatalogService."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_init_with_default_client(self, mock_client_class: MagicMock) -> None:
         """Test service initialization with default client."""
         service = BigQueryCatalogService()
@@ -60,7 +60,7 @@ class TestBigQueryCatalogService:
         assert mock_client_class.call_args.kwargs["default_query_job_config"].maximum_bytes_billed == MAX_BYTES_DEFAULT
         assert service.client == mock_client_class.return_value
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_init_with_custom_client(self, mock_client_class: MagicMock) -> None:
         """Test service initialization with custom client."""
         custom_client = MagicMock()
@@ -68,7 +68,7 @@ class TestBigQueryCatalogService:
         assert service.client == custom_client
         mock_client_class.assert_not_called()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_songs(self, mock_client_class: MagicMock) -> None:
         """Test searching songs by query."""
         mock_client = mock_client_class.return_value
@@ -88,7 +88,7 @@ class TestBigQueryCatalogService:
         assert results[0].title == "Bohemian Rhapsody"
         mock_client.query.assert_called_once()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_songs_with_pagination(self, mock_client_class: MagicMock) -> None:
         """Test searching songs with limit and offset."""
         mock_client = mock_client_class.return_value
@@ -104,7 +104,7 @@ class TestBigQueryCatalogService:
         assert params["limit"] == 10
         assert params["offset"] == 20
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_songs_with_min_brands(self, mock_client_class: MagicMock) -> None:
         """Test filtering by minimum brand count."""
         mock_client = mock_client_class.return_value
@@ -118,7 +118,7 @@ class TestBigQueryCatalogService:
         params = {p.name: p.value for p in config.query_parameters}
         assert params["min_brands"] == 3
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_song_by_id_found(self, mock_client_class: MagicMock) -> None:
         """Test getting a song by ID when found."""
         mock_client = mock_client_class.return_value
@@ -137,7 +137,7 @@ class TestBigQueryCatalogService:
         assert result.id == 42
         assert result.artist == "Journey"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_song_by_id_not_found(self, mock_client_class: MagicMock) -> None:
         """Test getting a song by ID when not found."""
         mock_client = mock_client_class.return_value
@@ -148,7 +148,7 @@ class TestBigQueryCatalogService:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_popular_songs(self, mock_client_class: MagicMock) -> None:
         """Test getting popular songs."""
         mock_client = mock_client_class.return_value
@@ -170,7 +170,7 @@ class TestBigQueryCatalogService:
         for result in results:
             assert result.brand_count >= 5
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_songs_by_artist(self, mock_client_class: MagicMock) -> None:
         """Test getting all songs by an artist."""
         mock_client = mock_client_class.return_value
@@ -188,7 +188,7 @@ class TestBigQueryCatalogService:
         assert len(results) == 1
         assert results[0].artist == "Queen"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_count_songs(self, mock_client_class: MagicMock) -> None:
         """Test counting total songs."""
         mock_client = mock_client_class.return_value
@@ -201,7 +201,7 @@ class TestBigQueryCatalogService:
 
         assert count == 275809
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_stats(self, mock_client_class: MagicMock) -> None:
         """Test getting catalog statistics."""
         mock_client = mock_client_class.return_value
@@ -220,7 +220,7 @@ class TestBigQueryCatalogService:
         assert stats["max_brand_count"] == 10
         assert stats["avg_brand_count"] == 2.57  # Rounded to 2 decimal places
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_artist_by_name_found(self, mock_client_class: MagicMock) -> None:
         """Test looking up an artist by name when found."""
         mock_client = mock_client_class.return_value
@@ -241,7 +241,7 @@ class TestBigQueryCatalogService:
         assert result.popularity == 88
         assert result.genres == ["rock", "classic rock"]
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_artist_by_name_not_found(self, mock_client_class: MagicMock) -> None:
         """Test looking up an artist by name when not found."""
         mock_client = mock_client_class.return_value
@@ -252,7 +252,7 @@ class TestBigQueryCatalogService:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_artist_by_name_empty_input(self, mock_client_class: MagicMock) -> None:
         """Test looking up with empty or None input."""
         service = BigQueryCatalogService()
@@ -260,7 +260,7 @@ class TestBigQueryCatalogService:
         assert service.lookup_artist_by_name("") is None
         assert service.lookup_artist_by_name(None) is None  # type: ignore
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_batch_lookup_artists_by_name(self, mock_client_class: MagicMock) -> None:
         """Test batch lookup of artists by name."""
         mock_client = mock_client_class.return_value
@@ -290,14 +290,14 @@ class TestBigQueryCatalogService:
         assert results["queen"].artist_name == "Queen"
         assert results["radiohead"].artist_name == "Radiohead"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_batch_lookup_artists_empty_input(self, mock_client_class: MagicMock) -> None:
         """Test batch lookup with empty list."""
         service = BigQueryCatalogService()
         results = service.batch_lookup_artists_by_name([])
         assert results == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_artists(self, mock_client_class: MagicMock) -> None:
         """Test artist search for autocomplete."""
         mock_client = mock_client_class.return_value
@@ -324,7 +324,7 @@ class TestBigQueryCatalogService:
         assert results[0].artist_name == "Queen"
         assert results[0].popularity == 88
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_artists_short_query(self, mock_client_class: MagicMock) -> None:
         """Test artist search with too short query."""
         service = BigQueryCatalogService()
@@ -398,7 +398,7 @@ class TestNormalization:
 class TestMBIDLookups:
     """Tests for MBID lookup methods."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_spotify_ids_empty(self, mock_client_class: MagicMock) -> None:
         """Test bulk MBID lookup with empty input."""
         service = BigQueryCatalogService()
@@ -407,7 +407,7 @@ class TestMBIDLookups:
         # Should not make any queries
         mock_client_class.return_value.query.assert_not_called()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_spotify_ids_success(self, mock_client_class: MagicMock) -> None:
         """Test bulk MBID lookup with results."""
         mock_client = mock_client_class.return_value
@@ -422,7 +422,7 @@ class TestMBIDLookups:
         assert result == {"4Z8W4fKeB5YxbusRsdQVPb": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}
         mock_client.query.assert_called_once()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbid_by_spotify_id_uses_bulk(self, mock_client_class: MagicMock) -> None:
         """Test single MBID lookup delegates to bulk method."""
         mock_client = mock_client_class.return_value
@@ -436,7 +436,7 @@ class TestMBIDLookups:
 
         assert result == "mbid456"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbid_by_spotify_id_not_found(self, mock_client_class: MagicMock) -> None:
         """Test single MBID lookup when not found."""
         mock_client = mock_client_class.return_value
@@ -447,14 +447,14 @@ class TestMBIDLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_names_empty(self, mock_client_class: MagicMock) -> None:
         """Test name lookup with empty input."""
         service = BigQueryCatalogService()
         result = service.lookup_mbids_by_names([])
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_names_success(self, mock_client_class: MagicMock) -> None:
         """Test name lookup with results."""
         mock_client = mock_client_class.return_value
@@ -469,7 +469,7 @@ class TestMBIDLookups:
         assert result == {"radiohead": "a74b1b7f-71a5-4011-9441-d0b5e4122711"}
         mock_client.query.assert_called_once()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_artist_by_mbid_found(self, mock_client_class: MagicMock) -> None:
         """Test getting artist by MBID when found."""
         mock_client = mock_client_class.return_value
@@ -493,7 +493,7 @@ class TestMBIDLookups:
         assert result.disambiguation == "UK rock band"
         assert result.popularity == 80
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_artist_by_mbid_follows_merge_redirects(self, mock_client_class: MagicMock) -> None:
         """A pre-merge MBID resolves through mb_artist_redirects in the same query."""
         mock_client = mock_client_class.return_value
@@ -507,7 +507,7 @@ class TestMBIDLookups:
         params = mock_client.query.call_args.kwargs["job_config"].query_parameters
         assert params[0].value == "old-mbid"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_recording_by_mbid_follows_merge_redirects(self, mock_client_class: MagicMock) -> None:
         """A pre-merge recording MBID resolves through mb_recording_redirects."""
         mock_client = mock_client_class.return_value
@@ -519,7 +519,7 @@ class TestMBIDLookups:
         assert "mb_recording_redirects" in sql
         assert "old_mbid = @mbid" in sql
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_artist_by_mbid_not_found(self, mock_client_class: MagicMock) -> None:
         """Test getting artist by MBID when not found."""
         mock_client = mock_client_class.return_value
@@ -530,7 +530,7 @@ class TestMBIDLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_artist_by_mbid_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -541,7 +541,7 @@ class TestMBIDLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_artist_by_mbid_null_fields(self, mock_client_class: MagicMock) -> None:
         """Test getting artist with null optional fields."""
         mock_client = mock_client_class.return_value
@@ -564,7 +564,7 @@ class TestMBIDLookups:
         assert result.tags == []  # Empty list
         assert result.spotify_genres is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_spotify_ids_deduplicates(self, mock_client_class: MagicMock) -> None:
         """Test that duplicate Spotify IDs are deduplicated."""
         mock_client = mock_client_class.return_value
@@ -582,7 +582,7 @@ class TestMBIDLookups:
         params = {p.name: p.values for p in config.query_parameters}
         assert len(params["spotify_ids"]) == 2
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_names_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -593,7 +593,7 @@ class TestMBIDLookups:
 
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_mbids_by_spotify_ids_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -673,7 +673,7 @@ class TestRecordingDataclasses:
 class TestRecordingLookups:
     """Tests for recording lookup methods."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_found(self, mock_client_class: MagicMock) -> None:
         """Test searching recordings by title."""
         mock_client = mock_client_class.return_value
@@ -695,7 +695,7 @@ class TestRecordingLookups:
         assert results[0].title == "Bohemian Rhapsody"
         assert results[0].recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_short_query(self, mock_client_class: MagicMock) -> None:
         """Test recording search with too short query."""
         service = BigQueryCatalogService()
@@ -706,7 +706,7 @@ class TestRecordingLookups:
         results = service.search_recordings("")
         assert results == []
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -718,7 +718,7 @@ class TestRecordingLookups:
 
         assert results == []
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_recording_by_mbid_found(self, mock_client_class: MagicMock) -> None:
         """Test getting recording by MBID when found."""
         mock_client = mock_client_class.return_value
@@ -740,7 +740,7 @@ class TestRecordingLookups:
         assert result.title == "Bohemian Rhapsody"
         assert result.disambiguation == "studio version"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_recording_by_mbid_not_found(self, mock_client_class: MagicMock) -> None:
         """Test getting recording by MBID when not found."""
         mock_client = mock_client_class.return_value
@@ -751,7 +751,7 @@ class TestRecordingLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_recording_by_mbid_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -762,7 +762,7 @@ class TestRecordingLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_by_isrc_found(self, mock_client_class: MagicMock) -> None:
         """Test ISRC lookup when found."""
         mock_client = mock_client_class.return_value
@@ -784,7 +784,7 @@ class TestRecordingLookups:
         assert result.recording_mbid == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
         assert result.title == "Bohemian Rhapsody"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_by_isrc_not_found(self, mock_client_class: MagicMock) -> None:
         """Test ISRC lookup when not found."""
         mock_client = mock_client_class.return_value
@@ -795,14 +795,14 @@ class TestRecordingLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recordings_by_isrcs_empty(self, mock_client_class: MagicMock) -> None:
         """Test batch ISRC lookup with empty input."""
         service = BigQueryCatalogService()
         result = service.lookup_recordings_by_isrcs([])
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recordings_by_isrcs_batch(self, mock_client_class: MagicMock) -> None:
         """Test batch ISRC lookup."""
         mock_client = mock_client_class.return_value
@@ -837,7 +837,7 @@ class TestRecordingLookups:
         assert result["GBUM71029604"].title == "Song 1"
         assert result["USRC17607839"].title == "Song 2"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recordings_by_isrcs_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -848,7 +848,7 @@ class TestRecordingLookups:
 
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_mbid_by_spotify_track_id_found(self, mock_client_class: MagicMock) -> None:
         """Test Spotify track ID to MBID lookup when found."""
         mock_client = mock_client_class.return_value
@@ -862,7 +862,7 @@ class TestRecordingLookups:
 
         assert result == "a74b1b7f-71a5-4011-9441-d0b5e4122711"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_mbid_by_spotify_track_id_not_found(self, mock_client_class: MagicMock) -> None:
         """Test Spotify track ID to MBID lookup when not found."""
         mock_client = mock_client_class.return_value
@@ -873,14 +873,14 @@ class TestRecordingLookups:
 
         assert result is None
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_mbids_by_spotify_track_ids_empty(self, mock_client_class: MagicMock) -> None:
         """Test batch Spotify to MBID lookup with empty input."""
         service = BigQueryCatalogService()
         result = service.lookup_recording_mbids_by_spotify_track_ids([])
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_lookup_recording_mbids_by_spotify_track_ids_batch(self, mock_client_class: MagicMock) -> None:
         """Test batch Spotify to MBID lookup."""
         mock_client = mock_client_class.return_value
@@ -894,14 +894,14 @@ class TestRecordingLookups:
 
         assert result == {"spotify123": "mbid456"}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_karaoke_recording_links_empty(self, mock_client_class: MagicMock) -> None:
         """Test karaoke links lookup with empty input."""
         service = BigQueryCatalogService()
         result = service.get_karaoke_recording_links([])
         assert result == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_karaoke_recording_links_found(self, mock_client_class: MagicMock) -> None:
         """Test karaoke links lookup when found."""
         mock_client = mock_client_class.return_value
@@ -923,7 +923,7 @@ class TestRecordingLookups:
         assert result[12345].match_method == "isrc"
         assert result[12345].match_confidence == 0.95
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_karaoke_recording_links_handles_exception(self, mock_client_class: MagicMock) -> None:
         """Test that exception is handled gracefully."""
         mock_client = mock_client_class.return_value
@@ -966,7 +966,7 @@ class TestNormalizeUnicode:
 class TestSearchTracksWithArtist:
     """Tests for search_tracks with artist filtering."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_tracks_with_unicode_artist(self, mock_client_class: MagicMock) -> None:
         """Test that unicode artist names are normalized for Spotify search."""
         mock_client = mock_client_class.return_value
@@ -982,7 +982,7 @@ class TestSearchTracksWithArtist:
         # Unicode ï should be decomposed to i
         assert params["artist_prefix"] == "maximo park%"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_tracks_with_artist(self, mock_client_class: MagicMock) -> None:
         """Test that artist filter generates correct SQL with artist_prefix param."""
         mock_client = mock_client_class.return_value
@@ -1003,7 +1003,7 @@ class TestSearchTracksWithArtist:
         assert params["query_prefix"] == "apply some pressure%"
         assert params["min_popularity"] == 0  # Lowered when artist provided
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_tracks_without_artist(self, mock_client_class: MagicMock) -> None:
         """Test backward compat: no artist uses OR on title/artist."""
         mock_client = mock_client_class.return_value
@@ -1024,7 +1024,7 @@ class TestSearchTracksWithArtist:
 class TestSearchRecordingsWithArtist:
     """Tests for search_recordings with artist filtering."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_with_artist(self, mock_client_class: MagicMock) -> None:
         """Test that artist filter adds unicode-aware WHERE clause."""
         mock_client = mock_client_class.return_value
@@ -1043,7 +1043,7 @@ class TestSearchRecordingsWithArtist:
         assert "artist_prefix" in params
         assert params["artist_prefix"] == "maximo park%"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_without_artist(self, mock_client_class: MagicMock) -> None:
         """Test backward compat: no artist clause when artist not provided."""
         mock_client = mock_client_class.return_value
@@ -1059,7 +1059,7 @@ class TestSearchRecordingsWithArtist:
         assert "artist_normalized" not in sql
         assert "artist_prefix" not in params
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_search_recordings_uses_enriched_table_with_byte_cap(self, mock_client_class: MagicMock) -> None:
         """Search must hit the pre-joined clustered table, never the raw 3-way join."""
         mock_client = mock_client_class.return_value
@@ -1078,7 +1078,7 @@ class TestSearchRecordingsWithArtist:
         assert "name_normalized LIKE @query_prefix" in sql
         assert config.maximum_bytes_billed == MAX_BYTES_RECORDING_SEARCH
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_get_recording_by_mbid_uses_enriched_table_with_byte_cap(self, mock_client_class: MagicMock) -> None:
         mock_client = mock_client_class.return_value
         mock_client.query.return_value.result.return_value = []
@@ -1096,7 +1096,7 @@ class TestSearchRecordingsWithArtist:
 class TestSearchTracksCombined:
     """Tests for search_tracks_combined orchestration."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_spotify_sufficient(self, mock_client_class: MagicMock) -> None:
         """When Spotify returns enough results, MB is not called."""
         service = BigQueryCatalogService()
@@ -1124,7 +1124,7 @@ class TestSearchTracksCombined:
             mock_sr.assert_not_called()
             assert len(results) == 10
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_mb_supplement(self, mock_client_class: MagicMock) -> None:
         """When Spotify is sparse, MB fills the gaps."""
         service = BigQueryCatalogService()
@@ -1179,7 +1179,7 @@ class TestSearchTracksCombined:
             assert results[2].track_id == "spotify:3"
             assert results[2].recording_mbid == "mbid-2"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_dedup(self, mock_client_class: MagicMock) -> None:
         """MB tracks already in Spotify results are skipped."""
         service = BigQueryCatalogService()
@@ -1227,7 +1227,7 @@ class TestSearchTracksCombined:
             assert results[0].track_id == "spotify:1"
             assert results[1].track_id == "mb:mbid-new"
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_both_empty(self, mock_client_class: MagicMock) -> None:
         """When both Spotify and MB return nothing, result is empty."""
         service = BigQueryCatalogService()
@@ -1240,7 +1240,7 @@ class TestSearchTracksCombined:
 
             assert results == []
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_artist_forwarded_to_both(self, mock_client_class: MagicMock) -> None:
         """Artist param is forwarded to both search_tracks and search_recordings."""
         service = BigQueryCatalogService()
@@ -1258,7 +1258,7 @@ class TestSearchTracksCombined:
 class TestTrackSearchRoute:
     """Tests for the /tracks route endpoint."""
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_artist_param_forwarded(self, mock_client_class: MagicMock) -> None:
         """Test that artist param is accepted and forwarded to service."""
 
@@ -1313,7 +1313,7 @@ class TestBatchLookupArtistGenres:
         row.spotify_genres = spotify_genres
         return row
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_empty_input_skips_query(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
@@ -1321,7 +1321,7 @@ class TestBatchLookupArtistGenres:
         assert service.batch_lookup_artist_genres([]) == {}
         mock_client.query.assert_not_called()
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_merges_and_lowercases_keyed_by_original_name(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
@@ -1335,7 +1335,7 @@ class TestBatchLookupArtistGenres:
         assert result == {"Pendulum": ["drum and bass", "electronic", "big beat"]}
         assert "UnknownArtist" not in result
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_picks_highest_popularity_row_per_name(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
@@ -1347,7 +1347,7 @@ class TestBatchLookupArtistGenres:
         result = service.batch_lookup_artist_genres(["Queen"])
         assert result == {"Queen": ["rock", "classic rock"]}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_query_failure_returns_partial(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
@@ -1355,7 +1355,7 @@ class TestBatchLookupArtistGenres:
         service = BigQueryCatalogService()
         assert service.batch_lookup_artist_genres(["Queen"]) == {}
 
-    @patch("karaoke_decide.services.bigquery_catalog.bigquery.Client")
+    @patch("google.cloud.bigquery.Client")
     def test_distinct_names_sharing_normalized_key_both_resolved(self, mock_client_class: MagicMock) -> None:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client

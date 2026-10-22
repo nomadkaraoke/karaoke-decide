@@ -16,6 +16,7 @@ from backend.search.models import Identification, SongDetail, SongGroup, SongRef
 from karaoke_decide.song_search.availability import AvailabilityIndex
 from karaoke_decide.song_search.identify import MAX_QUERY_CHARS, SongIdentifier
 from karaoke_decide.song_search.identify_kind import identify_kind
+from karaoke_decide.song_search.library_filter import LibraryFilter, group_matches_library
 from karaoke_decide.song_search.text_normalize import song_key
 
 logger = logging.getLogger(__name__)
@@ -83,14 +84,14 @@ class SearchService:
             logger.warning("identify failed for %r", q, exc_info=True)
             return {"status": "none", "best": None, "candidates": []}
 
-    def search(self, q: str, limit: int = 20) -> SearchResult:
+    def search(self, q: str, limit: int = 20, library: LibraryFilter = "any") -> SearchResult:
         q = (q or "").strip()[:MAX_QUERY_CHARS]
         if len(q) < MIN_QUERY_CHARS:
             return SearchResult(_NONE, [])
         limit = _clamp(limit, MAX_GROUPS)
 
         ident_f = self._executor.submit(self._identify, q)
-        typed_f = self._executor.submit(self.availability.search, q, limit)
+        typed_f = self._executor.submit(self.availability.search, q, limit, library)
         raw = ident_f.result()
         status = raw.get("status", "none")
         best = _ref(raw["best"]) if raw.get("best") and status != "none" else None
@@ -98,10 +99,12 @@ class SearchService:
         merged: dict[str, dict[str, Any]] = {}
         if status == "confident" and best is not None:
             # kjbox fetchKaraokeForCorrection: also look up what the singer meant.
-            corrected = self.availability.search(f"{best.artist} {best.title}", limit)
+            corrected = self.availability.search(f"{best.artist} {best.title}", limit, library)
             own = next((g for g in corrected if g["song_key"] == best.song_key), None)
             if own is None:
                 own = self._song_or_none(best.song_key)
+                if own is not None and not group_matches_library(own, library):
+                    own = None  # identification stays; the group is outside the library
             if own is not None:
                 merged[own["song_key"]] = own
             for g in corrected:
@@ -148,8 +151,8 @@ class SearchService:
         )
         return ref, [_group(g) for g in list(merged.values())[:limit]]
 
-    def popular(self, limit: int = 30) -> list[SongGroup]:
-        return [_group(g) for g in self.availability.popular(_clamp(limit, MAX_GROUPS))]
+    def popular(self, limit: int = 30, library: LibraryFilter = "any") -> list[SongGroup]:
+        return [_group(g) for g in self.availability.popular(_clamp(limit, MAX_GROUPS), library)]
 
     def song(self, key: str) -> SongDetail | None:
         g = self.availability.song(key)

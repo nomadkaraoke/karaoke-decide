@@ -28,6 +28,8 @@ def mock_firestore() -> MagicMock:
     mock.update_document = AsyncMock(return_value=None)
     mock.query_documents = AsyncMock(return_value=[])
     mock.count_documents = AsyncMock(return_value=0)
+    mock.get_many = AsyncMock(return_value={})
+    mock.batch_set = AsyncMock(return_value=None)
     return mock
 
 
@@ -162,7 +164,9 @@ class TestSubmitQuiz:
 
         assert result.songs_added == 1
         assert result.recommendations_ready is True
-        mock_firestore.set_document.assert_called()
+        mock_firestore.batch_set.assert_awaited_once()
+        docs = mock_firestore.batch_set.call_args[0][1]
+        assert docs["user_123:1"]["song_key"]
 
     @pytest.mark.asyncio
     async def test_skips_existing_user_songs(
@@ -173,12 +177,8 @@ class TestSubmitQuiz:
     ) -> None:
         """Doesn't duplicate existing UserSong records."""
         # Mock song already exists
-        mock_firestore.get_document = AsyncMock(
-            return_value={
-                "id": "user_123:1",
-                "user_id": "user_123",
-                "song_id": "1",
-            }
+        mock_firestore.get_many = AsyncMock(
+            return_value={"user_123:1": {"id": "user_123:1", "user_id": "user_123", "song_id": "1"}}
         )
 
         # Mock BigQuery
@@ -631,8 +631,8 @@ class TestCollaborativeSuggestions:
         """Returns empty dict when no users share enough artists."""
         # Mock users with different artists
         mock_firestore.query_documents.return_value = [
-            {"quiz_artists_known": ["Taylor Swift", "Ariana Grande", "Drake"]},
-            {"quiz_artists_known": ["Metallica", "Slayer", "Megadeth"]},
+            {"top_artist_names": ["Taylor Swift", "Ariana Grande", "Drake"]},
+            {"top_artist_names": ["Metallica", "Slayer", "Megadeth"]},
         ]
 
         result = await quiz_service._get_collaborative_suggestions(
@@ -651,12 +651,12 @@ class TestCollaborativeSuggestions:
         # Create 6 users who all like Green Day, Blink-182, Sum 41
         # and also like The Offspring (which user hasn't selected)
         similar_users = [
-            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring", "NOFX"]} for _ in range(6)
+            {"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "The Offspring", "NOFX"]} for _ in range(6)
         ]
         # Add some non-similar users
         other_users = [
-            {"quiz_artists_known": ["Taylor Swift", "Ariana Grande"]},
-            {"quiz_artists_known": ["Metallica"]},  # Too few artists
+            {"top_artist_names": ["Taylor Swift", "Ariana Grande"]},
+            {"top_artist_names": ["Metallica"]},  # Too few artists
         ]
         mock_firestore.query_documents.return_value = similar_users + other_users
 
@@ -683,7 +683,7 @@ class TestCollaborativeSuggestions:
         """Does not suggest artists user already selected."""
         # Users share Green Day, Blink-182, Sum 41 and also like NOFX
         mock_firestore.query_documents.return_value = [
-            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "NOFX"]} for _ in range(6)
+            {"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "NOFX"]} for _ in range(6)
         ]
 
         result = await quiz_service._get_collaborative_suggestions(
@@ -703,7 +703,7 @@ class TestCollaborativeSuggestions:
     ) -> None:
         """Does not suggest artists in exclude list."""
         mock_firestore.query_documents.return_value = [
-            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "NOFX", "Bad Religion"]} for _ in range(6)
+            {"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "NOFX", "Bad Religion"]} for _ in range(6)
         ]
 
         result = await quiz_service._get_collaborative_suggestions(
@@ -724,7 +724,7 @@ class TestCollaborativeSuggestions:
         """Only suggests artists liked by MIN_SIMILAR_USERS or more users."""
         # Only 4 similar users like The Offspring (need 5)
         mock_firestore.query_documents.return_value = [
-            {"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(4)
+            {"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(4)
         ]
 
         result = await quiz_service._get_collaborative_suggestions(
@@ -741,7 +741,7 @@ class TestCollaborativeSuggestions:
         quiz_service: QuizService,
         mock_firestore: MagicMock,
     ) -> None:
-        """Queries both organic users and Last.fm users collections."""
+        """Queries only Last.fm users (never scans decide_users)."""
         # Set up mock to track calls
         mock_firestore.query_documents = AsyncMock(return_value=[])
 
@@ -750,14 +750,8 @@ class TestCollaborativeSuggestions:
             exclude_artists=set(),
         )
 
-        # Should query both collections
-        assert mock_firestore.query_documents.call_count == 2
-
-        # Check collection names in calls
-        call_args_list = mock_firestore.query_documents.call_args_list
-        collections_queried = [call[0][0] for call in call_args_list]
-        assert "decide_users" in collections_queried
-        assert "lastfm_users" in collections_queried
+        collections_queried = [call[0][0] for call in mock_firestore.query_documents.call_args_list]
+        assert collections_queried == ["lastfm_users"]
 
     @pytest.mark.asyncio
     async def test_includes_lastfm_users_in_suggestions(
@@ -767,14 +761,9 @@ class TestCollaborativeSuggestions:
     ) -> None:
         """Last.fm users contribute to collaborative suggestions."""
 
-        # Set up mock to return different data for each collection
         async def mock_query(collection: str, **kwargs: Any) -> list[dict]:
-            if collection == "decide_users":
-                # Organic users - only 3 (not enough for MIN_SIMILAR_USERS=5)
-                return [{"quiz_artists_known": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(3)]
-            elif collection == "lastfm_users":
-                # Last.fm users - 3 more (totaling 6 > MIN_SIMILAR_USERS=5)
-                return [{"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(3)]
+            if collection == "lastfm_users":
+                return [{"top_artist_names": ["Green Day", "Blink-182", "Sum 41", "The Offspring"]} for _ in range(6)]
             return []
 
         mock_firestore.query_documents = AsyncMock(side_effect=mock_query)
@@ -784,7 +773,7 @@ class TestCollaborativeSuggestions:
             exclude_artists=set(),
         )
 
-        # Should find The Offspring since 6 total users like them (3 organic + 3 lastfm)
+        # Should find The Offspring since 6 Last.fm users like them
         assert "The Offspring" in result
 
     @pytest.mark.asyncio
@@ -952,3 +941,210 @@ class TestFansAlsoLikeReason:
         )
 
         assert reason.display_text == "Singers who like Green Day, Blink-182 & others also chose"
+
+
+# ---------------------------------------------------------------------------
+# Catalog-backed quiz (no live MusicBrainz, no decide_users scan, batched submit)
+# ---------------------------------------------------------------------------
+
+
+class FakeCatalogReader:
+    """Just the CatalogReader calls the quiz service makes."""
+
+    def __init__(self) -> None:
+        self.similar_calls: list[list[str]] = []
+        self.top_calls: list[tuple[list[str], int]] = []
+
+    def artist_mbid(self, name: str) -> str | None:
+        return "mbid-muse" if name.lower() == "muse" else None
+
+    def similar(self, artist_keys: Any, limit_per: int = 30) -> list[tuple[str, str, float]]:
+        self.similar_calls.append(list(artist_keys))
+        return [
+            ("green day", "nofx", 0.9),  # best score first, like CatalogReader.similar
+            ("blink 182", "sum 41", 0.8),
+            ("green day", "sum 41", 0.4),
+        ]
+
+    def top_songs_for_artists(self, artist_keys: Any, per_artist: int) -> list[dict[str, Any]]:
+        self.top_calls.append((list(artist_keys), per_artist))
+        return [
+            {"song_key": f"{k}|song {n}", "artist": k.title(), "title": f"Song {n}", "artist_key": k}
+            for k in artist_keys
+            for n in range(per_artist)
+        ]
+
+    def kn_ids_for_song_keys(self, song_keys: Any) -> dict[str, int]:
+        return {k: 1000 + i for i, k in enumerate(song_keys) if not k.endswith("song 4")}
+
+
+class FakeCatalogStore:
+    def __init__(self, reader: FakeCatalogReader | None) -> None:
+        self.reader = reader
+
+    def require(self) -> FakeCatalogReader:
+        from backend.services.catalog_store import CatalogUnavailable
+
+        if self.reader is None:
+            raise CatalogUnavailable("warming_up")
+        return self.reader
+
+
+@pytest.fixture
+def catalog_reader() -> FakeCatalogReader:
+    return FakeCatalogReader()
+
+
+@pytest.fixture
+def catalog_quiz_service(
+    mock_settings: BackendSettings,
+    mock_firestore: MagicMock,
+    mock_bigquery: MagicMock,
+    catalog_reader: FakeCatalogReader,
+) -> QuizService:
+    return QuizService(
+        settings=mock_settings,
+        firestore=mock_firestore,
+        bigquery_client=mock_bigquery,
+        catalog_store=FakeCatalogStore(catalog_reader),  # type: ignore[arg-type]
+    )
+
+
+def _artist(name: str, brands: int = 50, genres: list[str] | None = None, decade: str = "1990s") -> QuizArtist:
+    return QuizArtist(
+        name=name,
+        song_count=10,
+        top_songs=["A"],
+        total_brand_count=brands,
+        primary_decade=decade,
+        genres=genres or [],
+    )
+
+
+class TestPeopleAlsoLikeUsesCatalog:
+    @pytest.mark.asyncio
+    async def test_people_also_like_reads_no_decide_users(
+        self, catalog_quiz_service: QuizService, mock_firestore: MagicMock
+    ) -> None:
+        await catalog_quiz_service._get_collaborative_suggestions(
+            user_selected_artists=["Green Day", "Blink-182", "Sum 41"],
+            exclude_artists=set(),
+        )
+        collections = [c[0][0] for c in mock_firestore.query_documents.call_args_list]
+        assert "decide_users" not in collections
+        assert collections == ["lastfm_users"]
+
+    @pytest.mark.asyncio
+    async def test_catalog_similarity_feeds_fans_also_like(
+        self, catalog_quiz_service: QuizService, catalog_reader: FakeCatalogReader
+    ) -> None:
+        matches, scores = await catalog_quiz_service._catalog_similar_matches(
+            ["Green Day", "Blink-182"], [_artist("NOFX"), _artist("Sum 41"), _artist("Queen")]
+        )
+        assert matches == {"NOFX": ["Green Day"], "Sum 41": ["Blink-182", "Green Day"]}
+        assert scores == {"NOFX": 0.9, "Sum 41": 0.8}
+        assert catalog_reader.similar_calls == [["green day", "blink 182"]]
+
+    @pytest.mark.asyncio
+    async def test_catalog_warming_up_gives_no_matches(
+        self, mock_settings: BackendSettings, mock_firestore: MagicMock
+    ) -> None:
+        svc = QuizService(settings=mock_settings, firestore=mock_firestore, catalog_store=FakeCatalogStore(None))  # type: ignore[arg-type]
+        assert await svc._catalog_similar_matches(["Green Day"], [_artist("NOFX")]) == ({}, {})
+
+
+class TestSmartSuggestionsRanked:
+    @pytest.mark.asyncio
+    async def test_smart_suggestions_ranked_and_explained(
+        self, catalog_quiz_service: QuizService, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        candidates = [
+            _artist("Queen", brands=99),
+            _artist("Sum 41", brands=10),
+            _artist("NOFX", brands=20),
+            _artist("Abba", brands=80, decade="1970s"),
+            _artist("Blur", brands=70),
+        ]
+        monkeypatch.setattr(catalog_quiz_service, "_fetch_artist_candidates", lambda **kw: list(candidates))
+        monkeypatch.setattr(catalog_quiz_service, "_get_artist_genres_detailed", lambda names: {})
+        monkeypatch.setattr(catalog_quiz_service, "_get_mlhd_similar_artists", lambda **kw: {})
+        monkeypatch.setattr(
+            catalog_quiz_service.listenbrainz, "find_similar_artist_matches", AsyncMock(return_value={})
+        )
+
+        runs = [
+            await catalog_quiz_service.get_smart_quiz_artists(
+                seed_artists=["Green Day", "Blink-182"], decades=["1970s"], count=4
+            )
+            for _ in range(3)
+        ]
+        names = [[a.name for a in r] for r in runs]
+        assert names[0] == names[1] == names[2]
+        # fans_also_like by score (NOFX 0.9, Sum 41 0.8), then decade_match, then popular_choice
+        assert names[0] == ["NOFX", "Sum 41", "Abba", "Queen"]
+        for artist in runs[0]:
+            assert artist.suggestion_reason is not None
+            assert artist.suggestion_reason.display_text
+        assert runs[0][0].suggestion_reason.type == "fans_also_like"  # type: ignore[union-attr]
+        assert "Green Day" in runs[0][0].suggestion_reason.display_text  # type: ignore[union-attr]
+
+
+class TestSubmitBatched:
+    @pytest.mark.asyncio
+    async def test_submit_one_batch(
+        self, catalog_quiz_service: QuizService, mock_firestore: MagicMock, catalog_reader: FakeCatalogReader
+    ) -> None:
+        mock_firestore.get_many = AsyncMock(return_value={})
+        result = await catalog_quiz_service.submit_quiz(user_id="u1", known_artists=["Queen", "Abba", "Blur"])
+
+        assert result.songs_added == 15
+        assert catalog_reader.top_calls == [(["queen", "abba", "blur"], 5)]
+        assert mock_firestore.get_many.await_count == 1
+        assert mock_firestore.batch_set.await_count == 1
+        assert not [c for c in mock_firestore.get_document.call_args_list if c[0][0] == "user_songs"]
+        assert not [c for c in mock_firestore.set_document.call_args_list if c[0][0] == "user_songs"]
+
+        collection, docs = mock_firestore.batch_set.call_args[0][:2]
+        assert collection == "user_songs"
+        assert len(docs) == 15
+        for doc_id, doc in docs.items():
+            assert doc["song_key"]
+            assert doc["id"] == doc_id and doc["user_id"] == "u1" and doc["source"] == "quiz"
+            assert "/" not in doc_id
+
+    @pytest.mark.asyncio
+    async def test_submit_skips_existing_docs(
+        self, catalog_quiz_service: QuizService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.get_many = AsyncMock(return_value={"u1:1000": {"id": "u1:1000"}})
+        result = await catalog_quiz_service.submit_quiz(user_id="u1", known_artists=["Queen"])
+        assert result.songs_added == 4
+        docs = mock_firestore.batch_set.call_args[0][1]
+        assert "u1:1000" not in docs and len(docs) == 4
+
+    @pytest.mark.asyncio
+    async def test_submit_falls_back_to_bigquery_while_warming(
+        self,
+        mock_settings: BackendSettings,
+        mock_firestore: MagicMock,
+        mock_bigquery: MagicMock,
+    ) -> None:
+        svc = QuizService(
+            settings=mock_settings,
+            firestore=mock_firestore,
+            bigquery_client=mock_bigquery,
+            catalog_store=FakeCatalogStore(None),  # type: ignore[arg-type]
+        )
+        result = await svc.submit_quiz(user_id="u1", known_artists=["Queen"])
+        assert result.songs_added == 5  # the five mocked BigQuery rows
+        docs = mock_firestore.batch_set.call_args[0][1]
+        assert all(d["song_key"] for d in docs.values())
+        assert mock_firestore.batch_set.await_count == 1
+
+
+class TestGetProgress:
+    @pytest.mark.asyncio
+    async def test_returns_saved_doc(self, quiz_service: QuizService, mock_firestore: MagicMock) -> None:
+        mock_firestore.get_document = AsyncMock(return_value={"step": 2})
+        assert await quiz_service.get_progress("u1") == {"step": 2}
+        mock_firestore.get_document.assert_awaited_once_with("quiz_progress", "u1")

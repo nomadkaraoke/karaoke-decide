@@ -293,3 +293,49 @@ class TestFirestoreServiceCountDocuments:
         result = await firestore_service.count_documents("users")
 
         assert result == 42
+
+
+class TestFirestoreServiceBatchAndGetMany:
+    """batch_set chunking and get_many."""
+
+    @pytest.mark.asyncio
+    @patch("backend.services.firestore_service.firestore.AsyncClient")
+    async def test_batch_set_chunks_400(
+        self, mock_async_client: MagicMock, firestore_service: FirestoreService
+    ) -> None:
+        batches = []
+
+        def new_batch() -> MagicMock:
+            b = MagicMock()
+            b.commit = AsyncMock()
+            batches.append(b)
+            return b
+
+        mock_async_client.return_value.batch.side_effect = new_batch
+        docs = {f"d{i}": {"n": i} for i in range(1000)}
+        await firestore_service.batch_set("things", docs, merge=True)
+
+        assert [b.set.call_count for b in batches] == [400, 400, 200]
+        assert all(b.commit.await_count == 1 for b in batches)
+        assert batches[0].set.call_args.kwargs == {"merge": True}
+
+    @pytest.mark.asyncio
+    @patch("backend.services.firestore_service.firestore.AsyncClient")
+    async def test_get_many_returns_existing_by_id(
+        self, mock_async_client: MagicMock, firestore_service: FirestoreService
+    ) -> None:
+        def snap(doc_id: str, exists: bool, data: dict[str, int] | None = None) -> MagicMock:
+            s = MagicMock()
+            s.id, s.exists = doc_id, exists
+            s.to_dict.return_value = data
+            return s
+
+        async def get_all(refs: list[MagicMock]) -> AsyncGenerator[MagicMock, None]:
+            yield snap("a", True, {"n": 1})
+            yield snap("b", False)
+
+        client = mock_async_client.return_value
+        client.get_all = get_all
+        result = await firestore_service.get_many("things", ["a", "b"])
+        assert result == {"a": {"n": 1}}
+        assert await firestore_service.get_many("things", []) == {}

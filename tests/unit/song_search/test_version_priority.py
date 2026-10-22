@@ -581,3 +581,12 @@ class TestAnnotateVersionsSetsDisplayName:
         rows = [{"disc_id": "ASK-011277", "filename": "ASK-011277 - Q - X.zip"}]
         annotate_versions(rows, _cfg(), shape="rotation_search_local")
         assert rows[0]["priority_display"] == ""
+
+
+class TestDigitraxAlias:
+    def test_karaoke_cloud_digitrax_is_chartbuster_not_kv(self):
+        assert resolve_brand(brand_name="Karaoke Cloud Digitrax") == ("CB", "commercial")
+
+    def test_kv_still_resolves_its_own_aliases(self):
+        for alias in ("Karaoke Version", "Karafun", "KVD", "KCD"):
+            assert resolve_brand(brand_name=alias) == ("KV", "commercial")

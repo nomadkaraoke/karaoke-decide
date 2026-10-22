@@ -4,16 +4,21 @@ Analyzes user's listening history and quiz responses to recommend
 karaoke songs they might enjoy singing.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
-
-from google.cloud import bigquery
+from typing import TYPE_CHECKING, Any, Literal
 
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from karaoke_decide.core.models import Recommendation, UserSong
 from karaoke_decide.services.bq_limits import MAX_BYTES_RECOMMENDATION, make_client
+
+# google.cloud.bigquery is imported inside the functions that use it: importing it costs
+# ~0.5 s, so this keeps it out of the main API's cold start (spec §6).
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 
 @dataclass
@@ -66,11 +71,16 @@ class ScoredSong:
 class CategorizedRecommendations:
     """Recommendations organized into categories."""
 
-    from_artists_you_know: list["Recommendation"]
-    create_your_own: list["Recommendation"]
-    crowd_pleasers: list["Recommendation"]
+    from_artists_you_know: list[Recommendation]
+    create_your_own: list[Recommendation]
+    crowd_pleasers: list[Recommendation]
     total_count: int
     filters_applied: dict[str, Any]
+
+
+def _as_datetime(value: Any) -> datetime:
+    """Firestore docs hold ISO strings, but tolerate datetime values."""
+    return value if isinstance(value, datetime) else datetime.fromisoformat(value)
 
 
 class RecommendationService:
@@ -480,17 +490,17 @@ class RecommendationService:
                 play_count=doc.get("sync_count") or doc.get("play_count", 0),
                 playcount=doc.get("playcount"),
                 rank=doc.get("rank"),
-                last_played_at=(datetime.fromisoformat(doc["last_played_at"]) if doc.get("last_played_at") else None),
+                last_played_at=(_as_datetime(doc["last_played_at"]) if doc.get("last_played_at") else None),
                 is_saved=doc.get("is_saved", False),
                 times_sung=doc.get("times_sung", 0),
-                last_sung_at=(datetime.fromisoformat(doc["last_sung_at"]) if doc.get("last_sung_at") else None),
+                last_sung_at=(_as_datetime(doc["last_sung_at"]) if doc.get("last_sung_at") else None),
                 average_rating=doc.get("average_rating"),
                 notes=doc.get("notes"),
                 artist=doc["artist"],
                 title=doc["title"],
                 spotify_popularity=doc.get("spotify_popularity"),
-                created_at=(datetime.fromisoformat(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
-                updated_at=(datetime.fromisoformat(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
+                created_at=(_as_datetime(doc["created_at"]) if doc.get("created_at") else datetime.now(UTC)),
+                updated_at=(_as_datetime(doc["updated_at"]) if doc.get("updated_at") else datetime.now(UTC)),
             )
             for doc in paginated_docs
         ]
@@ -820,6 +830,8 @@ class RecommendationService:
         Returns:
             List of song dicts.
         """
+        from google.cloud import bigquery
+
         if not artists:
             return []
 
@@ -884,6 +896,8 @@ class RecommendationService:
         """
         # GROUP BY to avoid duplicates from Spotify join
         # (one karaoke song can match many Spotify tracks for different releases)
+        from google.cloud import bigquery
+
         sql = f"""
             SELECT
                 CAST(k.Id AS STRING) as id,

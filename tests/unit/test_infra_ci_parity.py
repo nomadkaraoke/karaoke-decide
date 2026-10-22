@@ -24,6 +24,7 @@ SERVICE = "karaoke-decide-search"
 JOB = "song-index-build"
 PULUMI_SERVICE_RESOURCE = "karaoke-decide-search-api"
 PULUMI_JOB_RESOURCE = "song-index-build-job"
+PULUMI_MAIN_RESOURCE = "karaoke-decide-api"
 JOB_OWNED_ENV = "SONG_INDEX_RUN"
 
 
@@ -98,6 +99,12 @@ def pulumi_service() -> dict[str, Any]:
     kw = _kwargs(call, _module_constants(tree))
     kw["_ignore_changes"] = _ignore_changes(call)
     return kw
+
+
+@pytest.fixture(scope="module")
+def pulumi_main() -> dict[str, Any]:
+    tree = _pulumi_tree()
+    return _kwargs(_resource_call(tree, "Service", PULUMI_MAIN_RESOURCE), _module_constants(tree))
 
 
 @pytest.fixture(scope="module")
@@ -181,6 +188,14 @@ def ci_deploy() -> dict[str, str | bool]:
 
 
 @pytest.fixture(scope="module")
+def ci_main_deploy() -> dict[str, str | bool]:
+    for step in _ci_steps():
+        if "gcloud run deploy ${{ env.IMAGE_NAME }}" in step.get("run", ""):
+            return _flags(_command_line(step["run"], "gcloud run deploy"))
+    raise AssertionError("no main-service `gcloud run deploy ${{ env.IMAGE_NAME }}` step in deploy-backend")
+
+
+@pytest.fixture(scope="module")
 def ci_job_update() -> dict[str, str | bool]:
     for step in _ci_steps():
         if f"gcloud run jobs update {JOB}" in step.get("run", ""):
@@ -257,6 +272,39 @@ def test_secret_env_vars_match(pulumi_service: dict[str, Any], ci_deploy: dict[s
 def test_offline_url_template_goes_through_the_worker(pulumi_service: dict[str, Any]) -> None:
     template = _plain_envs(_container(pulumi_service))["SONG_INDEX_OFFLINE_URL_TEMPLATE"]
     assert template == "https://decide.nomadkaraoke.com/offline-index/{run}/offline.db.gz"
+
+
+# --------------------------------------------------------------------------
+# Main API service (karaoke-decide): Pulumi vs CI deploy flags
+# --------------------------------------------------------------------------
+
+
+def test_main_memory_cpu_and_scaling_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    limits = _container(pulumi_main)["resources"]["limits"]
+    # 2Gi: availability.db + catalog.db are decompressed into in-memory /tmp.
+    assert limits["memory"] == ci_main_deploy["--memory"] == "2Gi"
+    assert limits["cpu"] == ci_main_deploy["--cpu"] == "1"
+    template = pulumi_main["template"]
+    assert str(template["scaling"]["max_instance_count"]) == ci_main_deploy["--max-instances"] == "10"
+    assert str(pulumi_main["scaling"]["min_instance_count"]) == ci_main_deploy["--min-instances"] == "0"
+    assert str(template["max_instance_request_concurrency"]) == ci_main_deploy["--concurrency"] == "80"
+
+
+def test_main_cpu_idle_and_boost_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    resources = _container(pulumi_main)["resources"]
+    assert resources["cpu_idle"] is True and ci_main_deploy.get("--cpu-throttling") is True
+    assert resources["startup_cpu_boost"] is True and ci_main_deploy.get("--cpu-boost") is True
+
+
+def test_main_startup_probe_matches(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    probe = _container(pulumi_main)["startup_probe"]
+    ci = _kv(str(ci_main_deploy["--startup-probe"]))
+    assert probe["http_get"]["path"] == ci["httpGet.path"] == "/api/ready"
+    assert str(probe["http_get"]["port"]) == ci["httpGet.port"] == "8000"
+    assert str(probe["timeout_seconds"]) == ci["timeoutSeconds"] == "5"
+    assert str(probe["period_seconds"]) == ci["periodSeconds"] == "10"
+    assert str(probe["failure_threshold"]) == ci["failureThreshold"] == "24"
+    assert probe["failure_threshold"] * probe["period_seconds"] <= 240  # Cloud Run startup-probe cap
 
 
 # --------------------------------------------------------------------------

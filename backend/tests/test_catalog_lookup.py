@@ -1,7 +1,11 @@
-"""Tests for CatalogLookup service."""
+"""Tests for CatalogLookup service (catalog.db kn_song_map lookups)."""
+
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
+from backend.config import BackendSettings
 from backend.services.catalog_lookup import (
     CatalogEntry,
     CatalogLookup,
@@ -10,6 +14,8 @@ from backend.services.catalog_lookup import (
     _normalize_title,
     get_catalog_lookup,
 )
+from backend.services.catalog_store import CatalogStore
+from karaoke_decide.catalog import fixtures
 
 
 class TestNormalizeFunctions:
@@ -38,80 +44,42 @@ class TestNormalizeFunctions:
 class TestCatalogLookup:
     """Tests for CatalogLookup class."""
 
-    def test_not_loaded_initially(self) -> None:
-        """Test catalog is not loaded initially."""
-        lookup = CatalogLookup()
-        assert not lookup.is_loaded
-        assert lookup.entry_count == 0
-
     def test_match_returns_none_when_not_loaded(self) -> None:
-        """Test match returns None when catalog not loaded."""
-        lookup = CatalogLookup()
-        result = lookup.match("Queen", "Bohemian Rhapsody")
-        assert result is None
+        lookup = CatalogLookup(CatalogStore())
+        assert lookup.match("Queen", "Bohemian Rhapsody") is None
 
-    def test_make_key_normalizes(self) -> None:
-        """Test _make_key produces consistent normalized keys."""
-        lookup = CatalogLookup()
-        key1 = lookup._make_key("Queen", "Bohemian Rhapsody")
-        key2 = lookup._make_key("QUEEN", "BOHEMIAN RHAPSODY")
-        key3 = lookup._make_key("Queen feat. Someone", "Bohemian Rhapsody (Remastered)")
-        assert key1 == key2
-        assert key1 == key3  # Patterns should be stripped
+
+@pytest.fixture(scope="module")
+def ready_store(tmp_path_factory: pytest.TempPathFactory) -> Iterator[CatalogStore]:
+    d: Path = tmp_path_factory.mktemp("catalog")
+    fixtures.build(d)
+    store = CatalogStore()
+    store.load(BackendSettings(catalog_local_dir=str(d), song_index_local_dir=str(d / "no-index")))
+    assert store.status == "ready"
+    yield store
+    store.close()
 
 
 class TestCatalogLookupWithData:
-    """Tests for CatalogLookup with pre-loaded data."""
+    """Matching reads kn_song_map by match_key through CatalogReader."""
 
-    @pytest.fixture
-    def loaded_lookup(self) -> CatalogLookup:
-        """Create a CatalogLookup with test data."""
-        lookup = CatalogLookup()
-        # Manually set lookup data for testing
-        lookup._lookup = {
-            "queen:bohemian rhapsody": CatalogEntry(
-                id=123,
-                artist="Queen",
-                title="Bohemian Rhapsody",
-                brands="Sound Choice,Zoom",
-                brand_count=2,
-            ),
-            "the beatles:hey jude": CatalogEntry(
-                id=456,
-                artist="The Beatles",
-                title="Hey Jude",
-                brands="Karaoke Version",
-                brand_count=1,
-            ),
-        }
-        lookup._loaded = True
-        lookup._entry_count = 2
-        return lookup
+    def test_match_finds_song(self, ready_store: CatalogStore) -> None:
+        lookup = CatalogLookup(ready_store)
+        assert lookup.store.status == "ready"
+        assert lookup.match("Toto", "Africa") == CatalogEntry(
+            id=1, artist="Toto", title="Africa", brands="CC,KV", brand_count=2
+        )
 
-    def test_match_finds_song(self, loaded_lookup: CatalogLookup) -> None:
-        """Test match finds a song in the catalog."""
-        result = loaded_lookup.match("Queen", "Bohemian Rhapsody")
-        assert result is not None
-        assert result.id == 123
-        assert result.artist == "Queen"
-        assert result.title == "Bohemian Rhapsody"
+    def test_match_is_case_insensitive(self, ready_store: CatalogStore) -> None:
+        result = CatalogLookup(ready_store).match("TOTO", "AFRICA")
+        assert result is not None and result.id == 1
 
-    def test_match_is_case_insensitive(self, loaded_lookup: CatalogLookup) -> None:
-        """Test match is case insensitive."""
-        result = loaded_lookup.match("QUEEN", "BOHEMIAN RHAPSODY")
-        assert result is not None
-        assert result.id == 123
+    def test_match_strips_patterns(self, ready_store: CatalogStore) -> None:
+        result = CatalogLookup(ready_store).match("Toto feat. Someone", "Africa (Remastered 2011)")
+        assert result is not None and result.id == 1
 
-    def test_match_strips_patterns(self, loaded_lookup: CatalogLookup) -> None:
-        """Test match strips common patterns from input."""
-        result = loaded_lookup.match("Queen feat. David Bowie", "Bohemian Rhapsody (Remastered)")
-        assert result is not None
-        assert result.id == 123
-
-    def test_match_returns_none_for_unknown(self, loaded_lookup: CatalogLookup) -> None:
-        """Test match returns None for unknown song."""
-        result = loaded_lookup.match("Unknown Artist", "Unknown Song")
-        assert result is None
+    def test_match_returns_none_for_unknown(self, ready_store: CatalogStore) -> None:
+        assert CatalogLookup(ready_store).match("Unknown Artist", "Unknown Song") is None
 
 
 class TestGetCatalogLookup:

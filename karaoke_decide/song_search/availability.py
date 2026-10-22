@@ -52,6 +52,7 @@ from typing import Any
 from karaoke_decide.song_search import fuzzy_match
 from karaoke_decide.song_search.brand_names import brand_name
 from karaoke_decide.song_search.build_song_id import merge_key
+from karaoke_decide.song_search.library_filter import LibraryFilter, library_clause
 from karaoke_decide.song_search.text_normalize import (
     FILE_TAG_RE,
     NORMALIZER_VERSION,
@@ -424,12 +425,16 @@ class AvailabilityIndex:
 
     # ---------------------------------------------------------------- public
 
-    def search(self, query: str, limit: int = MAX_LIMIT) -> list[dict[str, Any]]:
+    def search(self, query: str, limit: int = MAX_LIMIT, library: LibraryFilter = "any") -> list[dict[str, Any]]:
         """Groups matching ``query``, most relevant first. ``[]`` on no match or any
-        index trouble (search must never get worse than empty — A76)."""
+        index trouble (search must never get worse than empty — A76). ``library``
+        drops candidate songs outside that library before ranking and the limit."""
         limit = _clamp(limit)
         try:
             rows = self._candidates(query or "")
+            if rows and library != "any":
+                allowed = self._in_library([r["song_key"] for r in rows], library)
+                rows = [r for r in rows if r["song_key"] in allowed]
             if not rows:
                 return []
             playable = self._playable({r["song_key"] for r in rows})
@@ -449,17 +454,28 @@ class AvailabilityIndex:
         row = self._conn().execute("SELECT * FROM songs WHERE song_key = ?", (key,)).fetchone()
         return self._groups([row])[0] if row else None
 
-    def popular(self, limit: int = 30) -> list[dict[str, Any]]:
-        """Most popular songs with any version (popularity from song_id.db)."""
+    def popular(self, limit: int = 30, library: LibraryFilter = "any") -> list[dict[str, Any]]:
+        """Most popular songs with any version (popularity from song_id.db), optionally
+        only those in ``library``."""
+        clause, params = library_clause(library, "songs.song_key")
         rows = (
             self._conn()
             .execute(
-                "SELECT * FROM songs WHERE pop IS NOT NULL ORDER BY pop DESC, version_count DESC, song_key LIMIT ?",
-                (_clamp(limit),),
+                f"SELECT * FROM songs WHERE pop IS NOT NULL AND {clause} "
+                "ORDER BY pop DESC, version_count DESC, song_key LIMIT ?",
+                (*params, _clamp(limit)),
             )
             .fetchall()
         )
         return self._groups(rows)
+
+    def _in_library(self, keys: list[str], library: LibraryFilter) -> set[str]:
+        clause, params = library_clause(library, "s.song_key")
+        marks = ",".join("?" * len(keys))
+        rows = self._conn().execute(
+            f"SELECT s.song_key FROM songs s WHERE s.song_key IN ({marks}) AND {clause}", (*keys, *params)
+        )
+        return {r["song_key"] for r in rows}
 
     # --------------------------------------------------------------- ladder
 

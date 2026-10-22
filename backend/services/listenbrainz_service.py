@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import httpx
 
 from backend.config import BackendSettings
+from backend.services.catalog_store import CatalogStore, CatalogUnavailable, get_catalog_store
 from backend.services.firestore_service import FirestoreService
 
 
@@ -21,7 +22,6 @@ class ListenBrainzService:
     """
 
     LISTENBRAINZ_LABS_URL = "https://labs.api.listenbrainz.org"
-    MUSICBRAINZ_API_URL = "https://musicbrainz.org/ws/2"
 
     # Best algorithm based on ListenBrainz documentation
     DEFAULT_ALGORITHM = "session_based_days_7500_session_300_contribution_5_threshold_10_limit_100_filter_True_skip_30"
@@ -34,15 +34,18 @@ class ListenBrainzService:
         self,
         settings: BackendSettings,
         firestore: FirestoreService | None = None,
+        catalog_store: CatalogStore | None = None,
     ):
         """Initialize the ListenBrainz service.
 
         Args:
             settings: Backend settings.
             firestore: Optional Firestore service for caching.
+            catalog_store: Where artist MBIDs come from (default: the process-wide catalog.db).
         """
         self.settings = settings
         self.firestore = firestore
+        self._catalog_store = catalog_store
         self._http_client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -61,38 +64,26 @@ class ListenBrainzService:
             self._http_client = None
 
     async def search_artist_mbid(self, artist_name: str) -> dict | None:
-        """Search MusicBrainz for an artist by name.
+        """Look an artist's MBID up in catalog.db (never the live MusicBrainz API).
 
         Args:
             artist_name: Artist name to search for.
 
         Returns:
-            Dict with mbid, name, type, score, disambiguation or None if not found.
+            Dict with mbid and name, or None if unknown or the catalog is still warming up.
         """
-        client = await self._get_client()
+        store = self._catalog_store or get_catalog_store()
+
+        def lookup() -> str | None:
+            return store.require().artist_mbid(artist_name)
 
         try:
-            response = await client.get(
-                f"{self.MUSICBRAINZ_API_URL}/artist",
-                params={"query": artist_name, "fmt": "json", "limit": 5},
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                artists = data.get("artists", [])
-                if artists:
-                    artist = artists[0]
-                    return {
-                        "mbid": artist.get("id"),
-                        "name": artist.get("name"),
-                        "type": artist.get("type"),
-                        "score": artist.get("score"),
-                        "disambiguation": artist.get("disambiguation"),
-                    }
-        except Exception:
-            pass
-
-        return None
+            mbid = await asyncio.to_thread(lookup)
+        except CatalogUnavailable:  # warming up
+            return None
+        except Exception:  # best effort: similarity is optional garnish
+            return None
+        return {"mbid": mbid, "name": artist_name} if mbid else None
 
     async def get_similar_artists(
         self,

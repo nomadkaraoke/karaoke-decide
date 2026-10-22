@@ -86,6 +86,18 @@ class TestGetDataSummary:
         assert result["preferences"]["decade"] == "1990s"
 
     @pytest.mark.asyncio
+    async def test_summary_genres_cleared_vs_legacy(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        """Cleared quiz_genres must not resurrect legacy quiz_genres_pref in the summary."""
+        base = {"id": "h", "user_id": "user123", "quiz_genres_pref": ["jazz"]}
+        for doc, expected in (({**base, "quiz_genres": []}, []), (base, ["jazz"])):
+            mock_firestore.query_documents.side_effect = [[doc], [], []]
+            mock_firestore.count_documents.side_effect = [0, 0, 0]
+            result = await user_data_service.get_data_summary("user123")
+            assert result["preferences"]["genres"] == expected
+
+    @pytest.mark.asyncio
     async def test_handles_empty_user(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
         """Should handle user with no data."""
         # Mock query_documents: first call for _get_user_document (empty), then user_artists, then music_services
@@ -147,7 +159,7 @@ class TestUpdatePreferences:
             "user_id": "user123",
             "quiz_decade_pref": "2000s",
             "quiz_energy_pref": "medium",
-            "quiz_genres_pref": ["electronic"],
+            "quiz_genres": ["electronic"],
         }
         # First query for _get_user_document (update), second for _get_user_document (return)
         mock_firestore.query_documents.side_effect = [[user_doc], [user_doc]]
@@ -157,6 +169,7 @@ class TestUpdatePreferences:
             decade_preference="2000s",
             energy_preference="medium",
             genres=["electronic"],
+            decades=["2000s"],
         )
 
         mock_firestore.update_document.assert_called_once()
@@ -165,7 +178,9 @@ class TestUpdatePreferences:
         assert call_args[0][1] == "email_hash_123"  # Uses the doc ID from query
         assert call_args[0][2]["quiz_decade_pref"] == "2000s"
         assert call_args[0][2]["quiz_energy_pref"] == "medium"
-        assert call_args[0][2]["quiz_genres_pref"] == ["electronic"]
+        assert call_args[0][2]["quiz_genres"] == ["electronic"]
+        assert call_args[0][2]["quiz_decades"] == ["2000s"]
+        assert "quiz_genres_pref" not in call_args[0][2]
 
     @pytest.mark.asyncio
     async def test_partial_update(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
@@ -188,7 +203,61 @@ class TestUpdatePreferences:
         call_args = mock_firestore.update_document.call_args
         assert "quiz_decade_pref" in call_args[0][2]
         assert "quiz_energy_pref" not in call_args[0][2]
-        assert "quiz_genres_pref" not in call_args[0][2]
+        assert "quiz_genres" not in call_args[0][2]
+        assert "quiz_decades" not in call_args[0][2]
+
+
+class TestPreferencesLegacyFallback:
+    """quiz_genres is canonical; quiz_genres_pref is read as a legacy fallback."""
+
+    @pytest.mark.asyncio
+    async def test_reads_new_fields(self, user_data_service: UserDataService, mock_firestore: MagicMock) -> None:
+        mock_firestore.query_documents.return_value = [
+            {
+                "id": "h",
+                "user_id": "u",
+                "quiz_genres": ["rock"],
+                "quiz_genres_pref": ["jazz"],
+                "quiz_decades": ["1990s"],
+            }
+        ]
+        result = await user_data_service.get_preferences("u")
+        assert result["genres"] == ["rock"]
+        assert result["decades"] == ["1990s"]
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_legacy_genres(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.query_documents.return_value = [{"id": "h", "user_id": "u", "quiz_genres_pref": ["jazz"]}]
+        result = await user_data_service.get_preferences("u")
+        assert result["genres"] == ["jazz"]
+        assert result["decades"] == []
+
+    @pytest.mark.asyncio
+    async def test_cleared_genres_do_not_fall_back_to_legacy(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.query_documents.return_value = [
+            {"id": "h", "user_id": "u", "quiz_genres": [], "quiz_genres_pref": ["jazz"]}
+        ]
+        assert (await user_data_service.get_preferences("u"))["genres"] == []
+
+    @pytest.mark.asyncio
+    async def test_none_genres_fall_back_to_legacy(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.query_documents.return_value = [
+            {"id": "h", "user_id": "u", "quiz_genres": None, "quiz_genres_pref": ["jazz"]}
+        ]
+        assert (await user_data_service.get_preferences("u"))["genres"] == ["jazz"]
+
+    @pytest.mark.asyncio
+    async def test_missing_user_has_empty_decades(
+        self, user_data_service: UserDataService, mock_firestore: MagicMock
+    ) -> None:
+        mock_firestore.query_documents.return_value = []
+        assert (await user_data_service.get_preferences("u"))["decades"] == []
 
 
 class TestGetAllArtists:

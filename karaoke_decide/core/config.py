@@ -30,6 +30,19 @@ class Settings(BaseSettings):
     # Legacy decide JWTs are accepted through this date (inclusive); gen sessions replace them.
     legacy_jwt_sunset: date = date(2026, 11, 30)
 
+    # Recommendations catalog (main API startup; see backend/services/catalog_store.py).
+    # catalog.db is published by mb-refresh behind gs://<catalog_bucket>/catalog/latest.json;
+    # availability.db comes from the search service's daily song index. The *_local_dir
+    # settings point at already-built files instead (local stack, tests) and win when set.
+    catalog_bucket: str = "nomadkaraoke-musicbrainz-data"
+    catalog_local_dir: str = ""
+    song_index_bucket: str = "nomadkaraoke-kn-data"
+    song_index_local_dir: str = ""
+    catalog_load_timeout_s: float = 60
+    catalog_dir: str = "/tmp/decide-catalog"  # download dir (in-memory on Cloud Run)
+    # Make every BigQuery client construction fail (local stack / tests: no GCP).
+    bigquery_disabled: bool = False
+
     # API Server
     api_host: str = "0.0.0.0"
     api_port: int = 8000

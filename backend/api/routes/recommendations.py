@@ -4,10 +4,15 @@ Provides endpoints for user's song library and AI-generated
 recommendations based on listening history and quiz responses.
 """
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from typing import Annotated, Literal
 
-from backend.api.deps import CurrentUser, RecommendationServiceDep
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, StringConstraints
+
+from backend.api.deps import CurrentUser, RecommendationServiceDep, RecommendationServiceV2Dep
+from backend.services.catalog_store import CatalogUnavailable
+from backend.services.recs_v2.filters import Mood, RecFilters, Sort
+from backend.services.recs_v2.service import BadCursorError, RecommendationsV2Response
 
 router = APIRouter()
 
@@ -304,3 +309,50 @@ async def get_my_artists(
         total=len(artists),
         sources=sources,
     )
+
+
+# Cap repeated list params so oversized requests get 422, not a huge IN (...) clause.
+MAX_LIST_VALUES = 50
+_Value = Annotated[str, StringConstraints(max_length=64)]
+
+
+@router.get("/recommendations/v2", response_model=RecommendationsV2Response)
+async def get_recommendations_v2(
+    user: CurrentUser,
+    service: RecommendationServiceV2Dep,
+    genre: Annotated[list[_Value] | None, Query(max_length=MAX_LIST_VALUES)] = None,
+    mood: Annotated[list[Mood] | None, Query(max_length=MAX_LIST_VALUES)] = None,
+    energy: Literal["low", "mid", "high"] | None = None,
+    decade: Annotated[list[_Value] | None, Query(max_length=MAX_LIST_VALUES)] = None,
+    popularity: Annotated[int | None, Query(ge=0, le=100)] = None,
+    popularity_max: Annotated[int | None, Query(ge=0, le=100)] = None,
+    lead_gender: Literal["male", "female", "mixed"] | None = None,
+    duration: Literal["short", "medium", "long"] | None = None,
+    classic: bool = False,
+    explicit: Literal["exclude", "include"] = "include",
+    has_karaoke: Literal["yes", "make", "any"] = "any",
+    library: Literal["any", "community", "karafun"] = "any",
+    sort: Sort = "best",
+    cursor: Annotated[str | None, Query(max_length=64)] = None,
+) -> RecommendationsV2Response:
+    """Catalog-backed recommendations: explained sections for ``sort=best``, else one paged flat list."""
+    filters = RecFilters(
+        genre=genre or [],
+        mood=mood or [],
+        energy=energy,
+        decade=decade or [],
+        popularity=popularity,
+        popularity_max=popularity_max,
+        lead_gender=lead_gender,
+        duration=duration,
+        classic=classic,
+        explicit=explicit,
+        has_karaoke=has_karaoke,
+        library=library,
+    )
+    try:
+        return await service.recommend(user, filters, sort, cursor)
+    except BadCursorError:
+        raise HTTPException(status_code=400, detail="bad_cursor") from None
+    except CatalogUnavailable:
+        raise HTTPException(status_code=503, detail="warming_up", headers={"Retry-After": "30"}) from None

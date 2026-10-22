@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.api.deps import FirestoreServiceDep, Settings
+from backend.services.catalog_store import get_catalog_store
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,29 @@ class DeepHealthCheckResponse(BaseModel):
 async def health_check() -> HealthCheckResponse:
     """Health check endpoint for load balancers and monitoring."""
     return HealthCheckResponse(status="healthy", service="karaoke-decide")
+
+
+class ReadyResponse(BaseModel):
+    """Startup probe: the lifespan (catalog load) has finished."""
+
+    ok: bool
+    catalog: bool
+    availability: bool
+    run: str | None
+
+
+@router.get("/ready", response_model=ReadyResponse)
+async def ready() -> ReadyResponse:
+    """200 once startup finished. ``catalog: false`` means recommendations v2 is warming up;
+    health, search and everything else serve regardless."""
+    store = get_catalog_store()
+    reader = store.reader
+    return ReadyResponse(
+        ok=True,
+        catalog=reader is not None,
+        availability=reader is not None and reader.has_availability,
+        run=store.run,
+    )
 
 
 @router.get("/health/deep", response_model=DeepHealthCheckResponse)

@@ -66,6 +66,36 @@ Useful for post-deploy verification and scheduled monitoring.
 
 ---
 
+### GET /api/ready
+
+`GET /api/ready` is the startup probe: `{"ok": true, "catalog": bool, "availability": bool, "run": str | null}`. `catalog: false` means recommendations v2 is still warming up; everything else serves.
+
+### GET /api/my/recommendations/v2
+
+Catalog-backed, explained recommendations (auth: decide JWT or gen session token). Query params (all optional):
+`genre` (multi), `mood` (multi), `energy` (low|mid|high), `decade` (multi), `popularity` (min 0-100), `popularity_max` (0-100), `lead_gender` (male|female|mixed), `duration` (short|medium|long), `classic` (bool), `explicit` (exclude|include), `has_karaoke` (yes|make|any), `library` (any|community|karafun), `sort` (best|popular|newest|oldest|shortest|az), `cursor`.
+
+`sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
+
+```json
+{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}}]}],
+ "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000"}
+```
+
+Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded. `GET /api/my/recommendations/categorized` (v1) is unchanged and keeps working.
+
+### Song feedback: /api/my/songs
+
+`GET /api/my/songs/hidden`, `GET /api/my/songs/loved` list `{songs: [...]}`. `POST` / `DELETE /api/my/songs/{song_key}/hide` and `/love` (204) hide or love a song; hidden songs never appear in v2.
+
+### GET /api/quiz/progress
+
+Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when there is none.
+
+### Library filter on search
+
+`GET /api/search` and `GET /api/search/popular` accept `library=any|community|karafun`. `karafun` means KaraokeNerds brand `KV` (KaraFun / Karaoke Version catalogue); `community` means a version of kind `community`.
+
 ## Song search ✅ Implemented
 
 Served by the separate `karaoke-decide-search` Cloud Run service (`backend/search/app.py`). The Worker routes `/api/search` and `/api/search/*` there; every other `/api/*` path goes to the main API. No auth. Clients send `X-Device-Id`, which is used for rate limits; the per-IP limit uses the `X-Nomad-Client-IP` header the Worker sets from `CF-Connecting-IP` (client-supplied values are overwritten). OpenAPI: `/api/search/openapi.json`; Swagger UI: `/api/search/docs` (both reachable through the Worker).
@@ -836,6 +866,12 @@ Get quiz songs for onboarding (legacy). Returns popular karaoke songs for users 
   ]
 }
 ```
+
+### GET /api/quiz/progress
+
+Returns the progress last saved by `PUT /api/quiz/progress`, in the same shape as that request (missing lists default to `[]`), or `204 No Content` when nothing was saved.
+
+**Requires:** Bearer token
 
 ### PUT /api/quiz/progress
 

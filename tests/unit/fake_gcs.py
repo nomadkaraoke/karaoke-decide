@@ -32,10 +32,12 @@ class FakeBlob:
         buf = io.BytesIO()
         close = buf.close
         objects = self.bucket.objects
+        writes = self.bucket.writes
         name = self.name
 
         def finish() -> None:
             objects[name] = buf.getvalue()
+            writes.append(name)
             close()
 
         buf.close = finish  # type: ignore[method-assign]
@@ -49,6 +51,10 @@ class FakeBucket:
         self.objects: dict[str, bytes] = {}
         self.metadata: dict[str, dict[str, str]] = {}
         self.reads: list[str] = []
+        self.writes: list[str] = []  # object names in completed-write order
 
     def blob(self, name: str) -> FakeBlob:
         return FakeBlob(self, name)
+
+    def list_blobs(self, prefix: str = "") -> list[FakeBlob]:
+        return [FakeBlob(self, n) for n in sorted(self.objects) if n.startswith(prefix)]

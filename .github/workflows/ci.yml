@@ -339,8 +339,11 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --memory 1Gi \
+            --memory 2Gi \
             --cpu 1 \
+            --cpu-throttling \
+            --cpu-boost \
+            --startup-probe httpGet.path=/api/ready,httpGet.port=8000,timeoutSeconds=5,periodSeconds=10,failureThreshold=24 \
             --timeout 1800 \
             --concurrency 80 \
             --max-instances 10 \

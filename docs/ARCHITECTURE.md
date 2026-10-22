@@ -137,6 +137,18 @@ song-index-build (Cloud Run Job, daily 13:30 UTC)
 
   Until the service exists, CI skips its search deploy and job-image steps with a warning.
 
+## Recommendations catalog (catalog.db) and startup
+
+Recommendations v2 (`GET /api/my/recommendations/v2`) reads two SQLite files, never BigQuery:
+
+- **`catalog.db`**: per-song facets (genre, mood, decade, energy, lead gender, duration, popularity, explicit, classic), artists, artist similarity and the KaraokeNerds id map (`kn_song_map`). Built by the weekly `mb-refresh` job (step 8, `karaoke_decide/catalog/`, best-effort after the app tables publish) from the fresh BigQuery tables, gated against the previous build (`catalog_gate`: min songs, max 10% song drop, max 10-point coverage drop per facet), then published to `gs://nomadkaraoke-musicbrainz-data/catalog/<run>/catalog.db.gz` behind the `catalog/latest.json` pointer (written last; 3 runs kept). Songs with neither a ListenBrainz nor a Spotify popularity signal are left out of `songs` to hold the size budget (they stay in `kn_song_map`). First prod build: 132k songs, 115 MB raw, 46 MB gzipped (budget 150 / 50 MB).
+- **`availability.db`**: the search service's daily index (which songs have karaoke versions, by library), through `index_loader`.
+
+Both are downloaded and verified (sha256) during the lifespan, before the port opens (`backend/services/catalog_store.py`), because Cloud Run throttles CPU once it is open. `/tmp` is in-memory on Cloud Run, so the main service has 2Gi. The startup probe is `GET /api/ready` (`catalog` / `availability` booleans), 24 x 10 s with CPU boost. A missing or unusable catalog never blocks startup: v2 answers 503 `warming_up` (`Retry-After: 30`) while everything else serves, and the store retries on demand every 5 minutes.
+
+- **Ops:** `mb-refresh catalog [--no-publish] [--workdir DIR]` builds only the catalog. `--no-publish --workdir DIR` runs the real BigQuery build locally and leaves `catalog.db` there (nothing uploaded) for size checks. The first prod build (or an ad-hoc rebuild) can be started with the manual `Run catalog build` workflow (`.github/workflows/run-catalog-build.yml`) or `gcloud run jobs execute mb-refresh --region us-central1 --args=catalog --wait`.
+- **Infra:** the main service runtime SA already has project-level `storage.admin`, so no extra bucket IAM is declared. A `decide-api-health-uptime` check pings `/api/health` every 60 s through the Worker (idle CPU is released, so keeping an instance warm costs about nothing).
+
 ## Data Flow
 
 ### 1. User Registration & Auth

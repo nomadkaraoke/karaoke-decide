@@ -102,9 +102,12 @@ def _download_verified(bucket: Any, name: str, dest: Path, expected: dict[str, A
         raise IndexLoadError(f"{dest.name}: download failed: {exc}") from exc
 
 
-def load(run: str, bucket: str, dest_dir: Path, *, client: Any = None) -> IndexPaths:
-    """Download and verify ``song_id.db`` + ``availability.db`` for ``run``
-    (``"<run>-<token>"``; empty → ``song-index/latest.json``) into ``dest_dir/<run>``."""
+def load(
+    run: str, bucket: str, dest_dir: Path, *, client: Any = None, files: tuple[str, ...] = SERVER_FILES
+) -> IndexPaths:
+    """Download and verify ``files`` (default ``song_id.db`` + ``availability.db``) for ``run``
+    (``"<run>-<token>"``; empty → ``song-index/latest.json``) into ``dest_dir/<run>``.
+    The main API passes ``("availability.db",)``: it never opens ``song_id.db``."""
     if client is None:
         from google.cloud import storage  # type: ignore[attr-defined]
 
@@ -112,17 +115,16 @@ def load(run: str, bucket: str, dest_dir: Path, *, client: Any = None) -> IndexP
     b = client.bucket(bucket)
     run = run.strip() or _run_id(_read_json(b, LATEST))
     manifest = _read_json(b, f"{PREFIX}/{run}/manifest.json")
-    files = manifest.get("files") or {}
-    for name in SERVER_FILES:
-        if not isinstance(files.get(name), dict):
+    entries = manifest.get("files") or {}
+    for name in files:
+        if not isinstance(entries.get(name), dict):
             raise IndexLoadError(f"manifest for {run} has no entry for {name}")
     out = Path(dest_dir) / run
     out.mkdir(parents=True, exist_ok=True)
     # Both files at once: cold-start time is mostly this download.
-    with ThreadPoolExecutor(max_workers=len(SERVER_FILES)) as pool:
+    with ThreadPoolExecutor(max_workers=len(files)) as pool:
         futures = [
-            pool.submit(_download_verified, b, f"{PREFIX}/{run}/{name}", out / name, files[name])
-            for name in SERVER_FILES
+            pool.submit(_download_verified, b, f"{PREFIX}/{run}/{name}", out / name, entries[name]) for name in files
         ]
         for f in futures:
             f.result()
@@ -137,10 +139,10 @@ def _meta(db: Path) -> dict[str, str]:
         conn.close()
 
 
-def load_local(local_dir: Path) -> IndexPaths:
-    """An already-built index directory (no download, no sha check)."""
+def load_local(local_dir: Path, *, files: tuple[str, ...] = SERVER_FILES) -> IndexPaths:
+    """An already-built index directory (no download, no sha check); ``files`` must exist."""
     d = Path(local_dir)
-    for name in SERVER_FILES:
+    for name in files:
         if not (d / name).is_file():
             raise IndexLoadError(f"{d / name} not found")
     manifest_path = d / "manifest.json"
