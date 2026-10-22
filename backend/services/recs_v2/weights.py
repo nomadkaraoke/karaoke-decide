@@ -66,7 +66,7 @@ def song_weight(doc: dict[str, object]) -> float:
 
 
 def to_int(v: object) -> int | None:
-    if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+    if isinstance(v, bool) or not isinstance(v, int | float | str):
         return None
     try:
         return int(v)
