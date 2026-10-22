@@ -163,17 +163,19 @@ export const api = {
     /**
      * Is `token` a legacy decide guest session? Probes with that token
      * directly and never touches the stored one (no 401 redirect).
+     * "unknown" (network error or 5xx) must be treated as possibly a guest.
      */
-    isGuestToken: async (token: string): Promise<boolean> => {
+    probeGuestToken: async (token: string): Promise<"guest" | "not_guest" | "unknown"> => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!response.ok) return false;
+        if (response.status === 401) return "not_guest";
+        if (!response.ok) return "unknown";
         const me = (await response.json()) as { is_guest?: boolean };
-        return me.is_guest === true;
+        return me.is_guest === true ? "guest" : "not_guest";
       } catch {
-        return false;
+        return "unknown";
       }
     },
 

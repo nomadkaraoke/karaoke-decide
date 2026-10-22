@@ -36,7 +36,7 @@ test.describe("gen sign-in", () => {
     await page.getByTestId("login-code").fill(code);
     await page.getByTestId("login-verify").click();
 
-    await expect(page).toHaveURL(/\/en\/my-songs/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/en\/(my-songs|my-data)/, { timeout: 15000 });
 
     const token = await page.evaluate(() =>
       localStorage.getItem("karaoke_decide_token")

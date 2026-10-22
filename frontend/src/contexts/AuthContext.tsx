@@ -140,8 +140,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await claimGuestIfAny();
       // Also check quiz status
       await refreshQuizStatus();
-    } catch {
-      // Token is invalid or expired
+    } catch (err) {
+      // Token is invalid or expired. A legacy (dotted) token that failed for a
+      // transient reason may still hold guest data: park it for claiming.
+      if (token.includes(".") && !(err instanceof ApiError && err.status === 401)) {
+        writeGuestToken(token);
+      }
       clearAuthToken();
       setUser(null);
       setHasCompletedQuiz(false);
@@ -156,7 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // can claim its data into the new account.
     const existing = getAuthToken();
     if (existing && existing !== token && existing.includes(".")) {
-      if (await api.auth.isGuestToken(existing)) writeGuestToken(existing);
+      // Park unless definitely not a guest: a transient probe failure must not
+      // lose guest data (the claim's 400/404 cleans up a non-guest token).
+      if ((await api.auth.probeGuestToken(existing)) !== "not_guest") {
+        writeGuestToken(existing);
+      }
     }
     setAuthToken(token);
     // Token is stored; caller should call checkAuth() to fetch user data
@@ -171,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore errors on logout
     } finally {
       clearAuthToken();
+      writeGuestToken(null);
       setUser(null);
       setHasCompletedQuiz(false);
     }

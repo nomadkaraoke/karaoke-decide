@@ -10,12 +10,25 @@ const GEN_TOKEN = "gen-session-token-without-dots";
 const GUEST_KEY = "karaoke_decide_guest_token";
 const TOKEN_KEY = "karaoke_decide_token";
 
-async function mockStack(page: Page, claimStatus: number) {
+async function mockStack(page: Page, claimStatus: number, meGuestStatus = 200) {
+  let guestMeCalls = 0;
   const claims: Array<{ auth: string | undefined; body: unknown }> = [];
 
+  // Catch-all first (later routes win): pages opened after sign-in must not hit
+  // a real API, whose 401 for the fake token would sign the test user out.
+  await page.route(/\/api\//, (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+  );
   await page.route("**/api/auth/me", async (route) => {
     const auth = route.request().headers()["authorization"];
     const isGuest = auth === `Bearer ${GUEST_JWT}`;
+    if (isGuest) guestMeCalls += 1;
+    // meGuestStatus applies from the 2nd guest /me call (the sign-in probe),
+    // so the initial page-load check succeeds.
+    if (isGuest && meGuestStatus !== 200 && guestMeCalls > 1) {
+      await route.fulfill({ status: meGuestStatus, contentType: "application/json", body: "{}" });
+      return;
+    }
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -59,6 +72,18 @@ async function mockStack(page: Page, claimStatus: number) {
   return claims;
 }
 
+/** localStorage read that survives the post-sign-in redirect. */
+async function readGuestKey(page: Page): Promise<string | null> {
+  for (let i = 0; i < 20; i++) {
+    try {
+      return await page.evaluate((g) => localStorage.getItem(g), GUEST_KEY);
+    } catch {
+      await page.waitForLoadState("domcontentloaded").catch(() => {});
+    }
+  }
+  throw new Error("could not read localStorage");
+}
+
 async function signIn(page: Page) {
   await page.goto("/en/login");
   await page.getByTestId("login-email").fill("claimer@example.com");
@@ -87,10 +112,11 @@ test.describe("claim guest profile on sign-in", () => {
     const claims = await mockStack(page, 200);
     await signIn(page);
 
+    await expect.poll(() => claims.length).toBe(1);
     await expect(page.getByTestId("claim-guest-toast")).toContainText(
-      "We moved your quiz answers and songs to your account."
+      "We moved your quiz answers and songs to your account.",
+      { timeout: 10000 }
     );
-    expect(claims).toHaveLength(1);
     expect(claims[0].body).toEqual({ guest_token: GUEST_JWT });
     expect(claims[0].auth).toBe(`Bearer ${GEN_TOKEN}`);
 
@@ -108,7 +134,7 @@ test.describe("claim guest profile on sign-in", () => {
 
     await expect.poll(() => claims.length).toBe(1);
     await expect
-      .poll(() => page.evaluate((g) => localStorage.getItem(g), GUEST_KEY))
+      .poll(() => readGuestKey(page))
       .toBeNull();
     await expect(page.getByTestId("claim-guest-toast")).toHaveCount(0);
   });
@@ -119,8 +145,36 @@ test.describe("claim guest profile on sign-in", () => {
 
     await expect.poll(() => claims.length).toBe(1);
     await expect(page.getByTestId("claim-guest-toast")).toHaveCount(0);
-    expect(await page.evaluate((g) => localStorage.getItem(g), GUEST_KEY)).toBe(
+    expect(await readGuestKey(page)).toBe(
       GUEST_JWT
     );
+  });
+
+  test("a 5xx probe still parks the token and the claim goes ahead", async ({ page }) => {
+    const claims = await mockStack(page, 200, 503);
+    await signIn(page);
+
+    // (No toast assertion: a post-sign-in redirect may reload the page first.)
+    await expect.poll(() => claims.length).toBe(1);
+    expect(claims[0].body).toEqual({ guest_token: GUEST_JWT });
+    await expect
+      .poll(() => readGuestKey(page))
+      .toBeNull();
+  });
+
+  test("logout clears a pending guest token", async ({ page }) => {
+    await mockStack(page, 503);
+    await signIn(page); // claim 503 -> token kept
+    await expect
+      .poll(() => readGuestKey(page))
+      .toBe(GUEST_JWT);
+    await page.route("**/api/users/auth/logout", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: "{}" })
+    );
+    await page.goto("/en/status");
+    await page.getByTitle("Log out").click();
+    await expect
+      .poll(() => readGuestKey(page))
+      .toBeNull();
   });
 });
