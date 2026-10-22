@@ -179,6 +179,7 @@ def run(
         if job.get("outputs_deleted_at"):
             counts["skipped_deleted"] += 1
             continue
+        counts["attempted"] += 1
         try:
             with gen.blob(corr_names[jid]).open("rb") as fh:
                 windows = select_word_windows(json.loads(fh.read()))
@@ -223,7 +224,7 @@ def run(
         + " ".join(f"{k}={v}" for k, v in summary.items())
         + f" rows={len(rows_out)}"
     )
-    if todo and counts["failed"] == len(todo):
+    if counts["attempted"] and counts["failed"] == counts["attempted"]:
         logger.error("vocal-range-gen: every job failed. %s", line)
     else:
         logger.info("vocal-range-gen done. %s", line)
@@ -233,6 +234,17 @@ def run(
 def _write(out: Any, name: str, rows: list[dict[str, str]]) -> None:
     with out.blob(name).open("wb") as fh:
         fh.write(_csv_bytes(rows))
+
+
+def resolve_run_id(explicit: str | None = None) -> str:
+    """--run, else VOCAL_RANGE_RUN, else CLOUD_RUN_EXECUTION (shared by all tasks of one
+    execution), else a UTC timestamp."""
+    return (
+        explicit
+        or os.environ.get("VOCAL_RANGE_RUN")
+        or os.environ.get("CLOUD_RUN_EXECUTION")
+        or datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    )
 
 
 def _main(argv: list[str] | None = None) -> int:
@@ -253,7 +265,7 @@ def _main(argv: list[str] | None = None) -> int:
         snap: Any = db.collection("jobs").document(jid).get()
         return snap.to_dict() if snap.exists else None
 
-    run_id = args.run_id or os.environ.get("VOCAL_RANGE_RUN") or datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    run_id = resolve_run_id(args.run_id)
     run(
         client.bucket(GEN_BUCKET),
         client.bucket(OUT_BUCKET),

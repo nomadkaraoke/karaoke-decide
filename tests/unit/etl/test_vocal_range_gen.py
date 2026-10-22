@@ -149,3 +149,37 @@ def test_all_failures_log_error(monkeypatch: pytest.MonkeyPatch, caplog: pytest.
     assert summary["failed"] == 1
     levels = [r.levelno for r in caplog.records]
     assert levels.count(logging.ERROR) == 1
+
+
+def test_run_id_prefers_explicit_then_env_then_cloud_run_execution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VOCAL_RANGE_RUN", raising=False)
+    monkeypatch.setenv("CLOUD_RUN_EXECUTION", "vocal-range-gen-abc12")
+    assert vrg.resolve_run_id() == "vocal-range-gen-abc12"  # same for every task of the execution
+    monkeypatch.setenv("VOCAL_RANGE_RUN", "mine")
+    assert vrg.resolve_run_id() == "mine"
+    assert vrg.resolve_run_id("explicit") == "explicit"
+    monkeypatch.delenv("VOCAL_RANGE_RUN")
+    monkeypatch.delenv("CLOUD_RUN_EXECUTION")
+    assert len(vrg.resolve_run_id()) == 15  # timestamp fallback
+
+
+def test_error_only_when_every_attempted_job_failed(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Skipped (tenant) jobs are not attempts: one success + one failure is not an ERROR."""
+    calls = iter([RuntimeError("x"), ([0.0], 16000)])
+
+    def load(blob: Any) -> Any:
+        v = next(calls)
+        if isinstance(v, Exception):
+            raise v
+        return v
+
+    monkeypatch.setattr(vrg, "load_audio", load)
+    monkeypatch.setattr(vrg, "analyze_vocals", lambda y, sr, windows=None: STATS)
+    corr = _corr(_words((1.0, 2.0)))
+    gen = _gen({"a": corr, "b": corr, "t": corr}, with_stem={"a", "b", "t"})
+    jobs = {"a": {"artist": "A"}, "b": {"artist": "B"}, "t": {"tenant_id": "x"}}
+    with caplog.at_level(logging.INFO):
+        vrg.run(gen, FakeBucket(), jobs.get, run_id="r", task_index=0, task_count=1)
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]

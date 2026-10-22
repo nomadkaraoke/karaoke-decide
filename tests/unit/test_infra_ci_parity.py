@@ -496,3 +496,28 @@ def test_vocal_range_job_image_is_pinned_by_ci() -> None:
     assert "::warning::" in steps[0]["run"]  # skipped, not failed, until Pulumi creates the job
     build = [s for s in _ci_steps() if "Dockerfile.vocal-analysis" in s.get("run", "")]
     assert len(build) == 1 and "karaoke-decide-vocal" in build[0]["run"]
+
+
+def test_vocal_range_pulumi_image_tag_is_pushed_by_ci() -> None:
+    tree = _pulumi_tree()
+    c = _kwargs(_resource_call(tree, "Job", "vocal-range-gen-job"), _module_constants(tree))["template"]["template"][
+        "containers"
+    ][0]
+    tag = ast.unparse(c["image"]).rstrip("'").rsplit(":", 1)[1]
+    (build,) = [s for s in _ci_steps() if "Dockerfile.vocal-analysis" in s.get("run", "")]
+    assert f"-t $VOCAL_IMAGE:{tag}" in build["run"]
+    assert build.get("continue-on-error") is True
+
+
+def test_vocal_range_bucket_grant_has_list_clause() -> None:
+    tree = _pulumi_tree()
+    kw = _kwargs(
+        _resource_call(tree, "BucketIAMMember", "vocal-range-gen-musicbrainz-data-writer"), _module_constants(tree)
+    )
+    expr = kw["condition"]["expression"]
+    if not isinstance(expr, str):
+        expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
+    assert "objects/vocal-range/gen_measured/" in expr
+    assert 'resource.type == "storage.googleapis.com/Bucket"' in expr
+    assert 'api.getAttribute("storage.googleapis.com/objectListPrefix", "")' in expr
+    assert '.startsWith("vocal-range/gen_measured/")' in expr

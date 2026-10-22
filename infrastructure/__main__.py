@@ -1325,8 +1325,9 @@ gcp.projects.IAMMember(
     member=vocal_range_gen_member,
 )
 # Write (and list/read back for resume) only under vocal-range/gen_measured/. objectAdmin
-# is needed to overwrite the task's checkpointed part file (same prefix-condition pattern
-# as song-index-build's kn-data writer, which also lists under its prefix).
+# overwrites the task's checkpointed part file. Object reads/writes match on the object
+# name; `storage.objects.list` is checked against the BUCKET resource, so the condition
+# needs a separate clause on the list prefix attribute.
 gcp.storage.BucketIAMMember(
     "vocal-range-gen-musicbrainz-data-writer",
     bucket=MUSICBRAINZ_DATA_BUCKET,
@@ -1337,6 +1338,8 @@ gcp.storage.BucketIAMMember(
         "description": "vocal-range-gen may only write and read vocal-range/gen_measured/",
         "expression": (
             f'resource.name.startsWith("projects/_/buckets/{MUSICBRAINZ_DATA_BUCKET}/objects/vocal-range/gen_measured/")'
+            ' || (resource.type == "storage.googleapis.com/Bucket" && '
+            'api.getAttribute("storage.googleapis.com/objectListPrefix", "").startsWith("vocal-range/gen_measured/"))'
         ),
     },
 )

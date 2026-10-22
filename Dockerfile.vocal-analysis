@@ -14,5 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsndfi
 # explicit about the resulting set).
 RUN poetry install --no-interaction --no-ansi --only main,vocal-analysis --no-root
 
+ENV NUMBA_CACHE_DIR=/tmp/numba
 USER appuser
 CMD ["python", "-m", "karaoke_decide.etl.vocal_range_gen", "run"]
