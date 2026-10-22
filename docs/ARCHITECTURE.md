@@ -315,5 +315,6 @@ gcloud run deploy SERVICE_NAME \
 | `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
 | `postmark-server-token` | `POSTMARK_SERVER_TOKEN` | Email delivery |
 | `decide-gen-partner-secret` | `DECIDE_GEN_PARTNER_SECRET` | Search service only: gen catalog-resolve partner auth (secret owned by karaoke-gen's Pulumi) |
+| `decide-kjbox-secret` | `DECIDE_KJBOX_SECRET` | Main API: kjbox's karaoke-log partner auth (`X-Kjbox-Secret`). Pulumi creates the secret; its value is added by hand (`/gcp-admin`) and must exist before a deploy that mounts it. kjbox's `decide_kjbox_secret` config holds the same value. |
 
 **IAM requirement:** Cloud Run service account needs `roles/secretmanager.secretAccessor` on each secret. Managed via Pulumi in `infrastructure/__main__.py`.

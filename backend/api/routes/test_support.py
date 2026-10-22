@@ -15,8 +15,10 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import get_auth_service_dep, get_firestore
+from backend.models.karaoke_log import KaraokeLogEntry
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
+from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLLECTION, log_doc_id
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 
 router = APIRouter()
@@ -26,7 +28,7 @@ USERS = AuthService.USERS_COLLECTION
 ARTISTS_COLLECTION = "user_artists"
 QUIZ_PROGRESS_COLLECTION = "quiz_progress"
 # Every per-user collection keyed by a user_id field, cleared by reset and by seed.
-USER_OWNED = (USER_SONGS_COLLECTION, ARTISTS_COLLECTION, HIDDEN_COLLECTION)
+USER_OWNED = (USER_SONGS_COLLECTION, ARTISTS_COLLECTION, HIDDEN_COLLECTION, LOG_COLLECTION, UNRESOLVED_COLLECTION)
 
 FirestoreDep = Annotated[FirestoreService, Depends(get_firestore)]
 AuthDep = Annotated[AuthService, Depends(get_auth_service_dep)]
@@ -60,7 +62,11 @@ def _split_key(song_key: str) -> tuple[str, str]:
 async def _clear_user_data(fs: FirestoreService, user_id: str) -> None:
     for collection in USER_OWNED:
         docs = await fs.query_documents(collection, filters=[("user_id", "==", user_id)], limit=10000)
-        await fs.batch_delete(collection, [d["id"] for d in docs])
+        if collection == LOG_COLLECTION:  # the doc's own ``id`` field is the entry id, not the doc id
+            ids = [log_doc_id(user_id, d["id"]) for d in docs]
+        else:
+            ids = [d["id"] for d in docs]
+        await fs.batch_delete(collection, ids)
     await fs.delete_document(QUIZ_PROGRESS_COLLECTION, user_id)
 
 
@@ -129,4 +135,40 @@ async def read_profile(email: Annotated[str, Query()], fs: FirestoreDep, auth: A
         ],
         "loved": [s.song_key for s in await feedback.list_loved(user_id)] if user_id else [],
         "hidden": [s.song_key for s in await feedback.list_hidden(user_id)] if user_id else [],
+    }
+
+
+@router.get("/karaoke-log")
+async def read_karaoke_log(email: Annotated[str, Query()], fs: FirestoreDep, auth: AuthDep) -> dict[str, Any]:
+    """Everything the karaoke log holds for the user, for E2E assertions.
+
+    ``entries``: every record, newest ``updated_at`` first, deleted ones and survey-only
+    placeholders included. ``sung``: ``user_songs`` rows with a sung count. ``unresolved``:
+    the per-artist+title counts of records with no catalog match."""
+    doc = await fs.get_document(USERS, auth._hash_email(email.lower())) or {}
+    user_id = doc.get("user_id")
+    if not user_id:
+        return {"user_id": None, "entries": [], "sung": [], "unresolved": []}
+    by_user = [("user_id", "==", user_id)]
+    logs, songs, unresolved = (
+        await fs.query_documents(LOG_COLLECTION, filters=by_user, limit=10000),
+        await fs.query_documents(USER_SONGS_COLLECTION, filters=by_user, limit=10000),
+        await fs.query_documents(UNRESOLVED_COLLECTION, filters=by_user, limit=10000),
+    )
+    logs.sort(key=lambda d: str(d.get("updated_at") or ""), reverse=True)
+    return {
+        "user_id": user_id,
+        "entries": [
+            KaraokeLogEntry.model_validate(d).model_dump(mode="json", exclude={"user_id", "email_hash"}) for d in logs
+        ],
+        "sung": [
+            {k: d.get(k) for k in ("song_key", "artist", "title", "times_sung", "last_sung_at", "source")}
+            for d in songs
+            if d.get("times_sung")
+        ],
+        "unresolved": [
+            {"artist": d.get("artist"), "title": d.get("title"), "times_sung": d.get("times_sung")}
+            for d in unresolved
+            if d.get("times_sung")
+        ],
     }

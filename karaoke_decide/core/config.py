@@ -7,6 +7,8 @@ from typing import Literal
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+LOCAL_STACK_KJBOX_SECRET = "local-stack-secret"
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -24,6 +26,10 @@ class Settings(BaseSettings):
     # Local-stack /api/test/* seeding routes (env DECIDE_TEST_API). The backend refuses to mount
     # them when environment is production, whatever this says.
     decide_test_api: bool = False
+
+    # kjbox -> decide karaoke-log partner secret (env DECIDE_KJBOX_SECRET; Secret Manager
+    # decide-kjbox-secret). Empty disables the partner routes (503). Use ``kjbox_secret``.
+    decide_kjbox_secret: str = ""
 
     # Google Cloud
     google_cloud_project: str = ""
@@ -111,6 +117,15 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production."""
         return self.environment == "production"
+
+    @property
+    def kjbox_secret(self) -> str:
+        """The effective kjbox partner secret. With the local-stack test API on (never in
+        production) an unset secret defaults to ``local-stack-secret``, kjbox's local value."""
+        secret = self.decide_kjbox_secret.strip()
+        if not secret and self.decide_test_api and not self.is_production:
+            return LOCAL_STACK_KJBOX_SECRET
+        return secret
 
     @property
     def is_emulated(self) -> bool:

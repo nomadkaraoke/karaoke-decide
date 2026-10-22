@@ -56,7 +56,8 @@ def lastfm_song(playcount: int | None) -> float:
 def song_weight(doc: dict[str, object]) -> float:
     """Weight of one ``user_songs`` doc by its ``source``."""
     source = doc.get("source")
-    if source in MANUAL_SOURCES:
+    loved = doc.get("loved")  # "Love it" marker (song_feedback_service.is_loved); None on legacy rows
+    if loved is True or (source in MANUAL_SOURCES and not (source == "manual" and loved is False)):
         return SONG_MANUAL
     if source == "lastfm":
         return lastfm_song(to_int(doc.get("playcount")))

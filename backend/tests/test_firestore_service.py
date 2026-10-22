@@ -339,3 +339,46 @@ class TestFirestoreServiceBatchAndGetMany:
         result = await firestore_service.get_many("things", ["a", "b"])
         assert result == {"a": {"n": 1}}
         assert await firestore_service.get_many("things", []) == {}
+
+
+class TestRunTransaction:
+    """run_transaction: reads and writes across several documents in one transaction."""
+
+    @pytest.mark.asyncio
+    @patch("backend.services.firestore_service.firestore")
+    async def test_reads_and_writes_through_the_transaction(
+        self, mock_firestore: MagicMock, firestore_service: FirestoreService
+    ) -> None:
+        mock_firestore.async_transactional = lambda fn: fn  # run the body once, no retry wrapper
+        transaction = MagicMock()
+        client = mock_firestore.AsyncClient.return_value
+        client.transaction.return_value = transaction
+
+        def doc_ref(collection: str, doc_id: str) -> MagicMock:
+            ref = MagicMock(name=f"{collection}/{doc_id}")
+            snap = MagicMock()
+            snap.exists = doc_id == "present"
+            snap.to_dict.return_value = {"n": 1}
+            ref.get = AsyncMock(return_value=snap)
+            return ref
+
+        refs: dict[tuple[str, str], MagicMock] = {}
+
+        def collection(name: str) -> MagicMock:
+            col = MagicMock()
+            col.document.side_effect = lambda d: refs.setdefault((name, d), doc_ref(name, d))
+            return col
+
+        client.collection.side_effect = collection
+
+        async def body(txn: object) -> tuple[object, object]:
+            a = await txn.get("c", "present")  # type: ignore[attr-defined]
+            b = await txn.get("c", "missing")  # type: ignore[attr-defined]
+            txn.set("c", "new", {"x": 1})  # type: ignore[attr-defined]
+            txn.delete("c", "present")  # type: ignore[attr-defined]
+            return a, b
+
+        assert await firestore_service.run_transaction(body) == ({"n": 1}, None)
+        refs[("c", "present")].get.assert_awaited_with(transaction=transaction)
+        transaction.set.assert_called_once_with(refs[("c", "new")], {"x": 1})
+        transaction.delete.assert_called_once_with(refs[("c", "present")])

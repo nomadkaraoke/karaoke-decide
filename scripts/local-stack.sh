@@ -20,6 +20,8 @@
 # Env overrides: DECIDE_LOCAL_PORT (8030), SEARCH_LOCAL_PORT (8020),
 # GEN_API_URL (http://127.0.0.1:8010; must be loopback),
 # LOCAL_STACK_PARTNER_SECRET (local-stack-secret; the caller's DECIDE_GEN_PARTNER_SECRET is ignored),
+# LOCAL_STACK_KJBOX_SECRET (local-stack-secret: kjbox's karaoke-log partner secret, sent as
+# X-Kjbox-Secret; the caller's DECIDE_KJBOX_SECRET is ignored),
 # SEARCH_LOCAL_PUBLIC_URL (http://127.0.0.1:$SEARCH_PORT; http://10.0.2.2:... for Android),
 # DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`).
 # See docs/TESTING.md § "Local stack". bash 3.2 compatible (macOS).
@@ -45,6 +47,7 @@ GEN_API_URL="${GEN_API_URL:-http://127.0.0.1:8010}"
 # Never inherit DECIDE_GEN_PARTNER_SECRET from the caller's environment (it may be a real one):
 # only an explicit LOCAL_STACK_PARTNER_SECRET overrides the fixed local value.
 PARTNER_SECRET="${LOCAL_STACK_PARTNER_SECRET:-local-stack-secret}"
+KJBOX_SECRET="${LOCAL_STACK_KJBOX_SECRET:-local-stack-secret}"
 case "$GEN_API_URL" in
     http://127.0.0.1|http://127.0.0.1:*|http://localhost|http://localhost:*|http://10.0.2.2|http://10.0.2.2:*) ;;
     *) echo "refusing GEN_API_URL=$GEN_API_URL: the local stack only talks to a loopback gen (127.0.0.1, localhost, 10.0.2.2)" >&2; exit 2 ;;
@@ -187,7 +190,7 @@ up_api() {
         export ENVIRONMENT=development JWT_SECRET=local-stack-jwt
         export DECIDE_TEST_API=1 BIGQUERY_DISABLED=1
         export CATALOG_LOCAL_DIR="$CATALOG_DIR" SONG_INDEX_LOCAL_DIR="$INDEX_DIR"
-        export GEN_API_URL DECIDE_GEN_PARTNER_SECRET="$PARTNER_SECRET"
+        export GEN_API_URL DECIDE_GEN_PARTNER_SECRET="$PARTNER_SECRET" DECIDE_KJBOX_SECRET="$KJBOX_SECRET"
         nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.main:app --host 127.0.0.1 --port "$API_PORT" \
             > "$API_LOG" 2>&1 &
         echo $! > "$API_PID"

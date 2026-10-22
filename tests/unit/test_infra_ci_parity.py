@@ -290,6 +290,39 @@ def test_main_memory_cpu_and_scaling_match(pulumi_main: dict[str, Any], ci_main_
     assert str(template["max_instance_request_concurrency"]) == ci_main_deploy["--concurrency"] == "80"
 
 
+def test_main_secret_env_vars_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    # CI's --set-secrets replaces the service's secret envs on every deploy: both lists must agree.
+    secrets = _secret_envs(_container(pulumi_main))
+    assert secrets == _kv(str(ci_main_deploy["--set-secrets"]))
+    assert secrets["DECIDE_KJBOX_SECRET"] == "decide-kjbox-secret:latest"
+
+
+def test_kjbox_secret_is_managed_and_readable() -> None:
+    tree = _pulumi_tree()
+    secret = _kwargs(_resource_call(tree, "Secret", "decide-kjbox-secret"), _module_constants(tree))
+    assert secret["secret_id"] == "decide-kjbox-secret"
+    access = _kwargs(
+        _resource_call(tree, "SecretIamMember", "cloud-run-secret-access-decide-kjbox-secret"),
+        _module_constants(tree),
+    )
+    assert access["secret_id"] == "decide-kjbox-secret"
+    assert access["role"] == "roles/secretmanager.secretAccessor"
+
+
+def test_main_service_waits_for_the_kjbox_secret_and_its_grant() -> None:
+    """The API mounts DECIDE_KJBOX_SECRET, so Pulumi must create the secret and the accessor
+    grant before it updates the service (the version itself is added by hand)."""
+    call = _resource_call(_pulumi_tree(), "Service", PULUMI_MAIN_RESOURCE)
+    opts = next(kw.value for kw in call.keywords if kw.arg == "opts")
+    assert isinstance(opts, ast.Call)
+    deps = next(kw.value for kw in opts.keywords if kw.arg == "depends_on")
+    assert isinstance(deps, ast.List)
+    assert {e.id for e in deps.elts if isinstance(e, ast.Name)} == {
+        "decide_kjbox_secret",
+        "decide_kjbox_secret_access",
+    }
+
+
 def test_main_cpu_idle_and_boost_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
     resources = _container(pulumi_main)["resources"]
     assert resources["cpu_idle"] is True and ci_main_deploy.get("--cpu-throttling") is True
