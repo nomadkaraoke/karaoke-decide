@@ -18,7 +18,8 @@
 # listens on :8080 the main API's `up` starts scripts/start-emulators.sh itself.
 #
 # Env overrides: DECIDE_LOCAL_PORT (8030), SEARCH_LOCAL_PORT (8020),
-# GEN_API_URL (http://127.0.0.1:8010), DECIDE_GEN_PARTNER_SECRET (local-stack-secret),
+# GEN_API_URL (http://127.0.0.1:8010; must be loopback),
+# LOCAL_STACK_PARTNER_SECRET (local-stack-secret; the caller's DECIDE_GEN_PARTNER_SECRET is ignored),
 # SEARCH_LOCAL_PUBLIC_URL (http://127.0.0.1:$SEARCH_PORT; http://10.0.2.2:... for Android),
 # DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`).
 # See docs/TESTING.md § "Local stack". bash 3.2 compatible (macOS).
@@ -41,7 +42,13 @@ SEARCH_BASE="http://127.0.0.1:$SEARCH_PORT/api/search"
 SEARCH_PUBLIC_URL="${SEARCH_LOCAL_PUBLIC_URL:-http://127.0.0.1:$SEARCH_PORT}"
 API_PUBLIC_URL="${DECIDE_LOCAL_PUBLIC_URL:-http://127.0.0.1:$API_PORT}"
 GEN_API_URL="${GEN_API_URL:-http://127.0.0.1:8010}"
-PARTNER_SECRET="${DECIDE_GEN_PARTNER_SECRET:-local-stack-secret}"
+# Never inherit DECIDE_GEN_PARTNER_SECRET from the caller's environment (it may be a real one):
+# only an explicit LOCAL_STACK_PARTNER_SECRET overrides the fixed local value.
+PARTNER_SECRET="${LOCAL_STACK_PARTNER_SECRET:-local-stack-secret}"
+case "$GEN_API_URL" in
+    http://127.0.0.1|http://127.0.0.1:*|http://localhost|http://localhost:*|http://10.0.2.2|http://10.0.2.2:*) ;;
+    *) echo "refusing GEN_API_URL=$GEN_API_URL: the local stack only talks to a loopback gen (127.0.0.1, localhost, 10.0.2.2)" >&2; exit 2 ;;
+esac
 READY_TRIES="${DECIDE_LOCAL_READY_TRIES:-${SEARCH_LOCAL_READY_TRIES:-60}}"
 mkdir -p "$STATE_DIR"
 
@@ -103,7 +110,11 @@ stop_server() { # $1 = name, $2 = pid file, $3 = alive fn
 }
 
 up_search() {
-    if search_healthy; then echo "search already up on :$SEARCH_PORT"; return 0; fi
+    if search_healthy; then
+        if search_alive; then echo "search already up on :$SEARCH_PORT"; return 0; fi
+        echo "port $SEARCH_PORT is healthy but held by a process we did not start" >&2
+        return 1
+    fi
     if search_alive; then
         echo "search process $(cat "$SEARCH_PID") is alive but not healthy; run 'down' first" >&2
         return 1
@@ -114,7 +125,7 @@ up_search() {
         return 1
     fi
     echo "Building fixture index into $INDEX_DIR"
-    (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.song_search.fixtures build "$INDEX_DIR")
+    (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.song_search.fixtures build "$INDEX_DIR") || return 1
     echo "Starting search on :$SEARCH_PORT"
     (
         cd "$PROJECT_ROOT"
@@ -124,7 +135,7 @@ up_search() {
         nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.search.app:search_app --host 127.0.0.1 --port "$SEARCH_PORT" \
             > "$SEARCH_LOG" 2>&1 &
         echo $! > "$SEARCH_PID"
-    )
+    ) || return 1
     local i=0
     while [ "$i" -lt "$READY_TRIES" ]; do
         search_alive || break
@@ -147,11 +158,16 @@ ensure_firestore_emulator() {
         return 0
     fi
     echo "Nothing on 127.0.0.1:8080: starting emulators via scripts/start-emulators.sh"
-    "$SCRIPT_DIR/start-emulators.sh"
+    "$SCRIPT_DIR/start-emulators.sh" || return 1
+    (exec 3<>/dev/tcp/127.0.0.1/8080) 2>/dev/null || { echo "Firestore emulator still not listening on :8080" >&2; return 1; }
 }
 
 up_api() {
-    if api_healthy; then echo "api already up on :$API_PORT"; return 0; fi
+    if api_healthy; then
+        if api_alive; then echo "api already up on :$API_PORT"; return 0; fi
+        echo "port $API_PORT is healthy but held by a process we did not start" >&2
+        return 1
+    fi
     if api_alive; then
         echo "api process $(cat "$API_PID") is alive but not healthy; run 'down' first" >&2
         return 1
@@ -161,9 +177,9 @@ up_api() {
         lsof -nP -iTCP:"$API_PORT" -sTCP:LISTEN >&2 || true
         return 1
     fi
-    ensure_firestore_emulator
+    ensure_firestore_emulator || return 1
     echo "Building fixture catalog into $CATALOG_DIR"
-    (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.catalog.fixtures build "$CATALOG_DIR")
+    (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.catalog.fixtures build "$CATALOG_DIR") || return 1
     echo "Starting api on :$API_PORT"
     (
         cd "$PROJECT_ROOT"
@@ -175,7 +191,7 @@ up_api() {
         nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.main:app --host 127.0.0.1 --port "$API_PORT" \
             > "$API_LOG" 2>&1 &
         echo $! > "$API_PID"
-    )
+    ) || return 1
     local i=0
     while [ "$i" -lt "$READY_TRIES" ]; do
         api_alive || break
@@ -202,6 +218,9 @@ cmd_up() {
 cmd_down() {
     if [ "$SEARCH_ONLY" = 0 ]; then stop_server api "$API_PID" api_alive; fi
     stop_server search "$SEARCH_PID" search_alive
+    if [ "$SEARCH_ONLY" = 0 ]; then
+        echo "note: the docker Firestore/GCS emulators (gen's stack) are left running; stop them with gen's scripts/local-stack.sh down"
+    fi
 }
 
 cmd_status() {
@@ -221,7 +240,10 @@ case "$CMD" in
     up) cmd_up ;;
     down) cmd_down ;;
     status) cmd_status ;;
-    logs) if [ "$LOG_TARGET" = search ]; then tail -n 100 -f "$SEARCH_LOG"; else tail -n 100 -f "$API_LOG"; fi ;;
+    logs)
+        if [ "$LOG_TARGET" = search ]; then LF="$SEARCH_LOG"; else LF="$API_LOG"; fi
+        if [ -f "$LF" ]; then tail -n 100 -f "$LF"; else echo "no log yet: $LF (run 'up' first)" >&2; exit 1; fi
+        ;;
     env)
         echo "EXPO_PUBLIC_DECIDE_API_URL=$API_PUBLIC_URL"
         echo "EXPO_PUBLIC_DECIDE_SEARCH_URL=$SEARCH_PUBLIC_URL"
