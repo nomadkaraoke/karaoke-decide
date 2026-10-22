@@ -71,7 +71,7 @@ export default function LoginPage() {
   };
 
   const completeSignIn = async (sessionToken: string) => {
-    login(sessionToken);
+    await login(sessionToken);
     await checkAuth();
   };
 

@@ -230,51 +230,6 @@ test.describe("My Data Page", () => {
     await expect(page.getByText("High Energy")).toBeVisible();
     await expect(page.getByText("Rock")).toBeVisible();
   });
-
-  test("guest user sees upgrade prompt for services", async ({ page }) => {
-    // Override auth mock for guest
-    await page.route("**/api/auth/me", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "guest_123",
-          email: null,
-          display_name: null,
-          is_guest: true,
-        }),
-      });
-    });
-
-    // Mock summary endpoint
-    await page.route("**/api/my/data/summary", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          services: {},
-          artists: { total: 0, by_source: {} },
-          songs: { total: 0, with_karaoke: 0 },
-          preferences: { completed: false },
-        }),
-      });
-    });
-
-    // Mock services sync status
-    await page.route("**/api/services/sync/status", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ services: [], active_job: null }),
-      });
-    });
-
-    await page.goto("/my-data");
-    await page.waitForLoadState("networkidle");
-
-    // Guest should see upgrade prompt in services section
-    await expect(page.getByText(/create.*account/i)).toBeVisible({ timeout: 10000 });
-  });
 });
 
 test.describe("My Data Redirects", () => {

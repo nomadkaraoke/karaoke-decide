@@ -31,7 +31,7 @@ interface ServiceInfo {
 }
 
 export default function SettingsPage() {
-  const { user, isGuest, checkAuth, logout } = useAuth();
+  const { user, checkAuth, logout } = useAuth();
   const t = useTranslations('settings');
   const tc = useTranslations('common');
 
@@ -169,7 +169,7 @@ export default function SettingsPage() {
                     {t("emailLabel")}
                   </label>
                   <div className="px-3 py-2.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--text-muted)] text-sm">
-                    {user?.email || t("guestSession")}
+                    {user?.email}
                   </div>
                 </div>
 
@@ -313,18 +313,17 @@ export default function SettingsPage() {
                   <div>
                     <h2 className="font-semibold text-[var(--text)]">{t("logOutSection")}</h2>
                     <p className="text-xs text-[var(--text-muted)]">
-                      {isGuest ? t("clearGuestSession") : t("signOutOfAccount")}
+                      {t("signOutOfAccount")}
                     </p>
                   </div>
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleLogout}>
-                  {isGuest ? t("clearSession") : t("logOut")}
+                  {t("logOut")}
                 </Button>
               </div>
             </section>
 
-            {/* Danger Zone - Only for non-guests */}
-            {!isGuest && (
+            {/* Danger Zone */}
               <section className="p-5 rounded-2xl bg-red-500/5 border border-red-500/20">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
@@ -374,7 +373,6 @@ export default function SettingsPage() {
                   </div>
                 )}
               </section>
-            )}
 
             {/* Account ID */}
             <div className="text-center text-xs text-[var(--text-subtle)]">

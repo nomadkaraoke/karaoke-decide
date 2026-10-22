@@ -112,14 +112,13 @@ const GENRES: Genre[] = [
   { id: "other", labelKey: "other", exampleArtists: ["I'll browse recommendations"], emoji: "❓" },
 ];
 
-// 6-step quiz (redesigned flow):
+// 5-step quiz (redesigned flow):
 // Step 1: How It Works (intro) - explains the quiz, sets expectations
 // Step 2: What Kind of Music? (genres required + decades optional combined)
 // Step 3: Artists You Know (manual entry) - triggers smart artist pre-calc on continue
 // Step 4: Karaoke Preferences (prefs + songs you love to sing) - buys time for pre-calc
 // Step 5: Know Any of These? (smart suggestions) - loads instantly from pre-calc
-// Step 6: Email + Generating (collect email while recommendations generate)
-type QuizStep = 1 | 2 | 3 | 4 | 5 | 6;
+type QuizStep = 1 | 2 | 3 | 4 | 5;
 
 // Type for songs user enjoys singing in the quiz
 interface EnjoySongSelection extends SelectedSong {
@@ -167,12 +166,6 @@ export default function QuizPage() {
 
   // Submit state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [recommendationsReady, setRecommendationsReady] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
-  const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreArtists, setHasMoreArtists] = useState(true);
 
@@ -194,7 +187,8 @@ export default function QuizPage() {
 
     // If we have a draft, restore the state
     if (draft) {
-      setStep(draft.step);
+      // Drafts saved before step 6 was removed may hold step 6
+      setStep(Math.min(draft.step, 5) as QuizStep);
       setSelectedGenres(new Set(draft.selectedGenres));
       setSelectedDecades(new Set(draft.selectedDecades));
       setArtistAffinity(new Map(Object.entries(draft.artistAffinity)));
@@ -323,12 +317,11 @@ export default function QuizPage() {
   }, [authLoading, isAuthenticated, router]);
 
   // Redirect users who have already completed the quiz
-  // But not if we're on step 6 (email collection + generating)
   useEffect(() => {
-    if (!authLoading && !quizStatusLoading && isAuthenticated && hasCompletedQuiz && step !== 6) {
+    if (!authLoading && !quizStatusLoading && isAuthenticated && hasCompletedQuiz) {
       router.push("/recommendations");
     }
-  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, step, router]);
+  }, [authLoading, quizStatusLoading, isAuthenticated, hasCompletedQuiz, router]);
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -473,11 +466,6 @@ export default function QuizPage() {
         ([artist_name, affinity]) => ({ artist_name, affinity })
       );
 
-      // Move to step 6 immediately to show generating state
-      setStep(6);
-      setIsSubmitting(false);
-      setIsGenerating(true);
-
       // Submit main quiz data with all new fields
       await api.quiz.submit({
         artist_affinities: artistAffinityArray,
@@ -508,43 +496,11 @@ export default function QuizPage() {
       // Clear the saved draft since quiz is complete
       clearDraft();
 
-      // Mark recommendations as ready
-      setIsGenerating(false);
-      setRecommendationsReady(true);
+      router.push("/recommendations");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit quiz");
       setIsSubmitting(false);
-      setIsGenerating(false);
     }
-  };
-
-  const handleEmailSubmit = async () => {
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
-      setEmailError(t("pleaseEnterEmail"));
-      return;
-    }
-    if (!emailRegex.test(email.trim())) {
-      setEmailError(t("pleaseEnterValidEmail"));
-      return;
-    }
-
-    try {
-      setIsEmailSubmitting(true);
-      setEmailError(null);
-      // Collect email
-      await api.auth.collectEmail(email.trim());
-      setEmailSubmitted(true);
-      setIsEmailSubmitting(false);
-    } catch (err) {
-      setIsEmailSubmitting(false);
-      setEmailError(err instanceof Error ? err.message : t("failedToSaveEmail"));
-    }
-  };
-
-  const handleViewRecommendations = () => {
-    router.push("/recommendations");
   };
 
   const handleSkipToRecommendations = async () => {
@@ -604,8 +560,7 @@ export default function QuizPage() {
   };
 
   // Show loading while auth is being checked or redirecting
-  // But not if we're on step 6 (email collection + generating)
-  if (authLoading || quizStatusLoading || !isAuthenticated || (hasCompletedQuiz && step !== 6)) {
+  if (authLoading || quizStatusLoading || !isAuthenticated || (hasCompletedQuiz)) {
     return <LoadingOverlay message={t("startingQuiz")} />;
   }
 
@@ -614,7 +569,7 @@ export default function QuizPage() {
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Progress indicator */}
         <div data-testid="progress-indicator" className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3, 4, 5, 6].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <div
               key={s}
               data-testid={`progress-dot-${s}`}
@@ -1250,138 +1205,6 @@ export default function QuizPage() {
                   isSubmitting={isSubmitting}
                 />
               </>
-            )}
-          </>
-        )}
-
-        {/* Step 6: Email Collection + Generating Recommendations */}
-        {step === 6 && (
-          <>
-            <div className="text-center mb-8">
-              <h1 data-testid="email-step-heading" className="text-2xl font-bold text-[var(--text)] mb-2">
-                {t("almostThere")}
-              </h1>
-              <p className="text-[var(--text)]/60">
-                {t("enterEmailToSave")}
-              </p>
-            </div>
-
-            {/* Generation Progress */}
-            <div data-testid="generation-progress" className="mb-8 p-6 rounded-xl bg-[var(--card)] border border-[var(--card-border)]">
-              <div className="flex items-center gap-4">
-                {isGenerating ? (
-                  <>
-                    <LoaderIcon className="w-8 h-8 animate-spin text-[var(--brand-pink)] flex-shrink-0" />
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">{t("generatingRecs")}</h3>
-                      <p className="text-sm text-[var(--text-muted)]">{t("analyzingTaste")}</p>
-                      {/* Progress bar */}
-                      <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
-                        <div className="h-full bg-[var(--brand-pink)] rounded-full animate-pulse" style={{ width: "60%" }} />
-                      </div>
-                    </div>
-                  </>
-                ) : recommendationsReady ? (
-                  <>
-                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <CheckIcon className="w-5 h-5 text-green-500" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">{t("recsReady")}</h3>
-                      <p className="text-sm text-[var(--text-muted)]">{t("personalizedListWaiting")}</p>
-                      {/* Completed progress bar */}
-                      <div className="mt-3 h-2 bg-[var(--secondary)] rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500 rounded-full" style={{ width: "100%" }} />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-8 h-8 rounded-full bg-[var(--secondary)] flex items-center justify-center flex-shrink-0">
-                      <span className="text-[var(--text-muted)]">⏳</span>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-[var(--text)]">{t("waitingToGenerate")}</h3>
-                      <p className="text-sm text-[var(--text-muted)]">{t("startShortly")}</p>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Email Input */}
-            <div className="mb-8">
-              <label htmlFor="email" className="block text-sm font-medium text-[var(--text)]/70 mb-2 uppercase tracking-wide">
-                {t("yourEmail")}
-              </label>
-              {emailSubmitted ? (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
-                  <CheckIcon className="w-5 h-5 text-green-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-[var(--text)] font-medium">{t("emailSavedSuccess")}</p>
-                    <p className="text-sm text-[var(--text-muted)]">{email}</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex gap-3">
-                    <input
-                      id="email"
-                      data-testid="email-input"
-                      type="email"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        setEmailError(null);
-                      }}
-                      placeholder={t("emailPlaceholder")}
-                      className={`
-                        flex-1 px-4 py-3 rounded-xl bg-[var(--card)] border text-[var(--text)]
-                        placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--brand-pink)]
-                        ${emailError ? "border-red-500" : "border-[var(--card-border)]"}
-                      `}
-                      disabled={isEmailSubmitting}
-                    />
-                    <Button
-                      data-testid="email-save-button"
-                      variant="secondary"
-                      onClick={handleEmailSubmit}
-                      disabled={isEmailSubmitting || !email.trim()}
-                    >
-                      {isEmailSubmitting ? tCommon("loading") : t("saveEmail")}
-                    </Button>
-                  </div>
-                  {emailError && (
-                    <p className="mt-2 text-sm text-red-500">{emailError}</p>
-                  )}
-                  <p className="mt-3 text-xs text-[var(--text-muted)]">
-                    {t("emailUpdatesHint")}
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* View Recommendations Button */}
-            <Button
-              data-testid="view-recommendations-button"
-              variant="primary"
-              size="lg"
-              className="w-full"
-              onClick={handleViewRecommendations}
-              disabled={!emailSubmitted || !recommendationsReady}
-              rightIcon={<ChevronRightIcon className="w-5 h-5" />}
-            >
-              {!recommendationsReady
-                ? t("generatingRecommendationsButton")
-                : !emailSubmitted
-                  ? t("enterEmailToContinue")
-                  : t("viewRecommendations")}
-            </Button>
-
-            {!emailSubmitted && recommendationsReady && (
-              <p className="text-center mt-3 text-sm text-[var(--text-muted)]">
-                {t("pleaseEnterEmailAbove")}
-              </p>
             )}
           </>
         )}

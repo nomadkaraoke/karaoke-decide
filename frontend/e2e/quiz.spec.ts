@@ -2,13 +2,12 @@ import { test, expect } from "@playwright/test";
 
 /**
  * Quiz onboarding flow tests
- * Tests the 6-step quiz:
+ * Tests the 5-step quiz (sign-in required; submitting goes to /recommendations):
  * 1. How It Works (intro)
  * 2. What Kind of Music? (genres + decades)
  * 3. Artists You Know (manual entry)
  * 4. Karaoke Preferences (prefs + songs)
  * 5. Know Any of These? (smart suggestions)
- * 6. Almost There! (email collection + generating recommendations)
  *
  * Uses data-testid selectors for maintainability
  */
@@ -115,18 +114,6 @@ test.describe("Quiz Onboarding", () => {
       });
     });
 
-    // Mock email collection endpoint - permissive pattern
-    await page.route("**/auth/collect-email**", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          message: "Email collected",
-          user_id: "user_test123",
-        }),
-      });
-    });
-
     // Mock quiz progress endpoint (auto-save) - permissive pattern
     await page.route("**/quiz/progress**", async (route) => {
       await route.fulfill({
@@ -137,7 +124,7 @@ test.describe("Quiz Onboarding", () => {
     });
 
     // Navigate to home first to set up localStorage properly
-    await page.goto("/");
+    await page.goto("/en/");
 
     // Clear ALL localStorage first, then set only the auth token
     await page.evaluate(() => {
@@ -147,28 +134,28 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("quiz page shows intro (step 1)", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Check heading for intro using data-testid
     await expect(page.getByTestId("quiz-heading")).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId("quiz-heading")).toHaveText(/let's find your perfect karaoke songs/i);
 
-    // Check progress indicator (6 dots) using data-testid
+    // Check progress indicator (5 dots) using data-testid
     await expect(page.getByTestId("progress-indicator")).toBeVisible();
     await expect(page.getByTestId("progress-dot-1")).toBeVisible();
     await expect(page.getByTestId("progress-dot-2")).toBeVisible();
     await expect(page.getByTestId("progress-dot-3")).toBeVisible();
     await expect(page.getByTestId("progress-dot-4")).toBeVisible();
     await expect(page.getByTestId("progress-dot-5")).toBeVisible();
-    await expect(page.getByTestId("progress-dot-6")).toBeVisible();
+    await expect(page.getByTestId("progress-dot-6")).toHaveCount(0);
 
     // Check "Get Started" button exists
     await expect(page.getByRole("button", { name: /get started/i })).toBeVisible();
   });
 
   test("can navigate from intro to genre selection (step 2)", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Wait for step 1 content
@@ -192,7 +179,7 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("can select genres and decades in step 2", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate to step 2
@@ -227,7 +214,7 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("can navigate to step 3 (artists you know)", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate to step 2
@@ -246,7 +233,7 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("step 4 has karaoke preferences and songs section", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate through steps 1-3
@@ -283,7 +270,7 @@ test.describe("Quiz Onboarding", () => {
     const isWebkit = test.info().project.name === "webkit";
     test.skip(isWebkit, "Skip on webkit due to timing issues");
 
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate through steps 1-4
@@ -305,7 +292,7 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("can complete full quiz flow", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Step 1: Intro
@@ -332,29 +319,16 @@ test.describe("Quiz Onboarding", () => {
     // Step 5: Smart Artist Suggestions - finish quiz
     await expect(page.getByTestId("smart-artists-heading")).toBeVisible({ timeout: 10000 });
 
-    // Click finish quiz to go to step 6
+    // Click finish quiz to go to submit
     await page.getByRole("button", { name: /finish quiz/i }).click();
 
-    // Step 6: Email Collection + Generating
-    await expect(page.getByTestId("email-step-heading")).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId("email-step-heading")).toHaveText(/almost there/i);
-
-    // Enter email and save
-    const emailInput = page.getByTestId("email-input");
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill("test@example.com");
-    await page.getByTestId("email-save-button").click();
-
-    // Wait for recommendations to be ready (mocked) and click view recommendations
-    await expect(page.getByTestId("view-recommendations-button")).toBeEnabled({ timeout: 10000 });
-    await page.getByTestId("view-recommendations-button").click();
-
+    // Submitting goes straight to recommendations (no email step)
     // Should navigate to recommendations
     await page.waitForURL(/\/recommendations/, { timeout: 10000 });
   });
 
   test("can skip to recommendations from step 2", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate to step 2
@@ -364,22 +338,10 @@ test.describe("Quiz Onboarding", () => {
     // Select a genre (required)
     await page.getByTestId("genre-pop").click();
 
-    // Click skip to recommendations (goes to step 6)
+    // Click skip to recommendations (goes to submit)
     await page.getByRole("button", { name: /skip to recommendations/i }).click();
 
-    // Step 6: Email Collection + Generating
-    await expect(page.getByTestId("email-step-heading")).toBeVisible({ timeout: 10000 });
-
-    // Enter email and save
-    const emailInput = page.getByTestId("email-input");
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill("test@example.com");
-    await page.getByTestId("email-save-button").click();
-
-    // Wait for recommendations to be ready (mocked) and click view recommendations
-    await expect(page.getByTestId("view-recommendations-button")).toBeEnabled({ timeout: 10000 });
-    await page.getByTestId("view-recommendations-button").click();
-
+    // Submitting goes straight to recommendations (no email step)
     // Should navigate to recommendations
     await page.waitForURL(/\/recommendations/, { timeout: 10000 });
   });
@@ -389,7 +351,7 @@ test.describe("Quiz Onboarding", () => {
     const isMobileSafari = test.info().project.name === "mobile-safari";
     test.skip(isMobileSafari, "Skip on mobile-safari due to timing issues");
 
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Navigate to step 2
@@ -416,7 +378,7 @@ test.describe("Quiz Onboarding", () => {
   });
 
   test("selections persist through back/forward navigation", async ({ page }) => {
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Step 1: Go to step 2
@@ -462,7 +424,7 @@ test.describe("Quiz Onboarding", () => {
     const isWebkit = test.info().project.name === "webkit";
     test.skip(isWebkit, "Skip on webkit due to timing issues");
 
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Go through to step 4
@@ -493,22 +455,10 @@ test.describe("Quiz Onboarding", () => {
     await page.getByRole("button", { name: /continue/i }).click();
     await expect(page.getByTestId("smart-artists-heading")).toBeVisible({ timeout: 10000 });
 
-    // Finish quiz to go to step 6
+    // Finish quiz to go to submit
     await page.getByRole("button", { name: /finish quiz/i }).click();
 
-    // Step 6: Email Collection + Generating
-    await expect(page.getByTestId("email-step-heading")).toBeVisible({ timeout: 10000 });
-
-    // Enter email and save
-    const emailInput = page.getByTestId("email-input");
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill("test@example.com");
-    await page.getByTestId("email-save-button").click();
-
-    // Wait for recommendations to be ready (mocked) and click view recommendations
-    await expect(page.getByTestId("view-recommendations-button")).toBeEnabled({ timeout: 10000 });
-    await page.getByTestId("view-recommendations-button").click();
-
+    // Submitting goes straight to recommendations (no email step)
     await page.waitForURL(/\/recommendations/, { timeout: 10000 });
   });
 
@@ -517,7 +467,7 @@ test.describe("Quiz Onboarding", () => {
     const isMobile = test.info().project.name.includes("mobile");
     test.skip(isMobile, "Skip on mobile due to dev tools overlay interference with sticky bar");
 
-    await page.goto("/quiz");
+    await page.goto("/en/quiz");
     await page.waitForLoadState("networkidle");
 
     // Step 1 -> 2

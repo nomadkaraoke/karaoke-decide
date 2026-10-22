@@ -160,8 +160,48 @@ export const api = {
   // ============================================================================
 
   auth: {
-    collectEmail: (email: string) =>
-      api.post<{ message: string; user_id: string }>("/api/auth/collect-email", { email }),
+    /**
+     * Is `token` a legacy decide guest session? Probes with that token
+     * directly and never touches the stored one (no 401 redirect).
+     */
+    isGuestToken: async (token: string): Promise<boolean> => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return false;
+        const me = (await response.json()) as { is_guest?: boolean };
+        return me.is_guest === true;
+      } catch {
+        return false;
+      }
+    },
+
+    /**
+     * Merge a legacy guest profile into the signed-in (gen) account.
+     * Authenticated by the stored gen token; the body carries the guest JWT.
+     * Uses fetch directly so a failure never triggers the 401 sign-out redirect.
+     */
+    claimGuest: async (guestToken: string): Promise<void> => {
+      const token = getAuthToken();
+      let response: Response;
+      try {
+        response = await fetch(`${API_BASE_URL}/api/auth/claim-guest`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ guest_token: guestToken }),
+        });
+      } catch (error) {
+        const originalError = error instanceof Error ? error : new Error(String(error));
+        throw new NetworkError(NetworkError.getHelpfulMessage(originalError), originalError);
+      }
+      if (!response.ok) {
+        throw new ApiError(response.status, `API error: ${response.status}`);
+      }
+    },
 
     getMe: () =>
       api.get<{

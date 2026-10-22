@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedPage } from "@/components/ProtectedPage";
 import {
   MusicIcon,
@@ -76,7 +75,6 @@ interface ConnectedService {
 }
 
 export default function MusicIKnowPage() {
-  const { isGuest } = useAuth();
   const t = useTranslations("musicIKnow");
   const [activeTab, setActiveTab] = useState<Tab>("artists");
 
@@ -182,7 +180,6 @@ export default function MusicIKnowPage() {
           )}
           {activeTab === "services" && (
             <ServicesTab
-              isGuest={isGuest}
               onCountChange={handleServicesCountChange}
             />
           )}
@@ -867,10 +864,8 @@ function SongsTab({ onCountChange }: { onCountChange: (count: number) => void })
 
 // ============ SERVICES TAB ============
 function ServicesTab({
-  isGuest,
   onCountChange
 }: {
-  isGuest: boolean;
   onCountChange: (count: number) => void;
 }) {
   const t = useTranslations("musicIKnow");
@@ -903,12 +898,11 @@ function ServicesTab({
   }, [onCountChange, t]);
 
   useEffect(() => {
-    if (!isGuest) loadServices();
-    else setIsLoading(false);
+    loadServices();
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, [loadServices, isGuest]);
+  }, [loadServices]);
 
   const isConnected = (type: string) => services.some((s) => s.service_type === type);
   const getService = (type: string) => services.find((s) => s.service_type === type);
@@ -984,23 +978,6 @@ function ServicesTab({
     const date = new Date(dateString);
     return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
-
-  if (isGuest) {
-    return (
-      <div className="text-center py-12">
-        <div className="w-16 h-16 rounded-full bg-[var(--card)] flex items-center justify-center mx-auto mb-4">
-          <SpotifyIcon className="w-8 h-8 text-[var(--text-subtle)]" />
-        </div>
-        <h3 className="text-lg font-medium text-[var(--text)] mb-2">{t("connectYourServices")}</h3>
-        <p className="text-[var(--text-muted)] text-sm mb-6 max-w-sm mx-auto">
-          {t("connectServicesGuestDesc")}
-        </p>
-        <Link href="/login">
-          <Button variant="primary">{t("createAccount")}</Button>
-        </Link>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return <LoadingPulse count={2} />;
