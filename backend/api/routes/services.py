@@ -51,7 +51,11 @@ from backend.services.screenshot_import_service import (
 from backend.services.sync_service import ImportRateLimitedError
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
-from karaoke_decide.services.listenbrainz import ListenBrainzImportInProgressError, ListenBrainzRateLimitedError
+from karaoke_decide.services.listenbrainz import (
+    LB_IMPORT_TERMINAL_STATUSES,
+    ListenBrainzImportInProgressError,
+    ListenBrainzRateLimitedError,
+)
 from karaoke_decide.services.metabrainz_oauth import new_pkce_pair
 from karaoke_decide.services.spotify_embed import (
     InvalidSpotifyPlaylistUrlError,
@@ -595,7 +599,6 @@ def _listenbrainz_oauth_return(
     return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND, headers=headers)
 
 
-LB_IMPORT_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
 _ZIP_MAGIC = b"PK\x03\x04"
 
 

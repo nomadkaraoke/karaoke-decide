@@ -11,6 +11,7 @@ import logging
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -18,6 +19,14 @@ from backend.config import BackendSettings
 from karaoke_decide.core.exceptions import ExternalServiceError
 
 logger = logging.getLogger(__name__)
+
+# ``GET /1/import-listens/<id>/`` statuses after which an import never changes again.
+LB_IMPORT_TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+
+def _user_path(username: str) -> str:
+    """A username as one URL path segment (LB usernames may contain ``/``, ``?``, spaces...)."""
+    return quote(username, safe="")
 
 
 class ListenBrainzRateLimitedError(ExternalServiceError):
@@ -109,7 +118,7 @@ class ListenBrainzClient:
         client = await self._get_client()
 
         try:
-            response = await client.get(f"{self.api_base}/user/{username}/listen-count")
+            response = await client.get(f"{self.api_base}/user/{_user_path(username)}/listen-count")
 
             if response.status_code == 404:
                 raise ExternalServiceError("ListenBrainz", f"User '{username}' not found")
@@ -205,13 +214,17 @@ class ListenBrainzClient:
         }
 
     @staticmethod
-    def _raise_for_import_status(response: httpx.Response) -> None:
+    def _raise_if_rate_limited(response: httpx.Response) -> None:
         if response.status_code == 429:
             try:
                 retry_after = float(response.headers.get("X-RateLimit-Reset-In", ""))
             except ValueError:
                 retry_after = 60.0
             raise ListenBrainzRateLimitedError(retry_after)
+
+    @classmethod
+    def _raise_for_import_status(cls, response: httpx.Response) -> None:
+        cls._raise_if_rate_limited(response)
         if response.status_code == 400 and "already in progress" in response.text:
             raise ListenBrainzImportInProgressError()
         if response.status_code != 200:
@@ -251,7 +264,8 @@ class ListenBrainzClient:
             List of listens.
 
         Raises:
-            ExternalServiceError: If API error.
+            ListenBrainzRateLimitedError: 429.
+            ExternalServiceError: Any other API error (404: user not found).
         """
         client = await self._get_client()
 
@@ -263,10 +277,11 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.api_base}/user/{username}/listens",
+                f"{self.api_base}/user/{_user_path(username)}/listens",
                 params=params,
             )
 
+            self._raise_if_rate_limited(response)
             if response.status_code != 200:
                 raise ExternalServiceError("ListenBrainz", f"API error: {response.status_code}")
 
@@ -367,7 +382,7 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.api_base}/stats/user/{username}/artists",
+                f"{self.api_base}/stats/user/{_user_path(username)}/artists",
                 params={"count": min(count, 100), "range": range_},
             )
 
@@ -412,7 +427,7 @@ class ListenBrainzClient:
 
         try:
             response = await client.get(
-                f"{self.api_base}/stats/user/{username}/recordings",
+                f"{self.api_base}/stats/user/{_user_path(username)}/recordings",
                 params={"count": min(count, 100), "range": range_},
             )
 
