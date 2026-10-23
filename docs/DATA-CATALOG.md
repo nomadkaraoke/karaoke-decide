@@ -1022,12 +1022,12 @@ Built by the `vocal_range` step of `mb-refresh` (see [VOCAL-RANGE.md](VOCAL-RANG
 float MIDI note numbers. All columns NULLABLE.
 
 ### song_vocal_range_sources
-One row per (song, source) before merging. `song_key`, `source` (`gen_measured|nomad_measured|ultrastar|gemini`),
+One row per (song, source) before merging. `song_key`, `source` (`gen_measured|pool_measured|nomad_measured|ultrastar|gemini`),
 `source_id`, `artist`, `title`, `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `octave_confidence`,
 `lead_part`, `weight_s` (voiced seconds), `pop_rank`, `confidence`, `loaded_at`.
 
 ### song_vocal_range
-Merged winner per `song_key` (source precedence gen_measured > nomad_measured > ultrastar > gemini):
+Merged winner per `song_key` (source precedence gen_measured > pool_measured > nomad_measured > ultrastar > gemini):
 `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `tier` (`measured|notes|estimated`), `source`,
 `octave_confidence`, `is_duet`, `n_sources`, `confidence`, and Phase 4 placeholders
 `crowd_comfortable`, `crowd_too_low`, `crowd_too_high` (always NULL for now).
@@ -1038,6 +1038,33 @@ Per `artist_key`: `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `basis`, `confid
 
 Also exported as TSVs under `gs://nomadkaraoke-musicbrainz-data/vocal-range/runs/<run>/` (pointer: `vocal-range/latest.json`) and surfaced as `vr_*`
 columns in `catalog.db` (schema 2) and `offline.db` (plus its `artist_vocal_range` table).
+
+## Voice pool tables
+
+Written by the Phase 3d voice-pool jobs (runbook: [VOICE-POOL.md](VOICE-POOL.md)). Both tables are
+created on first write (WRITE_APPEND). All columns NULLABLE.
+
+### voice_pool_songs
+One row per song added to the shared pool by `voice-pool-select` (appended per selection run):
+`song_key`, `pool_id` (`sha1(song_key)[:16]`, the Firestore `voice_pool_fetch` doc id), `artist`,
+`title`, `source` (`shared|andrew_sheet|personal`), `stratum`, `spotify_id`, `duration_ms`,
+`video_id` (best embeddable community version), `brand_code`, `selection_run`, `added_at`.
+
+### song_voice_analysis
+Per-song vocal markers from `voice-pool-analyse`, the source of record for voice.db. Readers take
+the latest row per `(song_key, analysis_version)`. Pitches are float MIDI note numbers.
+- Identity: `song_key`, `pool_id`, `analysis_version`, `analysed_at`.
+- Range: `low`, `high`, `p10`, `p50`, `p90`, `voiced_s`, `secs_above` / `secs_below` (JSON
+  `{"<midi>": seconds}`).
+- Register: `octave_split_male`, `octave_split_female`, `section_jump`.
+- Held notes: `sustained_high_count`, `sustained_high_s`, `longest_held_s`, `high_loudness_db`.
+- Density and phrasing: `syllables_per_s`, `density_source` (`ultrastar|onsets`),
+  `longest_phrase_s`, `intro_s`.
+- From Spotify: `key`, `mode`, `key_changes`, `energy`, `valence`, `duration_ms`.
+
+The same whole-song ranges are written as `pool_measured` CSVs
+(`gs://nomadkaraoke-musicbrainz-data/vocal-range/pool_measured/<run>/part-*.csv`) for the vocal
+range merge above.
 
 ---
 
@@ -1066,6 +1093,7 @@ Daily automated data pipelines running as Cloud Functions in the `nomadkaraoke` 
 |-----|----------|-----------|
 | `mb-refresh` | Sun 10:00 UTC | MusicBrainz full dump → `musicbrainz_staging` → `mb_*`, `karaoke_recording_links` |
 | `vocal-range-gen` | on demand | gen vocals stems -> pyin -> `gs://.../vocal-range/gen_measured/` (read by the `mb-refresh` vocal_range step) |
+| `voice-pool-select` / `voice-pool-fetch` (hourly, created paused) / `voice-pool-analyse` | see [VOICE-POOL.md](VOICE-POOL.md) | catalog → pool → flacfetch → gen GPU separation → markers → `voice_pool_songs`, `song_voice_analysis`, `vocal-range/pool_measured/`, `voice/latest.json` |
 | `lb-refresh` | Mon + Thu 11:00 UTC (runs only for a new export) | ListenBrainz statistics dump → `listenbrainz_staging` → `lb_*` |
 
 ---

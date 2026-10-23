@@ -7,11 +7,12 @@ is what the mobile TypeScript port must match.
 
 ## Sources and precedence
 
-`gen_measured` > `nomad_measured` > `ultrastar` > `gemini` (see `vocal_range/merge.py`).
+`gen_measured` > `pool_measured` > `nomad_measured` > `ultrastar` > `gemini` (see `vocal_range/merge.py`).
 
 | Source | What | Where it comes from |
 |--------|------|---------------------|
 | `gen_measured` | pyin over gen's separated vocals stems (word-timed windows, one pass per singer on duets) | `vocal-range-gen` Cloud Run job, `gs://nomadkaraoke-musicbrainz-data/vocal-range/gen_measured/<run>/part-*.csv` |
+| `pool_measured` | pyin over whole separated vocals of the Phase 3d voice pool (Spotify audio, gen GPU separation) | `voice-pool-analyse` Cloud Run job, `gs://nomadkaraoke-musicbrainz-data/vocal-range/pool_measured/<run>/part-*.csv` ([VOICE-POOL.md](VOICE-POOL.md)) |
 | `nomad_measured` | pyin over the NOMAD catalog vocal stems | `scripts/vocal_range/analyze_nomad_stems.py` on NomadPC, result committed as `data/vocal_range/nomad_measured.csv.gz` |
 | `ultrastar` | Note charts from the archive.org USDB dump (`usdb_20250204`), octave-repaired against the artist's lead gender. Only derived pitch statistics are kept, never lyrics | fetched once into `gs://.../vocal-range/ultrastar/`, parsed in memory |
 | `gemini` | Gemini Flash batch estimates from artist + title only, calibrated per popularity band against measured/UltraStar truth; uncalibrated bands are dropped | `scripts/vocal_range/gemini_batch.py` -> `data/vocal_range/gemini_{songs,artists}.csv.gz` |
