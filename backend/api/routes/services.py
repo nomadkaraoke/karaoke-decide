@@ -1095,7 +1095,7 @@ async def _start_sync_job(user_id: str, settings: BackendSettings, firestore: Fi
 
 
 async def _find_stalled_job(user_id: str, firestore: FirestoreService) -> str | None:
-    """The user's latest sync job id if it is in progress with a dead heartbeat, else None."""
+    """The user's latest sync job id if it is stalled (dead heartbeat or lost task), else None."""
     docs = await firestore.query_documents(
         collection="sync_jobs",
         filters=[("user_id", "==", user_id)],

@@ -164,9 +164,9 @@ async def test_concurrent_deliveries_only_one_claims() -> None:
 async def test_heartbeat_refreshes_updated_at() -> None:
     old = (datetime.now(UTC) - timedelta(seconds=200)).isoformat()
     fs = FakeFirestore(_job(SyncJobStatus.IN_PROGRESS))
-    fs.docs[JOB_ID]["updated_at"] = old
+    fs.docs[JOB_ID].update(updated_at=old, run_id="r1")
     with patch.object(internal, "HEARTBEAT_INTERVAL_SECONDS", 0.01):
-        task = asyncio.create_task(internal._heartbeat(fs, JOB_ID))  # type: ignore[arg-type]
+        task = asyncio.create_task(internal._heartbeat(fs, JOB_ID, "r1"))  # type: ignore[arg-type]
         await asyncio.sleep(0.05)
         task.cancel()
     assert fs.docs[JOB_ID]["updated_at"] > old
@@ -194,3 +194,90 @@ def test_trigger_sync_reuses_stalled_job(
     assert r.json()["job_id"] == JOB_ID
     mock_cloud_tasks_service.create_sync_task.assert_called_once_with(job_id=JOB_ID, user_id=sample_user.id)
     mock_firestore_service.set_document.assert_not_called()
+
+
+def test_stale_job_at_resume_cap_is_failed_not_resumed() -> None:
+    fs = FakeFirestore(
+        _job(SyncJobStatus.IN_PROGRESS, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 5, resume_count=MAX_SYNC_RESUMES)
+    )
+    svc = _sync_service()
+    assert _client(fs, svc).post("/internal/sync/process", json=BODY).status_code == 200
+    svc.sync_all_services_with_progress.assert_not_called()
+    assert fs.docs[JOB_ID]["status"] == "failed"
+
+
+def test_pending_job_is_claimed_without_counting_a_resume() -> None:
+    fs = FakeFirestore(_job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 5))
+    assert _client(fs, _sync_service()).post("/internal/sync/process", json=BODY).status_code == 200
+    assert fs.docs[JOB_ID]["resume_count"] == 0
+
+
+def test_superseded_run_does_not_write_its_result() -> None:
+    """A zombie run whose claim was taken over must not complete or fail the job."""
+    fs = FakeFirestore(_job(SyncJobStatus.PENDING))
+
+    async def takeover(**_: Any) -> list[Any]:
+        fs.docs[JOB_ID]["run_id"] = "someone-else"
+        return [
+            SimpleNamespace(
+                service_type="lastfm",
+                tracks_fetched=1,
+                tracks_matched=1,
+                user_songs_created=1,
+                user_songs_updated=0,
+                error=None,
+            )
+        ]
+
+    svc = MagicMock()
+    svc.sync_all_services_with_progress = AsyncMock(side_effect=takeover)
+    r = _client(fs, svc).post("/internal/sync/process", json=BODY)
+    assert r.status_code == 503
+    assert fs.docs[JOB_ID]["status"] == "in_progress"
+    assert fs.docs[JOB_ID]["run_id"] == "someone-else"
+
+
+def test_superseded_run_failure_does_not_requeue() -> None:
+    fs = FakeFirestore(_job(SyncJobStatus.PENDING))
+
+    async def boom(**_: Any) -> list[Any]:
+        fs.docs[JOB_ID]["run_id"] = "someone-else"
+        raise RuntimeError("late failure")
+
+    svc = MagicMock()
+    svc.sync_all_services_with_progress = AsyncMock(side_effect=boom)
+    assert _client(fs, svc).post("/internal/sync/process", json=BODY).status_code == 503
+    assert fs.docs[JOB_ID]["status"] == "in_progress"
+
+
+def test_status_reports_stalled_for_lost_pending_job(
+    auth_client: TestClient, mock_firestore_service: MagicMock
+) -> None:
+    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 60)
+    mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
+    r = auth_client.get("/api/services/sync/status", headers={"Authorization": "Bearer test-token"})
+    assert r.json()["active_job"]["status"] == "stalled"
+
+
+def test_trigger_sync_reuses_lost_pending_job(
+    auth_client: TestClient, mock_firestore_service: MagicMock, mock_cloud_tasks_service: MagicMock
+) -> None:
+    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 60)
+    mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
+    r = auth_client.post("/api/services/sync", headers={"Authorization": "Bearer test-token"})
+    assert r.json()["job_id"] == JOB_ID
+    mock_firestore_service.set_document.assert_not_called()
+
+
+@pytest.mark.parametrize("age", [5, None])
+def test_trigger_sync_new_job_when_latest_not_stalled(
+    auth_client: TestClient, mock_firestore_service: MagicMock, mock_cloud_tasks_service: MagicMock, age: int | None
+) -> None:
+    """A live job (fresh heartbeat) or a finished one is not reused."""
+    job = _job(SyncJobStatus.IN_PROGRESS, age_seconds=age) if age else _job(SyncJobStatus.COMPLETED, age_seconds=999)
+    mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
+    r = auth_client.post("/api/services/sync", headers={"Authorization": "Bearer test-token"})
+    assert r.status_code == 202
+    assert r.json()["job_id"] != JOB_ID
+    mock_firestore_service.set_document.assert_called_once()
+    assert mock_cloud_tasks_service.create_sync_task.call_args.kwargs["job_id"] != JOB_ID

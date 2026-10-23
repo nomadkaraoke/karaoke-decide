@@ -67,10 +67,14 @@ class SyncJob:
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     resume_count: int = 0
+    run_id: str | None = None  # token of the run that owns the job; only that run may write results
 
     def is_stalled(self, now: datetime | None = None) -> bool:
-        """True if the job claims to be running but its heartbeat has gone quiet."""
-        if self.status != SyncJobStatus.IN_PROGRESS:
+        """True if the job should be running (running, or queued) but nothing has touched it for too long.
+
+        A pending job this old has lost its Cloud Task (or exhausted the queue's retries).
+        """
+        if self.status not in (SyncJobStatus.IN_PROGRESS, SyncJobStatus.PENDING):
             return False
         age = ((now or datetime.now(UTC)) - self.updated_at).total_seconds()
         return age > STALE_JOB_THRESHOLD_SECONDS
@@ -106,6 +110,7 @@ class SyncJob:
             "updated_at": self.updated_at.isoformat(),
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "resume_count": self.resume_count,
+            "run_id": self.run_id,
         }
 
     @classmethod
@@ -144,4 +149,5 @@ class SyncJob:
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC),
             completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
             resume_count=data.get("resume_count", 0),
+            run_id=data.get("run_id"),
         )
