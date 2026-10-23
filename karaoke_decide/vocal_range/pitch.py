@@ -4,7 +4,9 @@ Standalone on purpose: depends only on numpy (librosa is imported lazily), with 
 package-relative imports, so ``scripts/vocal_range/analyze_nomad_stems.py`` can run
 against a plain copy of this file on a box without a decide checkout.
 
-Phase 3d will lift ``_voiced_midi_frames`` into a public frame-level ``vocal_frames``.
+``voiced_midi_frames`` is the public frame-level view (times, MIDI, loudness) that
+Phase 3d's ``karaoke_decide.voice_analysis`` builds on; it keeps exactly the frames that
+``analyze_vocals`` measures.
 """
 
 from __future__ import annotations
@@ -35,16 +37,17 @@ class PitchStats:
     voiced_s: float
 
 
-def _voiced_midi_frames(
+def _voiced_frames(
     y: np.ndarray,
     sr: int,
     windows: list[tuple[float, float]] | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return (times_s, midi) of kept voiced frames.
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (times_s, midi, rms_db) of kept voiced frames.
 
     Resamples to 16 kHz, runs pyin, keeps voiced frames with prob >= 0.5, then either
     keeps only frames inside ``windows`` (word timings) or, without windows, applies
-    energy gating (RMS dB >= P95 RMS dB - 25) to drop stem bleed.
+    energy gating (RMS dB >= P95 RMS dB - 25) to drop stem bleed. ``rms_db`` is the
+    same per-frame loudness the energy gate uses.
     """
     import librosa
 
@@ -53,7 +56,7 @@ def _voiced_midi_frames(
         y = y.mean(axis=0) if y.shape[0] < y.shape[-1] else y.mean(axis=-1)
     if sr != TARGET_SR:
         y = librosa.resample(y, orig_sr=sr, target_sr=TARGET_SR)
-    empty = (np.empty(0), np.empty(0))
+    empty = (np.empty(0), np.empty(0), np.empty(0))
     if y.size < PYIN_FRAME_LENGTH:
         return empty
 
@@ -69,19 +72,41 @@ def _voiced_midi_frames(
     t = librosa.frames_to_time(np.arange(n), sr=TARGET_SR, hop_length=HOP_LENGTH)
     keep = voiced_flag & (voiced_prob >= MIN_VOICED_PROB) & np.isfinite(f0)
 
+    rms = librosa.feature.rms(y=y, frame_length=PYIN_FRAME_LENGTH, hop_length=HOP_LENGTH)[0][:n]
+    db = 20 * np.log10(rms + 1e-10)
     if windows is not None:
         in_win = np.zeros(n, dtype=bool)
         for start, end in windows:
             in_win |= (t >= start) & (t <= end)
         keep &= in_win
     else:
-        rms = librosa.feature.rms(y=y, frame_length=PYIN_FRAME_LENGTH, hop_length=HOP_LENGTH)[0][:n]
-        db = 20 * np.log10(rms + 1e-10)
         keep[: len(db)] &= db >= (np.percentile(db, 95) - ENERGY_GATE_DB)
         keep[len(db) :] = False
 
     midi = 69 + 12 * np.log2(f0[keep] / 440.0)
-    return t[keep], midi
+    # pyin and rms share centre framing and hop, so lengths match; pad defensively.
+    db_full = np.full(n, np.nan)
+    db_full[: len(db)] = db
+    return t[keep], midi, db_full[keep]
+
+
+def _voiced_midi_frames(
+    y: np.ndarray,
+    sr: int,
+    windows: list[tuple[float, float]] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (times_s, midi) of kept voiced frames (see ``_voiced_frames``)."""
+    t, midi, _ = _voiced_frames(y, sr, windows)
+    return t, midi
+
+
+def voiced_midi_frames(
+    y: np.ndarray,
+    sr: int,
+    windows: list[tuple[float, float]] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Public frame-level view: ``(times_s, midi, rms_db)`` of the frames ``analyze_vocals`` keeps."""
+    return _voiced_frames(y, sr, windows)
 
 
 def analyze_vocals(

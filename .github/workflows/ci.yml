@@ -351,8 +351,8 @@ jobs:
             --concurrency 80 \
             --max-instances 10 \
             --min-instances 0 \
-            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke,GOOGLE_CLOUD_PROJECT_NUMBER=718638054799,CLOUD_RUN_URL=https://karaoke-decide-718638054799.us-central1.run.app,FRONTEND_URL=https://decide.nomadkaraoke.com,SPOTIFY_REDIRECT_URI=https://karaoke-decide-718638054799.us-central1.run.app/api/services/spotify/callback,LISTENBRAINZ_OAUTH_ENABLED=true,PUBLIC_API_BASE_URL=https://decide.nomadkaraoke.com" \
-            --set-secrets "JWT_SECRET=karaoke-decide-jwt-secret:latest,SPOTIFY_CLIENT_ID=spotipy-client-id:latest,SPOTIFY_CLIENT_SECRET=spotipy-client-secret:latest,LASTFM_API_KEY=lastfm-api-key:latest,POSTMARK_SERVER_TOKEN=postmark-server-token:latest,DECIDE_KJBOX_SECRET=decide-kjbox-secret:latest,APPLE_MUSICKIT_PRIVATE_KEY=apple-musickit-private-key:latest,APPLE_MUSICKIT_KEY_ID=apple-musickit-key-id:latest,APPLE_TEAM_ID=apple-team-id:latest,GEMINI_API_KEY=gemini-api-key:latest,METABRAINZ_CLIENT_ID=metabrainz-client-id:latest,METABRAINZ_CLIENT_SECRET=metabrainz-client-secret:latest,DECIDE_TOKEN_KEY=decide-token-key:latest"
+            --set-env-vars "ENVIRONMENT=production,GOOGLE_CLOUD_PROJECT=nomadkaraoke,GOOGLE_CLOUD_PROJECT_NUMBER=718638054799,CLOUD_RUN_URL=https://karaoke-decide-718638054799.us-central1.run.app,FRONTEND_URL=https://decide.nomadkaraoke.com,SPOTIFY_REDIRECT_URI=https://karaoke-decide-718638054799.us-central1.run.app/api/services/spotify/callback,LISTENBRAINZ_OAUTH_ENABLED=true,PUBLIC_API_BASE_URL=https://decide.nomadkaraoke.com,VOICE_DATA_BUCKET=nomadkaraoke-musicbrainz-data,VOICE_RECORDINGS_BUCKET=nomadkaraoke-voice-recordings" \
+            --set-secrets "JWT_SECRET=karaoke-decide-jwt-secret:latest,SPOTIFY_CLIENT_ID=spotipy-client-id:latest,SPOTIFY_CLIENT_SECRET=spotipy-client-secret:latest,LASTFM_API_KEY=lastfm-api-key:latest,POSTMARK_SERVER_TOKEN=postmark-server-token:latest,DECIDE_KJBOX_SECRET=decide-kjbox-secret:latest,APPLE_MUSICKIT_PRIVATE_KEY=apple-musickit-private-key:latest,APPLE_MUSICKIT_KEY_ID=apple-musickit-key-id:latest,APPLE_TEAM_ID=apple-team-id:latest,GEMINI_API_KEY=gemini-api-key:latest,METABRAINZ_CLIENT_ID=metabrainz-client-id:latest,METABRAINZ_CLIENT_SECRET=metabrainz-client-secret:latest,DECIDE_TOKEN_KEY=decide-token-key:latest,ADMIN_TOKENS=admin-tokens:latest"
 
       - name: Update mb-refresh job image
         # Cloud Run Jobs resolve the image at update time, not per execution, so
@@ -384,6 +384,44 @@ jobs:
           gcloud run jobs update lb-poll \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}
+
+      - name: Update voice-pool-select job image
+        id: voice_pool_select_update
+        # Non-critical: never skip the later deploy/verify steps.
+        continue-on-error: true
+        # Same as lb-poll: pin the on-demand voice-pool selection job to the deployed image (skipped until Pulumi creates it).
+        run: |
+          if ! out=$(gcloud run jobs describe voice-pool-select --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::voice-pool-select does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run jobs update voice-pool-select \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
+      - name: Update voice-pool-fetch job image
+        id: voice_pool_fetch_update
+        # Non-critical: never skip the later deploy/verify steps.
+        continue-on-error: true
+        # Same as lb-poll: pin the hourly voice-pool fetch job to the deployed image (skipped until Pulumi creates it).
+        run: |
+          if ! out=$(gcloud run jobs describe voice-pool-fetch --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::voice-pool-fetch does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run jobs update voice-pool-fetch \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
+      - name: Warn if voice-pool job image updates failed
+        if: steps.voice_pool_select_update.outcome == 'failure' || steps.voice_pool_fetch_update.outcome == 'failure'
+        run: echo "::warning::voice-pool-select / voice-pool-fetch image update failed (non-blocking; prod deploy unaffected)"
 
       - name: Deploy search service
         # Same image, different command. Settings must match infrastructure/__main__.py
@@ -461,9 +499,26 @@ jobs:
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/karaoke-decide-vocal:${{ github.sha }} \
             --region ${{ env.REGION }}
 
-      - name: Warn if vocal-range-gen image steps failed
-        if: steps.vocal_build.outcome == 'failure' || steps.vocal_update.outcome == 'failure'
-        run: echo "::warning::vocal-range-gen image build/update failed (non-blocking; prod deploy unaffected)"
+      - name: Update voice-pool-analyse job image
+        id: voice_analyse_update
+        # Same vocal-analysis image as vocal-range-gen; non-critical, skipped until Pulumi creates the job.
+        if: steps.vocal_build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          if ! out=$(gcloud run jobs describe voice-pool-analyse --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::voice-pool-analyse does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run jobs update voice-pool-analyse \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/karaoke-decide-vocal:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
+      - name: Warn if vocal-analysis image steps failed
+        if: steps.vocal_build.outcome == 'failure' || steps.vocal_update.outcome == 'failure' || steps.voice_analyse_update.outcome == 'failure'
+        run: echo "::warning::vocal-analysis image build or vocal-range-gen / voice-pool-analyse update failed (non-blocking; prod deploy unaffected)"
 
       - name: Verify deployment
         run: |

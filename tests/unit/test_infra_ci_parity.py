@@ -558,3 +558,179 @@ def test_song_index_build_reads_vocal_range_by_name() -> None:
         assert name.startswith("vocal-range/")
     # by name: the job never lists that bucket
     assert "list_names(VOCAL_RANGE_BUCKET" not in Path(sib.__file__).read_text()
+
+
+# --------------------------------------------------------------------------
+# Voice pool (Phase 3d): three jobs, the paused hourly scheduler, IAM, recordings bucket
+# --------------------------------------------------------------------------
+
+VOICE_POOL_JOBS = {
+    # resource name: (job name, args, cpu, memory, timeout, image repo)
+    "voice-pool-select-job": ("voice-pool-select", ["select"], "2", "4Gi", "3600s", "karaoke-decide"),
+    "voice-pool-fetch-job": ("voice-pool-fetch", ["fetch"], "1", "1Gi", "3900s", "karaoke-decide"),
+    "voice-pool-analyse-job": ("voice-pool-analyse", ["analyse"], "4", "8Gi", "21600s", "karaoke-decide-vocal"),
+}
+
+
+def _expr(kw: dict[str, Any]) -> str:
+    expr = kw["condition"]["expression"]
+    return expr if isinstance(expr, str) else ast.unparse(expr)
+
+
+@pytest.mark.parametrize("resource", sorted(VOICE_POOL_JOBS))
+def test_voice_pool_job_shape(resource: str) -> None:
+    name, args, cpu, memory, timeout, repo = VOICE_POOL_JOBS[resource]
+    tree = _pulumi_tree()
+    call = _resource_call(tree, "Job", resource)
+    kw = _kwargs(call, _module_constants(tree))
+    assert kw["name"] == name
+    assert kw["location"].id == "region"  # us-central1, from stack config
+    tmpl = kw["template"]["template"]
+    (c,) = tmpl["containers"]
+    assert c["commands"] == ["python", "-m", "karaoke_decide.voice_pool"]
+    assert c["args"] == args
+    assert c["resources"]["limits"] == {"cpu": cpu, "memory": memory}
+    assert ast.unparse(c["image"]).rstrip("'").endswith(f"/karaoke-repo/{repo}:latest")
+    assert ast.unparse(tmpl["service_account"]) == "voice_pool_sa.email"
+    assert tmpl["timeout"] == timeout
+    assert tmpl["max_retries"] == 0
+    assert "template.template.containers[0].image" in _ignore_changes(call)
+
+
+def test_voice_pool_fetch_outlasts_its_deadline_and_reads_flacfetch_secrets() -> None:
+    from karaoke_decide.voice_pool.cli import build_parser
+
+    deadline = build_parser().parse_args(["fetch"]).deadline_s
+    assert int(VOICE_POOL_JOBS["voice-pool-fetch-job"][4].rstrip("s")) >= deadline + 600
+    consts = _module_constants(_pulumi_tree())
+    assert consts["VOICE_POOL_SECRETS"] == {
+        "FLACFETCH_API_URL": "flacfetch-api-url",
+        "FLACFETCH_API_KEY": "flacfetch-api-key",
+    }
+    assert "flacfetch-api-url" not in str(consts.get("REQUIRED_SECRETS"))  # the API doesn't mount them
+
+
+def test_voice_pool_analyse_is_one_task() -> None:
+    tree = _pulumi_tree()
+    kw = _kwargs(_resource_call(tree, "Job", "voice-pool-analyse-job"), _module_constants(tree))
+    assert kw["template"]["task_count"] == 1
+
+
+def test_voice_pool_fetch_scheduler_is_hourly_and_created_paused() -> None:
+    tree = _pulumi_tree()
+    call = _resource_call(tree, "Job", "voice-pool-fetch-scheduler")
+    sched = _kwargs(call, _module_constants(tree))
+    assert sched["schedule"] == "7 * * * *" and sched["time_zone"] == "UTC"
+    assert sched["paused"] is True
+    assert "paused" in _ignore_changes(call)  # a later `pulumi up` never re-pauses a resumed scheduler
+    assert sched["http_target"]["http_method"] == "POST"
+    invoker = _kwargs(
+        _resource_call(tree, "JobIamMember", "voice-pool-fetch-scheduler-invoker"), _module_constants(tree)
+    )
+    assert invoker["role"] == "roles/run.invoker"
+    # on demand: nothing schedules select or analyse
+    text = PULUMI.read_text()
+    assert not re.search(r'Job\(\s*"voice-pool-(select|analyse)-scheduler', text)
+
+
+def test_voice_pool_can_start_and_watch_separation_and_analysis() -> None:
+    from karaoke_decide.voice_pool import fetch, separate
+
+    tree = _pulumi_tree()
+    consts = _module_constants(tree)
+    sep = f"projects/nomadkaraoke/locations/{separate.SEPARATE_REGION}/jobs/{separate.SEPARATE_JOB}"
+    assert consts["VOICE_POOL_SEPARATE_JOB"] == sep
+    for resource, role in [
+        ("voice-pool-separate-executor", "roles/run.jobsExecutorWithOverrides"),
+        ("voice-pool-separate-viewer", "roles/run.viewer"),
+    ]:
+        kw = _kwargs(_resource_call(tree, "JobIamMember", resource), consts)
+        assert kw["role"] == role and kw["name"] == sep and kw["location"] == separate.SEPARATE_REGION
+    assert fetch.ANALYSE_JOB == "voice-pool-analyse" and fetch.ANALYSE_REGION == "us-central1"
+    for resource, role in [
+        ("voice-pool-analyse-executor", "roles/run.jobsExecutorWithOverrides"),
+        ("voice-pool-analyse-viewer", "roles/run.viewer"),
+    ]:
+        kw = _kwargs(_resource_call(tree, "JobIamMember", resource), consts)
+        assert kw["role"] == role and ast.unparse(kw["name"]) == "voice_pool_analyse_job.name"
+
+
+def test_voice_pool_bucket_grants_are_prefix_scoped() -> None:
+    from karaoke_decide.etl.vocal_range_refresh import POOL_MEASURED_PREFIX
+    from karaoke_decide.voice_pool.voicedb import VOICE_BUCKET, VOICE_PREFIX
+
+    tree = _pulumi_tree()
+    consts = _module_constants(tree)
+    gen = _kwargs(_resource_call(tree, "BucketIAMMember", "voice-pool-gen-storage-writer"), consts)
+    assert gen["role"] == "roles/storage.objectAdmin" and gen["bucket"] == "karaoke-gen-storage-nomadkaraoke"
+    expr = _expr(gen)
+    assert "/objects/voice-pool/" in expr and 'resource.type == "storage.googleapis.com/Bucket"' in expr
+    data = _kwargs(_resource_call(tree, "BucketIAMMember", "voice-pool-musicbrainz-data-writer"), consts)
+    assert data["role"] == "roles/storage.objectAdmin" and data["bucket"] == VOICE_BUCKET
+    expr = _expr(data)
+    assert f"/objects/{VOICE_PREFIX}/" in expr and f"/objects/{POOL_MEASURED_PREFIX}" in expr
+    assert expr.count("startsWith(") == 2
+    for e in (_expr(gen), expr):
+        assert "matches(" not in e and "objectListPrefix" not in e
+    # objectViewer (catalog.db, availability.db, the UltraStar zip; and listing) from a loop.
+    text = PULUMI.read_text()
+    loop = text[text.index('f"voice-pool-{_name}-reader"') - 200 :]
+    assert '("musicbrainz-data", MUSICBRAINZ_DATA_BUCKET), ("kn-data", KN_DATA_BUCKET)' in loop[:200]
+    assert 'role="roles/storage.objectViewer"' in loop[:500]
+
+
+def test_voice_recordings_bucket_is_private_and_kept() -> None:
+    tree = _pulumi_tree()
+    consts = _module_constants(tree)
+    kw = _kwargs(_resource_call(tree, "Bucket", "voice-recordings-bucket"), consts)
+    assert kw["name"] == "nomadkaraoke-voice-recordings"
+    assert kw["uniform_bucket_level_access"] is True
+    assert kw["public_access_prevention"] == "enforced"
+    assert kw["versioning"] == {"enabled": False}
+    # Privacy: a user's delete must really erase the audio (no 7-day soft-delete copy).
+    assert kw["soft_delete_policy"] == {"retention_duration_seconds": 0}
+    assert "lifecycle_rules" not in kw
+    admin = _kwargs(_resource_call(tree, "BucketIAMMember", "voice-recordings-api-admin"), consts)
+    assert admin["role"] == "roles/storage.objectAdmin"
+
+
+def test_main_api_has_voice_env(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    envs = _kv(str(ci_main_deploy["--set-env-vars"]))
+    assert envs["VOICE_DATA_BUCKET"] == "nomadkaraoke-musicbrainz-data"
+    assert envs["VOICE_RECORDINGS_BUCKET"] == "nomadkaraoke-voice-recordings"
+    assert _kv(str(ci_main_deploy["--set-secrets"]))["ADMIN_TOKENS"] == "admin-tokens:latest"
+    assert _secret_envs(_container(pulumi_main))["ADMIN_TOKENS"] == "admin-tokens:latest"
+
+
+@pytest.mark.parametrize(
+    ("job", "repo"),
+    [
+        ("voice-pool-select", "karaoke-decide"),
+        ("voice-pool-fetch", "karaoke-decide"),
+        ("voice-pool-analyse", "karaoke-decide-vocal"),
+    ],
+)
+def test_voice_pool_job_images_are_pinned_by_ci(job: str, repo: str) -> None:
+    steps = [s for s in _ci_steps() if f"gcloud run jobs update {job}" in s.get("run", "")]
+    assert len(steps) == 1
+    flags = _flags(_command_line(steps[0]["run"], f"gcloud run jobs update {job}"))
+    image = str(flags["--image"])
+    assert image.endswith(":EXPR")  # ...:${{ github.sha }}
+    if repo == "karaoke-decide-vocal":
+        assert image.endswith("/karaoke-decide-vocal:EXPR")
+        assert steps[0].get("continue-on-error") is True
+        assert steps[0]["if"] == "steps.vocal_build.outcome == 'success'"
+    else:
+        assert "karaoke-decide-vocal" not in image
+    assert f"::warning::{job} does not exist yet" in steps[0]["run"]  # skipped, not failed, until Pulumi
+    # Non-blocking: a describe/update failure can't skip the later search deploy + verify steps.
+    assert steps[0].get("continue-on-error") is True
+    step_id = steps[0]["id"]
+    warns = [s for s in _ci_steps() if f"steps.{step_id}.outcome == 'failure'" in str(s.get("if", ""))]
+    assert len(warns) == 1 and "::warning::" in warns[0]["run"]
+
+
+def test_steps_after_the_voice_pool_updates_still_run() -> None:
+    names = [s.get("name", "") for s in _ci_steps()]
+    last_voice = max(i for i, n in enumerate(names) if n.startswith("Update voice-pool-"))
+    assert names.index("Deploy search service") < last_voice < names.index("Verify deployment")

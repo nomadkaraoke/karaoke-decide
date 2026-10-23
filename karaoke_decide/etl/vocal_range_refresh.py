@@ -11,9 +11,11 @@ Inputs (optional ones missing -> one INFO line each, never louder):
   and reused from there. Every ``.txt`` is parsed from memory; lyrics never touch disk and
   never leave this process (only derived pitch statistics are kept). Each part is
   octave-repaired against the artist's lead gender; parse failures are counted (DEBUG per file).
-* Measured CSVs (pyin): ``data/vocal_range/nomad_measured.csv.gz`` (NomadPC script) and
-  ``gs://.../vocal-range/gen_measured/<run>/part-*.csv`` (vocal-range-gen job). Rows with an
-  empty ``low_midi`` (short stems, written so the scripts can resume) are dropped.
+* Measured CSVs (pyin): ``data/vocal_range/nomad_measured.csv.gz`` (NomadPC script),
+  ``gs://.../vocal-range/gen_measured/<run>/part-*.csv`` (vocal-range-gen job) and
+  ``gs://.../vocal-range/pool_measured/<run>/part-*.csv`` (Phase 3d voice-pool-analyse job,
+  ``source_id`` = pool id). Rows with an empty ``low_midi`` (short stems, written so the
+  scripts can resume) are dropped.
 * Gemini estimates: ``data/vocal_range/gemini_{songs,artists}.csv.gz``, calibrated per
   popularity band against the measured/notes truth; only kept bands survive the merge.
 * Wikidata P412 voice types (``data/vocal_range/wikidata_p412.csv``) and artist mbid/gender
@@ -82,6 +84,7 @@ BUCKET = "nomadkaraoke-musicbrainz-data"
 PREFIX = "vocal-range"
 ZIP_BLOB = f"{PREFIX}/ultrastar/usdb_20250204.zip"
 GEN_MEASURED_PREFIX = f"{PREFIX}/gen_measured/"
+POOL_MEASURED_PREFIX = f"{PREFIX}/pool_measured/"
 SONG_TSV_BLOB = f"{PREFIX}/latest/song_vocal_range.tsv.gz"
 ARTIST_TSV_BLOB = f"{PREFIX}/latest/artist_vocal_range.tsv.gz"
 SUMMARY_BLOB = f"{PREFIX}/latest/summary.json"
@@ -136,7 +139,6 @@ WHERE Artist IS NOT NULL AND Title IS NOT NULL
 """
 
 _YT_ID_RE = re.compile(r"(?:youtu\.be/|[?&]v=|/embed/|/shorts/|/live/)([A-Za-z0-9_-]{11})")
-_GEN_PART_RE = re.compile(rf"^{re.escape(GEN_MEASURED_PREFIX)}[^/]+/part-[^/]*\.csv$")
 _FLOAT = "FLOAT64"
 
 
@@ -345,17 +347,28 @@ def load_nomad_measured(data_dir: Path) -> list[SourceRow]:
         return list(measured_rows(f, "nomad_measured"))
 
 
-def load_gen_measured(bucket: Any) -> list[SourceRow]:
-    blobs = [b for b in bucket.list_blobs(prefix=GEN_MEASURED_PREFIX) if _GEN_PART_RE.match(b.name)]
+def _load_measured_parts(bucket: Any, prefix: str, source: str) -> list[SourceRow]:
+    """Every ``<prefix><run>/part-*.csv`` as ``source`` rows (an INFO line when there are none)."""
+    part = re.compile(rf"^{re.escape(prefix)}[^/]+/part-[^/]*\.csv$")
+    blobs = [b for b in bucket.list_blobs(prefix=prefix) if part.match(b.name)]
     if not blobs:
-        logger.info(f"vocal_range: no gen_measured input (gs://{BUCKET}/{GEN_MEASURED_PREFIX}*/part-*.csv); skipping")
+        logger.info(f"vocal_range: no {source} input (gs://{BUCKET}/{prefix}*/part-*.csv); skipping")
         return []
     rows: list[SourceRow] = []
     for blob in blobs:
         with blob.open("rb") as f:
             text = f.read().decode("utf-8")
-        rows.extend(measured_rows(io.StringIO(text, newline=""), "gen_measured"))
+        rows.extend(measured_rows(io.StringIO(text, newline=""), source))
     return rows
+
+
+def load_gen_measured(bucket: Any) -> list[SourceRow]:
+    return _load_measured_parts(bucket, GEN_MEASURED_PREFIX, "gen_measured")
+
+
+def load_pool_measured(bucket: Any) -> list[SourceRow]:
+    """voice-pool-analyse's whole-song pyin ranges (``source_id`` = pool id, ``lead_part`` = all)."""
+    return _load_measured_parts(bucket, POOL_MEASURED_PREFIX, "pool_measured")
 
 
 def _gemini_rows(path: Path, kind: str) -> list[SourceRow]:
@@ -648,7 +661,7 @@ def run_step(
     mbid_of, gender_of = load_artists(bq)
     kn_keys, by_video = load_kn(bq)
     ultrastar = ultrastar_rows(fetch_ultrastar_zip(bucket, http), gender_of, by_video)
-    measured = [*load_gen_measured(bucket), *load_nomad_measured(data_dir)]
+    measured = [*load_gen_measured(bucket), *load_pool_measured(bucket), *load_nomad_measured(data_dir)]
     p412_path = data_dir / P412_FILE
     p412 = load_p412(p412_path) if p412_path.exists() else {}
     if not p412:

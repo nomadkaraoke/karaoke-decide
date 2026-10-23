@@ -160,6 +160,45 @@ Measured in the production image (local, `--cpus=1`): uvicorn + app import went 
 
 `mb-refresh` runs a `vocal_range` step just before the catalog build (`karaoke_decide/etl/vocal_range_refresh.py`, skip with `--skip-vocal-range`, alone via `mb-refresh vocal-range`): UltraStar notes (archive.org dump cached in GCS), measured pyin CSVs, Gemini estimates and Wikidata voice types are merged (`karaoke_decide/vocal_range/merge.py`) into BigQuery `song_vocal_range_sources`, `song_vocal_range`, `artist_vocal_range` (staged then copied to prod) plus TSVs and a `latest.json` pointer in GCS. `catalog.db` (schema 2) and `offline.db` (additive) carry `vr_*` columns; `song-index-build` reads the per-run TSVs named by the pointer and degrades to NULL; the catalog build reads the BigQuery tables. The on-demand Cloud Run job `vocal-range-gen` (`Dockerfile.vocal-analysis`, own SA, optional poetry group `vocal-analysis`) measures gen's vocals stems. Runbook: [VOCAL-RANGE.md](VOCAL-RANGE.md).
 
+## Voice pool (Phase 3d)
+
+The voice session plays from a shared pool of about 1,000 songs with per-song vocal markers. Four
+Cloud Run jobs build it; the API reads only the published `voice.db`. Runbook:
+[VOICE-POOL.md](VOICE-POOL.md).
+
+```
+voice-pool-select (on demand, us-central1)
+  catalog.db + availability.db + BigQuery Spotify ids, YouTube oEmbed probe
+  → Firestore voice_pool_fetch (queued), BigQuery voice_pool_songs, voice/selection/<run>/coverage.json
+        │
+        ▼
+voice-pool-fetch (hourly :07 UTC, scheduler voice-pool-fetch-hourly, created paused)
+  flacfetch POST /download-by-id (priority batch) under its Spotify budget
+  (12 h of audio per 24 h for batch, GET /spotify/budget)
+  → gs://karaoke-gen-storage-nomadkaraoke/voice-pool/audio/<pool_id>/original.flac (fetched)
+        │  ≥ 25 fetched or the oldest > 6 h: manifest voice-pool/manifests/<run>.jsonl
+        ▼
+voice-pool-separate-job (karaoke-gen, us-east4, 1 x L4, ≤ 4 tasks x 20 songs)
+  → voice-pool/stems/<pool_id>/vocals.flac + <run>.results/part-<task>.jsonl
+        │  collected by the next fetch run (separated)
+        ▼
+voice-pool-analyse (started by fetch, karaoke-decide-vocal image, 1 task)
+  pyin + Spotify sections/key (BigQuery) + UltraStar density → markers (analysed)
+  → BigQuery song_voice_analysis, vocal-range/pool_measured/<run>/part-*.csv
+        │  task 0, after the shard
+        ▼
+gs://nomadkaraoke-musicbrainz-data/voice/<run>/voice.db.gz + voice/latest.json (written last)
+  → API voice session; pool_measured → weekly vocal-range refresh (mb-refresh) → song_vocal_range
+```
+
+All three decide jobs run as SA `voice-pool`. Its grants are scoped: objectAdmin only under
+`voice-pool/` in the gen bucket and under `voice/` and `vocal-range/pool_measured/` in the data
+bucket. It holds `run.jobsExecutorWithOverrides` and `run.viewer` on gen's separation job and on
+`voice-pool-analyse`, so it can start them with argument overrides and see whether one is running.
+Before `pulumi up`, every job degrades with a WARNING. The API reads `VOICE_DATA_BUCKET` (voice.db)
+and `VOICE_RECORDINGS_BUCKET` (`nomadkaraoke-voice-recordings`: private, uniform access, no
+lifecycle) and mounts `ADMIN_TOKENS` (gen's `admin-tokens` secret).
+
 ## Data Flow
 
 ### 1. User Registration & Auth
