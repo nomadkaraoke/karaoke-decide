@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from karaoke_decide.vocal_range.notes import VOICE_TYPES
 from karaoke_decide.voice_session.weights import (
     EPS_DIFFICULTY,
     EPS_POSITION,
@@ -20,15 +21,6 @@ from karaoke_decide.voice_session.weights import (
     evidence_weight,
 )
 
-# Mirrors karaoke_decide/vocal_range/notes.py VOICE_TYPES (3c); import from there once merged.
-VOICE_TYPES: dict[str, tuple[int, int]] = {
-    "bass": (40, 64),
-    "baritone": (45, 69),
-    "tenor": (48, 72),
-    "alto": (53, 77),
-    "mezzo": (57, 81),
-    "soprano": (60, 84),
-}
 SHIFTS: tuple[int, ...] = (-2, -1, 0, 1, 2)
 COMFORT_MARGIN = 5
 
