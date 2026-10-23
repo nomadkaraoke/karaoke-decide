@@ -73,10 +73,6 @@ from karaoke_decide.services.youtube_music import (
 
 logger = logging.getLogger(__name__)
 
-# Sync job is considered stale if no progress update in this many seconds
-# BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable
-STALE_JOB_THRESHOLD_SECONDS = 300
-
 router = APIRouter()
 
 
@@ -1098,6 +1094,21 @@ async def _start_sync_job(user_id: str, settings: BackendSettings, firestore: Fi
     return job_id
 
 
+async def _find_stalled_job(user_id: str, firestore: FirestoreService) -> str | None:
+    """The user's latest sync job id if it is in progress with a dead heartbeat, else None."""
+    docs = await firestore.query_documents(
+        collection="sync_jobs",
+        filters=[("user_id", "==", user_id)],
+        order_by="created_at",
+        order_direction="DESCENDING",
+        limit=1,
+    )
+    for data in docs:
+        if data and SyncJob.from_dict(data).is_stalled():
+            return str(data["id"])
+    return None
+
+
 @router.post("/sync", response_model=SyncJobStartResponse, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_sync(
     user: VerifiedUser,
@@ -1114,16 +1125,27 @@ async def trigger_sync(
     Returns immediately with a job_id. Use GET /sync/status to poll
     for progress. An email will be sent when sync completes.
     """
+    locale = get_locale_from_request(request)
     try:
+        stalled_id = await _find_stalled_job(user.id, firestore)
+        if stalled_id:
+            # Resume the stalled job instead of starting a second one next to it.
+            try:
+                get_cloud_tasks_service(settings).create_sync_task(job_id=stalled_id, user_id=user.id)
+            except Exception as e:
+                raise SyncEnqueueError(str(e)) from e
+            return SyncJobStartResponse(
+                job_id=stalled_id,
+                status="stalled",
+                message=t(locale, "services.syncStarted"),
+            )
         job_id = await _start_sync_job(user.id, settings, firestore)
     except SyncEnqueueError as e:
-        locale = get_locale_from_request(request)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=t(locale, "services.failedToStartSync", error=str(e)),
         )
 
-    locale = get_locale_from_request(request)
     return SyncJobStartResponse(
         job_id=job_id,
         status="pending",
@@ -1161,29 +1183,11 @@ async def get_sync_status(
             if job_data:
                 job = SyncJob.from_dict(job_data)
 
-                # Check if in_progress job is stale (no heartbeat for too long)
-                if job.status == SyncJobStatus.IN_PROGRESS and job.updated_at:
-                    age_seconds = (datetime.now(UTC) - job.updated_at).total_seconds()
-                    if age_seconds > STALE_JOB_THRESHOLD_SECONDS:
-                        # Auto-mark as failed - job likely crashed
-                        logger.warning(
-                            f"Marking stale sync job {job.id} as failed "
-                            f"(no progress for {int(age_seconds)} seconds)"
-                        )
-                        timeout_error = f"Sync timed out (no progress for {int(age_seconds)} seconds)"
-                        completed_at = datetime.now(UTC)
-                        await firestore.update_document(
-                            "sync_jobs",
-                            job.id,
-                            {
-                                "status": SyncJobStatus.FAILED.value,
-                                "error": timeout_error,
-                                "completed_at": completed_at.isoformat(),
-                            },
-                        )
-                        job.status = SyncJobStatus.FAILED
-                        job.error = timeout_error
-                        job.completed_at = completed_at
+                # A running job whose heartbeat went quiet is stalled, not failed: the retried
+                # Cloud Task (or the next POST /sync) resumes it from its checkpoint.
+                status_value = job.status.value
+                if job.is_stalled():
+                    status_value = "stalled"
 
                 # Include if pending, in_progress, or completed/failed within last minute
                 include_job = job.status in (SyncJobStatus.PENDING, SyncJobStatus.IN_PROGRESS)
@@ -1219,7 +1223,7 @@ async def get_sync_status(
 
                     active_job = SyncJobStatusResponse(
                         job_id=job.id,
-                        status=job.status.value,
+                        status=status_value,
                         progress=progress,
                         results=results,
                         error=job.error,

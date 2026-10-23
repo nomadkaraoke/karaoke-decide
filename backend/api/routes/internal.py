@@ -4,6 +4,7 @@ These endpoints are called by Cloud Tasks, not by users directly.
 Protected by OIDC token verification (backend.api.internal_auth) in production.
 """
 
+import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
@@ -15,12 +16,14 @@ from pydantic import BaseModel
 from backend.api.deps import FirestoreServiceDep, Settings, SyncServiceDep
 from backend.api.internal_auth import InternalCaller
 from backend.config import BackendSettings
-from backend.models.sync_job import SyncJob, SyncJobProgress, SyncJobResult, SyncJobStatus
-from backend.services.firestore_service import FirestoreService
+from backend.models.sync_job import MAX_SYNC_RESUMES, SyncJob, SyncJobProgress, SyncJobResult, SyncJobStatus
+from backend.services.firestore_service import FirestoreService, TransactionView
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+HEARTBEAT_INTERVAL_SECONDS = 60
 
 
 class SyncProcessRequest(BaseModel):
@@ -55,38 +58,32 @@ async def process_sync_task(
 
     logger.info(f"Processing sync task: job_id={job_id}, user_id={user_id}")
 
+    claim, job = await _claim_job(firestore, job_id)
+    if claim == "missing":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Sync job not found: {job_id}")
+    if claim == "running":
+        # Another run is alive (fresh heartbeat): make Cloud Tasks retry later instead of racing it.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="in_progress",
+            headers={"Retry-After": str(HEARTBEAT_INTERVAL_SECONDS)},
+        )
+    assert job is not None
+    if claim == "done":
+        logger.info(f"Job already {job.status.value}: {job_id}")
+        return SyncProcessResponse(job_id=job_id, status=job.status.value, message=f"Job already {job.status.value}")
+
+    heartbeat = asyncio.create_task(_heartbeat(firestore, job_id))
     try:
-        # Get the job from Firestore
-        job_data = await firestore.get_document("sync_jobs", job_id)
-        if not job_data:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sync job not found: {job_id}",
-            )
-
-        job = SyncJob.from_dict(job_data)
-
-        # Check if already in progress, completed, or failed
-        if job.status in (SyncJobStatus.IN_PROGRESS, SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
-            logger.info(f"Job already {job.status.value}: {job_id}")
-            return SyncProcessResponse(
-                job_id=job_id,
-                status=job.status.value,
-                message=f"Job already {job.status.value}",
-            )
-
-        # Update status to in_progress
-        job.status = SyncJobStatus.IN_PROGRESS
-        job.updated_at = datetime.now(UTC)
-        await firestore.set_document("sync_jobs", job_id, job.to_dict())
-
-        # Execute sync with progress updates
         results = await sync_service.sync_all_services_with_progress(
             user_id=user_id,
             progress_callback=_create_progress_callback(firestore, job_id),
         )
+        heartbeat.cancel()
 
-        # Update job with results
+        # Re-read so progress written during the run isn't clobbered.
+        job_data = await firestore.get_document("sync_jobs", job_id)
+        job = SyncJob.from_dict(job_data) if job_data else job
         job.status = SyncJobStatus.COMPLETED
         job.results = [
             SyncJobResult(
@@ -124,24 +121,79 @@ async def process_sync_task(
         )
 
     except Exception as e:
+        heartbeat.cancel()
         logger.exception(f"Sync job failed: {job_id}")
+        requeue = await _record_failure(firestore, job_id, e)
+        if requeue:
+            # 500 makes Cloud Tasks retry; the retry resumes from the checkpoint.
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Sync failed, will retry: {e}",
+            )
+        return SyncProcessResponse(job_id=job_id, status="failed", message=f"Sync failed: {e}")
+    finally:
+        heartbeat.cancel()
 
-        # Update job with error
+
+async def _claim_job(firestore: FirestoreService, job_id: str) -> tuple[str, SyncJob | None]:
+    """Atomically decide whether this delivery may run the job.
+
+    Runs in one Firestore transaction so two concurrent deliveries cannot both claim it.
+    Returns ("missing" | "done" | "running" | "claimed", job). A claim marks the job
+    in_progress with a fresh heartbeat; claiming a stalled job counts as a resume.
+    """
+
+    async def claim(tx: TransactionView) -> tuple[str, SyncJob | None]:
+        data = await tx.get("sync_jobs", job_id)
+        if not data:
+            return "missing", None
+        job = SyncJob.from_dict(data)
+        if job.status in (SyncJobStatus.COMPLETED, SyncJobStatus.FAILED):
+            return "done", job
+        if job.status == SyncJobStatus.IN_PROGRESS:
+            if not job.is_stalled():
+                return "running", job
+            job.resume_count += 1
+            logger.warning(f"Resuming stalled sync job {job_id} (resume {job.resume_count})")
+        job.status = SyncJobStatus.IN_PROGRESS
+        job.updated_at = datetime.now(UTC)
+        tx.set("sync_jobs", job_id, job.to_dict())
+        return "claimed", job
+
+    return await firestore.run_transaction(claim)
+
+
+async def _record_failure(firestore: FirestoreService, job_id: str, error: Exception) -> bool:
+    """Put the job back to pending for a retry, or mark it failed after too many. True = retry."""
+    try:
+        data = await firestore.get_document("sync_jobs", job_id)
+        if not data:
+            return True
+        job = SyncJob.from_dict(data)
+        job.error = str(error)
+        job.updated_at = datetime.now(UTC)
+        requeue = job.resume_count < MAX_SYNC_RESUMES
+        if requeue:
+            job.resume_count += 1
+            job.status = SyncJobStatus.PENDING
+        else:
+            job.status = SyncJobStatus.FAILED
+            job.completed_at = datetime.now(UTC)
+        await firestore.set_document("sync_jobs", job_id, job.to_dict())
+        return requeue
+    except Exception:
+        logger.exception("Failed to update job status on error")
+        return True
+
+
+async def _heartbeat(firestore: FirestoreService, job_id: str) -> None:
+    """Keep updated_at fresh while the sync runs, so a retry sees this run as alive."""
+    while True:
+        await asyncio.sleep(HEARTBEAT_INTERVAL_SECONDS)
         try:
-            job_data = await firestore.get_document("sync_jobs", job_id)
-            if job_data:
-                job = SyncJob.from_dict(job_data)
-                job.status = SyncJobStatus.FAILED
-                job.error = str(e)
-                job.updated_at = datetime.now(UTC)
-                await firestore.set_document("sync_jobs", job_id, job.to_dict())
+            await firestore.update_document("sync_jobs", job_id, {"updated_at": datetime.now(UTC).isoformat()})
         except Exception:
-            logger.exception("Failed to update job status on error")
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Sync failed: {e}",
-        )
+            logger.warning(f"Sync heartbeat write failed for {job_id}", exc_info=True)
 
 
 def _create_progress_callback(firestore: FirestoreService, job_id: str) -> Callable[..., Coroutine[Any, Any, None]]:

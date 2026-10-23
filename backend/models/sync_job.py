@@ -5,6 +5,13 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+# An in-progress job with no heartbeat for this long is stalled (its instance died or hung).
+# BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable.
+STALE_JOB_THRESHOLD_SECONDS = 300
+
+# A job that fails (or is resumed after stalling) this many times is marked failed for good.
+MAX_SYNC_RESUMES = 5
+
 
 class SyncJobStatus(str, Enum):
     """Sync job status values."""
@@ -59,6 +66,14 @@ class SyncJob:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
+    resume_count: int = 0
+
+    def is_stalled(self, now: datetime | None = None) -> bool:
+        """True if the job claims to be running but its heartbeat has gone quiet."""
+        if self.status != SyncJobStatus.IN_PROGRESS:
+            return False
+        age = ((now or datetime.now(UTC)) - self.updated_at).total_seconds()
+        return age > STALE_JOB_THRESHOLD_SECONDS
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Firestore document dict."""
@@ -90,6 +105,7 @@ class SyncJob:
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "resume_count": self.resume_count,
         }
 
     @classmethod
@@ -127,4 +143,5 @@ class SyncJob:
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC),
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC),
             completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            resume_count=data.get("resume_count", 0),
         )
