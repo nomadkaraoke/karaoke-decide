@@ -19,7 +19,7 @@ import sys
 import time
 
 from backend.config import BackendSettings, get_backend_settings
-from backend.logging_config import configure_logging
+from backend.logging_config import configure_job_logging
 
 logger = logging.getLogger("lb_poll")
 
@@ -56,7 +56,7 @@ async def _run(settings: BackendSettings) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    configure_logging()
+    configure_job_logging()
     try:
         asyncio.run(_run(get_backend_settings()))
     except Exception:

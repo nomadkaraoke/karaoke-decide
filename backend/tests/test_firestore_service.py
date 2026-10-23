@@ -225,7 +225,10 @@ class TestFirestoreServiceQueryDocuments:
             filters=[("status", "==", "active")],
         )
 
-        mock_query.where.assert_called_once_with("status", "==", "active")
+        mock_query.where.assert_called_once()
+        # keyword filter= (positional where() args raise a UserWarning in google-cloud-firestore)
+        field_filter = mock_query.where.call_args.kwargs["filter"]
+        assert (field_filter.field_path, field_filter.op_string, field_filter.value) == ("status", "==", "active")
 
     @pytest.mark.asyncio
     @patch("backend.services.firestore_service.firestore.AsyncClient")

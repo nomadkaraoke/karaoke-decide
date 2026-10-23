@@ -158,7 +158,7 @@ class FirestoreService:
 
         if filters:
             for field, op, value in filters:
-                query = query.where(field, op, value)
+                query = query.where(filter=firestore.FieldFilter(field, op, value))
 
         if order_by:
             direction = firestore.Query.DESCENDING if order_direction == "DESCENDING" else firestore.Query.ASCENDING
@@ -187,7 +187,7 @@ class FirestoreService:
 
         if filters:
             for field, op, value in filters:
-                query = query.where(field, op, value)
+                query = query.where(filter=firestore.FieldFilter(field, op, value))
 
         # Use count aggregation
         count_query = query.count()
