@@ -1,9 +1,10 @@
 """Dependency injection for API routes."""
 
+import hmac
 from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.config import BackendSettings, get_backend_settings
@@ -25,7 +26,9 @@ from backend.services.recs_v2.service import RecommendationServiceV2
 from backend.services.song_feedback_service import SongFeedbackService
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
+from backend.services.voice_data_store import VoiceDataStore, get_voice_data_store
 from backend.services.voice_profile_service import VoiceProfileService
+from backend.services.voice_session_service import VoiceSessionService
 from karaoke_decide.core.models import User
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
@@ -174,6 +177,27 @@ async def get_admin_user(
     return user
 
 
+async def get_admin_access(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    user: Annotated[User | None, Depends(get_optional_user)],
+    x_admin_token: Annotated[str | None, Header()] = None,
+) -> User | None:
+    """Admin decide user, or a configured static ``X-Admin-Token`` (scripts). Otherwise 403.
+
+    Returns the admin user, or None when the caller authenticated with a token.
+    """
+    if x_admin_token:
+        supplied = x_admin_token.encode()
+        matched = False
+        for token in settings.admin_tokens:  # compare against every token: no early exit
+            matched |= hmac.compare_digest(supplied, token.encode())
+        if matched:
+            return None
+    if user is not None and user.is_admin:
+        return user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
 async def get_music_service_service_dep(
     settings: Annotated[BackendSettings, Depends(get_settings)],
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
@@ -294,6 +318,22 @@ async def get_voice_profile_service(
     return VoiceProfileService(firestore)
 
 
+def get_voice_store() -> VoiceDataStore:
+    """The lifespan-loaded voice.db store (tests override this)."""
+    return get_voice_data_store()
+
+
+async def get_voice_session_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    voice: Annotated[VoiceDataStore, Depends(get_voice_store)],
+    catalog: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
+    # SongFeedbackService (hidden songs + "Love it"); tests override get_hidden_keys_provider with a fake.
+    feedback: Annotated[SongFeedbackService, Depends(get_hidden_keys_provider)],
+    recs: Annotated[RecommendationServiceV2, Depends(get_recommendation_service_v2_dep)],
+) -> VoiceSessionService:
+    return VoiceSessionService(firestore, voice, catalog, feedback, VoiceProfileService(firestore), recs)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -324,6 +364,7 @@ async def get_user_data_service_dep(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 VerifiedUser = Annotated[User, Depends(get_verified_user)]
 AdminUser = Annotated[User, Depends(get_admin_user)]
+AdminAccess = Annotated[User | None, Depends(get_admin_access)]
 OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 Settings = Annotated[BackendSettings, Depends(get_settings)]
 FirestoreServiceDep = Annotated[FirestoreService, Depends(get_firestore)]
@@ -340,3 +381,5 @@ GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_serv
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
 ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]
 VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]
+VoiceDataStoreDep = Annotated[VoiceDataStore, Depends(get_voice_store)]
+VoiceSessionServiceDep = Annotated[VoiceSessionService, Depends(get_voice_session_service)]

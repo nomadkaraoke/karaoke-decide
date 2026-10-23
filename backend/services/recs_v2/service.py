@@ -93,7 +93,7 @@ class RecFit(BaseModel):
 
 class RecVoice(BaseModel):
     has_profile: bool
-    method: Literal["mic", "self"] | None
+    method: Literal["mic", "self", "session"] | None
 
 
 class RecSong(BaseModel):
@@ -225,6 +225,9 @@ class RecommendationServiceV2:
         self._feedback = feedback
         self._voice = voice
 
+    async def _stored_profile(self, user_id: str, *, override: bool) -> VoiceProfileOut | None:
+        return None if override else await self._profile(user_id)
+
     async def _profile(self, user_id: str) -> VoiceProfileOut | None:
         """The voice profile; a failed read degrades to none (recs never fail on it)."""
         if self._voice is None:
@@ -236,13 +239,22 @@ class RecommendationServiceV2:
             return None
 
     async def recommend(
-        self, user: User, f: RecFilters, sort: Sort = "best", cursor: str | None = None
+        self,
+        user: User,
+        f: RecFilters,
+        sort: Sort = "best",
+        cursor: str | None = None,
+        *,
+        profile: VoiceProfileOut | None = None,
     ) -> RecommendationsV2Response:
+        """``profile`` overrides the stored voice profile (a voice session's result before it is saved)."""
         offset = decode_cursor(cursor)  # cheap; reject before any work
         reader = await asyncio.to_thread(self._store.require)  # CatalogUnavailable -> route 503
-        ctx, profile = await asyncio.gather(
-            build_context(self._firestore, reader, self._feedback, user.id), self._profile(user.id)
+        ctx, stored = await asyncio.gather(
+            build_context(self._firestore, reader, self._feedback, user.id),
+            self._stored_profile(user.id, override=profile is not None),
         )
+        profile = profile or stored
         voice = voice_range(profile)
         if voice is None and f.singable:
             f = f.model_copy(update={"singable": False})  # ignored (and not echoed) without a profile

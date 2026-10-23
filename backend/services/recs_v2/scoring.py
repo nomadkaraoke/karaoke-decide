@@ -62,6 +62,8 @@ def score(c: Candidate, ctx: UserContextV2) -> Scored:
         + w.SCORE_BRANDS * brand
         + w.W_FIT * fit
     )
+    if c.song_key in ctx.session_no:
+        total -= w.SESSION_NO_PENALTY
     if ctx.crowd_pref == "hits":
         total += w.HITS_POPULARITY_BONUS * pop
     elif ctx.crowd_pref == "deep_cuts":

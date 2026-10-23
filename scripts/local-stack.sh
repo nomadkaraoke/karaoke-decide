@@ -26,6 +26,8 @@
 # DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`).
 # The api always runs with DECIDE_FAKE_EXTERNALS=1 and DECIDE_INLINE_TASKS=1, the fake URLs on
 # http://127.0.0.1:$DECIDE_LOCAL_PORT/fake/... (docs/TESTING.md § "Local stack: fakes").
+# The api also gets the voice session (docs/TESTING.md § "Voice session"): VOICE_LOCAL_DIR=.local-stack/voice
+# (fixture voice.db, built once), VOICE_RECORDINGS_LOCAL_DIR=.local-stack/recordings, VOICE_SESSION_OPEN=1.
 # See docs/TESTING.md § "Local stack". bash 3.2 compatible (macOS).
 
 set -euo pipefail
@@ -35,6 +37,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 STATE_DIR="$PROJECT_ROOT/.local-stack"
 INDEX_DIR="$STATE_DIR/song-index"
 CATALOG_DIR="$STATE_DIR/catalog"
+VOICE_DIR="$STATE_DIR/voice"
+RECORDINGS_DIR="$STATE_DIR/recordings"
 API_PID="$STATE_DIR/api.pid"
 API_LOG="$STATE_DIR/api.log"
 SEARCH_PID="$STATE_DIR/search.pid"
@@ -191,6 +195,12 @@ up_api() {
     ensure_firestore_emulator || return 1
     echo "Building fixture catalog into $CATALOG_DIR"
     (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.catalog.fixtures build "$CATALOG_DIR") || return 1
+    # The voice session's fixture voice.db: built once (delete .local-stack/voice to rebuild).
+    if [ ! -f "$VOICE_DIR/voice.db" ]; then
+        echo "Building fixture voice.db into $VOICE_DIR"
+        (cd "$PROJECT_ROOT" && ${RUN[@]+"${RUN[@]}"} python -m karaoke_decide.voice_pool.fixtures build "$VOICE_DIR") || return 1
+    fi
+    mkdir -p "$RECORDINGS_DIR"
     echo "Starting api on :$API_PORT"
     (
         cd "$PROJECT_ROOT"
@@ -198,6 +208,8 @@ up_api() {
         export ENVIRONMENT=development JWT_SECRET=local-stack-jwt
         export DECIDE_TEST_API=1 BIGQUERY_DISABLED=1
         export CATALOG_LOCAL_DIR="$CATALOG_DIR" SONG_INDEX_LOCAL_DIR="$INDEX_DIR"
+        # Voice session: fixture voice.db, recordings in a local dir, open to every user.
+        export VOICE_LOCAL_DIR="$VOICE_DIR" VOICE_RECORDINGS_LOCAL_DIR="$RECORDINGS_DIR" VOICE_SESSION_OPEN=1
         export GEN_API_URL DECIDE_GEN_PARTNER_SECRET="$PARTNER_SECRET" DECIDE_KJBOX_SECRET="$KJBOX_SECRET"
         # Fake ListenBrainz / MetaBrainz / Spotify embed / Last.fm / Gemini, and inline Cloud Tasks.
         export DECIDE_FAKE_EXTERNALS=1 DECIDE_INLINE_TASKS=1

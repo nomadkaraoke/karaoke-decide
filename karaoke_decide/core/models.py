@@ -125,6 +125,7 @@ class UserSong(BaseModel):
         "known_songs",
         "enjoy_singing",
         "manual",
+        "voice_session",
     ] = "spotify"
 
     # From listening history
@@ -145,6 +146,12 @@ class UserSong(BaseModel):
     singing_tags: list[str] = Field(default_factory=list)
     singing_energy: Literal["upbeat_party", "chill_ballad", "emotional_powerhouse"] | None = None
     vocal_comfort: Literal["easy", "comfortable", "challenging"] | None = None
+
+    # Latest voice-session answers for this song (Phase 3d; recs v2 reads them whatever the row's source).
+    session_feel: Literal["loved", "fine", "not_for_me"] | None = None
+    session_would_sing: Literal["yes", "yes_other_key", "no"] | None = None
+    session_key_hint: Literal["down", "up", "octave"] | None = None
+    session_tags: list[str] = Field(default_factory=list)
 
     @field_validator("singing_tags")
     @classmethod

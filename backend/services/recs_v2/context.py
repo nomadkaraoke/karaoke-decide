@@ -55,6 +55,8 @@ class UserContextV2:
     known_songs: dict[str, float] = field(default_factory=dict)
     known_without_karaoke: list[tuple[str, str, str]] = field(default_factory=list)
     hidden: set[str] = field(default_factory=set)
+    # Songs the singer said they would not sing in a voice session: penalised, never "known".
+    session_no: set[str] = field(default_factory=set)
     genres: set[str] = field(default_factory=set)
     decades: set[str] = field(default_factory=set)
     energy_pref: Literal["chill", "medium", "high"] | None = None
@@ -96,14 +98,36 @@ def _kn_id(song_id: object) -> int | None:
     return int(s) if s.isdigit() else None
 
 
+def _row_sources(d: dict[str, Any]) -> list[str]:
+    """The row's ``sources``; rows written before the field existed have just their ``source``."""
+    sources = d.get("sources")
+    if isinstance(sources, list):
+        return [str(s) for s in sources]
+    return [str(d["source"])] if d.get("source") else []
+
+
+def _base_weight(d: dict[str, Any]) -> float:
+    """``song_weight`` of the row's best source: imports keep the first ``source`` and only add to
+    ``sources`` (a row a voice session created can later carry real listens). Loved/manual rules hold."""
+    return max([w.song_weight(d), *(w.song_weight({**d, "source": s}) for s in _row_sources(d))])
+
+
 def _map_songs(
     reader: CatalogReader, docs: list[dict[str, Any]]
-) -> tuple[dict[str, float], list[tuple[str, str, str]], dict[str, int]]:
-    """Return (song_key -> weight, songs with no karaoke version, song_key -> artist key per song)."""
+) -> tuple[dict[str, float], list[tuple[str, str, str]], dict[str, int], set[str]]:
+    """Return (song_key -> weight, songs with no karaoke version, song_key -> artist key per song,
+    voice-session "would not sing" keys).
+
+    Voice-session labels come from the ``session_*`` fields whatever the row's ``source``: "yes" /
+    "yes in another key" and a "fine" feel raise the weight (max wins); "no" puts the song in
+    ``session_no`` and out of the known songs. A row whose only source is ``voice_session`` has no
+    base weight (known only through a label) and counts toward its artist only once loved ("Love it",
+    as a manual love does)."""
     kn_keys = reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
     known: dict[str, float] = {}
     no_karaoke: dict[str, tuple[str, str, str]] = {}
     artist_songs: dict[str, set[str]] = {}
+    session_no: set[str] = set()
     for d in docs:
         artist, title = d.get("artist") or "", d.get("title") or ""
         kn_id = _kn_id(d.get("song_id"))
@@ -114,12 +138,21 @@ def _map_songs(
                 continue
             key = song_key(artist, title)
             has_karaoke = reader.match_kn(artist, title) is not None or reader.has_karaoke_key(key)
-        known[key] = max(known.get(key, 0.0), w.song_weight(d))
-        if not has_karaoke:
-            no_karaoke.setdefault(key, (key, artist, title))
-        if artist and d.get("source") != "quiz":  # quiz seeds 5 songs per liked artist; affinity already covers it
+        if d.get("session_would_sing") == "no":
+            session_no.add(key)
+        weight = max(_base_weight(d), w.session_song_weight(d) or 0.0)
+        if weight > 0:  # a voice_session-only row is known only through a session label
+            known[key] = max(known.get(key, 0.0), weight)
+            if not has_karaoke:
+                no_karaoke.setdefault(key, (key, artist, title))
+        # quiz seeds 5 songs per liked artist (affinity already covers it); voice-session pool songs probe range
+        session_only = _row_sources(d) == [w.SESSION_SOURCE] and d.get("loved") is not True
+        if artist and d.get("source") != "quiz" and not session_only:
             artist_songs.setdefault(artist_key(artist), set()).add(key)
-    return known, list(no_karaoke.values()), {k: len(v) for k, v in artist_songs.items()}
+    for key in session_no:
+        known.pop(key, None)
+        no_karaoke.pop(key, None)
+    return known, list(no_karaoke.values()), {k: len(v) for k, v in artist_songs.items()}, session_no
 
 
 async def _hidden(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
@@ -142,7 +175,7 @@ async def build_context(
     ctx = UserContextV2(user_id=user_id, hidden=set(hidden))
 
     # catalog.db reads are synchronous SQLite; keep them off the event loop.
-    ctx.known_songs, ctx.known_without_karaoke, songs_per_artist = await asyncio.to_thread(
+    ctx.known_songs, ctx.known_without_karaoke, songs_per_artist, ctx.session_no = await asyncio.to_thread(
         _map_songs, reader, song_docs
     )
 

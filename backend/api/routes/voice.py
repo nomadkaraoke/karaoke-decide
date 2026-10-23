@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Self
+
 from fastapi import APIRouter, HTTPException, Response, status
+from pydantic import model_validator
 
 from backend.api.deps import CurrentUser, VoiceProfileServiceDep
 from backend.services.voice_profile_service import (
@@ -20,8 +23,19 @@ async def get_voice(user: CurrentUser, service: VoiceProfileServiceDep) -> Voice
     return VoiceProfileResponse(profile=await service.get(user.id))
 
 
+class VoiceProfilePutIn(VoiceProfileIn):
+    """``PUT /api/my/voice``: the app's mic / self-report profiles. ``method: 'session'`` profiles are
+    saved only by a voice session's result (``VoiceSessionService``), never through this route."""
+
+    @model_validator(mode="after")
+    def _not_session(self) -> Self:
+        if self.method == "session":
+            raise ValueError("method 'session' is set only by a voice session")
+        return self
+
+
 @router.put("/voice")
-async def put_voice(body: VoiceProfileIn, user: CurrentUser, service: VoiceProfileServiceDep) -> VoiceProfileOut:
+async def put_voice(body: VoiceProfilePutIn, user: CurrentUser, service: VoiceProfileServiceDep) -> VoiceProfileOut:
     try:
         return await service.put(user.id, body)
     except VoiceProfileUserNotFoundError:

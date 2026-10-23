@@ -308,6 +308,35 @@ sung_records:
   - (user_id ASC, sung_at DESC)
 ```
 
+## Personal data
+
+Voice recordings are the one class of user audio decide stores. They are recorded only with the
+session's consent (`setup.record = true` at upload time), kept private, and never expire.
+
+- **Storage**: objects `voice-recordings/<user_id>/<session_id>/<n>.m4a|.wav` in the private
+  `VOICE_RECORDINGS_BUCKET` (`nomadkaraoke-voice-recordings`, soft delete off, so a delete is real
+  erasure); Firestore `voice_recordings/{session_id}:{n}` (`gcs_path` = the object name) and
+  `voice_attempts.recording_id`. `VOICE_RECORDINGS_LOCAL_DIR` swaps the bucket for a directory (local stack, tests).
+- **User deletion**: `DELETE /api/voice/recordings` (open to every signed-in user, even with the voice flag off)
+  calls `VoiceRecordingService.delete_all_for_user(user_id)`: writes `voice_recording_purges/{user_id}`, sets
+  `setup.record = false` on all the user's `voice_sessions` (withdrawing consent, so an upload the app queued
+  before the delete gets `403 recording_not_consented`; the user can re-consent with PATCH), lists and deletes
+  every object under the user's prefix, deletes every `voice_recordings` doc, clears `recording_id` on the
+  user's attempts, returns the number erased, and is idempotent (a second call returns 0). An upload in flight
+  that finds a newer purge marker undoes its own object, doc and link and returns 409 (an undo that fails is
+  logged as a WARNING and still returns 409; the next delete-all sweeps what is left).
+- **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
+  the request (so it can be retried) if any step raises:
+  1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);
+  2. delete the user's `voice_sessions`, `voice_attempts`, `voice_labels` and their
+     `voice_recording_purges/{user_id}` marker;
+  3. undo what sessions wrote to `user_songs`: delete rows whose only source is `voice_session`; on any other
+     row strip the `session_*` fields and remove `"voice_session"` from `sources` (and from `source`, replaced
+     by the first remaining source).
+
+  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) does exactly
+  this and is the template. Any new store of user audio or voice data must be added to both.
+
 ## Security Considerations
 
 1. **OAuth Tokens**: Encrypted at rest in Firestore, refreshed automatically

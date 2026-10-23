@@ -235,3 +235,97 @@ async def test_import_artists_are_ranked_top_artists(reader: CatalogReader, sour
     ctx = await _ctx(reader, fs)
     assert ctx.artists[artist_key("Toto")].weight == pytest.approx(w.artist_top(1))
     assert ctx.artists[artist_key("Toto")].source == source
+
+
+def _session(title: str, source: str = "voice_session", **extra: Any) -> dict[str, Any]:
+    return _song(f"x:{title}", "Weezer", title, source=source, **extra)
+
+
+async def test_context_session_yes_is_known(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Yes Song", session_would_sing="yes", session_feel="not_for_me"),
+            _session("Other Key", session_would_sing="yes_other_key"),
+            _session("Fine Song", session_feel="fine"),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs[song_key("Weezer", "Yes Song")] == w.SONG_SESSION_YES
+    assert ctx.known_songs[song_key("Weezer", "Other Key")] == w.SONG_SESSION_YES
+    assert ctx.known_songs[song_key("Weezer", "Fine Song")] == w.SONG_SESSION_FINE
+    assert ctx.session_no == set()
+
+
+async def test_session_no_penalised_not_known(reader: CatalogReader) -> None:
+    fs = FakeFirestore(user_songs=[_session("No Song", session_would_sing="no", session_feel="fine")])
+    ctx = await _ctx(reader, fs)
+    k = song_key("Weezer", "No Song")
+    assert k in ctx.session_no and k not in ctx.known_songs
+
+
+async def test_session_labels_apply_whatever_the_row_source(reader: CatalogReader) -> None:
+    """A session attempt keeps an existing row's source: promotion reads the session_* fields."""
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Yes Export", source="spotify_export", playcount=1, session_would_sing="yes"),
+            _session("No Export", source="spotify_export", playcount=50, session_would_sing="no"),
+            _session("Fine Loved", source="manual", loved=True, session_feel="fine"),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs[song_key("Weezer", "Yes Export")] == w.SONG_SESSION_YES  # 0.4 by plays alone
+    assert song_key("Weezer", "No Export") in ctx.session_no
+    assert song_key("Weezer", "No Export") not in ctx.known_songs
+    assert ctx.known_songs[song_key("Weezer", "Fine Loved")] == w.SONG_MANUAL  # max wins
+
+
+def test_session_weights() -> None:
+    assert (w.SONG_SESSION_YES, w.SONG_SESSION_FINE, w.SESSION_NO_PENALTY) == (1.0, 0.6, 0.15)
+
+
+async def test_session_only_rows_are_not_taste(reader: CatalogReader) -> None:
+    """Pool songs probe range, not taste: a voice_session-only row is known only through a session label
+    and never makes its artist a known artist."""
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Meh Song", session_feel="not_for_me", sources=["voice_session"]),
+            _session("No Song", session_would_sing="no", session_feel="fine"),
+            _session("Yes Song", session_would_sing="yes", sources=["voice_session"]),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Yes Song"): w.SONG_SESSION_YES}
+    assert ctx.known_without_karaoke == [(song_key("Weezer", "Yes Song"), "Weezer", "Yes Song")]
+    assert artist_key("Weezer") not in ctx.artists
+    assert w.song_weight({"source": "voice_session"}) == 0.0
+
+
+async def test_session_row_with_another_source_still_signals_the_artist(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[_session("Export", source="spotify_export", sources=["spotify_export", "voice_session"],
+                             playcount=3, session_feel="not_for_me")]
+    )  # fmt: skip
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Export"): w.SONG_LASTFM_MID}
+    assert artist_key("Weezer") in ctx.artists
+
+
+async def test_session_created_row_later_imported_weighs_by_its_best_source(reader: CatalogReader) -> None:
+    """Imports keep a row's first ``source`` and only add to ``sources``: weigh the best of them."""
+    fs = FakeFirestore(user_songs=[_session("Later Export", sources=["voice_session", "spotify_export"], playcount=12)])
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Later Export"): w.SONG_LASTFM_HIGH}
+    assert artist_key("Weezer") in ctx.artists
+
+
+async def test_loved_session_only_row_counts_toward_its_artist(reader: CatalogReader) -> None:
+    """ "Love it" on a song first met in a voice session is a taste signal, the same as a manual love."""
+    loved = FakeFirestore(
+        user_songs=[_session("Loved Song", sources=["voice_session"], loved=True, session_feel="loved")]
+    )
+    manual = FakeFirestore(user_songs=[_song("x:Loved Song", "Weezer", "Loved Song", source="manual", loved=True)])
+    from_session, from_manual = await _ctx(reader, loved), await _ctx(reader, manual)
+    assert from_session.known_songs == {song_key("Weezer", "Loved Song"): w.SONG_MANUAL}
+    assert from_session.artists[artist_key("Weezer")].weight == from_manual.artists[artist_key("Weezer")].weight
+    unloved = FakeFirestore(user_songs=[_session("Loved Song", sources=["voice_session"], loved=False)])
+    assert artist_key("Weezer") not in (await _ctx(reader, unloved)).artists

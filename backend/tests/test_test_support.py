@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import io
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -11,7 +13,9 @@ from fastapi.testclient import TestClient
 
 from backend import main
 from backend.api.deps import get_catalog_store_dep, get_current_user, get_firestore
+from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
+from backend.services.voice_recording_service import LocalBucket, user_prefix
 from backend.tests.recs_v2.conftest import catalog_dir, reader  # noqa: F401  (fixtures)
 from backend.tests.recs_v2.test_personas import _rock_artists
 from karaoke_decide.catalog.reader import CatalogReader
@@ -298,3 +302,125 @@ def test_read_karaoke_log(client: TestClient, fs: FakeFirestore) -> None:
     assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
     assert list(fs.cols["karaoke_log"]) == ["someone_else:kj_1"]
     assert not fs.cols["user_karaoke_unresolved"]
+
+
+# ---------------------------------------------------------------------------------------------
+# Voice session: /api/test/voice/{sessions,recordings,reset}
+# ---------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def voice_client(
+    monkeypatch: pytest.MonkeyPatch, fs: FakeFirestore, tmp_path: Path
+) -> Iterator[tuple[TestClient, LocalBucket]]:
+    bucket = LocalBucket(tmp_path / "recordings")
+    c = _app_with(monkeypatch, flag=True, environment="development")
+    c.app.dependency_overrides[get_firestore] = lambda: fs  # type: ignore[attr-defined]
+    c.app.dependency_overrides[get_recordings_bucket] = lambda: bucket  # type: ignore[attr-defined]
+    yield c, bucket
+    c.app.dependency_overrides.clear()  # type: ignore[attr-defined]
+
+
+def _seed_voice_user(c: TestClient, fs: FakeFirestore, bucket: LocalBucket) -> str:
+    user_id = c.post("/api/test/profile/seed", json=SEED).json()["user_id"]
+    other = "someone_else"
+    fs.cols["voice_sessions"] = {
+        "s1": {"user_id": user_id, "state": "done", "done_reason": "enough"},
+        "s2": {"user_id": user_id, "state": "active"},
+        "sx": {"user_id": other, "state": "active"},
+    }
+    fs.cols["voice_attempts"] = {
+        "s1:1": {"user_id": user_id, "session_id": "s1", "n": 1},
+        "s1:2": {"user_id": user_id, "session_id": "s1", "n": 2, "recording_id": "r1"},
+        "sx:1": {"user_id": other, "session_id": "sx", "n": 1},
+    }
+    name = f"{user_prefix(user_id)}s1/2.webm"
+    bucket.blob(name).upload_from_file(io.BytesIO(b"synthetic"))
+    fs.cols["voice_recordings"] = {
+        "r1": {"user_id": user_id, "gcs_path": name},
+        "rx": {"user_id": other, "gcs_path": f"{user_prefix(other)}sx/1.webm"},
+    }
+    fs.cols["voice_labels"] = {"l1": {"user_id": user_id, "song_key": "a|b"}, "lx": {"user_id": other}}
+    fs.cols["voice_recording_purges"] = {user_id: {"purged_at": "2026-10-01T00:00:00+00:00"}}
+    fs.cols.setdefault("user_songs", {}).update(
+        {
+            f"{user_id}:only": {"user_id": user_id, "source": "voice_session", "sources": ["voice_session"]},
+            f"{user_id}:mixed": {
+                "user_id": user_id,
+                "source": "spotify_export",
+                "sources": ["spotify_export", "voice_session"],
+                "times_sung": 1,
+                "session_feel": "loved",
+                "session_would_sing": True,
+                "session_key_hint": "down",
+                "session_tags": ["fun"],
+                "vocal_comfort": "easy",
+            },
+            f"{user_id}:plain": {"user_id": user_id, "source": "quiz", "sources": ["quiz"]},
+            f"{other}:only": {"user_id": other, "source": "voice_session", "sources": ["voice_session"]},
+        }
+    )
+    return str(user_id)
+
+
+def test_voice_test_api_not_mounted_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    for flag, env in ((False, "development"), (True, "production")):
+        c = _app_with(monkeypatch, flag=flag, environment=env)
+        assert c.get("/api/test/voice/sessions", params={"email": EMAIL}).status_code == 404
+        assert c.get("/api/test/voice/recordings", params={"email": EMAIL}).status_code == 404
+        assert c.post("/api/test/voice/reset", json={"email": EMAIL}).status_code == 404
+
+
+def test_voice_sessions_and_recordings_read(voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore) -> None:
+    c, bucket = voice_client
+    _seed_voice_user(c, fs, bucket)
+    rows = {r["session_id"]: r for r in c.get("/api/test/voice/sessions", params={"email": EMAIL}).json()}
+    assert rows == {
+        "s1": {"session_id": "s1", "state": "done", "attempts": 2, "done_reason": "enough"},
+        "s2": {"session_id": "s2", "state": "active", "attempts": 0, "done_reason": None},
+    }
+    assert c.get("/api/test/voice/recordings", params={"email": EMAIL}).json() == {"count": 1}
+
+
+def test_voice_reads_for_unknown_email_are_empty(voice_client: tuple[TestClient, LocalBucket]) -> None:
+    c, _ = voice_client
+    assert c.get("/api/test/voice/sessions", params={"email": "nobody@example.com"}).json() == []
+    assert c.get("/api/test/voice/recordings", params={"email": "nobody@example.com"}).json() == {"count": 0}
+    assert c.post("/api/test/voice/reset", json={"email": "nobody@example.com"}).status_code == 204
+
+
+def test_voice_reset_clears_everything(voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore) -> None:
+    c, bucket = voice_client
+    user_id = _seed_voice_user(c, fs, bucket)
+
+    assert c.post("/api/test/voice/reset", json={"email": EMAIL}).status_code == 204
+
+    assert list(fs.cols["voice_sessions"]) == ["sx"]
+    assert list(fs.cols["voice_attempts"]) == ["sx:1"]
+    assert list(fs.cols["voice_recordings"]) == ["rx"]
+    assert list(fs.cols["voice_labels"]) == ["lx"]
+    assert not fs.cols["voice_recording_purges"]  # a fresh run may upload again
+    assert [b.name for b in bucket.list_blobs()] == []
+    assert c.get("/api/test/voice/sessions", params={"email": EMAIL}).json() == []
+    assert c.get("/api/test/voice/recordings", params={"email": EMAIL}).json() == {"count": 0}
+
+    songs = fs.cols["user_songs"]
+    assert f"{user_id}:only" not in songs  # only source was voice_session: row deleted
+    assert "someone_else:only" in songs  # another user's row is untouched
+    assert songs[f"{user_id}:plain"] == {"user_id": user_id, "source": "quiz", "sources": ["quiz"]}
+    mixed = songs[f"{user_id}:mixed"]  # imported row survives: session fields and the source label go
+    assert mixed["source"] == "spotify_export"
+    assert mixed["sources"] == ["spotify_export"]
+    assert not [k for k in mixed if k.startswith("session_")]
+    assert mixed["times_sung"] == 1
+
+
+def test_voice_reset_mixed_row_whose_source_is_voice_session(
+    voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore
+) -> None:
+    c, bucket = voice_client
+    user_id = _seed_voice_user(c, fs, bucket)
+    fs.cols["user_songs"][f"{user_id}:mixed"]["source"] = "voice_session"
+    c.post("/api/test/voice/reset", json={"email": EMAIL})
+    mixed = fs.cols["user_songs"][f"{user_id}:mixed"]
+    assert mixed["source"] == "spotify_export" and mixed["sources"] == ["spotify_export"]

@@ -28,6 +28,7 @@ from backend.services.recs_v2.context import ArtistSignal, UserContextV2
 from backend.services.recs_v2.filters import RecFilters, where_sql
 from backend.services.recs_v2.scoring import Scored, score
 from backend.services.recs_v2.sections import BUCKET_RANK, _flat_key
+from backend.services.voice_profile_service import VoiceProfileOut
 from backend.tests.recs_v2.factories import cand
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
@@ -446,3 +447,24 @@ def test_old_catalog_sort_fit_with_profile(client_for: Callable[..., TestClient]
     pops = [s["facets"]["popularity"] or 0 for s in songs]
     assert pops == sorted(pops, reverse=True)
     assert r.json()["voice"]["has_profile"] is True
+
+
+class NoStoredProfile:
+    async def get(self, user_id: str) -> Any:
+        raise AssertionError("an explicit profile skips the stored-profile read")
+
+
+async def test_recommend_with_explicit_profile(reader: CatalogReader) -> None:
+    """A voice session's result (saved or not) ranks with its own profile, not the stored one."""
+    session = VoiceProfileOut.model_validate(
+        {**PROFILE, "method": "session", "confidence": "low", "evidence_count": 2, "session_id": "s1"}
+    )
+    service = svc.RecommendationServiceV2(
+        _firestore({"user_id": "guest_fit"}), FakeStore(reader), FakeHidden(), voice=NoStoredProfile()
+    )
+    res = await service.recommend(
+        User(id="guest_fit", is_guest=True), RecFilters(singable=True), "fit", profile=session
+    )
+    assert res.voice.model_dump() == {"has_profile": True, "method": "session"}
+    songs = [s for sec in res.sections for s in sec.songs]
+    assert songs and all(s.fit is not None and s.fit.bucket in ("fits", "fitsIn") for s in songs)

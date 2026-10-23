@@ -21,6 +21,8 @@ from backend.api.deps import (
     get_music_service_service_dep,
     get_settings,
 )
+from backend.api.routes.admin_voice import LABELS_COLLECTION as VOICE_LABELS
+from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
 from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
@@ -32,6 +34,9 @@ from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
+from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
+from backend.services.voice_session_outputs import SESSION_SOURCE
+from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
 
 router = APIRouter()
 
@@ -142,6 +147,83 @@ async def seed_voice(body: VoiceSeedBody, fs: FirestoreDep, auth: AuthDep) -> Re
     await fs.update_document(
         USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json", by_alias=True)}
     )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _user_id_of(fs: FirestoreService, auth: AuthService, email: str) -> str | None:
+    doc = await fs.get_document(USERS, auth._hash_email(email.lower())) or {}
+    return doc.get("user_id") or None
+
+
+@router.get("/voice/sessions")
+async def read_voice_sessions(email: Annotated[str, Query()], fs: FirestoreDep, auth: AuthDep) -> list[dict[str, Any]]:
+    """The user's voice sessions with their attempt counts, for E2E assertions (unknown email: empty)."""
+    user_id = await _user_id_of(fs, auth, email)
+    if not user_id:
+        return []
+    by_user = [("user_id", "==", user_id)]
+    sessions = await fs.query_documents(SESSIONS_COLLECTION, filters=by_user, limit=10000)
+    attempts = await fs.query_documents(ATTEMPTS_COLLECTION, filters=by_user, limit=10000)
+    counts: dict[str, int] = {}
+    for a in attempts:
+        sid = str(a.get("session_id"))
+        counts[sid] = counts.get(sid, 0) + 1
+    return [
+        {
+            "session_id": d["id"],
+            "state": d.get("state"),
+            "attempts": counts.get(d["id"], 0),
+            "done_reason": d.get("done_reason"),
+        }
+        for d in sessions
+    ]
+
+
+@router.get("/voice/recordings")
+async def read_voice_recordings(email: Annotated[str, Query()], fs: FirestoreDep, auth: AuthDep) -> dict[str, int]:
+    user_id = await _user_id_of(fs, auth, email)
+    if not user_id:
+        return {"count": 0}
+    docs = await fs.query_documents(RECORDINGS_COLLECTION, filters=[("user_id", "==", user_id)], limit=10000)
+    return {"count": len(docs)}
+
+
+@router.post("/voice/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_voice(
+    body: EmailBody,
+    fs: FirestoreDep,
+    auth: AuthDep,
+    bucket: Annotated[Any, Depends(get_recordings_bucket)],
+) -> Response:
+    """Delete the user's voice sessions, attempts, imported labels, recordings (objects too) and purge marker, and
+    undo what sessions wrote to ``user_songs`` (rows made only by a session go; on any other row
+    the ``session_*`` labels and the ``voice_session`` source are removed). Unknown emails: no-op."""
+    user_id = await _user_id_of(fs, auth, body.email)
+    if not user_id:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    by_user = [("user_id", "==", user_id)]
+    await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
+    await fs.delete_document(PURGES_COLLECTION, user_id)  # delete_all writes this marker; a fresh run may upload
+    for collection in (ATTEMPTS_COLLECTION, SESSIONS_COLLECTION, VOICE_LABELS):
+        docs = await fs.query_documents(collection, filters=by_user, limit=10000)
+        await fs.batch_delete(collection, [d["id"] for d in docs])
+
+    rows = await fs.query_documents(USER_SONGS_COLLECTION, filters=by_user, limit=10000)
+    deletes: list[str] = []
+    for row in rows:
+        sources = list(row.get("sources") or ([row["source"]] if row.get("source") else []))
+        if SESSION_SOURCE not in sources and row.get("source") != SESSION_SOURCE:
+            continue
+        rest = [x for x in sources if x != SESSION_SOURCE]
+        if not rest:
+            deletes.append(row["id"])
+            continue
+        kept = {k: v for k, v in row.items() if k != "id" and not k.startswith("session_")}
+        kept["sources"] = rest
+        if kept.get("source") == SESSION_SOURCE:
+            kept["source"] = rest[0]
+        await fs.set_document(USER_SONGS_COLLECTION, row["id"], kept)
+    await fs.batch_delete(USER_SONGS_COLLECTION, deletes)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

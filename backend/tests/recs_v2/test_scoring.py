@@ -99,3 +99,9 @@ def test_reason_type_precedence() -> None:
     assert score(cand("x|genre", "X", genres=("pop",)), ctx).reason_type == "genre_match"
     assert score(cand("x|dec", "X", genres=g, decade="2010s"), ctx).reason_type == "decade_match"
     assert score(cand("x|crowd", "X", genres=g), ctx).reason_type == "crowd_pleaser"
+
+
+def test_session_no_penalised() -> None:
+    c = cand("a|nope")
+    assert score(c, _ctx(session_no={"a|nope"})).score == pytest.approx(score(c, _ctx()).score - w.SESSION_NO_PENALTY)
+    assert score(cand("a|other"), _ctx(session_no={"a|nope"})).score == score(cand("a|other"), _ctx()).score

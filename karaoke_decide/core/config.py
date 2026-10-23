@@ -2,10 +2,10 @@
 
 from datetime import date
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LOCAL_STACK_KJBOX_SECRET = "local-stack-secret"
 
@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     # decide-kjbox-secret). Empty disables the partner routes (503). Use ``kjbox_secret``.
     decide_kjbox_secret: str = ""
 
+    # Static admin tokens for scripts (env ADMIN_TOKENS, comma-separated; sent as X-Admin-Token).
+    admin_tokens: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("admin_tokens", mode="before")
+    @classmethod
+    def _split_admin_tokens(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return [t.strip() for t in v.split(",") if t.strip()]
+        return v
+
     # Google Cloud
     google_cloud_project: str = ""
     google_cloud_project_number: str = ""  # Required for service account references
@@ -50,6 +60,19 @@ class Settings(BaseSettings):
     song_index_local_dir: str = ""
     catalog_load_timeout_s: float = 60
     catalog_dir: str = "/tmp/decide-catalog"  # download dir (in-memory on Cloud Run)
+
+    # Voice session (backend/services/voice_data_store.py). voice.db is published by the
+    # voice-pool jobs behind gs://<voice_data_bucket>/voice/latest.json and downloaded into
+    # <catalog_dir>/voice/<run>/; the pointer is re-read every voice_refresh_s. voice_local_dir
+    # (an already-built voice.db: local stack, tests) wins when set.
+    voice_data_bucket: str = "nomadkaraoke-musicbrainz-data"
+    voice_local_dir: str = ""
+    voice_refresh_s: float = 600
+    # Open the voice session to every signed-in user (env VOICE_SESSION_OPEN); admins always have it.
+    voice_session_open: bool = False
+    # Private user recordings (voice-recordings/<user_id>/<session_id>/<n>.<ext>).
+    voice_recordings_bucket: str = "nomadkaraoke-voice-recordings"
+    voice_recordings_local_dir: str = ""  # a directory instead of the bucket (local stack, tests)
     # Make every BigQuery client construction fail (local stack / tests: no GCP).
     bigquery_disabled: bool = False
 
