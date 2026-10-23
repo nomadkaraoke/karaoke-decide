@@ -330,6 +330,41 @@ class TestServiceCRUD:
         mock_firestore.update_document.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_spotify_reconnect_clears_needs_reconnect(
+        self,
+        service: MusicServiceService,
+        mock_firestore: MagicMock,
+        sample_spotify_service: MusicService,
+    ) -> None:
+        """Reconnecting after a dead refresh token clears error_code and the error status."""
+        now = datetime.now(UTC)
+        mock_firestore.get_document = AsyncMock(
+            return_value={
+                "id": sample_spotify_service.id,
+                "user_id": sample_spotify_service.user_id,
+                "service_type": "spotify",
+                "service_user_id": sample_spotify_service.service_user_id,
+                "service_username": sample_spotify_service.service_username,
+                "access_token": "old-token",
+                "refresh_token": "revoked-refresh",
+                "token_expires_at": (now - timedelta(hours=1)).isoformat(),
+                "sync_status": "error",
+                "sync_error": "Spotify access expired. Reconnect Spotify.",
+                "error_code": "needs_reconnect",
+                "created_at": sample_spotify_service.created_at.isoformat(),
+                "updated_at": sample_spotify_service.updated_at.isoformat(),
+            }
+        )
+        tokens = {"access_token": "fresh-access", "refresh_token": "fresh-refresh", "expires_in": 3600}
+
+        await service.create_or_update_spotify_service("user_123", tokens, {"id": "spotify-user"})
+
+        written = mock_firestore.update_document.call_args.args[2]
+        assert written["error_code"] is None
+        assert written["sync_status"] == "idle"
+        assert written["sync_error"] is None
+
+    @pytest.mark.asyncio
     async def test_create_lastfm_service(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
         """Creates Last.fm service connection."""
         mock_firestore.get_document = AsyncMock(return_value=None)  # No existing service

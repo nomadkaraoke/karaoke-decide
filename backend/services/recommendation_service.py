@@ -280,7 +280,7 @@ class RecommendationService:
         # Section 3: Crowd Pleasers (popular karaoke songs for discovery)
         crowd_pleasers: list[Recommendation] = []
         if has_karaoke is not False:
-            popular_songs = await asyncio.to_thread(self._get_popular_songs, self.CROWD_PLEASER_LIMIT * 5)
+            popular_songs = await asyncio.to_thread(self._get_popular_songs, limit=self.CROWD_PLEASER_LIMIT * 5)
             scored_popular = []
             for song in popular_songs:
                 if song["id"] not in context.known_song_ids:
@@ -672,7 +672,7 @@ class RecommendationService:
 
         # Strategy 2: Popular karaoke songs (crowd pleasers)
         if len(scored) < limit:
-            popular_songs = await asyncio.to_thread(self._get_popular_songs, limit)
+            popular_songs = await asyncio.to_thread(self._get_popular_songs, limit=limit)
 
             for song in popular_songs:
                 if song["id"] not in context.known_song_ids:
@@ -949,7 +949,7 @@ class RecommendationService:
         Returns:
             List of Recommendation objects.
         """
-        songs = await asyncio.to_thread(self._get_popular_songs, limit)
+        songs = await asyncio.to_thread(self._get_popular_songs, limit=limit)
 
         return [
             Recommendation(

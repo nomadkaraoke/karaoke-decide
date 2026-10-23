@@ -433,8 +433,9 @@ async def spotify_callback(
 
     # Handle OAuth errors
     if error:
+        code = "denied" if error == "access_denied" else "spotify_error"
         return RedirectResponse(
-            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={'denied' if error == 'access_denied' else 'spotify_error'}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={code}",
             status_code=status.HTTP_302_FOUND,
         )
 

@@ -77,12 +77,11 @@ class TestGetAuthUrl:
         assert "redirect_uri=" in url
 
     def test_auth_url_encodes_scope_and_redirect(self, spotify_client: SpotifyClient) -> None:
-        """Spaces are %20 (not +/raw) and the redirect URI is fully percent-encoded."""
+        """Scopes are joined with %20 and the redirect URI is fully percent-encoded."""
         spotify_client.redirect_uri = "https://example.com/api/services/spotify/callback"
         url = spotify_client.get_auth_url("state")
 
-        assert "scope=user-read-private%20user-read-email%20" in url
-        assert " " not in url and "+" not in url
+        assert f"scope={'%20'.join(SpotifyClient.SCOPES)}&" in url
         assert "redirect_uri=https%3A%2F%2Fexample.com%2Fapi%2Fservices%2Fspotify%2Fcallback" in url
 
 
