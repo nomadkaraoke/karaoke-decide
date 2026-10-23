@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import threading
 from typing import TYPE_CHECKING, Any
+
+import httpx
 
 from backend.config import BackendSettings
 from karaoke_decide.core.lazy_import import lazy_module
@@ -18,6 +21,11 @@ else:  # imported on first use (API cold start)
     timestamp_pb2 = lazy_module("google.protobuf.timestamp_pb2")
 
 logger = logging.getLogger(__name__)
+
+# DECIDE_INLINE_TASKS: a sync run can take as long as Cloud Run allows a request.
+INLINE_TASK_TIMEOUT_S = 1800.0
+# Strong references to running inline tasks (the event loop only keeps weak ones).
+_INLINE_TASKS: set[asyncio.Task[None]] = set()
 
 
 class CloudTasksService:
@@ -35,6 +43,7 @@ class CloudTasksService:
         self.queue = settings.cloud_tasks_queue
         self._client: tasks_v2.CloudTasksClient | None = None
         self._client_lock = threading.Lock()
+        self._inline_transport: httpx.AsyncBaseTransport | None = None  # tests only
 
     @property
     def client(self) -> tasks_v2.CloudTasksClient:
@@ -66,6 +75,10 @@ class CloudTasksService:
         Returns:
             Task name.
         """
+        payload = {"job_id": job_id, "user_id": user_id}
+        if self.settings.inline_tasks:
+            return self._run_inline("/internal/sync/process", payload, name=f"inline:{job_id}")
+
         # Build the Cloud Run URL for the internal endpoint
         cloud_run_url = self.settings.cloud_run_url
         if not cloud_run_url:
@@ -73,12 +86,6 @@ class CloudTasksService:
             cloud_run_url = f"http://localhost:{self.settings.api_port}"
 
         url = f"{cloud_run_url}/internal/sync/process"
-
-        # Build task payload
-        payload = {
-            "job_id": job_id,
-            "user_id": user_id,
-        }
 
         # Create task request
         task: dict[str, Any] = {
@@ -116,6 +123,30 @@ class CloudTasksService:
         response = self.client.create_task(request=request)
         logger.info(f"Created sync task: {response.name}")
         return response.name
+
+    def _run_inline(self, path: str, payload: dict[str, Any], name: str) -> str:
+        """DECIDE_INLINE_TASKS (local stack): POST the task to this API now, in the background.
+
+        Fire-and-forget on the running event loop, never awaited by the caller, so the request
+        that enqueued it returns at once and the handler runs as its own request (the same
+        /internal route Cloud Tasks would call; non-production needs no OIDC). No retries.
+        """
+        url = self.settings.public_api_base_url.rstrip("/") + path
+        task = asyncio.get_running_loop().create_task(self._post_inline(url, payload, name))
+        _INLINE_TASKS.add(task)
+        task.add_done_callback(_INLINE_TASKS.discard)
+        logger.info(f"Running task inline: {name} -> {url}")
+        return name
+
+    async def _post_inline(self, url: str, payload: dict[str, Any], name: str) -> None:
+        try:
+            async with httpx.AsyncClient(transport=self._inline_transport, timeout=INLINE_TASK_TIMEOUT_S) as client:
+                response = await client.post(url, json=payload)
+        except httpx.HTTPError as e:
+            logger.warning(f"Inline task {name} failed: {type(e).__name__}: {e}")
+            return
+        if response.status_code >= 400:
+            logger.warning(f"Inline task {name} answered {response.status_code}: {response.text[:300]}")
 
     def _get_project_number(self) -> str:
         """Get the GCP project number.

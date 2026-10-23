@@ -44,6 +44,8 @@ class LastFmClient:
         self.settings = settings
         self.api_key = settings.lastfm_api_key
         self.shared_secret = settings.lastfm_shared_secret
+        # BackendSettings.lastfm_api_base (LASTFM_API_BASE): the local stack points it at its fake.
+        self.api_base: str = getattr(settings, "lastfm_api_base", None) or self.API_BASE
 
     async def get_user_info(self, username: str) -> dict[str, Any]:
         """Get user profile information."""
@@ -373,7 +375,7 @@ class LastFmClient:
             )
 
         async with httpx.AsyncClient() as client:
-            response = await client.get(self.API_BASE, params=request_params)
+            response = await client.get(self.api_base, params=request_params)
 
             if response.status_code != 200:
                 raise ExternalServiceError("Last.fm", f"API error: {response.text}")

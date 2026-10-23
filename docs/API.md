@@ -151,6 +151,11 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `GET /api/test/profile?email=` | Reads the profile back |
 | `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log. |
 | `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
+| `PUT /api/test/fake-externals` | `{knobs: {metabrainz?: "deny", metabrainz_user?, spotify_embed?: "changed", screenshot?: "fail"}}` → `{knobs}`; resets every `DECIDE_FAKE_EXTERNALS` fake to its defaults, then sets the knobs (422 unknown knob; 409 `fake_externals_disabled` when the fakes are off, as for the two below) |
+| `POST /api/test/fake-listenbrainz/users` | `{username, listens: [{artist, title, listened_at}]}` → creates/replaces a fake ListenBrainz user |
+| `POST /api/test/fake-lastfm/users` | `{username, top_tracks: [{artist, title, playcount}], top_artists: [{name, playcount}]}` → creates/replaces a fake Last.fm user |
+
+With `DECIDE_FAKE_EXTERNALS=1` (local stack only; refused in production) `/fake/*` serves fake ListenBrainz, MetaBrainz OAuth, Spotify embed and Last.fm endpoints: see [TESTING.md § Local stack: fakes](TESTING.md#local-stack-fakes).
 
 ## Song search ✅ Implemented
 

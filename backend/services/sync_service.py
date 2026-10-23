@@ -862,6 +862,8 @@ class SyncService:
         Returns:
             Dict mapping normalized name -> ArtistMetadata
         """
+        if self.settings.bigquery_disabled:  # local stack: no BigQuery, artists stay unenriched
+            return {}
         try:
             from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 

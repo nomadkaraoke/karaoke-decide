@@ -3,6 +3,8 @@
 import os
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
+
 from karaoke_decide.core.config import Settings
 
 
@@ -29,7 +31,8 @@ class BackendSettings(Settings):
     spotify_embed_base: str = "https://open.spotify.com"
     decide_token_key: str = ""  # DECIDE_TOKEN_KEY: Fernet key for tokens at rest
     decide_fake_externals: bool = False
-    inline_tasks: bool = False  # DECIDE_INLINE_TASKS: run Cloud Tasks handlers inline (local/e2e)
+    # DECIDE_INLINE_TASKS: POST Cloud Tasks to this API in-process instead (local stack only)
+    inline_tasks: bool = Field(default=False, validation_alias=AliasChoices("decide_inline_tasks", "inline_tasks"))
     public_api_base_url: str = "https://decide.nomadkaraoke.com"
     mobile_app_scheme: str = "nomadkaraoke"
     screenshot_llm_model: str = "gemini-3.8-flash"

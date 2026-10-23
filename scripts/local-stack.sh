@@ -24,6 +24,8 @@
 # X-Kjbox-Secret; the caller's DECIDE_KJBOX_SECRET is ignored),
 # SEARCH_LOCAL_PUBLIC_URL (http://127.0.0.1:$SEARCH_PORT; http://10.0.2.2:... for Android),
 # DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`).
+# The api always runs with DECIDE_FAKE_EXTERNALS=1 and DECIDE_INLINE_TASKS=1, the fake URLs on
+# http://127.0.0.1:$DECIDE_LOCAL_PORT/fake/... (docs/TESTING.md § "Local stack: fakes").
 # See docs/TESTING.md § "Local stack". bash 3.2 compatible (macOS).
 
 set -euo pipefail
@@ -48,6 +50,12 @@ GEN_API_URL="${GEN_API_URL:-http://127.0.0.1:8010}"
 # only an explicit LOCAL_STACK_PARTNER_SECRET overrides the fixed local value.
 PARTNER_SECRET="${LOCAL_STACK_PARTNER_SECRET:-local-stack-secret}"
 KJBOX_SECRET="${LOCAL_STACK_KJBOX_SECRET:-local-stack-secret}"
+# TEST-ONLY Fernet key for DECIDE_TOKEN_KEY (encrypts the fake MetaBrainz tokens in the emulator).
+# Committed on purpose: it guards nothing real. Never use it outside the local stack.
+LOCAL_STACK_TOKEN_KEY="imC0NA2w3dNUv5rMVVWcaerh2hf6BOwbJNUWXbeAIEk="  # gitleaks:allow (test-only key)
+# The API's own loopback origin: the fakes (backend/fakes, mounted at /fake) and the inline Cloud
+# Tasks live on it. Android reaches it through `adb reverse`, so one URL works on both platforms.
+API_SELF_URL="http://127.0.0.1:$API_PORT"
 case "$GEN_API_URL" in
     http://127.0.0.1|http://127.0.0.1:*|http://localhost|http://localhost:*|http://10.0.2.2|http://10.0.2.2:*) ;;
     *) echo "refusing GEN_API_URL=$GEN_API_URL: the local stack only talks to a loopback gen (127.0.0.1, localhost, 10.0.2.2)" >&2; exit 2 ;;
@@ -191,6 +199,17 @@ up_api() {
         export DECIDE_TEST_API=1 BIGQUERY_DISABLED=1
         export CATALOG_LOCAL_DIR="$CATALOG_DIR" SONG_INDEX_LOCAL_DIR="$INDEX_DIR"
         export GEN_API_URL DECIDE_GEN_PARTNER_SECRET="$PARTNER_SECRET" DECIDE_KJBOX_SECRET="$KJBOX_SECRET"
+        # Fake ListenBrainz / MetaBrainz / Spotify embed / Last.fm / Gemini, and inline Cloud Tasks.
+        export DECIDE_FAKE_EXTERNALS=1 DECIDE_INLINE_TASKS=1
+        export PUBLIC_API_BASE_URL="$API_SELF_URL"
+        export LISTENBRAINZ_API_BASE="$API_SELF_URL/fake/listenbrainz/1"
+        export METABRAINZ_BASE_URL="$API_SELF_URL/fake/metabrainz"
+        export SPOTIFY_EMBED_BASE="$API_SELF_URL/fake/spotify"
+        export LASTFM_API_BASE="$API_SELF_URL/fake/lastfm/2.0/"
+        export LISTENBRAINZ_OAUTH_ENABLED=1 METABRAINZ_CLIENT_ID=fake METABRAINZ_CLIENT_SECRET=fake
+        export DECIDE_TOKEN_KEY="$LOCAL_STACK_TOKEN_KEY"
+        # Never a real Gemini call from the local stack (the fake extractor answers instead).
+        unset GEMINI_API_KEY
         nohup ${RUN[@]+"${RUN[@]}"} uvicorn backend.main:app --host 127.0.0.1 --port "$API_PORT" \
             > "$API_LOG" 2>&1 &
         echo $! > "$API_PID"
