@@ -309,6 +309,10 @@ cloud_run_service = gcp.cloudrunv2.Service(
                         "name": "SPOTIFY_REDIRECT_URI",
                         "value": f"https://karaoke-decide-{PROJECT_NUMBER}.{region}.run.app/api/services/spotify/callback",
                     },
+                    # Phase 3b: ListenBrainz connect through MetaBrainz OAuth (live; the capability still
+                    # hides itself unless the MetaBrainz secrets and DECIDE_TOKEN_KEY are all present).
+                    {"name": "LISTENBRAINZ_OAUTH_ENABLED", "value": "true"},
+                    {"name": "PUBLIC_API_BASE_URL", "value": "https://decide.nomadkaraoke.com"},
                     # Secrets from Secret Manager
                     {
                         "name": "JWT_SECRET",
@@ -391,6 +395,43 @@ cloud_run_service = gcp.cloudrunv2.Service(
                             }
                         },
                     },
+                    # Phase 3b secrets (created by hand; grants in REQUIRED_SECRETS).
+                    {
+                        "name": "GEMINI_API_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "gemini-api-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "METABRAINZ_CLIENT_ID",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "metabrainz-client-id",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "METABRAINZ_CLIENT_SECRET",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "metabrainz-client-secret",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
+                        "name": "DECIDE_TOKEN_KEY",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "decide-token-key",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {
@@ -465,6 +506,13 @@ REQUIRED_SECRETS = [
     "apple-musickit-private-key",
     "apple-musickit-key-id",
     "apple-team-id",
+    # Phase 3b, created by hand (no Secret resources here): the AI Studio key for screenshot
+    # import, the MetaBrainz OAuth app (ListenBrainz connect), and the Fernet key that encrypts
+    # stored service tokens.
+    "gemini-api-key",
+    "metabrainz-client-id",
+    "metabrainz-client-secret",
+    "decide-token-key",
     # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 
@@ -727,6 +775,148 @@ gcp.cloudscheduler.Job(
         },
     },
     opts=pulumi.ResourceOptions(depends_on=[lb_refresh_invoker]),
+)
+
+# =============================================================================
+# ListenBrainz poller (Cloud Run Job + Cloud Scheduler)
+# =============================================================================
+# Daily: folds each ListenBrainz-connected user's new listens into their profile, marks
+# stale connections, and checks pending Spotify-export imports handed to ListenBrainz.
+# A Job (not a request on the API service) so the long run never loads API instances.
+# See backend/services/listenbrainz_poller.py and backend/jobs/lb_poll.py.
+
+LB_POLL_JOB_NAME = "lb-poll"
+# Pending-import checks refresh MetaBrainz OAuth tokens, which are encrypted at rest.
+LB_POLL_SECRETS = {
+    "DECIDE_TOKEN_KEY": "decide-token-key",
+    "METABRAINZ_CLIENT_ID": "metabrainz-client-id",
+    "METABRAINZ_CLIENT_SECRET": "metabrainz-client-secret",
+}
+
+lb_poll_sa = gcp.serviceaccount.Account(
+    "lb-poll-sa",
+    account_id="lb-poll",
+    display_name="ListenBrainz Poll Job",
+    description="Runs the daily lb-poll Cloud Run Job",
+    project=project,
+)
+lb_poll_member = lb_poll_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+# Firestore: music_services, user_songs, user_artists.
+gcp.projects.IAMMember(
+    "lb-poll-datastore-user",
+    project=project,
+    role="roles/datastore.user",
+    member=lb_poll_member,
+)
+# catalog.db (musicbrainz-data/catalog/) and availability.db / song index (kn-data).
+for _name, _bucket in [("musicbrainz-data", musicbrainz_bucket.name), ("kn-data", "nomadkaraoke-kn-data")]:
+    gcp.storage.BucketIAMMember(
+        f"lb-poll-{_name}-reader",
+        bucket=_bucket,
+        role="roles/storage.objectViewer",
+        member=lb_poll_member,
+    )
+# TrackMatcher's BigQuery fallback (only if catalog.db doesn't load; the job then exits 1 instead).
+gcp.projects.IAMMember(
+    "lb-poll-bq-job-user",
+    project=project,
+    role="roles/bigquery.jobUser",
+    member=lb_poll_member,
+)
+gcp.bigquery.DatasetIamMember(
+    "lb-poll-bq-viewer-prod",
+    project=project,
+    dataset_id=bigquery_dataset.dataset_id,
+    role="roles/bigquery.dataViewer",
+    member=lb_poll_member,
+)
+lb_poll_secret_access = [
+    gcp.secretmanager.SecretIamMember(
+        f"lb-poll-secret-access-{_secret}",
+        project=project,
+        secret_id=_secret,
+        role="roles/secretmanager.secretAccessor",
+        member=lb_poll_member,
+    )
+    for _secret in LB_POLL_SECRETS.values()
+]
+
+lb_poll_job = gcp.cloudrunv2.Job(
+    "lb-poll-job",
+    name=LB_POLL_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "backend.jobs.lb_poll"],
+                    "envs": [
+                        {"name": "ENVIRONMENT", "value": environment},
+                        {"name": "GOOGLE_CLOUD_PROJECT", "value": project},
+                        {"name": "GOOGLE_CLOUD_PROJECT_NUMBER", "value": PROJECT_NUMBER},
+                        {"name": "CATALOG_BUCKET", "value": "nomadkaraoke-musicbrainz-data"},
+                        {"name": "SONG_INDEX_BUCKET", "value": "nomadkaraoke-kn-data"},
+                        {"name": "LISTENBRAINZ_OAUTH_ENABLED", "value": "true"},
+                        {"name": "PUBLIC_API_BASE_URL", "value": "https://decide.nomadkaraoke.com"},
+                        *[
+                            {
+                                "name": _env,
+                                "value_source": {"secret_key_ref": {"secret": _secret, "version": "latest"}},
+                            }
+                            for _env, _secret in LB_POLL_SECRETS.items()
+                        ],
+                    ],
+                    # 2Gi: catalog.db is decompressed into in-memory /tmp.
+                    "resources": {"limits": {"cpu": "1", "memory": "2Gi"}},
+                }
+            ],
+            "service_account": lb_poll_sa.email,
+            # The poll budget (LB_POLL_BUDGET_SECONDS, 1500 s) stays inside this.
+            "timeout": "1800s",
+            # No retry: a failed run logs one ERROR; tomorrow's run picks up (a retry doubles LB load).
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(
+        ignore_changes=["template.template.containers[0].image"],
+        depends_on=lb_poll_secret_access,
+    ),
+)
+
+lb_poll_invoker = gcp.cloudrunv2.JobIamMember(
+    "lb-poll-scheduler-invoker",
+    project=project,
+    location=region,
+    name=lb_poll_job.name,
+    role="roles/run.invoker",
+    member=lb_poll_member,
+)
+
+gcp.cloudscheduler.Job(
+    "lb-poll-scheduler",
+    name="lb-poll-daily",
+    description="ListenBrainz new listens -> user profiles (daily poll)",
+    project=project,
+    region=region,
+    schedule="30 6 * * *",
+    time_zone="UTC",
+    attempt_deadline="60s",
+    http_target={
+        "uri": lb_poll_job.name.apply(
+            lambda name: f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{name}:run"
+        ),
+        "http_method": "POST",
+        "oauth_token": {
+            "service_account_email": lb_poll_sa.email,
+            "scope": "https://www.googleapis.com/auth/cloud-platform",
+        },
+    },
+    opts=pulumi.ResourceOptions(depends_on=[lb_poll_invoker]),
 )
 
 # =============================================================================
