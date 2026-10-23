@@ -582,3 +582,78 @@ def test_next_p50_under_300ms(client: TestClient) -> None:
     p50 = statistics.median(times)
     print(f"voice session next p50 = {p50 * 1000:.1f} ms")
     assert p50 < 0.3
+
+
+# ---------------------------------------------------------------- fix round 1
+
+
+class RacingFirestore(RouteFirestore):
+    """The first attempt create loses a race to an identical request that lands just before it."""
+
+    raced = False
+
+    async def create_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> bool:
+        if collection == "voice_attempts" and not self.raced:
+            self.raced = True
+            await super().create_document(collection, doc_id, data)  # the concurrent retry wins n
+            return False
+        return await super().create_document(collection, doc_id, data)
+
+
+def test_overlapping_attempt_retries_store_one_attempt(make_client: MakeClient) -> None:
+    racing = RacingFirestore()
+    racing.cols["decide_users"] = {EMAIL_HASH: {"user_id": USER_ID, "email": EMAIL, "is_guest": False}}
+    client = make_client()
+    app.dependency_overrides[get_firestore] = lambda: racing
+    sid = _create(client)
+    song = _next(client, sid)
+    out = _post_attempt(client, sid, _attempt(song, 0))
+    assert racing.raced
+    assert out["n"] == 1 and out["attempt_id"] == f"{sid}:1"
+    assert list(racing.cols["voice_attempts"]) == [f"{sid}:1"]
+    assert _post_attempt(client, sid, _attempt(song, 0)) == out
+    assert len(racing.cols["voice_attempts"]) == 1
+
+
+def test_retried_skip_is_recorded_once(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    body = {"song_key": song["song_key"], "reason": "dont_know"}
+    for _ in range(2):
+        assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    skips = fs.cols["voice_sessions"][sid]["skips"]
+    assert [(s["song_key"], s["reason"]) for s in skips] == [(song["song_key"], "dont_know")]
+    ne = {"song_key": song["song_key"], "reason": "not_embeddable", "video_id": song["version"]["video_id"]}
+    for _ in range(2):  # retried not_embeddable (no next in between): one skip
+        assert client.post(f"/api/voice/sessions/{sid}/skips", json=ne).status_code == 204
+    assert len(fs.cols["voice_sessions"][sid]["skips"]) == 2
+
+
+def test_pitch_and_times_must_be_ordered(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    pitch = {"voiced_s": 60, "held_count": 4, "held_low": 48, "held_high": 62, "p10": 50, "p50": 55, "p90": 60}
+    for bad in ({"held_low": 63}, {"p10": 56}, {"p90": 54}, {"p50": 61}):
+        r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, pitch={**pitch, **bad}))
+        assert r.status_code == 422, bad
+    body = _attempt(song, 0, pitch=pitch)
+    body["ended_at"] = (T0 - timedelta(seconds=1)).isoformat()
+    assert client.post(f"/api/voice/sessions/{sid}/attempts", json=body).status_code == 422
+    assert "voice_attempts" not in fs.cols
+    body["ended_at"] = body["started_at"]  # equal is fine
+    assert client.post(f"/api/voice/sessions/{sid}/attempts", json=body).status_code == 200
+
+
+def test_every_song_skipped_is_no_candidates_and_partial(client: TestClient) -> None:
+    """Review Focus 4: skipping the whole 48-song fixture pool ends the session, and the result is partial."""
+    sid = _create(client)
+    seen: set[str] = set()
+    while (song := _next(client, sid))["kind"] == "song":
+        assert song["song_key"] not in seen
+        seen.add(song["song_key"])
+        body = {"song_key": song["song_key"], "reason": "dont_know"}
+        assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    assert len(seen) == 48
+    assert song == {"kind": "done", "reason": "no_candidates"}
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["partial"] is True and res["confidence_label"] == "low" and res["attempts"] == 0

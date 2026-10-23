@@ -4,8 +4,8 @@ Firestore:
 
 * ``voice_sessions/{id}`` = ``{user_id, setup, state, created_at, updated_at, tired_count, skips,
   prior_profile, pending_song_key, last_offer, done_reason}``. ``skips`` entries are
-  ``{song_key, reason, video_id, artist_key, at, done}``; ``prior_profile`` is the 3c voice profile at
-  setup (the prior, frozen for the session); ``last_offer`` is ``{song_key, reason_type, link_out}``.
+  ``{song_key, reason, video_id, artist_key, link_out, at, done}`` (a retried skip is not appended
+  twice); ``prior_profile`` is the 3c voice profile at setup (the prior, frozen for the session); ``last_offer`` is ``{song_key, reason_type, link_out}``.
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
   pitch, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the setup at
   attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
@@ -228,6 +228,16 @@ def _as_datetime(value: Any) -> datetime | None:
     return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
+def _matching_attempt(
+    attempts: Sequence[dict[str, Any]], song_key: str, started: datetime | None
+) -> dict[str, Any] | None:
+    """The stored attempt a request retries: same song_key and started_at."""
+    for a in attempts:
+        if a["song_key"] == song_key and _as_datetime(a.get("started_at")) == started:
+            return a
+    return None
+
+
 def _quiz(d: dict[str, Any]) -> Quiz:
     return Quiz(
         feel=d["feel"],
@@ -335,6 +345,11 @@ def _taste(ctx: UserContextV2) -> _Taste:
         artists={k: a.weight for k, a in ctx.artists.items()},
         hidden=set(ctx.hidden),
     )
+
+
+def _skip_identity(s: dict[str, Any]) -> tuple[Any, ...]:
+    """Skips with the same identity are retries of one request (see ``VoiceSessionService.skip``)."""
+    return (s.get("song_key"), s.get("reason"), s.get("video_id"), bool(s.get("link_out")))
 
 
 def _session_unplayable(skips: Sequence[dict[str, Any]], song_key: str | None = None) -> set[str]:
@@ -558,36 +573,53 @@ class VoiceSessionService:
         (the next call offers its next version) while a playable version is left; with none left the song
         is offered once more as a link-out, and a "not_embeddable" skip of that link-out finishes it.
         """
-        session = await self._active(user.id, session_id)
+        await self._active(user.id, session_id)
         index = await self._index()
         e = index.get(body.song_key)
         if e is None:
             raise UnknownSongError(body.song_key)
-        skips: list[dict[str, Any]] = list(session.get("skips") or [])
-        pending = session.get("pending_song_key")
-        entry: dict[str, Any] = {
-            "song_key": e.song_key,
-            "reason": body.reason,
-            "video_id": body.video_id,
-            "artist_key": e.artist_key,
-            "at": datetime.now(UTC),
-            "done": True,
-        }
+        stats: dict[str, VersionStats] = {}
         if body.reason == "not_embeddable":
             if body.video_id not in {v.video_id for v in e.versions}:
                 raise UnknownVersionError(str(body.video_id))
             await self._fs.set_document(VERSION_STATS_COLLECTION, body.video_id, {"embeddable": False}, merge=True)
             stats = await self._version_stats(e.versions)
-            unplayable = _session_unplayable(skips, e.song_key) | {body.video_id}
+
+        async def record(txn: Any) -> None:
+            session = await txn.get(SESSIONS_COLLECTION, session_id)
+            if not session or session.get("user_id") != user.id:
+                raise SessionNotFoundError(session_id)
+            if session.get("state") != "active":
+                raise SessionNotActiveError(session_id)
+            skips: list[dict[str, Any]] = list(session.get("skips") or [])
             last = session.get("last_offer") or {}
-            was_link_out = last.get("song_key") == e.song_key and bool(last.get("link_out"))
-            keep = bool(_playable(e.versions, stats, unplayable)) or not was_link_out
-            entry["done"] = not keep
-            pending = e.song_key if keep else (None if pending == e.song_key else pending)
-        elif pending == e.song_key:
-            pending = None
-        skips.append(entry)
-        await self._update(session_id, {"skips": skips, "pending_song_key": pending})
+            entry: dict[str, Any] = {
+                "song_key": e.song_key,
+                "reason": body.reason,
+                "video_id": body.video_id,
+                "artist_key": e.artist_key,
+                # A not_embeddable skip of the link-out offer is a new skip, not a retry of the one before it.
+                "link_out": last.get("song_key") == e.song_key and bool(last.get("link_out")),
+                "at": datetime.now(UTC),
+                "done": True,
+            }
+            if any(_skip_identity(s) == _skip_identity(entry) for s in skips):
+                return  # a retried request: already recorded
+            pending = session.get("pending_song_key")
+            if body.reason == "not_embeddable":
+                unplayable = _session_unplayable(skips, e.song_key) | {str(body.video_id)}
+                keep = bool(_playable(e.versions, stats, unplayable)) or not entry["link_out"]
+                entry["done"] = not keep
+                pending = e.song_key if keep else (None if pending == e.song_key else pending)
+            elif pending == e.song_key:
+                pending = None
+            txn.set(
+                SESSIONS_COLLECTION,
+                session_id,
+                {**session, "skips": [*skips, entry], "pending_song_key": pending, "updated_at": datetime.now(UTC)},
+            )
+
+        await self._fs.run_transaction(record)
 
     # ------------------------------------------------------------ attempts
 
@@ -596,9 +628,8 @@ class VoiceSessionService:
         session = await self._active(user.id, session_id)
         attempts = await self._attempts(user.id, session_id)
         started = _as_datetime(body.started_at)
-        for a in attempts:
-            if a["song_key"] == body.song_key and _as_datetime(a.get("started_at")) == started:
-                return await self._attempt_out(session, attempts, a)
+        if (same := _matching_attempt(attempts, body.song_key, started)) is not None:
+            return await self._attempt_out(session, attempts, same)
 
         index = await self._index()
         e = index.get(body.song_key)
@@ -636,6 +667,8 @@ class VoiceSessionService:
                 attempts.append({"id": doc_id, **doc, "n": n})
                 break
             attempts = await self._attempts(user.id, session_id)  # a concurrent attempt took n
+            if (same := _matching_attempt(attempts, body.song_key, started)) is not None:
+                return await self._attempt_out(session, attempts, same)  # ...this very attempt, retried
         else:
             raise AttemptLimitError(session_id)  # pragma: no cover  (3 concurrent writers)
 

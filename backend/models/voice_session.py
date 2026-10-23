@@ -7,9 +7,9 @@ summary, never audio or raw pitch frames.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.services.recs_v2.service import RecSong
 from karaoke_decide.voice_session.select import ReasonType
@@ -120,6 +120,14 @@ class PitchSummaryIn(_Request):
     p50: float = MidiFloat
     p90: float = MidiFloat
 
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.held_low > self.held_high:
+            raise ValueError("require held_low <= held_high")
+        if not (self.p10 <= self.p50 <= self.p90):
+            raise ValueError("require p10 <= p50 <= p90")
+        return self
+
 
 class AttemptIn(_Request):
     song_key: str = Field(max_length=500)
@@ -129,6 +137,12 @@ class AttemptIn(_Request):
     stopped_early: bool
     quiz: QuizIn
     pitch: PitchSummaryIn | None = None
+
+    @model_validator(mode="after")
+    def _ended_after_start(self) -> Self:
+        if self.ended_at < self.started_at:
+            raise ValueError("require ended_at >= started_at")
+        return self
 
 
 class AttemptOut(BaseModel):
