@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import logging
+import sqlite3
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -450,3 +451,59 @@ def test_lifespan_loads_local_voice_db(
     with TestClient(app):
         assert get_voice_data_store().status == "ready"
         assert get_voice_data_store().run == "fixture"
+
+
+def test_rollback_to_previous_run_keeps_its_files(
+    new_store: Callable[[], VoiceDataStore], tmp_path: Path, fixture_db: Path
+) -> None:
+    """A -> B -> A: the stale reader's dir is the new current reader's dir, so it must survive."""
+    bucket = FakeBucket()
+    bucket.publish(fixture_db, RUN_A)
+    store = new_store()
+    store.load(_settings(tmp_path), client=FakeClient(bucket), now=0.0)
+    bucket.publish(_small_db(tmp_path / "b" / "voice.db", RUN_B), RUN_B)
+    assert store.maybe_refresh(1000.0) and store.run == RUN_B
+    bucket.publish(fixture_db, RUN_A)
+    assert store.maybe_refresh(2000.0) and store.run == RUN_A
+    assert (tmp_path / "dl" / "voice" / RUN_A / "voice.db").is_file()
+    assert (tmp_path / "dl" / "voice" / RUN_B / "voice.db").is_file()
+    assert store.require().song(fixtures.STARLIGHT) is not None  # the live reader still reads run A
+    # ... and again forward: B's dir is the live one now; the stale A reader's dir is the old current
+    bucket.publish(_small_db(tmp_path / "b2" / "voice.db", RUN_B), RUN_B)
+    assert store.maybe_refresh(3000.0) and store.run == RUN_B
+    assert store.require().pool_keys() == ["alpha|one", "beta|two"]
+    assert (tmp_path / "dl" / "voice" / RUN_A / "voice.db").is_file()  # retired reader still serves A
+
+
+def test_load_never_raises(
+    new_store: Callable[[], VoiceDataStore], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = new_store()
+
+    def boom() -> bool:
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr(store, "_try_update", boom)
+    store.load(_settings(tmp_path), client=FakeClient())
+    assert store.status == "warming_up"
+
+
+def test_unreadable_meta_closes_the_new_reader(
+    new_store: Callable[[], VoiceDataStore], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _small_db(tmp_path / "local" / "voice.db", "small")
+    closed: list[bool] = []
+    real_close = voice_data_store.VoiceReader.close
+
+    def meta(self: voice_data_store.VoiceReader) -> dict[str, str]:
+        raise sqlite3.DatabaseError("broken meta")
+
+    def close(self: voice_data_store.VoiceReader) -> None:
+        closed.append(True)
+        real_close(self)
+
+    monkeypatch.setattr(voice_data_store.VoiceReader, "meta", meta)
+    monkeypatch.setattr(voice_data_store.VoiceReader, "close", close)
+    store = new_store()
+    store.load(_settings(tmp_path, voice_local_dir=str(tmp_path / "local")))
+    assert store.status == "warming_up" and closed == [True]

@@ -84,7 +84,7 @@ def client(fs: Fs, reader: CatalogReader) -> Iterator[TestClient]:
         environment="development",
         google_cloud_project="test-project",
         jwt_secret="test-jwt-secret-key-for-testing-only",
-        admin_tokens=f" {TOKEN} , ,other-token",
+        admin_tokens=f" {TOKEN} , ,other-token",  # type: ignore[arg-type]  # env-style string, split by the validator
     )
     auth = AuthService(settings, fs, email_service=MagicMock())  # type: ignore[arg-type]
     app.dependency_overrides[get_settings] = lambda: settings
@@ -105,7 +105,7 @@ def _tok(token: str = TOKEN) -> dict[str, str]:
 
 
 def test_admin_tokens_parsed_comma_separated() -> None:
-    s = BackendSettings(admin_tokens=" a , ,b")
+    s = BackendSettings(admin_tokens=" a , ,b")  # type: ignore[arg-type]  # the validator splits env-style strings
     assert s.admin_tokens == ["a", "b"]
 
 

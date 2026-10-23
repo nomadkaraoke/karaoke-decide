@@ -1,6 +1,7 @@
 """FastAPI application for Karaoke Decide."""
 
 import asyncio
+import contextlib
 import hashlib
 import importlib
 import logging
@@ -76,6 +77,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Shutdown
     logger.info("Shutting down Karaoke Decide API")
     voice_refresh.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await voice_refresh
     store.close()
     voice.close()
 

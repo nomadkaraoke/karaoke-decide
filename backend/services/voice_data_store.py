@@ -303,7 +303,10 @@ class VoiceDataStore:
         with self._refresh_lock:
             self._settings, self._client = settings, client
             self._last_check = time.monotonic() if now is None else now
-            self._try_update()
+            try:
+                self._try_update()
+            except Exception:  # noqa: BLE001  (_try_update catches its own failures; load must never raise)
+                logger.warning("voice.db load failed; voice session stays warming_up", exc_info=True)
 
     def maybe_refresh(self, now: float) -> bool:
         """Re-read the pointer when ``voice_refresh_s`` has passed; True when a new run was swapped in.
@@ -343,10 +346,13 @@ class VoiceDataStore:
         if found is None:
             return False
         path, run = found
+        reader: VoiceReader | None = None
         try:
             reader = VoiceReader(path)
             run = run or reader.meta().get("run") or path.parent.name
         except Exception as exc:
+            if reader is not None:
+                reader.close()
             logger.warning("voice.db %s unreadable (%s); keeping run %s", path, exc, self._run)
             return False
         self._swap(reader, run)
@@ -394,10 +400,18 @@ class VoiceDataStore:
             stale, self._retired = self._retired, self._reader
             self._reader, self._run = reader, run
         # The previous reader stays open for queries in flight; the one before it is closed now.
+        # Its download dir goes too, unless a rollback (A -> B -> A) means a live reader serves it.
         if stale is not None:
             stale.close()
-            self._remove_download(stale.path)
-        logger.info("voice.db %s loaded (%d songs offered)", run, len(reader.pool_keys()))
+            retired = self._retired
+            live = {reader.path.resolve(), *((retired.path.resolve(),) if retired is not None else ())}
+            if stale.path.resolve() not in live:
+                self._remove_download(stale.path)
+        try:
+            offered = len(reader.pool_keys())
+        except Exception:  # noqa: BLE001  (only for the log line)
+            offered = -1
+        logger.info("voice.db %s loaded (%d songs offered)", run, offered)
 
     def _remove_download(self, path: Path) -> None:
         settings = self._settings

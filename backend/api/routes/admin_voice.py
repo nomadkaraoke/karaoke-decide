@@ -329,9 +329,21 @@ async def user_songs(
     return await asyncio.to_thread(build)
 
 
-def _object_name(gcs_path: str, bucket_name: str) -> str:
-    prefix = f"gs://{bucket_name}/"
-    return gcs_path[len(prefix) :] if gcs_path.startswith(prefix) else gcs_path
+RECORDINGS_PREFIX = "voice-recordings/"
+
+
+def _object_name(gcs_path: str, bucket_name: str) -> str | None:
+    """The object name inside the recordings bucket, or None for anything outside it
+    (another bucket, outside ``voice-recordings/``, or a ``..`` segment)."""
+    if gcs_path.startswith("gs://"):
+        bucket, _, name = gcs_path[len("gs://") :].partition("/")
+        if bucket != bucket_name:
+            return None
+    else:
+        name = gcs_path
+    if not name.startswith(RECORDINGS_PREFIX) or ".." in name.split("/"):
+        return None
+    return name
 
 
 @router.get("/recordings/{recording_id}/audio")
@@ -346,7 +358,11 @@ async def recording_audio(
     doc = await firestore.get_document(RECORDINGS_COLLECTION, recording_id)
     if not doc or not doc.get("gcs_path"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found")
-    blob = bucket.blob(_object_name(str(doc["gcs_path"]), settings.voice_recordings_bucket))
+    name = _object_name(str(doc["gcs_path"]), settings.voice_recordings_bucket)
+    if name is None:
+        logger.warning("voice_recordings/%s has a gcs_path outside the recordings bucket", recording_id)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found")
+    blob = bucket.blob(name)
 
     def first_chunk() -> tuple[Any, bytes]:
         f = blob.open("rb")

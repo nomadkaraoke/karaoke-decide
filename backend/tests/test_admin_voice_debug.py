@@ -333,3 +333,23 @@ def test_recordings_bucket_default(settings: BackendSettings, tmp_path: Path) ->
     assert settings.voice_recordings_bucket == "nomadkaraoke-voice-recordings"
     assert settings.voice_data_bucket == "nomadkaraoke-musicbrainz-data"
     assert settings.voice_refresh_s == 600 and settings.voice_local_dir == ""
+
+
+@pytest.mark.parametrize(
+    "gcs_path",
+    [
+        "gs://some-other-bucket/voice-recordings/x/y/1.m4a",
+        "jobs/abc/output.mp4",
+        "voice-recordings/../jobs/abc/output.mp4",
+        "voice-recordings/u/../../secret",
+        "gs://nomadkaraoke-voice-recordings/other/1.m4a",
+        "/voice-recordings/u/s/1.m4a",
+    ],
+)
+def test_admin_audio_refuses_paths_outside_recordings(
+    client: TestClient, fs: MemoryFirestore, bucket: FakeBucket, gcs_path: str
+) -> None:
+    bucket.objects[gcs_path] = b"must not be served"
+    bucket.objects[gcs_path.split("/", 3)[-1]] = b"must not be served"
+    fs.cols["voice_recordings"] = {"bad": {"gcs_path": gcs_path, "content_type": "audio/mp4"}}
+    assert client.get("/api/admin/voice/recordings/bad/audio", headers=_tok()).status_code == 404
