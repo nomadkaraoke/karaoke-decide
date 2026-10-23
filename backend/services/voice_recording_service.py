@@ -212,9 +212,12 @@ class VoiceRecordingService:
         purge = await self._fs.get_document(PURGES_COLLECTION, user_id)
         purged_at = _as_utc(purge.get("purged_at")) if purge else None
         if purged_at is not None and purged_at >= started:
-            await asyncio.to_thread(self._delete_blob, name)
-            await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)
-            await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": None})
+            try:
+                await asyncio.to_thread(self._delete_blob, name)
+                await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)
+                await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": None})
+            except Exception:  # never a 500: the user's next delete-all sweeps what is left
+                logger.warning("could not fully undo recording %s after a delete-all", recording_id, exc_info=True)
             raise RecordingsDeletedError(recording_id)
         return recording_id
 
@@ -225,12 +228,24 @@ class VoiceRecordingService:
     async def delete_all_for_user(self, user_id: str) -> int:
         """Erase every recording of ``user_id``: objects (by prefix), docs, attempt links. Idempotent.
 
-        Returns the number of recordings erased (0 when there were none). Touches only this user's
-        prefix (the prefix ends in ``/``, so ``user_1`` never matches ``user_10``).
+        Also withdraws recording consent (``setup.record = false``) on every session of the user, so an
+        upload the app queued before the delete is refused (403 ``recording_not_consented``) instead of
+        re-creating a recording; the user can consent again with PATCH. Returns the number of recordings
+        erased (0 when there were none). Touches only this user's prefix (the prefix ends in ``/``, so
+        ``user_1`` never matches ``user_10``).
         """
         prefix = user_prefix(user_id)
         # Written first: an upload in flight sees it afterwards and undoes itself (see ``upload``).
         await self._fs.set_document(PURGES_COLLECTION, user_id, {"purged_at": datetime.now(UTC)})
+        sessions = await self._fs.query_documents(SESSIONS_COLLECTION, filters=[("user_id", "==", user_id)])
+        for s in sessions:
+            setup = s.get("setup") or {}
+            if setup.get("record") is True:
+                await self._fs.update_document(
+                    SESSIONS_COLLECTION,
+                    str(s["id"]),
+                    {"setup": {**setup, "record": False}, "updated_at": datetime.now(UTC)},
+                )
 
         def erase_objects() -> set[str]:
             names = [b.name for b in self._bucket.list_blobs(prefix=prefix)]

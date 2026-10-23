@@ -121,7 +121,8 @@ def _map_songs(
     Voice-session labels come from the ``session_*`` fields whatever the row's ``source``: "yes" /
     "yes in another key" and a "fine" feel raise the weight (max wins); "no" puts the song in
     ``session_no`` and out of the known songs. A row whose only source is ``voice_session`` has no
-    base weight (known only through a label) and never counts toward its artist."""
+    base weight (known only through a label) and counts toward its artist only once loved ("Love it",
+    as a manual love does)."""
     kn_keys = reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
     known: dict[str, float] = {}
     no_karaoke: dict[str, tuple[str, str, str]] = {}
@@ -145,7 +146,8 @@ def _map_songs(
             if not has_karaoke:
                 no_karaoke.setdefault(key, (key, artist, title))
         # quiz seeds 5 songs per liked artist (affinity already covers it); voice-session pool songs probe range
-        if artist and d.get("source") != "quiz" and _row_sources(d) != [w.SESSION_SOURCE]:
+        session_only = _row_sources(d) == [w.SESSION_SOURCE] and d.get("loved") is not True
+        if artist and d.get("source") != "quiz" and not session_only:
             artist_songs.setdefault(artist_key(artist), set()).add(key)
     for key in session_no:
         known.pop(key, None)

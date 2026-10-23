@@ -427,7 +427,7 @@ The singer's voice profile, stored on their `decide_users` doc (auth required; v
  "register": null, "confidence": "medium", "method": "mic", "measured_at": "2026-10-22T10:00:00Z"}
 ```
 
-Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self, and `self` requires `confidence: low`.
+Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self (`session` is `422` here: only a voice session's result saves those), and `self` requires `confidence: low`.
 
 ### GET /api/catalog/songs/{song_key}/vocal-range
 
@@ -2233,11 +2233,24 @@ Phase 3d. A guided singing session that finds the singer's voice type and key-fi
 
 ### GET /api/voice/flags
 
-`{"session_enabled": true, "is_admin": false, "voice_data": true}`. Never gated.
+`{"session_enabled": true, "is_admin": false, "voice_data": true, "active_session_id": "abc123" | null}`. Never gated. `active_session_id` is the user's active session (the newest, should two ever be active), so the app can offer to resume it with `GET /api/voice/sessions/{session_id}`.
 
 ### POST /api/voice/sessions
 
 Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel"}` (`device` optional, max 80). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
+
+### GET /api/voice/sessions/{session_id}
+
+The session as it stands, for resuming it. Read-only: never changes the session. Errors: `404 session_not_found` (also for another user's session).
+
+```json
+{"session_id": "abc123", "state": "active|abandoned|done",
+ "setup": {"posture": "standing", "warmth": "warm", "record": false, "headphones": true, "device": "Pixel"},
+ "attempts": 2, "top_p": 0.41, "done_reason": null, "last_offer": {"kind": "song", "song_key": "artist|title", "...": "..."},
+ "profile_saved": false}
+```
+
+`last_offer` is the song to show (the `GET .../next` shape, `attempt_n` recomputed): the last offered song while the session is active and not done, that song is neither attempted nor finished by a skip, and its version was not reported `not_embeddable` since; otherwise `null` (the app then calls `GET .../next`). `done_reason` is set once the session is over (or would end on the next `next`). `setup.record` reads `false` after the user deleted their recordings (see `DELETE /api/voice/recordings`).
 
 ### PATCH /api/voice/sessions/{session_id}
 
@@ -2250,14 +2263,15 @@ The next song, or the end of the session. Errors: `404 session_not_found`, `409 
 ```json
 {"kind": "song", "song_key": "artist|title", "artist": "Artist", "title": "Title", "duration_s": 215,
  "reason_type": "explore", "version": {"video_id": "FIXTURE11", "brand_code": "SING", "brand_name": "Sing King", "embeddable": true},
- "alternatives": [], "song_range": {"low": 48, "high": 70, "p10": 52, "p50": 59, "p90": 66}}
+ "alternatives": [], "song_range": {"low": 48, "high": 70, "p10": 52, "p50": 59, "p90": 66},
+ "attempt_n": 3, "max_attempts": 12}
 ```
 
-or `{"kind": "done", "reason": "..."}`. `version.embeddable` is `false` only for the link-out offer (no embeddable version is left): the app opens YouTube instead of embedding. `alternatives` holds at most 2 versions; `song_range` is `null` without data.
+or `{"kind": "done", "reason": "..."}`. `attempt_n` is the 1-based number an attempt on this song would get, out of `max_attempts` (12). `version.embeddable` is `false` only for the link-out offer (no embeddable version is left): the app opens YouTube instead of embedding. `alternatives` holds at most 2 versions; `song_range` is `null` without data.
 
 ### POST /api/voice/sessions/{session_id}/skips
 
-Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "video_id": null}`. `not_embeddable` (with `video_id`) marks that version unplayable for everyone. `204`. Errors: `404 session_not_found`, `409 session_not_active`, `422` for an unknown song or version (`unknown_song`, `unknown_version`).
+Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "video_id": null}`. `not_embeddable` (with `video_id`) marks that version unplayable for everyone. `204`. A song (and, for `not_embeddable`, a version) that the last `next` offered is accepted even if a new voice.db no longer has it (the offer's snapshot is used, and the song is finished for the session). Errors: `404 session_not_found`, `409 session_not_active`, `422` for an unknown song or version (`unknown_song`, `unknown_version`).
 
 ### POST /api/voice/sessions/{session_id}/attempts
 
@@ -2273,19 +2287,19 @@ One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `start
           "tags": ["fast_lyrics", "long_gaps", "needed_warmup", "crowd_song", "mood_only"]}}
 ```
 
-`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`.
+`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`. The song and version the last `next` offered are always accepted, even after a voice.db swap dropped them (the attempt stores the offer's snapshot of the song).
 
 ### GET /api/voice/sessions/{session_id}/result
 
-Works in any session state (no attempts yet: the prior, `partial: true`); marks the session done and saves the voice profile (`method: session`) once the result is confident enough. Errors: `404 session_not_found`.
+Works in any session state (no attempts yet: the prior, `partial: true`). On an **active** session it marks the session done and saves the voice profile (`method: session`) once the result is confident enough; a **done** session returns its stored `profile_saved` again; an **abandoned** session (the user started a newer one) gets its result with `profile_saved: false`, never saves over the newer profile, and stays abandoned. Errors: `404 session_not_found`. A failure writing an attempt's outputs never fails the result (logged, retried on the next fetch).
 
 ```json
 {"voice_type": "tenor", "between": null, "confidence_label": "low", "top_p": 0.5, "low": 45, "high": 69,
- "comfort_low": 50, "comfort_high": 65, "attempts": 3, "partial": false, "improve_hint": null, "profile_saved": false,
+ "comfort_low": 50, "comfort_high": 65, "attempts": 3, "partial": false, "improve_hint": null, "done_reason": "confident", "profile_saved": false,
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
 
-`suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session.
+`suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
 
 ### POST /api/voice/recordings
 
@@ -2293,11 +2307,19 @@ Private, consent-gated audio of one attempt (multipart form: `file`, `session_id
 
 ### DELETE /api/voice/recordings
 
-Erases every recording of the signed-in user (objects, documents, attempt links); idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
+Erases every recording of the signed-in user (objects, documents, attempt links) and withdraws recording consent (`setup.record = false`) on all their sessions, so an upload queued before the delete is refused with `403 recording_not_consented`; the user re-consents with `PATCH` (`{"record": true}`). Idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
 
 ### GET /api/voice/recordings/count
 
 `{"count": 2}`. Open to every signed-in user.
+
+### App upload queue rules
+
+The app queues recordings and uploads them in the background. For each queued upload:
+
+- **Drop it** on `403 recording_not_consented`, `409 recordings_deleted`, or `404 attempt_not_found`: the server will never take it.
+- **Keep it** (retry later) on `5xx` and on network errors.
+- **Before calling `DELETE /api/voice/recordings`, clear the queue**, so nothing recorded before the delete is sent after it. (The server also refuses such uploads, since the delete withdraws consent, but the app should not rely on that.)
 
 ### Admin voice (`/api/admin/voice/*`)
 

@@ -166,7 +166,8 @@ async def read_voice_sessions(email: Annotated[str, Query()], fs: FirestoreDep, 
     attempts = await fs.query_documents(ATTEMPTS_COLLECTION, filters=by_user, limit=10000)
     counts: dict[str, int] = {}
     for a in attempts:
-        counts[a.get("session_id")] = counts.get(a.get("session_id"), 0) + 1
+        sid = str(a.get("session_id"))
+        counts[sid] = counts.get(sid, 0) + 1
     return [
         {
             "session_id": d["id"],

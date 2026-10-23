@@ -23,6 +23,7 @@ from backend.models.voice_session import (
     NextSongOut,
     ResultOut,
     SessionCreated,
+    SessionOut,
     SessionPatch,
     SessionSetup,
     SkipIn,
@@ -31,7 +32,7 @@ from backend.models.voice_session import (
 from backend.services import voice_recording_service as vrs
 from backend.services.voice_data_store import VoiceDataUnavailable
 from backend.services.voice_recording_service import RecordingError, VoiceRecordingService
-from backend.services.voice_session_service import VoiceSessionError
+from backend.services.voice_session_service import VoiceSessionError, active_session_id
 from karaoke_decide.core.models import User
 from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS
 
@@ -63,15 +64,25 @@ async def _call(work: Awaitable[_T]) -> _T:
 
 
 @router.get("/flags", response_model=VoiceFlagsOut)
-async def flags(user: CurrentUser, settings: Settings, store: VoiceDataStoreDep) -> VoiceFlagsOut:
+async def flags(
+    user: CurrentUser, settings: Settings, store: VoiceDataStoreDep, firestore: FirestoreServiceDep
+) -> VoiceFlagsOut:
     return VoiceFlagsOut(
-        session_enabled=_enabled(settings, user), is_admin=user.is_admin, voice_data=store.status == "ready"
+        session_enabled=_enabled(settings, user),
+        is_admin=user.is_admin,
+        voice_data=store.status == "ready",
+        active_session_id=await active_session_id(firestore, user.id),
     )
 
 
 @router.post("/sessions", response_model=SessionCreated)
 async def create_session(body: SessionSetup, user: SessionUser, service: VoiceSessionServiceDep) -> SessionCreated:
     return await _call(service.create(user, body))
+
+
+@router.get("/sessions/{session_id}", response_model=SessionOut)
+async def get_session(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> SessionOut:
+    return await _call(service.get(user, session_id))
 
 
 @router.patch("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

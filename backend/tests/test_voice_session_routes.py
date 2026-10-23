@@ -5,6 +5,8 @@ Fixture voice.db (Task A7), fixture catalog.db + availability.db, in-memory Fire
 
 from __future__ import annotations
 
+import copy
+import dataclasses
 import hashlib
 import random
 import shutil
@@ -29,6 +31,7 @@ from backend.api.deps import (
 )
 from backend.config import BackendSettings
 from backend.main import app
+from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.voice_data_store import VoiceDataStore
 from backend.services.voice_profile_service import VoiceProfileOut
@@ -215,11 +218,11 @@ def _post_attempt(client: TestClient, sid: str, body: dict[str, Any]) -> dict[st
 
 def test_flags_admin_vs_user_vs_open(make_client: MakeClient) -> None:
     flags = make_client(admin=True).get("/api/voice/flags").json()
-    assert flags == {"session_enabled": True, "is_admin": True, "voice_data": True}
+    assert flags == {"session_enabled": True, "is_admin": True, "voice_data": True, "active_session_id": None}
     flags = make_client(admin=False).get("/api/voice/flags").json()
-    assert flags == {"session_enabled": False, "is_admin": False, "voice_data": True}
+    assert flags == {"session_enabled": False, "is_admin": False, "voice_data": True, "active_session_id": None}
     flags = make_client(admin=False, open_=True, store=VoiceDataStore()).get("/api/voice/flags").json()
-    assert flags == {"session_enabled": True, "is_admin": False, "voice_data": False}
+    assert flags == {"session_enabled": True, "is_admin": False, "voice_data": False, "active_session_id": None}
 
 
 def test_disabled_for_non_admin_403(make_client: MakeClient) -> None:
@@ -663,3 +666,175 @@ def test_every_song_skipped_is_no_candidates_and_partial(client: TestClient) -> 
     assert song == {"kind": "done", "reason": "no_candidates"}
     res = client.get(f"/api/voice/sessions/{sid}/result").json()
     assert res["partial"] is True and res["confidence_label"] == "low" and res["attempts"] == 0
+
+
+# ---------------------------------------------------------------- final review fixes
+
+
+def test_result_of_abandoned_session_never_saves_over_newer_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S1 active -> S2 created (S1 abandoned) -> S2 finished (saves P2) -> result(S1): P2 stands, S1 stays abandoned."""
+    monkeypatch.setattr(vss, "should_save", lambda *_: True)  # without the state gate S1 would overwrite P2
+    s1 = _create(client)
+    song = _next(client, s1)
+    _post_attempt(client, s1, _attempt(song, 0, _quiz(position="too_high")))
+    s2 = _create(client)
+    assert fs.cols["voice_sessions"][s1]["state"] == "abandoned"
+    song = _next(client, s2)
+    _post_attempt(client, s2, _attempt(song, 1))
+    r2 = client.get(f"/api/voice/sessions/{s2}/result").json()
+    assert r2["profile_saved"] is True
+    p2 = dict(fs.cols["decide_users"][EMAIL_HASH]["voice_profile"])
+    assert p2["session_id"] == s2
+
+    r1 = client.get(f"/api/voice/sessions/{s1}/result")
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["profile_saved"] is False and r1.json()["attempts"] == 1
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] == p2
+    assert fs.cols["voice_sessions"][s1]["state"] == "abandoned"
+    assert "profile_saved" not in fs.cols["voice_sessions"][s1]
+    # a done session keeps returning its stored outcome
+    assert client.get(f"/api/voice/sessions/{s2}/result").json()["profile_saved"] is True
+
+
+def _without(song_key: str, *, versions_only: bool = False) -> Callable[[Any], dict[str, Any]]:
+    """pool_index as a hot-swapped voice.db would give it: the song (or just its versions) gone."""
+    real = vss.pool_index
+
+    def index(reader: Any) -> dict[str, Any]:
+        out = dict(real(reader))
+        if versions_only:
+            out[song_key] = dataclasses.replace(out[song_key], versions=())
+        else:
+            out.pop(song_key)
+        return out
+
+    return index
+
+
+@pytest.mark.parametrize("versions_only", [False, True])
+def test_attempt_on_offered_song_survives_voice_db_swap(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch, versions_only: bool
+) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    expected = dict(fs.cols["voice_sessions"][sid]["last_offer"]["song"])
+    monkeypatch.setattr(vss, "pool_index", _without(song["song_key"], versions_only=versions_only))
+    out = _post_attempt(client, sid, _attempt(song, 0))
+    assert out["n"] == 1
+    stored = fs.cols["voice_attempts"][f"{sid}:1"]
+    assert stored["song_key"] == song["song_key"] and stored["song"] == expected
+    assert stored["song"]["artist"] == song["artist"]
+    # a song or version that was not the offer is still refused
+    other = {**song, "version": {**song["version"], "video_id": "NOT_OFFERED"}}
+    r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(other, 1))
+    assert r.status_code == 422 and r.json() == {"detail": "unknown_song" if not versions_only else "unknown_version"}
+
+
+def test_skips_of_offered_song_survive_voice_db_swap(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    monkeypatch.setattr(vss, "pool_index", _without(song["song_key"]))
+    ne = {"song_key": song["song_key"], "reason": "not_embeddable", "video_id": song["version"]["video_id"]}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=ne).status_code == 204
+    skip = fs.cols["voice_sessions"][sid]["skips"][-1]
+    assert (
+        skip["done"] is True
+        and skip["artist_key"] == fs.cols["voice_sessions"][sid]["last_offer"]["song"]["artist_key"]
+    )
+    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["embeddable"] is False
+    dk = {"song_key": song["song_key"], "reason": "dont_know"}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=dk).status_code == 204
+    bad = {"song_key": "nobody|nothing", "reason": "dont_know"}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=bad).status_code == 422
+
+
+def test_result_survives_failing_outputs(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    _post_attempt(client, sid, _attempt(song, 0))
+    fs.cols["voice_attempts"][f"{sid}:1"].pop("outputs_applied")  # missed: result sweeps it
+
+    async def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(vss.VoiceSessionService, "_apply_outputs", boom)
+    with caplog.at_level("WARNING"):
+        r = client.get(f"/api/voice/sessions/{sid}/result")
+    assert r.status_code == 200, r.text
+    assert r.json()["attempts"] == 1
+    assert any(rec.levelname == "WARNING" and "outputs" in rec.getMessage() for rec in caplog.records)
+    assert fs.cols["voice_sessions"][sid]["state"] == "done"
+
+
+def test_public_put_rejects_session_method(client: TestClient, fs: RouteFirestore) -> None:
+    body = {
+        "low_midi": 40, "high_midi": 69, "comfort_low": 45, "comfort_high": 64, "voice_type": "baritone",
+        "register": None, "confidence": "medium", "method": "session", "evidence_count": 3,
+        "session_id": "abc", "measured_at": "2026-10-22T10:00:00Z",
+    }  # fmt: skip
+    assert client.put("/api/my/voice", json=body).status_code == 422
+    assert "voice_profile" not in fs.cols["decide_users"][EMAIL_HASH]
+    assert client.put("/api/my/voice", json={**body, "method": "mic"}).status_code == 200
+
+
+def test_flags_report_active_session(client: TestClient) -> None:
+    assert client.get("/api/voice/flags").json()["active_session_id"] is None
+    first = _create(client)
+    assert client.get("/api/voice/flags").json()["active_session_id"] == first
+    second = _create(client)
+    assert client.get("/api/voice/flags").json()["active_session_id"] == second
+    client.get(f"/api/voice/sessions/{second}/result")
+    assert client.get("/api/voice/flags").json()["active_session_id"] is None
+
+
+def test_get_session_for_resume_is_read_only(make_client: MakeClient, fs: RouteFirestore) -> None:
+    client = make_client()
+    sid = _create(client)
+    got = client.get(f"/api/voice/sessions/{sid}")
+    assert got.status_code == 200, got.text
+    assert got.json() == {
+        "session_id": sid, "state": "active", "setup": SETUP, "attempts": 0, "top_p": got.json()["top_p"],
+        "done_reason": None, "last_offer": None, "profile_saved": False,
+    }  # fmt: skip
+
+    song = _next(client, sid)
+    assert song["attempt_n"] == 1 and song["max_attempts"] == 12
+    before = copy.deepcopy(fs.cols)
+    resumed = client.get(f"/api/voice/sessions/{sid}").json()
+    assert resumed["last_offer"] == song
+    assert fs.cols == before  # reading changes nothing
+
+    _post_attempt(client, sid, _attempt(song, 0))
+    resumed = client.get(f"/api/voice/sessions/{sid}").json()
+    assert resumed["attempts"] == 1 and resumed["last_offer"] is None
+    song2 = _next(client, sid)
+    assert song2["attempt_n"] == 2
+    assert client.get(f"/api/voice/sessions/{sid}").json()["last_offer"]["attempt_n"] == 2
+
+    ne = {"song_key": song2["song_key"], "reason": "not_embeddable", "video_id": song2["version"]["video_id"]}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=ne).status_code == 204
+    assert client.get(f"/api/voice/sessions/{sid}").json()["last_offer"] is None  # ask /next for the next version
+
+    assert make_client(user_id=OTHER_ID).get(f"/api/voice/sessions/{sid}").status_code == 404
+    client = make_client()
+    assert client.get("/api/voice/sessions/nope").status_code == 404
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    done = client.get(f"/api/voice/sessions/{sid}").json()
+    assert done["state"] == "done" and done["last_offer"] is None
+    assert done["profile_saved"] is res["profile_saved"] and done["done_reason"] == res["done_reason"]
+
+
+def test_result_carries_done_reason(client: TestClient) -> None:
+    sid = _create(client)
+    for i in range(2):
+        song = _next(client, sid)
+        _post_attempt(client, sid, _attempt(song, i, _quiz(voice_now="tired")))
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["done_reason"] == "tired"
+    sid = _create(client)
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["done_reason"] is None

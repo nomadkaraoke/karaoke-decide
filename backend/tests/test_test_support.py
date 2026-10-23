@@ -360,7 +360,7 @@ def _seed_voice_user(c: TestClient, fs: FakeFirestore, bucket: LocalBucket) -> s
             f"{other}:only": {"user_id": other, "source": "voice_session", "sources": ["voice_session"]},
         }
     )
-    return user_id
+    return str(user_id)
 
 
 def test_voice_test_api_not_mounted_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.services.recs_v2.service import RecSong
 from karaoke_decide.voice_session.select import ReasonType
-from karaoke_decide.voice_session.stopping import ConfidenceLabel, DoneReason, ImproveHint
+from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ConfidenceLabel, DoneReason, ImproveHint
 
 Posture = Literal["standing", "sitting", "lying"]
 Warmth = Literal["cold", "bit_warm", "warm"]
@@ -75,6 +75,8 @@ class NextSongOut(BaseModel):
     version: VersionOut
     alternatives: list[VersionOut] = Field(max_length=2)
     song_range: SongRangeOut | None
+    attempt_n: int  # the 1-based number an attempt on this song would get
+    max_attempts: int = MAX_ATTEMPTS
 
 
 class NextDoneOut(BaseModel):
@@ -171,12 +173,28 @@ class ResultOut(BaseModel):
     attempts: int
     partial: bool
     improve_hint: ImproveHint | None
+    done_reason: DoneReason | None
     profile_saved: bool
     suited: list[RecSong] = Field(max_length=15)
     loved: list[LovedSongOut]
+
+
+class SessionOut(BaseModel):
+    """A session as it stands (``GET /api/voice/sessions/{id}``), for the app to resume it."""
+
+    session_id: str
+    state: SessionStateName
+    setup: SessionSetup
+    attempts: int
+    top_p: float
+    done_reason: DoneReason | None
+    # The song offered last and not yet sung or skipped (what the app should show), else null.
+    last_offer: NextSongOut | None
+    profile_saved: bool
 
 
 class VoiceFlagsOut(BaseModel):
     session_enabled: bool
     is_admin: bool
     voice_data: bool
+    active_session_id: str | None = None

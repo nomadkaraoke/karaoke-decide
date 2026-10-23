@@ -5,7 +5,10 @@ Firestore:
 * ``voice_sessions/{id}`` = ``{user_id, setup, state, created_at, updated_at, tired_count, skips,
   prior_profile, pending_song_key, last_offer, done_reason, profile_saved}``. ``skips`` entries are
   ``{song_key, reason, video_id, artist_key, link_out, at, done}`` (a retried skip is not appended
-  twice); ``prior_profile`` is the 3c voice profile at setup (the prior, frozen for the session); ``last_offer`` is ``{song_key, reason_type, link_out}``.
+  twice); ``prior_profile`` is the 3c voice profile at setup (the prior, frozen for the session); ``last_offer`` is
+  ``{song_key, reason_type, link_out, video_ids, song, offer}``: ``video_ids`` the offered versions, ``song``
+  the attempt snapshot of the song and ``offer`` the ``NextSongOut`` sent. An attempt or skip of the offered
+  song and version is accepted from that snapshot even when a new voice.db no longer has them (hot swap).
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
   pitch, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the setup at
   attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
@@ -29,8 +32,9 @@ counts it exactly once): the song's ``user_songs`` row (``choose_user_song_row``
 ``{user_id}:{kn_id}`` row when it exists, else ``loved_doc_id``) gets ``times_sung`` + 1 and the
 session labels, and ``voice_version_stats/{video_id}`` its counters; a "loved" feel then calls
 "Love it". ``result`` first applies any attempt whose outputs were missed, then, only on the
-transition to done, saves the session's voice profile (``should_save``; the outcome is kept as
-``profile_saved`` and returned on later fetches), and lists the songs that suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
+transition from active to done, saves the session's voice profile (``should_save``; the outcome is kept
+as ``profile_saved`` and returned on later fetches; an abandoned session's result is derived, never saved,
+and the session stays abandoned), and lists the songs that suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
 
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
 (``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
@@ -61,6 +65,7 @@ from backend.models.voice_session import (
     NextSongOut,
     ResultOut,
     SessionCreated,
+    SessionOut,
     SessionPatch,
     SessionSetup,
     SkipIn,
@@ -435,6 +440,41 @@ def build_candidates(
     return out
 
 
+def _song_snapshot(e: PoolEntry) -> dict[str, Any]:
+    """What an attempt stores about its song (enough to rebuild the posterior without voice.db)."""
+    d = e.demand
+    return {
+        "artist": e.artist,
+        "title": e.title,
+        "artist_key": e.artist_key,
+        "stratum": e.stratum,
+        "demand": {"low": d.low, "high": d.high, "p10": d.p10, "p50": d.p50, "p90": d.p90},
+    }
+
+
+def _offered_song(session: dict[str, Any], song_key: str, video_id: str | None) -> dict[str, Any] | None:
+    """The session's ``last_offer`` snapshot of ``song_key`` when the request matches that offer (and,
+    given a ``video_id``, one of its offered versions); None otherwise."""
+    last = session.get("last_offer") or {}
+    song = last.get("song")
+    if last.get("song_key") != song_key or not isinstance(song, dict):
+        return None
+    if video_id is not None and video_id not in (last.get("video_ids") or []):
+        return None
+    return song
+
+
+async def active_session_id(fs: FirestoreService, user_id: str) -> str | None:
+    """The user's active session (the newest, should two ever be active), else None."""
+    docs = await fs.query_documents(
+        SESSIONS_COLLECTION, filters=[("user_id", "==", user_id), ("state", "==", "active")]
+    )
+    if not docs:
+        return None
+    newest = max(docs, key=lambda d: _as_datetime(d.get("created_at")) or datetime.min.replace(tzinfo=UTC))
+    return str(newest["id"])
+
+
 # ---------------------------------------------------------------- service
 
 
@@ -534,6 +574,42 @@ class VoiceSessionService:
         changes = {k: v for k, v in patch.model_dump(exclude_unset=True).items() if v is not None or k == "device"}
         await self._update(session_id, {"setup": {**(session.get("setup") or {}), **changes}})
 
+    # ------------------------------------------------------------ read (resume)
+
+    async def get(self, user: User, session_id: str) -> SessionOut:
+        """The session as it stands, for the app to resume it. Read-only: changes no state."""
+        session = await self._owned(user.id, session_id)
+        attempts = await self._attempts(user.id, session_id)
+        state = await asyncio.to_thread(rebuild_state, session, attempts)
+        done_reason: DoneReason | None = check(state) or session.get("done_reason")
+        return SessionOut(
+            session_id=session_id,
+            state=session.get("state") or "active",
+            setup=SessionSetup.model_validate(session.get("setup") or {}),
+            attempts=state.attempts,
+            top_p=round(_top_p(state), 4),
+            done_reason=done_reason,
+            last_offer=self._pending_offer(session, state) if done_reason is None else None,
+            profile_saved=bool(session.get("profile_saved")),
+        )
+
+    @staticmethod
+    def _pending_offer(session: dict[str, Any], state: SessionState) -> NextSongOut | None:
+        """The last offer while it is still the song to sing: an active session, the song not attempted
+        or finished by a skip, and its version not reported unplayable since."""
+        last = session.get("last_offer") or {}
+        offer, song_key = last.get("offer"), last.get("song_key")
+        if session.get("state") != "active" or not isinstance(offer, dict) or song_key in state.done_keys:
+            return None
+        video_id = (offer.get("version") or {}).get("video_id")
+        if video_id in _session_unplayable(session.get("skips") or [], song_key):
+            return None
+        try:
+            return NextSongOut.model_validate({**offer, "attempt_n": state.attempts + 1})
+        except ValidationError:
+            logger.warning("voice session %s: stored offer no longer validates", session.get("id"))
+            return None
+
     # ------------------------------------------------------------ next
 
     async def next_song(self, user: User, session_id: str) -> NextSongOut | NextDoneOut:
@@ -551,7 +627,9 @@ class VoiceSessionService:
         if pending in index and pending not in state.done_keys and pending not in taste.hidden:
             last = session.get("last_offer") or {}
             reason = last.get("reason_type") if last.get("song_key") == pending else "explore"
-            offer = await self._offer(session_id, index[pending], reason or "explore", skips, link_out_ok=True)
+            offer = await self._offer(
+                session_id, index[pending], reason or "explore", skips, link_out_ok=True, attempt_n=state.attempts + 1
+            )
             assert offer is not None  # link_out_ok always offers
             return offer
 
@@ -562,7 +640,12 @@ class VoiceSessionService:
             if pick is None:
                 return await self._done(session_id, "no_candidates")
             offer = await self._offer(
-                session_id, index[pick.song_key], pick.reason_type, skips, link_out_ok=attempt == MAX_REPICKS
+                session_id,
+                index[pick.song_key],
+                pick.reason_type,
+                skips,
+                link_out_ok=attempt == MAX_REPICKS,
+                attempt_n=state.attempts + 1,
             )
             if offer is not None:
                 return offer
@@ -574,7 +657,14 @@ class VoiceSessionService:
         return NextDoneOut(reason=reason)
 
     async def _offer(
-        self, session_id: str, e: PoolEntry, reason_type: Any, skips: Sequence[dict[str, Any]], *, link_out_ok: bool
+        self,
+        session_id: str,
+        e: PoolEntry,
+        reason_type: Any,
+        skips: Sequence[dict[str, Any]],
+        *,
+        link_out_ok: bool,
+        attempt_n: int,
     ) -> NextSongOut | None:
         """The song with its best playable version (live stats), a link-out offer, or None (no version)."""
         stats = await self._version_stats(e.versions)
@@ -584,11 +674,8 @@ class VoiceSessionService:
             return None
         link_out = not playable
         version = _version_out(ordered[0], embeddable=False) if link_out else _version_out(playable[0])
-        await self._update(
-            session_id, {"last_offer": {"song_key": e.song_key, "reason_type": reason_type, "link_out": link_out}}
-        )
         d = e.demand
-        return NextSongOut(
+        out = NextSongOut(
             song_key=e.song_key,
             artist=e.artist,
             title=e.title,
@@ -597,7 +684,18 @@ class VoiceSessionService:
             version=version,
             alternatives=[_version_out(v) for v in playable[1 : 1 + ALTERNATIVES]],
             song_range=SongRangeOut(low=d.low, high=d.high, p10=d.p10, p50=d.p50, p90=d.p90),
+            attempt_n=attempt_n,
         )
+        last_offer = {
+            "song_key": e.song_key,
+            "reason_type": reason_type,
+            "link_out": link_out,
+            "video_ids": [out.version.video_id, *(v.video_id for v in out.alternatives)],
+            "song": _song_snapshot(e),
+            "offer": out.model_dump(mode="json"),
+        }
+        await self._update(session_id, {"last_offer": last_offer})
+        return out
 
     # ------------------------------------------------------------ skips
 
@@ -608,17 +706,25 @@ class VoiceSessionService:
         (the next call offers its next version) while a playable version is left; with none left the song
         is offered once more as a link-out, and a "not_embeddable" skip of that link-out finishes it.
         """
-        await self._active(user.id, session_id)
+        session = await self._active(user.id, session_id)
         index = await self._index()
         e = index.get(body.song_key)
-        if e is None:
-            raise UnknownSongError(body.song_key)
+        ne = body.reason == "not_embeddable"
+        # Not in this voice.db (hot swap) but the song (and version) just offered: use the offer's snapshot.
+        known = e is not None and (not ne or body.video_id in {v.video_id for v in e.versions})
+        snap = None
+        if not known and not (ne and body.video_id is None):
+            snap = _offered_song(session, body.song_key, body.video_id if ne else None)
+        if not known and snap is None:
+            if e is None:
+                raise UnknownSongError(body.song_key)
+            raise UnknownVersionError(str(body.video_id))
+        artist_key = e.artist_key if known and e is not None else str((snap or {}).get("artist_key") or "")
         stats: dict[str, VersionStats] = {}
-        if body.reason == "not_embeddable":
-            if body.video_id not in {v.video_id for v in e.versions}:
-                raise UnknownVersionError(str(body.video_id))
-            await self._fs.set_document(VERSION_STATS_COLLECTION, body.video_id, {"embeddable": False}, merge=True)
-            stats = await self._version_stats(e.versions)
+        if ne:
+            await self._fs.set_document(VERSION_STATS_COLLECTION, str(body.video_id), {"embeddable": False}, merge=True)
+            if known and e is not None:
+                stats = await self._version_stats(e.versions)
 
         async def record(txn: Any) -> None:
             session = await txn.get(SESSIONS_COLLECTION, session_id)
@@ -629,24 +735,26 @@ class VoiceSessionService:
             skips: list[dict[str, Any]] = list(session.get("skips") or [])
             last = session.get("last_offer") or {}
             entry: dict[str, Any] = {
-                "song_key": e.song_key,
+                "song_key": body.song_key,
                 "reason": body.reason,
                 "video_id": body.video_id,
-                "artist_key": e.artist_key,
+                "artist_key": artist_key,
                 # A not_embeddable skip of the link-out offer is a new skip, not a retry of the one before it.
-                "link_out": last.get("song_key") == e.song_key and bool(last.get("link_out")),
+                "link_out": last.get("song_key") == body.song_key and bool(last.get("link_out")),
                 "at": datetime.now(UTC),
                 "done": True,
             }
             if any(_skip_identity(s) == _skip_identity(entry) for s in skips):
                 return  # a retried request: already recorded
             pending = session.get("pending_song_key")
-            if body.reason == "not_embeddable":
-                unplayable = _session_unplayable(skips, e.song_key) | {str(body.video_id)}
-                keep = bool(_playable(e.versions, stats, unplayable)) or not entry["link_out"]
+            if ne:
+                # A song gone from voice.db can't be offered again: its skip finishes it.
+                unplayable = _session_unplayable(skips, body.song_key) | {str(body.video_id)}
+                versions = e.versions if known and e is not None else ()
+                keep = known and (bool(_playable(versions, stats, unplayable)) or not entry["link_out"])
                 entry["done"] = not keep
-                pending = e.song_key if keep else (None if pending == e.song_key else pending)
-            elif pending == e.song_key:
+                pending = body.song_key if keep else (None if pending == body.song_key else pending)
+            elif pending == body.song_key:
                 pending = None
             txn.set(
                 SESSIONS_COLLECTION,
@@ -668,15 +776,19 @@ class VoiceSessionService:
 
         index = await self._index()
         e = index.get(body.song_key)
-        if e is None:
-            raise UnknownSongError(body.song_key)
-        if body.video_id not in {v.video_id for v in e.versions}:
-            raise UnknownVersionError(body.video_id)
-        d = e.demand
+        if e is not None and body.video_id in {v.video_id for v in e.versions}:
+            song = _song_snapshot(e)
+        else:  # a hot-swapped voice.db may have dropped the song or version just offered: use the offer's snapshot
+            snap = _offered_song(session, body.song_key, body.video_id)
+            if snap is None:
+                if e is None:
+                    raise UnknownSongError(body.song_key)
+                raise UnknownVersionError(body.video_id)
+            song = dict(snap)
         doc: dict[str, Any] = {
             "user_id": user.id,
             "session_id": session_id,
-            "song_key": e.song_key,
+            "song_key": body.song_key,
             "video_id": body.video_id,
             "quiz": body.quiz.model_dump(),
             "context": dict(session.get("setup") or {}),
@@ -685,13 +797,7 @@ class VoiceSessionService:
             "started_at": body.started_at,
             "ended_at": body.ended_at,
             "recording_id": None,
-            "song": {
-                "artist": e.artist,
-                "title": e.title,
-                "artist_key": e.artist_key,
-                "stratum": e.stratum,
-                "demand": {"low": d.low, "high": d.high, "p10": d.p10, "p50": d.p50, "p90": d.p90},
-            },
+            "song": song,
         }
         for _ in range(_CREATE_RETRIES):
             n = max((int(a["n"]) for a in attempts), default=0) + 1
@@ -711,7 +817,7 @@ class VoiceSessionService:
         pending = session.get("pending_song_key")
         await self._update(
             session_id,
-            {"tired_count": tired, "pending_song_key": None if pending == e.song_key else pending},
+            {"tired_count": tired, "pending_song_key": None if pending == body.song_key else pending},
         )
         return await self._attempt_out(user.id, session, attempts, attempts[-1])
 
@@ -797,19 +903,27 @@ class VoiceSessionService:
     # ------------------------------------------------------------ result
 
     async def result(self, user: User, session_id: str) -> ResultOut:
-        """The result for any session state (zero attempts: the prior, partial); marks the session done."""
+        """The result for any session state (zero attempts: the prior, partial).
+
+        An active session becomes done and may save its profile. A done session returns its stored
+        ``profile_saved``. An abandoned session (a newer one was started) gets its derived result, never
+        saves (its profile is stale next to the newer session's) and stays abandoned."""
         session = await self._owned(user.id, session_id)
+        was = session.get("state")
         attempts = await self._attempts(user.id, session_id)
         for a in sorted(attempts, key=lambda a: int(a["n"])):
-            await self._apply_outputs(user.id, session, attempts, a)  # any attempt whose outputs were missed
+            try:  # any attempt whose outputs were missed; outputs never fail the result
+                await self._apply_outputs(user.id, session, attempts, a)
+            except Exception:
+                logger.warning("voice session %s: outputs of attempt %s failed", session_id, a.get("n"), exc_info=True)
         state = await asyncio.to_thread(rebuild_state, session, attempts)
         done_reason: DoneReason | None = check(state) or session.get("done_reason")
         # summary() reads "not warm now" as "never warm"; warmth can step down mid-session, so use ever-warm.
         state.warmth = "warm" if _ever_warm(session, attempts) else state.warmth
         s = await asyncio.to_thread(summary, state, done_reason)
-        first = session.get("state") != "done"  # only finishing a session may save its profile
-        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=first)
-        if not first:
+        finishing = was == "active"  # only finishing an active session may save its profile
+        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=finishing)
+        if was == "done":
             saved = bool(session.get("profile_saved"))
         suited = await self._suited(user, profile)
         loved: dict[str, LovedSongOut] = {}
@@ -820,10 +934,10 @@ class VoiceSessionService:
                     a["song_key"],
                     LovedSongOut(song_key=a["song_key"], artist=song.get("artist", ""), title=song.get("title", "")),
                 )
-        done: dict[str, Any] = {"state": "done", "done_reason": done_reason}
-        if first:
-            done["profile_saved"] = saved
-        await self._update(session_id, done)
+        if finishing:
+            await self._update(session_id, {"state": "done", "done_reason": done_reason, "profile_saved": saved})
+        elif was == "done":
+            await self._update(session_id, {"done_reason": done_reason})
         return ResultOut(
             voice_type=s.voice_type,
             between=s.between,
@@ -836,6 +950,7 @@ class VoiceSessionService:
             attempts=state.attempts,
             partial=done_reason != "confident",
             improve_hint=s.improve_hint,
+            done_reason=done_reason,
             profile_saved=saved,
             suited=suited,
             loved=list(loved.values()),

@@ -421,17 +421,85 @@ async def test_upload_racing_delete_all_undoes_itself(bucket: FakeBucket) -> Non
     assert bucket.objects == {}
     assert rfs.cols["voice_recordings"] == {}
     assert rfs.cols["voice_attempts"]["s1:1"]["recording_id"] is None
-    # a later upload (after the purge) succeeds
-    await svc.upload(
-        USER,
-        session_id="s1",
-        attempt_n=1,
-        duration_s=1.0,
-        device=None,
-        content_type="audio/mp4",
-        file=io.BytesIO(AUDIO),
-    )
-    assert len(bucket.objects) == 1
+    # an upload queued before the delete and sent after it is refused: delete-all withdrew consent
+    with pytest.raises(vrs.RecordingNotConsentedError):
+        await svc.upload(
+            USER,
+            session_id="s1",
+            attempt_n=1,
+            duration_s=1.0,
+            device=None,
+            content_type="audio/mp4",
+            file=io.BytesIO(AUDIO),
+        )
+    assert bucket.objects == {}
+    assert rfs.cols["voice_sessions"]["s1"]["setup"]["record"] is False
+
+
+def test_delete_all_withdraws_consent_until_patched(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket
+) -> None:
+    """A queued pre-delete upload can't undo "Delete my recordings"; re-consenting with PATCH re-enables uploads."""
+    _seed(fs)
+    _seed(fs, sid="s2")
+    _seed(fs, user_id=OTHER, sid="s3")
+    c = make_client()
+    assert _post(c, n=1).status_code == 201
+    assert c.delete("/api/voice/recordings").json() == {"deleted": 1}
+    sessions = fs.cols["voice_sessions"]
+    assert sessions["s1"]["setup"]["record"] is False and sessions["s2"]["setup"]["record"] is False
+    assert sessions["s1"]["setup"]["posture"] == "standing"  # the rest of the setup is kept
+    assert sessions["s3"]["setup"]["record"] is True  # other users untouched
+    r = _post(c, n=2)  # the app's queued upload, sent after the delete
+    assert r.status_code == 403 and r.json() == {"detail": "recording_not_consented"}
+    assert bucket.objects == {} and fs.cols["voice_recordings"] == {}
+    assert c.patch("/api/voice/sessions/s1", json={"record": True}).status_code == 204
+    assert _post(c, n=2).status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_race_undo_failure_still_409_and_logs_warning(
+    bucket: FakeBucket, caplog: pytest.LogCaptureFixture
+) -> None:
+    rfs = RacingFirestore()
+    _seed(rfs)
+    svc = VoiceRecordingService(rfs, bucket)  # type: ignore[arg-type]
+
+    async def purge_then_break() -> None:
+        await svc.delete_all_for_user(USER)
+
+        def broken(name: str) -> None:
+            raise RuntimeError("transient")
+
+        svc._delete_blob = broken  # type: ignore[method-assign]
+
+    rfs.hook = purge_then_break
+    with caplog.at_level("WARNING"), pytest.raises(vrs.RecordingsDeletedError) as exc:
+        await svc.upload(
+            USER,
+            session_id="s1",
+            attempt_n=1,
+            duration_s=1.0,
+            device=None,
+            content_type="audio/mp4",
+            file=io.BytesIO(AUDIO),
+        )
+    assert exc.value.status_code == 409 and exc.value.detail == "recordings_deleted"
+    assert any(r.levelname == "WARNING" and "undo" in r.getMessage() for r in caplog.records)
+
+
+def test_race_undo_failure_maps_to_409_not_500(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed(fs)
+    fs.cols["voice_recording_purges"] = {USER: {"purged_at": datetime(2999, 1, 1, tzinfo=UTC)}}
+
+    async def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(fs, "delete_document", boom)
+    r = _post(make_client())
+    assert r.status_code == 409 and r.json() == {"detail": "recordings_deleted"}
 
 
 def test_race_maps_to_409(make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket) -> None:

@@ -316,3 +316,16 @@ async def test_session_created_row_later_imported_weighs_by_its_best_source(read
     ctx = await _ctx(reader, fs)
     assert ctx.known_songs == {song_key("Weezer", "Later Export"): w.SONG_LASTFM_HIGH}
     assert artist_key("Weezer") in ctx.artists
+
+
+async def test_loved_session_only_row_counts_toward_its_artist(reader: CatalogReader) -> None:
+    """ "Love it" on a song first met in a voice session is a taste signal, the same as a manual love."""
+    loved = FakeFirestore(
+        user_songs=[_session("Loved Song", sources=["voice_session"], loved=True, session_feel="loved")]
+    )
+    manual = FakeFirestore(user_songs=[_song("x:Loved Song", "Weezer", "Loved Song", source="manual", loved=True)])
+    from_session, from_manual = await _ctx(reader, loved), await _ctx(reader, manual)
+    assert from_session.known_songs == {song_key("Weezer", "Loved Song"): w.SONG_MANUAL}
+    assert from_session.artists[artist_key("Weezer")].weight == from_manual.artists[artist_key("Weezer")].weight
+    unloved = FakeFirestore(user_songs=[_session("Loved Song", sources=["voice_session"], loved=False)])
+    assert artist_key("Weezer") not in (await _ctx(reader, unloved)).artists
