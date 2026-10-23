@@ -112,3 +112,41 @@ def test_reader_vocal_range(fixture_reader: CatalogReader) -> None:
     vr = fixture_reader.vocal_range("muse|starlight")
     assert vr is not None and vr.tier == "measured" and vr.is_duet is False
     assert fixture_reader.vocal_range("") is None
+
+
+def test_vocal_range_endpoint_on_schema1_catalog(client: Any, fixture_reader: CatalogReader, tmp_path: Path) -> None:
+    import shutil
+    import sqlite3
+
+    path = tmp_path / "catalog_v1.db"
+    shutil.copy(fixture_reader.catalog_path, path)
+    conn = sqlite3.connect(path)
+    for col in ("vr_low", "vr_high", "vr_p10", "vr_p50", "vr_p90", "vr_tier", "vr_octave_conf", "vr_duet"):
+        conn.execute(f"ALTER TABLE songs DROP COLUMN {col}")
+    conn.commit()
+    conn.close()
+    old = CatalogReader(path, None)
+    try:
+        r = client(old).get(_url("muse|starlight"))
+        assert r.status_code == 200 and r.json() == {"song_key": "muse|starlight", "range": None}
+    finally:
+        old.close()
+
+
+def test_has_vocal_range_needs_every_column(fixture_reader: CatalogReader, tmp_path: Path) -> None:
+    import shutil
+    import sqlite3
+
+    for missing in ("vr_octave_conf", "vr_duet", "vr_tier"):
+        path = tmp_path / f"partial_{missing}.db"
+        shutil.copy(fixture_reader.catalog_path, path)
+        conn = sqlite3.connect(path)
+        conn.execute(f"ALTER TABLE songs DROP COLUMN {missing}")
+        conn.commit()
+        conn.close()
+        r = CatalogReader(path, None)
+        try:
+            assert r.has_vocal_range is False, missing
+            assert r.vocal_range("muse|starlight") is None
+        finally:
+            r.close()

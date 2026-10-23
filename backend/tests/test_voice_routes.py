@@ -224,3 +224,12 @@ def test_put_404_when_user_has_no_doc(client: TestClient, fs: RouteFirestore) ->
     fs.cols["decide_users"].clear()
     r = client.put("/api/my/voice", json=PROFILE)
     assert r.status_code == 404 and r.json() == {"detail": "not_found"}
+
+
+@pytest.mark.asyncio
+async def test_stored_profile_with_unknown_key_still_reads(fs: RouteFirestore) -> None:
+    """A field a newer build stored (e.g. Phase 3d's evidence_count) must not unset the profile."""
+    stored = {**PROFILE, "updated_at": "2026-10-22T10:00:00Z", "evidence_count": 7}
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = stored
+    got = await VoiceProfileService(fs).get(USER_ID)  # type: ignore[arg-type]
+    assert got is not None and got.low_midi == 40

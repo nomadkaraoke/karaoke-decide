@@ -26,7 +26,8 @@ from backend.services.recs_v2 import weights as w
 from backend.services.recs_v2.candidates import Candidate
 from backend.services.recs_v2.context import ArtistSignal, UserContextV2
 from backend.services.recs_v2.filters import RecFilters, where_sql
-from backend.services.recs_v2.scoring import score
+from backend.services.recs_v2.scoring import Scored, score
+from backend.services.recs_v2.sections import BUCKET_RANK, _flat_key
 from backend.tests.recs_v2.factories import cand
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
@@ -345,7 +346,7 @@ def test_sort_fit_orders_by_score(client_for: Callable[..., TestClient], reader:
         for r in reader.conn().execute(f"SELECT * FROM songs WHERE song_key IN ({','.join('?' * len(keys))})", keys)
     }
 
-    def order(k: str) -> tuple[float, int]:
+    def order(k: str) -> tuple[int, float, int]:
         r = rows[k]
         f = fit_song(
             BARITONE,
@@ -353,10 +354,36 @@ def test_sort_fit_orders_by_score(client_for: Callable[..., TestClient], reader:
                 r["vr_low"], r["vr_high"], r["vr_p10"], r["vr_p50"], r["vr_p90"], r["vr_tier"], r["vr_octave_conf"]
             ),
         )
-        return (f.score, -(r["popularity"] or 0))
+        return (BUCKET_RANK[f.bucket], f.score, -(r["popularity"] or 0))
 
     assert [order(k) for k in keys] == sorted(order(k) for k in keys)
     assert songs[0]["fit"]["bucket"] == "fits"
+
+
+def _fit_scored(key: str, bucket: str, fit_score: float) -> Scored:
+    c = cand(key)
+    c.fit = FitResult(bucket, 0, -1, fit_score, fit_score)  # type: ignore[arg-type]
+    return Scored(c, 0.5, "crowd_pleaser", None)
+
+
+def test_sort_fit_ranks_bucket_before_raw_score() -> None:
+    """Baritone, comfort 48-62: an octave penalty must not lift a worse bucket over a better one."""
+    fits_in_octave = _fit_scored("a|octave down fitsin", "fitsIn", 0.75)
+    stretch = _fit_scored("b|plain stretch", "stretch", 0.5)
+    octave_stretch = _fit_scored("c|octave stretch", "stretch", 1.1)
+    outside = _fit_scored("d|outside", "outside", 0.9)  # raw score below the octave stretch
+    fits = _fit_scored("e|fits", "fits", 0.2)
+    no_fit = Scored(cand("f|none"), 0.5, "crowd_pleaser", None)
+    key = _flat_key("fit")
+    ranked = sorted([no_fit, outside, octave_stretch, stretch, fits_in_octave, fits], key=key)
+    assert [s.c.song_key for s in ranked] == [
+        fits.c.song_key,
+        fits_in_octave.c.song_key,
+        stretch.c.song_key,
+        octave_stretch.c.song_key,
+        outside.c.song_key,
+        no_fit.c.song_key,
+    ]
 
 
 def test_sort_fit_pages(client_for: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch) -> None:
@@ -408,3 +435,14 @@ def test_old_catalog_without_vr_columns(client_for: Callable[..., TestClient], r
     singable = client.get(URL, params={"singable": "true", "sort": "az"})
     assert singable.status_code == 200 and singable.json()["sections"] == []
     assert reader_v1.vocal_range(STARLIGHT) is None
+
+
+def test_old_catalog_sort_fit_with_profile(client_for: Callable[..., TestClient], reader_v1: CatalogReader) -> None:
+    """Schema-1 catalog: sort=fit with a profile degrades to fit: null songs in popularity order."""
+    r = client_for(store_reader=reader_v1).get(URL, params={"sort": "fit"})
+    assert r.status_code == 200
+    songs = _songs(r.json())
+    assert songs and all(s["fit"] is None for s in songs)
+    pops = [s["facets"]["popularity"] or 0 for s in songs]
+    assert pops == sorted(pops, reverse=True)
+    assert r.json()["voice"]["has_profile"] is True

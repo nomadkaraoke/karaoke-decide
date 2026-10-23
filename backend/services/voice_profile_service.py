@@ -3,6 +3,9 @@
 Mic audio never reaches the server: the app sends only the derived numbers, and
 ``VoiceProfileIn`` forbids any extra key. Phase 3d will add ``method: 'session'`` and the
 optional ``evidence_count`` / ``session_id`` fields (extend the Literal and add fields here).
+``method: 'session'`` must be added both to ``VoiceProfileIn.method`` and to ``RecVoice.method`` in
+``backend/services/recs_v2/service.py``. ``VoiceProfileOut`` (the read model) ignores unknown stored
+keys, so a field written by a newer build never makes an older build treat the profile as unset.
 """
 
 from __future__ import annotations
@@ -51,6 +54,8 @@ class VoiceProfileIn(BaseModel):
 
 
 class VoiceProfileOut(VoiceProfileIn):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
     updated_at: datetime
 
 

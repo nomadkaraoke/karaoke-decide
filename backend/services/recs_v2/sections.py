@@ -148,6 +148,9 @@ def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
     return [slot.section for slot in [*first, *rest] if slot.section.songs]
 
 
+BUCKET_RANK = {"fits": 0, "fitsIn": 1, "stretch": 2, "outside": 3}
+
+
 def _flat_key(sort: Sort) -> Callable[[Scored], tuple[object, ...]]:
     """Python twin of ``filters.ORDER_SQL`` (NULLS LAST, ``song_key`` tiebreak)."""
 
@@ -164,9 +167,10 @@ def _flat_key(sort: Sort) -> Callable[[Scored], tuple[object, ...]]:
         return lambda s: (*nulls_last(s.c.duration_ms, False), s.c.song_key)
     if sort == "az":
         return lambda s: (s.c.title.casefold(), s.c.artist.casefold(), s.c.song_key)
-    if sort == "fit":  # best fit first (lower fit score), then popularity; no fit sorts last
+    if sort == "fit":  # bucket first (an octave-shifted score never outranks a better bucket), then score; no fit last
         return lambda s: (
             s.c.fit is None,
+            BUCKET_RANK[s.c.fit.bucket] if s.c.fit is not None else 0,
             s.c.fit.score if s.c.fit is not None else 0.0,
             *nulls_last(s.c.popularity, True),
             s.c.song_key,

@@ -135,7 +135,16 @@ class CatalogReader:
         """Whether ``songs`` has the ``vr_*`` columns (catalog schema 2+; a schema-1 file has none)."""
         if self._has_vr is None:
             cols = {r[1] for r in self.conn().execute("PRAGMA table_info(songs)")}
-            self._has_vr = {"vr_low", "vr_high", "vr_p10", "vr_p50", "vr_p90", "vr_tier"} <= cols
+            self._has_vr = {
+                "vr_low",
+                "vr_high",
+                "vr_p10",
+                "vr_p50",
+                "vr_p90",
+                "vr_tier",
+                "vr_octave_conf",
+                "vr_duet",
+            } <= cols
         return self._has_vr
 
     # ---------------------------------------------------------------- queries
