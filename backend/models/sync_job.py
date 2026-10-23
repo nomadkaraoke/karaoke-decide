@@ -9,6 +9,11 @@ from typing import Any
 # BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable.
 STALE_JOB_THRESHOLD_SECONDS = 300
 
+# A PENDING job is waiting for a Cloud Tasks delivery. A failed run is requeued as PENDING and the
+# queue retries it after up to max_backoff (600 s, infrastructure/__main__.py), so it only counts
+# as lost (stalled) once it has waited longer than that.
+STALE_PENDING_THRESHOLD_SECONDS = 900
+
 # A job that fails (or is resumed after stalling) this many times is marked failed for good.
 MAX_SYNC_RESUMES = 5
 
@@ -81,12 +86,17 @@ class SyncJob:
     def is_stalled(self, now: datetime | None = None) -> bool:
         """True if the job should be running (running, or queued) but nothing has touched it for too long.
 
-        A pending job this old has lost its Cloud Task (or exhausted the queue's retries).
+        A pending job past STALE_PENDING_THRESHOLD_SECONDS has lost its Cloud Task (or exhausted
+        the queue's retries); before that a scheduled retry may still be on its way.
         """
-        if self.status not in (SyncJobStatus.IN_PROGRESS, SyncJobStatus.PENDING):
+        if self.status == SyncJobStatus.IN_PROGRESS:
+            threshold = STALE_JOB_THRESHOLD_SECONDS
+        elif self.status == SyncJobStatus.PENDING:
+            threshold = STALE_PENDING_THRESHOLD_SECONDS
+        else:
             return False
         age = ((now or datetime.now(UTC)) - self.updated_at).total_seconds()
-        return age > STALE_JOB_THRESHOLD_SECONDS
+        return age > threshold
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Firestore document dict."""

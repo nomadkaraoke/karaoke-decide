@@ -14,7 +14,13 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_firestore, get_settings, get_sync_service_dep
 from backend.api.routes import internal
 from backend.config import BackendSettings
-from backend.models.sync_job import MAX_SYNC_RESUMES, STALE_JOB_THRESHOLD_SECONDS, SyncJob, SyncJobStatus
+from backend.models.sync_job import (
+    MAX_SYNC_RESUMES,
+    STALE_JOB_THRESHOLD_SECONDS,
+    STALE_PENDING_THRESHOLD_SECONDS,
+    SyncJob,
+    SyncJobStatus,
+)
 
 # Reuse the services-route test harness (auth_client + mocked Firestore/Cloud Tasks).
 from backend.tests.test_services_routes import (  # noqa: E402, F401
@@ -253,7 +259,7 @@ def test_superseded_run_failure_does_not_requeue() -> None:
 def test_status_reports_stalled_for_lost_pending_job(
     auth_client: TestClient, mock_firestore_service: MagicMock
 ) -> None:
-    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 60)
+    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_PENDING_THRESHOLD_SECONDS + 60)
     mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
     r = auth_client.get("/api/services/sync/status", headers={"Authorization": "Bearer test-token"})
     assert r.json()["active_job"]["status"] == "stalled"
@@ -262,11 +268,22 @@ def test_status_reports_stalled_for_lost_pending_job(
 def test_trigger_sync_reuses_lost_pending_job(
     auth_client: TestClient, mock_firestore_service: MagicMock, mock_cloud_tasks_service: MagicMock
 ) -> None:
-    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 60)
+    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_PENDING_THRESHOLD_SECONDS + 60)
     mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
     r = auth_client.post("/api/services/sync", headers={"Authorization": "Bearer test-token"})
     assert r.json()["job_id"] == JOB_ID
     mock_firestore_service.set_document.assert_not_called()
+
+
+def test_requeued_pending_job_is_not_stalled_while_a_retry_is_scheduled(
+    auth_client: TestClient, mock_firestore_service: MagicMock
+) -> None:
+    """A failed run requeued as pending waits up to the queue's max backoff (600 s) for its retry."""
+    job = _job(SyncJobStatus.PENDING, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 300)
+    assert not job.is_stalled()
+    mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
+    r = auth_client.get("/api/services/sync/status", headers={"Authorization": "Bearer test-token"})
+    assert r.json()["active_job"]["status"] == "pending"
 
 
 @pytest.mark.parametrize("age", [5, None])
