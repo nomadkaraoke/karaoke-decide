@@ -28,6 +28,7 @@ from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS
 logger = logging.getLogger(__name__)
 
 RECORDINGS_COLLECTION = "voice_recordings"
+PURGES_COLLECTION = "voice_recording_purges"
 RECORDINGS_PREFIX = "voice-recordings/"
 MAX_BYTES = 20 * 1024 * 1024
 CONTENT_TYPES = {"audio/mp4": "m4a", "audio/wav": "wav"}
@@ -57,6 +58,12 @@ class UnsupportedMediaError(RecordingError):
 
 class RecordingTooLargeError(RecordingError):
     status_code, detail = 413, "recording_too_large"
+
+
+class RecordingsDeletedError(RecordingError):
+    """The user deleted all recordings while this upload was in flight; the upload undid itself."""
+
+    status_code, detail = 409, "recordings_deleted"
 
 
 class EmptyRecordingError(RecordingError):
@@ -138,6 +145,7 @@ class VoiceRecordingService:
         file: IO[bytes],
     ) -> str:
         """Store one attempt's audio and return the recording id. ``file`` is a seekable binary stream."""
+        started = datetime.now(UTC)
         ext = CONTENT_TYPES.get(content_type)
         if ext is None:
             raise UnsupportedMediaError(content_type)
@@ -177,7 +185,10 @@ class VoiceRecordingService:
             blob.upload_from_file(file, content_type=content_type, rewind=True)
             old = previous.get("gcs_path") if previous else None
             if old and old != name and old.startswith(user_prefix(user_id)):  # same attempt, other format
-                self._delete_blob(old)
+                try:
+                    self._delete_blob(old)
+                except Exception:  # best effort: the next delete-all removes the orphan
+                    logger.warning("could not remove replaced recording object %s", old, exc_info=True)
 
         await asyncio.to_thread(put)
         await self._fs.set_document(
@@ -194,7 +205,17 @@ class VoiceRecordingService:
                 "created_at": datetime.now(UTC),
             },
         )
-        await self._fs.update_document(ATTEMPTS_COLLECTION, f"{session_id}:{attempt_n}", {"recording_id": recording_id})
+        attempt_id = f"{session_id}:{attempt_n}"
+        await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": recording_id})
+
+        # A delete-all that ran while this upload was in flight may have missed the object, so undo it.
+        purge = await self._fs.get_document(PURGES_COLLECTION, user_id)
+        purged_at = _as_utc(purge.get("purged_at")) if purge else None
+        if purged_at is not None and purged_at >= started:
+            await asyncio.to_thread(self._delete_blob, name)
+            await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)
+            await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": None})
+            raise RecordingsDeletedError(recording_id)
         return recording_id
 
     async def count(self, user_id: str) -> int:
@@ -208,6 +229,8 @@ class VoiceRecordingService:
         prefix (the prefix ends in ``/``, so ``user_1`` never matches ``user_10``).
         """
         prefix = user_prefix(user_id)
+        # Written first: an upload in flight sees it afterwards and undoes itself (see ``upload``).
+        await self._fs.set_document(PURGES_COLLECTION, user_id, {"purged_at": datetime.now(UTC)})
 
         def erase_objects() -> set[str]:
             names = [b.name for b in self._bucket.list_blobs(prefix=prefix)]
@@ -246,3 +269,14 @@ def _measure(file: IO[bytes]) -> int:
             raise RecordingTooLargeError(str(total))
     file.seek(0)
     return total
+
+
+def _as_utc(value: Any) -> datetime | None:
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)

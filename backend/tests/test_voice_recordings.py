@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -386,3 +387,81 @@ def test_local_dir_storage_roundtrip(tmp_path: Path, fs: RouteFirestore) -> None
 def test_local_bucket_refuses_escaping_names(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         LocalBucket(tmp_path).path_for("../outside")
+
+
+class RacingFirestore(RouteFirestore):
+    """Runs a hook just before the first ``voice_recordings`` write (the upload is mid-flight)."""
+
+    hook: Callable[[], Any] | None = None
+
+    async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
+        if collection == "voice_recordings" and self.hook is not None:
+            hook, self.hook = self.hook, None
+            await hook()
+        await super().set_document(collection, doc_id, data, merge=merge)
+
+
+@pytest.mark.asyncio
+async def test_upload_racing_delete_all_undoes_itself(bucket: FakeBucket) -> None:
+    rfs = RacingFirestore()
+    _seed(rfs)
+    svc = VoiceRecordingService(rfs, bucket)  # type: ignore[arg-type]
+    rfs.hook = lambda: svc.delete_all_for_user(USER)  # between the object put and the doc write
+    with pytest.raises(vrs.RecordingsDeletedError) as exc:
+        await svc.upload(
+            USER,
+            session_id="s1",
+            attempt_n=1,
+            duration_s=1.0,
+            device=None,
+            content_type="audio/mp4",
+            file=io.BytesIO(AUDIO),
+        )
+    assert exc.value.status_code == 409 and exc.value.detail == "recordings_deleted"
+    assert bucket.objects == {}
+    assert rfs.cols["voice_recordings"] == {}
+    assert rfs.cols["voice_attempts"]["s1:1"]["recording_id"] is None
+    # a later upload (after the purge) succeeds
+    await svc.upload(
+        USER,
+        session_id="s1",
+        attempt_n=1,
+        duration_s=1.0,
+        device=None,
+        content_type="audio/mp4",
+        file=io.BytesIO(AUDIO),
+    )
+    assert len(bucket.objects) == 1
+
+
+def test_race_maps_to_409(make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket) -> None:
+    _seed(fs)
+    fs.cols["voice_recording_purges"] = {USER: {"purged_at": datetime(2999, 1, 1, tzinfo=UTC)}}
+    r = _post(make_client())
+    assert r.status_code == 409 and r.json() == {"detail": "recordings_deleted"}
+    assert bucket.objects == {}
+
+
+def test_replaced_object_cleanup_failure_does_not_fail_upload(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket, caplog: pytest.LogCaptureFixture
+) -> None:
+    _seed(fs)
+    c = make_client()
+    assert _post(c, ctype="audio/mp4").status_code == 201
+    old = f"voice-recordings/{USER}/s1/1.m4a"
+    real_delete = FakeBlob.delete
+
+    def flaky(self: FakeBlob) -> None:
+        if self.name == old:
+            raise RuntimeError("transient")
+        real_delete(self)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(FakeBlob, "delete", flaky)
+        with caplog.at_level("WARNING"):
+            assert _post(c, ctype="audio/wav").status_code == 201
+    assert fs.cols["voice_recordings"]["s1:1"]["gcs_path"].endswith("1.wav")
+    assert any(r.levelname == "WARNING" for r in caplog.records)
+    assert not any(r.levelname == "ERROR" for r in caplog.records)
+    assert c.delete("/api/voice/recordings").json() == {"deleted": 2}  # orphan swept by delete-all
+    assert bucket.objects == {}

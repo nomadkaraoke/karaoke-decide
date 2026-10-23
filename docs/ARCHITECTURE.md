@@ -320,7 +320,8 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
 - **User deletion**: `DELETE /api/voice/recordings` (open to every signed-in user, even with the voice flag off)
   calls `VoiceRecordingService.delete_all_for_user(user_id)`: lists and deletes every object under the user's
   prefix, deletes every `voice_recordings` doc, clears `recording_id` on the user's attempts, returns the
-  number erased, and is idempotent (a second call returns 0).
+  number erased, and is idempotent (a second call returns 0). It first writes `voice_recording_purges/{user_id}`;
+  an upload in flight that finds a newer marker undoes its own object, doc and link and returns 409.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST call
   `VoiceRecordingService.delete_all_for_user(user.id)` before removing the user, and fail the request (so it
   can be retried) if that raises. Any new store of user audio must be added to that call.
