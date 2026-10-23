@@ -89,7 +89,8 @@ temp/
 
 # Large data files
 *.json.gz
-data/
+data/*
+!data/vocal_range/
 
 # Frontend (when added)
 frontend/node_modules/
@@ -99,7 +100,6 @@ frontend/.env.local
 
 # Emulator data
 emulator-data/
-data/
 
 # Local stacks (scripts/search-local-stack.sh)
 .local-stack/

@@ -5,7 +5,8 @@
 Writes ``song_id.db``, ``availability.db``, ``offline.db.gz`` and ``manifest.json`` into
 ``<dir>`` (recreated), exactly the layout ``backend/search/index_loader.load_local`` expects.
 It reuses the song-index-build job's local dry run, so the fixture index is built the
-same way as a real one (and passes the same eval gates).
+same way as a real one (and passes the same eval gates). Its ``offline.db`` carries the invented
+vocal ranges of ``tests/fixtures/vocal_range/*_fixture.tsv`` (``meta.vocal_range_run = "fixture"``).
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ def build(dest: Path) -> dict[str, object]:
         FIXTURES_DIR / "kn_full_fixture.json",
         FIXTURES_DIR / "kn_community_fixture.json",
         FIXTURE_RUN,
+        song_index_build.fixture_vocal_range(),  # vr_* for the mobile flows' fit badges
     )
     if not out.get("published"):
         raise RuntimeError(f"fixture index failed the eval gates: {out.get('failures')}")

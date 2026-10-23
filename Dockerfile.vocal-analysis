@@ -1,0 +1,19 @@
+# vocal-range-gen job image: the main karaoke-decide image + the optional pyin
+# analysis group (librosa, soundfile) + ffmpeg. Built by CI after the main image is
+# pushed:  docker build -f Dockerfile.vocal-analysis --build-arg BASE_IMAGE=<main>:<sha> .
+ARG BASE_IMAGE=karaoke-decide:latest
+FROM ${BASE_IMAGE}
+
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# The group is `optional = true`; naming it explicitly in --only installs it. main is
+# listed too so the install is a no-op for what the base image already has (a bare
+# `--only vocal-analysis` would also work with virtualenvs.create=false, but this is
+# explicit about the resulting set).
+RUN poetry install --no-interaction --no-ansi --only main,vocal-analysis --no-root
+
+ENV NUMBA_CACHE_DIR=/tmp/numba
+USER appuser
+CMD ["python", "-m", "karaoke_decide.etl.vocal_range_gen", "run"]

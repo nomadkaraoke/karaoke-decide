@@ -284,6 +284,11 @@ class TestRun:
         self.catalog = MagicMock(return_value={"run": "r"})
         monkeypatch.setattr(mr.catalog_publish, "build_and_publish_catalog", self.catalog)
 
+    @pytest.fixture(autouse=True)
+    def _vocal_range_step(self, monkeypatch):
+        self.vocal_range = MagicMock(return_value={"rows_per_source": {}})
+        monkeypatch.setattr(mr.vocal_range_refresh, "run_step", self.vocal_range)
+
     def _run(self, bq, monkeypatch, load_failures=None, **kwargs):
         extract = MagicMock()
         monkeypatch.setattr(mr, "extract_dump_to_gcs", extract)
@@ -393,6 +398,68 @@ class TestRun:
         assert mr.main(["catalog"]) == 1
         self.catalog.side_effect = RuntimeError("boom")
         assert mr.main(["catalog"]) == 1
+
+    def test_vocal_range_runs_before_catalog_in_run_publish_and_catalog_subcommand(self, monkeypatch):
+        order: list[str] = []
+        self.vocal_range.side_effect = lambda *a, **k: order.append("vocal_range") or {}
+        self.catalog.side_effect = lambda *a, **k: order.append("catalog") or {"run": "r"}
+        monkeypatch.setattr(
+            mirror, "build_and_publish", lambda *a, **k: order.append("mirror") or mirror.MirrorResult()
+        )
+        rc, _ = self._run(_mock_bq(), monkeypatch)
+        assert rc == 0 and order == ["mirror", "vocal_range", "catalog"]
+
+        order.clear()
+        mr.publish_existing(_mock_bq(), MagicMock(), "d")
+        assert order == ["mirror", "vocal_range", "catalog"]
+
+        order.clear()
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        assert mr.main(["catalog"]) == 0
+        assert order == ["vocal_range", "catalog"]
+
+        # A crashing vocal_range step never stops the catalog or fails the run.
+        order.clear()
+        self.vocal_range.side_effect = lambda *a, **k: order.append("vocal_range") or (_ for _ in ()).throw(
+            RuntimeError("boom")
+        )
+        rc, _ = self._run(_mock_bq(), monkeypatch)
+        assert rc == 0 and order == ["mirror", "vocal_range", "catalog"]
+
+    def test_skip_vocal_range_flag(self, monkeypatch):
+        self._run(_mock_bq(), monkeypatch, do_vocal_range=False)
+        self.vocal_range.assert_not_called()
+        mr.publish_existing(_mock_bq(), MagicMock(), "d", do_vocal_range=False)
+        self.vocal_range.assert_not_called()
+
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        run = MagicMock(return_value=0)
+        monkeypatch.setattr(mr, "run", run)
+        assert mr.main(["run", "--skip-vocal-range"]) == 0
+        assert run.call_args.kwargs["do_vocal_range"] is False
+        mr.main(["run"])
+        assert run.call_args.kwargs["do_vocal_range"] is True
+        pub = MagicMock(return_value=0)
+        monkeypatch.setattr(mr, "publish_existing", pub)
+        mr.main(["publish", "--dump-id", "d", "--skip-vocal-range"])
+        assert pub.call_args.kwargs["do_vocal_range"] is False
+        assert mr.main(["catalog", "--skip-vocal-range"]) == 0
+        assert mr.main(["catalog", "--no-publish"]) == 0  # no-publish uploads nothing: no vocal_range either
+        self.vocal_range.assert_not_called()
+        self.catalog.assert_called()
+
+    def test_vocal_range_subcommand_runs_only_the_step(self, monkeypatch):
+        monkeypatch.setattr(mr.bigquery, "Client", MagicMock())
+        monkeypatch.setattr(mr.storage, "Client", MagicMock())
+        for name in ("run", "publish_existing", "extract_dump_to_gcs", "load_raw_tables", "publish"):
+            monkeypatch.setattr(mr, name, MagicMock(side_effect=AssertionError(name)))
+        assert mr.main(["vocal-range"]) == 0
+        self.vocal_range.assert_called_once()
+        self.catalog.assert_not_called()
+        self.vocal_range.side_effect = RuntimeError("boom")
+        assert mr.main(["vocal-range"]) == 1
 
     def test_mirror_crash_does_not_fail_published_run(self, monkeypatch):
         bq = _mock_bq()

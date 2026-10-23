@@ -20,19 +20,26 @@ Runs as the ``mb-refresh`` Cloud Run Job (Cloud Scheduler, weekly). Steps:
              dataset (musicbrainz_mirror). Per-table failures keep last week's
              copy and log a WARNING, plus ONE ERROR summary per run; they
              never fail the run.
-8. CATALOG  Best-effort: build catalog.db (recommendation facets) from the fresh
+8. VOCAL    Best-effort: the vocal_range step (vocal_range_refresh) rebuilds
+             song/artist vocal ranges (UltraStar, measured, Gemini) into BigQuery +
+             gs://nomadkaraoke-musicbrainz-data/vocal-range/, right before the catalog
+             so catalog.db sees fresh tables. A failure logs ONE ERROR, keeps last
+             week's tables and pointer, and never fails the run.
+9. CATALOG  Best-effort: build catalog.db (recommendation facets) from the fresh
              tables, gate it against the previous build and publish it to
              ``gs://nomadkaraoke-musicbrainz-data/catalog/`` behind latest.json.
              A gate refusal logs ONE WARNING and keeps the old pointer; a crash
              logs ONE ERROR; neither fails the run.
-9. LOG       ``karaoke_decide.mb_refresh_log``, delete staging.
+10. LOG     ``karaoke_decide.mb_refresh_log``, delete staging.
 
 Usage:
     python -m karaoke_decide.etl.musicbrainz_refresh run [--dump-id ID] [--force] [--no-publish] [--skip-mirror]
     python -m karaoke_decide.etl.musicbrainz_refresh run --skip-extract   # rebuild from loaded raw tables
     python -m karaoke_decide.etl.musicbrainz_refresh run --reuse-gcs      # reload TSVs already in GCS staging
     python -m karaoke_decide.etl.musicbrainz_refresh publish --dump-id ID # validate + publish existing staging
-    python -m karaoke_decide.etl.musicbrainz_refresh catalog              # build + publish catalog.db only
+    python -m karaoke_decide.etl.musicbrainz_refresh catalog              # vocal_range + catalog.db only
+    python -m karaoke_decide.etl.musicbrainz_refresh vocal-range          # vocal_range step only
+    (run / publish / catalog take --skip-vocal-range)
     python -m karaoke_decide.etl.musicbrainz_refresh status
 """
 
@@ -59,6 +66,7 @@ from karaoke_decide.catalog import publish as catalog_publish
 from karaoke_decide.etl import musicbrainz_mirror as mirror
 from karaoke_decide.etl import musicbrainz_sql as sql
 from karaoke_decide.etl import refresh_common as common
+from karaoke_decide.etl import vocal_range_refresh
 from karaoke_decide.etl.refresh_common import (  # noqa: F401 - re-exported for callers/tests
     CHUNK,
     GIB,
@@ -385,6 +393,11 @@ def build_catalog(
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+def publish_vocal_range_best_effort(bq: bigquery.Client, gcs: storage.Client, http: httpx.Client | None = None) -> None:
+    """Runs right before the catalog build; never raises (logs ONE ERROR on failure)."""
+    vocal_range_refresh.run_step_safe(bq, gcs, http)
+
+
 def publish_catalog_best_effort(bq: bigquery.Client, gcs: storage.Client) -> None:
     """Runs after the app tables are live; never raises."""
     try:
@@ -429,6 +442,7 @@ def run(
     reuse_gcs: bool = False,
     do_mirror: bool = True,
     do_catalog: bool = True,
+    do_vocal_range: bool = True,
 ) -> int:
     log = _log(bq)
     log.ensure()
@@ -457,6 +471,8 @@ def run(
         raise
     if do_mirror:
         publish_mirror(bq, state, load_failures)
+    if do_vocal_range:
+        publish_vocal_range_best_effort(bq, gcs, http)
     if do_catalog:
         publish_catalog_best_effort(bq, gcs)
     log.write(state, "success")
@@ -466,7 +482,12 @@ def run(
 
 
 def publish_existing(
-    bq: bigquery.Client, gcs: storage.Client, dump_id: str, do_mirror: bool = True, do_catalog: bool = True
+    bq: bigquery.Client,
+    gcs: storage.Client,
+    dump_id: str,
+    do_mirror: bool = True,
+    do_catalog: bool = True,
+    do_vocal_range: bool = True,
 ) -> int:
     """Validate and publish staging tables built by an earlier --no-publish run."""
     log = _log(bq)
@@ -480,6 +501,8 @@ def publish_existing(
         raise
     if do_mirror:
         publish_mirror(bq, state)
+    if do_vocal_range:
+        publish_vocal_range_best_effort(bq, gcs)
     if do_catalog:
         publish_catalog_best_effort(bq, gcs)
     log.write(state, "success")
@@ -507,13 +530,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_run.add_argument("--skip-mirror", action="store_true", help="Don't build/publish the musicbrainz.* mirror")
     p_run.add_argument("--skip-catalog", action="store_true", help="Don't build/publish catalog.db")
+    p_run.add_argument("--skip-vocal-range", action="store_true", help="Don't run the vocal_range step")
     p_pub = sub.add_parser("publish", help="Validate + publish existing staging tables")
     p_pub.add_argument("--dump-id", required=True)
     p_pub.add_argument("--skip-mirror", action="store_true", help="Don't build/publish the musicbrainz.* mirror")
     p_pub.add_argument("--skip-catalog", action="store_true", help="Don't build/publish catalog.db")
-    p_cat = sub.add_parser("catalog", help="Build + publish catalog.db only (no refresh)")
+    p_pub.add_argument("--skip-vocal-range", action="store_true", help="Don't run the vocal_range step")
+    p_cat = sub.add_parser("catalog", help="vocal_range step + build/publish catalog.db (no refresh)")
+    p_cat.add_argument("--skip-vocal-range", action="store_true", help="Don't run the vocal_range step first")
     p_cat.add_argument("--no-publish", action="store_true", help="Build + gate only; upload nothing")
     p_cat.add_argument("--workdir", type=Path, help="Build here and keep catalog.db (default: scratch dir, removed)")
+    sub.add_parser("vocal-range", help="Run only the vocal_range step (BigQuery + GCS vocal ranges)")
     sub.add_parser("status", help="Show recent runs")
     args = parser.parse_args(argv)
 
@@ -523,15 +550,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "status":
             return status(bq)
         gcs = storage.Client(project=sql.PROJECT_ID)
+        if args.command == "vocal-range":
+            return 0 if vocal_range_refresh.run_step_safe(bq, gcs) is not None else 1
         if args.command == "catalog":
             if args.no_publish:
                 # Exit 0 when the build+gate completed; there is no pointer to return.
                 build_catalog(bq, gcs, workdir=args.workdir, publish=False)
                 return 0
+            if not args.skip_vocal_range:
+                publish_vocal_range_best_effort(bq, gcs)
             return 0 if build_catalog(bq, gcs, workdir=args.workdir) else 1
         if args.command == "publish":
             return publish_existing(
-                bq, gcs, args.dump_id, do_mirror=not args.skip_mirror, do_catalog=not args.skip_catalog
+                bq,
+                gcs,
+                args.dump_id,
+                do_mirror=not args.skip_mirror,
+                do_catalog=not args.skip_catalog,
+                do_vocal_range=not args.skip_vocal_range,
             )
         with httpx.Client(headers={"User-Agent": "nomadkaraoke-mb-refresh/1.0 (https://nomadkaraoke.com)"}) as http:
             return run(
@@ -545,6 +581,7 @@ def main(argv: list[str] | None = None) -> int:
                 reuse_gcs=args.reuse_gcs,
                 do_mirror=not args.skip_mirror,
                 do_catalog=not args.skip_catalog,
+                do_vocal_range=not args.skip_vocal_range,
             )
     except Exception:
         logger.exception("MusicBrainz refresh failed")

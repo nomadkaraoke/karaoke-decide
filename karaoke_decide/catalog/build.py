@@ -3,13 +3,14 @@
 import json
 import sqlite3
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 from karaoke_decide.catalog.schema import CATALOG_SCHEMA_VERSION, DDL
+from karaoke_decide.vocal_range.tsv import VocalRanges
 
-COVERAGE_FACETS = ("genre", "mood", "decade", "lead_gender", "duration", "popularity", "explicit")
+COVERAGE_FACETS = ("genre", "mood", "decade", "lead_gender", "duration", "popularity", "explicit", "vocal_range")
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,14 @@ class SongRow:
     lead_gender: str | None = None
     genres: tuple[str, ...] = ()
     in_kn: int = 1
+    vr_low: float | None = None
+    vr_high: float | None = None
+    vr_p10: float | None = None
+    vr_p50: float | None = None
+    vr_p90: float | None = None
+    vr_tier: str | None = None
+    vr_octave_conf: float | None = None
+    vr_duet: int | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +55,10 @@ class ArtistRow:
     popularity: int | None = None
     gender: str | None = None
     genres: tuple[str, ...] = ()
+    vr_p10: float | None = None
+    vr_p50: float | None = None
+    vr_p90: float | None = None
+    vr_basis: str | None = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +110,35 @@ def popularity_blend(lb_pct: float | None, spotify_pop: int | None) -> int | Non
     return None
 
 
+def with_vocal_range(rows: CatalogRows, ranges: VocalRanges) -> CatalogRows:
+    """``rows`` with ``vr_*`` filled: the song's own range, else its artist's range (tier
+    ``rough``, octave confidence and duet unknown), else left NULL."""
+    songs = []
+    for s in rows.songs:
+        r = ranges.lookup(s.song_key, s.artist_key)
+        if r is None:
+            songs.append(s)
+            continue
+        songs.append(
+            replace(
+                s,
+                vr_low=r.low,
+                vr_high=r.high,
+                vr_p10=r.p10,
+                vr_p50=r.p50,
+                vr_p90=r.p90,
+                vr_tier=r.tier,
+                vr_octave_conf=r.octave_confidence,
+                vr_duet=None if r.is_duet is None else int(r.is_duet),
+            )  # fmt: skip
+        )
+    artists = []
+    for a in rows.artists:
+        ar = ranges.artists.get(a.artist_key)
+        artists.append(a if ar is None else replace(a, vr_p10=ar.p10, vr_p50=ar.p50, vr_p90=ar.p90, vr_basis=ar.basis))
+    return replace(rows, songs=songs, artists=artists)
+
+
 def _dedupe_songs(songs: Sequence[SongRow]) -> list[SongRow]:
     """One row per song_key; the more-listened row wins (first on ties)."""
     best: dict[str, SongRow] = {}
@@ -142,6 +184,7 @@ def _coverage(songs: Sequence[SongRow]) -> dict[str, float]:
         "duration": lambda s: s.duration_ms is not None,
         "popularity": lambda s: s.popularity is not None,
         "explicit": lambda s: s.explicit is not None,
+        "vocal_range": lambda s: s.vr_p50 is not None,  # informational: catalog_gate never blocks on it
     }
     return {name: sum(1 for s in in_kn if check(s)) / len(in_kn) for name, check in checks.items()}
 
@@ -177,13 +220,14 @@ def build_catalog_db(rows: CatalogRows, dest: Path, run: str) -> CatalogStats:
     try:
         conn.executescript(DDL)
         conn.executemany(
-            "INSERT INTO songs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            f"INSERT INTO songs VALUES ({','.join('?' * 29)})",
             [
                 (
                     s.song_key, s.artist, s.title, s.artist_key, s.brand_count, s.is_classic, s.explicit,
                     s.duration_ms, s.year, s.decade, s.lb_listeners, s.spotify_pop, s.popularity,
                     s.energy, s.valence, s.danceability, s.tempo, s.mood, s.lead_gender,
                     json.dumps(list(s.genres)), s.in_kn,
+                    s.vr_low, s.vr_high, s.vr_p10, s.vr_p50, s.vr_p90, s.vr_tier, s.vr_octave_conf, s.vr_duet,
                 )
                 for s in songs
             ],
@@ -193,11 +237,23 @@ def build_catalog_db(rows: CatalogRows, dest: Path, run: str) -> CatalogStats:
             [(s.song_key, g) for s in songs for g in s.genres],
         )
         conn.executemany(
-            "INSERT INTO artists VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO artists VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             [
-                (a.artist_key, a.name, a.mbid, a.lb_listeners, a.popularity, a.gender, json.dumps(list(a.genres)))
+                (
+                    a.artist_key,
+                    a.name,
+                    a.mbid,
+                    a.lb_listeners,
+                    a.popularity,
+                    a.gender,
+                    json.dumps(list(a.genres)),
+                    a.vr_p10,
+                    a.vr_p50,
+                    a.vr_p90,
+                    a.vr_basis,
+                )
                 for a in artists.values()
-            ],
+            ],  # fmt: skip
         )
         conn.executemany(
             "INSERT OR IGNORE INTO artist_similar VALUES (?,?,?,?)",

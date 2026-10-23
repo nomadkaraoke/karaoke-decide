@@ -46,9 +46,17 @@ SIMILAR = [
     {"artist_a_name": "Unknown Act", "artist_b_name": "Alpha Band", "jaccard_similarity": 0.5},
 ]  # fmt: skip
 RAW_GENRES = [{"genre": "classic rock"}, {"genre": "polka"}, {"genre": "k-pop"}]
+SONG_VR = [
+    {"song_key": "alpha band|sunny day", "low_midi": 50.0, "high_midi": 70.0, "p10": 53.0, "p50": 60.0,
+     "p90": 66.0, "tier": "measured", "octave_confidence": None, "is_duet": False},
+]  # fmt: skip
+ARTIST_VR = [
+    {"artist_key": "alpha band", "low_midi": 48.0, "high_midi": 68.0, "p10": 51.0, "p50": 58.0, "p90": 64.0,
+     "basis": "songs"},
+]  # fmt: skip
 
 
-def fake_bq():
+def fake_bq(vr_error=None):
     """A client that routes on SQL substrings and records every job_config."""
     bq = MagicMock()
     bq.configs = []
@@ -68,6 +76,10 @@ def fake_bq():
             rows = SIMILAR
         elif sql == src.RAW_GENRES_SQL:
             rows = RAW_GENRES
+        elif sql in (src.VOCAL_RANGE_SQL, src.ARTIST_VOCAL_RANGE_SQL):
+            if vr_error is not None:
+                raise vr_error
+            rows = SONG_VR if sql == src.VOCAL_RANGE_SQL else ARTIST_VR
         else:
             raise AssertionError("unexpected query")
         job = MagicMock()
@@ -93,9 +105,9 @@ def test_facets_pick_one_track():
 def test_every_query_has_byte_cap_and_streams_pages():
     bq = fake_bq()
     src.fetch_catalog_rows(bq)
-    assert len(bq.configs) == 6
+    assert len(bq.configs) == 8
     assert all(c.maximum_bytes_billed == MAX_BYTES_CATALOG for c in bq.configs)
-    assert len(bq.jobs) == 6
+    assert len(bq.jobs) == 8
     for job in bq.jobs:
         job.result.assert_called_once_with(page_size=50_000)
 
@@ -103,7 +115,7 @@ def test_every_query_has_byte_cap_and_streams_pages():
 def test_dry_run_reads_nothing():
     bq = fake_bq()
     rows = src.fetch_catalog_rows(bq, dry_run=True)
-    assert len(bq.configs) == 6
+    assert len(bq.configs) == 8
     assert all(c.dry_run for c in bq.configs)
     assert list(rows.songs) == []
 
@@ -253,3 +265,35 @@ def test_no_karaoke_dedupes_loose_variants_of_one_candidate():
     ]
     out = src._no_karaoke_songs(iter(rows), set(), {})
     assert [s.title for s in out] == ["Brand New Day"]
+
+
+def test_vocal_range_sql_has_byte_cap():
+    bq = fake_bq()
+    src.fetch_catalog_rows(bq)
+    sqls = [c.args[0] for c in bq.query.call_args_list]
+    for sql in (src.VOCAL_RANGE_SQL, src.ARTIST_VOCAL_RANGE_SQL):
+        i = sqls.index(sql)
+        assert bq.configs[i].maximum_bytes_billed == MAX_BYTES_CATALOG
+    assert "song_vocal_range`" in src.VOCAL_RANGE_SQL and "octave_confidence" in src.VOCAL_RANGE_SQL
+    assert "artist_vocal_range`" in src.ARTIST_VOCAL_RANGE_SQL
+
+
+def test_vocal_range_rows_filled_with_rough_fallback():
+    rows = src.fetch_catalog_rows(fake_bq())
+    songs = {s.song_key: s for s in rows.songs}
+    sunny = songs[song_key("Alpha Band", "Sunny Day")]
+    assert (sunny.vr_p50, sunny.vr_tier, sunny.vr_duet) == (60.0, "measured", 0)
+    quiet = songs[song_key("Alpha Band", "Quiet Night")]
+    assert (quiet.vr_p50, quiet.vr_tier, quiet.vr_octave_conf, quiet.vr_duet) == (58.0, "rough", None, None)
+    assert (rows.artists[0].vr_p50, rows.artists[0].vr_basis) == (58.0, "songs")
+
+
+def test_missing_vocal_range_tables_warn_and_leave_vr_null(caplog):
+    from google.api_core.exceptions import NotFound
+
+    with caplog.at_level("INFO"):
+        rows = src.fetch_catalog_rows(fake_bq(vr_error=NotFound("Table song_vocal_range not found")))
+    assert all(s.vr_p50 is None and s.vr_tier is None for s in rows.songs)
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert len(warnings) == 1 and "vocal" in warnings[0].getMessage().lower()
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]

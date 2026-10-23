@@ -91,10 +91,10 @@ jobs:
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-interaction --with vocal-analysis --no-root
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --with vocal-analysis
 
       - name: Run unit tests with coverage
         run: |
@@ -433,6 +433,37 @@ jobs:
           gcloud run jobs update song-index-build \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}
+
+      - name: Build and push vocal-analysis image
+        id: vocal_build
+        # Non-critical: prod is already updated by now, so never fail the deploy job.
+        continue-on-error: true
+        # On-demand vocal-range-gen job image: main image + librosa/soundfile/ffmpeg.
+        run: |
+          VOCAL_IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/karaoke-decide-vocal
+          docker buildx build -f Dockerfile.vocal-analysis --push --provenance=false \
+            --build-arg BASE_IMAGE=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t $VOCAL_IMAGE:${{ github.sha }} -t $VOCAL_IMAGE:latest .
+
+      - name: Update vocal-range-gen job image
+        id: vocal_update
+        if: steps.vocal_build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          if ! out=$(gcloud run jobs describe vocal-range-gen --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::vocal-range-gen does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
+          gcloud run jobs update vocal-range-gen \
+            --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/karaoke-decide-vocal:${{ github.sha }} \
+            --region ${{ env.REGION }}
+
+      - name: Warn if vocal-range-gen image steps failed
+        if: steps.vocal_build.outcome == 'failure' || steps.vocal_update.outcome == 'failure'
+        run: echo "::warning::vocal-range-gen image build/update failed (non-blocking; prod deploy unaffected)"
 
       - name: Verify deployment
         run: |

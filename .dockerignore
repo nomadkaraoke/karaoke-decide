@@ -1,4 +1,4 @@
-# Only pyproject.toml, poetry.lock, karaoke_decide/ and backend/ go into the image.
+# Only pyproject.toml, poetry.lock, karaoke_decide/, backend/ and data/vocal_range/ go into the image.
 # Keep host bytecode (often another Python version) and bulky dirs out of the build context.
 **/__pycache__
 **/*.py[cod]

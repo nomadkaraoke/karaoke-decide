@@ -39,6 +39,11 @@ def test_gate_coverage_drop():
     assert pub.catalog_gate(_stats(mood=0.75), _prev(mood=0.8)) == []
 
 
+def test_gate_ignores_vocal_range_coverage_drop():
+    assert pub.catalog_gate(_stats(vocal_range=0.0), _prev(vocal_range=0.6)) == []
+    assert pub.catalog_gate(_stats(), _prev(vocal_range=0.6)) == []  # key missing in the new build
+
+
 def _db(tmp_path, make_rows):
     db = tmp_path / "catalog.db"
     stats = build_catalog_db(make_rows(), db, "r")
@@ -63,7 +68,7 @@ def test_pointer_sha_matches_uncompressed(tmp_path, make_rows):
     assert ptr["gz_bytes"] == len(gz)
     assert gzip.decompress(gz) == db.read_bytes()
     assert ptr["run"] == "20261021-010101" and ptr["songs"] == stats.songs
-    assert ptr["coverage"] == stats.coverage and ptr["schema"] == 1 and ptr["built_at"]
+    assert ptr["coverage"] == stats.coverage and ptr["schema"] == 2 and ptr["built_at"]
 
 
 def test_gzip_is_deterministic(tmp_path, make_rows):

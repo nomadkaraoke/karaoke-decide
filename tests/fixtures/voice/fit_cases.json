@@ -1,0 +1,527 @@
+[
+  {
+    "name": "fits_at_zero",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 52,
+      "high": 70,
+      "p10": 55,
+      "p50": 60,
+      "p90": 65,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "fits_down_2",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 54,
+      "high": 72,
+      "p10": 57,
+      "p50": 63,
+      "p90": 69,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": -2,
+      "octave": 0,
+      "cost": 0,
+      "score": 0.1
+    }
+  },
+  {
+    "name": "fits_up_3",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 48,
+      "high": 66,
+      "p10": 50,
+      "p50": 56,
+      "p90": 62,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": 3,
+      "octave": 0,
+      "cost": 0,
+      "score": 0.15
+    }
+  },
+  {
+    "name": "fits_down_4_not_5",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 54,
+      "high": 74,
+      "p10": 57,
+      "p50": 64,
+      "p90": 71,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": -4,
+      "octave": 0,
+      "cost": 0,
+      "score": 0.2
+    }
+  },
+  {
+    "name": "stretch_when_5_needed",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 55,
+      "high": 75,
+      "p10": 58,
+      "p50": 65,
+      "p90": 72,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": -4,
+      "octave": 0,
+      "cost": 1,
+      "score": 1.2
+    }
+  },
+  {
+    "name": "stretch_half_key_high",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 51,
+      "high": 70,
+      "p10": 53,
+      "p50": 60,
+      "p90": 68,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 1,
+      "score": 1
+    }
+  },
+  {
+    "name": "outside_too_wide",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 40,
+      "high": 80,
+      "p10": 45,
+      "p50": 60,
+      "p90": 75,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "outside",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 24,
+      "score": 24
+    }
+  },
+  {
+    "name": "octave_down_male_singing_female_song",
+    "user": {
+      "low": 45,
+      "high": 69,
+      "comfort_low": 50,
+      "comfort_high": 64
+    },
+    "song": {
+      "low": 60,
+      "high": 77,
+      "p10": 62,
+      "p50": 68,
+      "p90": 74,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": 0,
+      "octave": -12,
+      "cost": 0,
+      "score": 0.75
+    }
+  },
+  {
+    "name": "octave_up",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 39,
+      "high": 56,
+      "p10": 41,
+      "p50": 47,
+      "p90": 53,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": 0,
+      "octave": 12,
+      "cost": 0,
+      "score": 0.75
+    }
+  },
+  {
+    "name": "octave_free_notes_low_conf",
+    "user": {
+      "low": 45,
+      "high": 69,
+      "comfort_low": 50,
+      "comfort_high": 64
+    },
+    "song": {
+      "low": 60,
+      "high": 77,
+      "p10": 62,
+      "p50": 68,
+      "p90": 74,
+      "tier": "notes",
+      "octave_confidence": 0.3
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": -12,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "octave_notes_conf_boundary_not_free",
+    "user": {
+      "low": 45,
+      "high": 69,
+      "comfort_low": 50,
+      "comfort_high": 64
+    },
+    "song": {
+      "low": 60,
+      "high": 77,
+      "p10": 62,
+      "p50": 68,
+      "p90": 74,
+      "tier": "notes",
+      "octave_confidence": 0.5
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": 0,
+      "octave": -12,
+      "cost": 0,
+      "score": 0.75
+    }
+  },
+  {
+    "name": "estimated_tolerance_1",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 50,
+      "high": 71,
+      "p10": 52,
+      "p50": 60,
+      "p90": 68,
+      "tier": "estimated",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "rough_tolerance_2",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 48,
+      "high": 72,
+      "p10": 51,
+      "p50": 60,
+      "p90": 69,
+      "tier": "rough",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "tie_prefers_zero_shift",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 55,
+      "high": 64,
+      "p10": 57,
+      "p50": 60,
+      "p90": 62,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "tie_prefers_down",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 50,
+      "high": 70,
+      "p10": 56,
+      "p50": 62,
+      "p90": 68,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fitsIn",
+      "transpose": -1,
+      "octave": 0,
+      "cost": 0,
+      "score": 0.05
+    }
+  },
+  {
+    "name": "ext_half_weight",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 47,
+      "high": 70,
+      "p10": 53,
+      "p50": 60,
+      "p90": 67,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.5,
+      "score": 0.5
+    }
+  },
+  {
+    "name": "exact_edge_inclusive",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 48,
+      "high": 72,
+      "p10": 53,
+      "p50": 60,
+      "p90": 67,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "fits",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0,
+      "score": 0
+    }
+  },
+  {
+    "name": "duet_wide_span_outside",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 36,
+      "high": 76,
+      "p10": 40,
+      "p50": 58,
+      "p90": 70,
+      "tier": "rough",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "outside",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 18,
+      "score": 18
+    }
+  },
+  {
+    "name": "fractional_half_semitones",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 48.5,
+      "high": 72.5,
+      "p10": 53.5,
+      "p50": 60,
+      "p90": 67.5,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.75,
+      "score": 0.75
+    }
+  },
+  {
+    "name": "fractional_rounds_up_at_half_milli",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 50,
+      "high": 70,
+      "p10": 54,
+      "p50": 60,
+      "p90": 67.0005,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.001,
+      "score": 0.001
+    }
+  },
+  {
+    "name": "fractional_rounds_down_below_half_milli",
+    "user": {
+      "low": 48,
+      "high": 72,
+      "comfort_low": 53,
+      "comfort_high": 67
+    },
+    "song": {
+      "low": 47.9995,
+      "high": 70,
+      "p10": 55,
+      "p50": 60,
+      "p90": 66,
+      "tier": "measured",
+      "octave_confidence": null
+    },
+    "expect": {
+      "bucket": "stretch",
+      "transpose": 0,
+      "octave": 0,
+      "cost": 0.0,
+      "score": 0.0
+    }
+  }
+]

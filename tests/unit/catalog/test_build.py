@@ -2,7 +2,8 @@ import json
 import sqlite3
 from pathlib import Path
 
-from karaoke_decide.catalog.build import build_catalog_db, popularity_blend
+from karaoke_decide.catalog.build import build_catalog_db, popularity_blend, with_vocal_range
+from karaoke_decide.vocal_range.tsv import ArtistRange, SongRange, VocalRanges
 
 
 def _rows(db: Path, sql: str) -> list[tuple]:
@@ -23,7 +24,7 @@ def test_build_roundtrip(tmp_path, make_rows):
         ("artist 2|song 2", "pop"),
     ]
     meta = dict(_rows(dest, "SELECT key, value FROM meta"))
-    assert meta["schema"] == "1"
+    assert meta["schema"] == "2"
     assert meta["run"] == "r1"
     assert meta["built_at"]
     assert json.loads(meta["coverage"])["genre"] == stats.coverage["genre"]
@@ -84,7 +85,9 @@ def test_coverage(tmp_path, make_rows, song):
     stats = build_catalog_db(make_rows(songs=songs), tmp_path / "catalog.db", run="r")
     assert stats.coverage["mood"] == 0.5
     assert stats.coverage["genre"] == 1.0
-    assert set(stats.coverage) == {"genre", "mood", "decade", "lead_gender", "duration", "popularity", "explicit"}
+    assert set(stats.coverage) == {
+        "genre", "mood", "decade", "lead_gender", "duration", "popularity", "explicit", "vocal_range",
+    }  # fmt: skip
 
 
 def test_indexes_exist(tmp_path, make_rows):
@@ -99,3 +102,29 @@ def test_indexes_exist(tmp_path, make_rows):
         "idx_kn_song_map_match_key",
         "idx_kn_song_map_song_key",
     } <= names
+
+
+def test_catalog_vr_columns_and_rough_fallback(tmp_path, make_rows):
+    ranges = VocalRanges(
+        songs={"artist 1|song 1": SongRange(50.0, 70.0, 53.0, 60.0, 66.0, "notes", 0.9, True)},
+        artists={"artist 2": ArtistRange(45.0, 65.0, 48.0, 55.0, 61.0, "p412")},
+        run="vr1",
+    )
+    dest = tmp_path / "catalog.db"
+    stats = build_catalog_db(with_vocal_range(make_rows(), ranges), dest, run="r")
+    cols = "vr_low, vr_high, vr_p10, vr_p50, vr_p90, vr_tier, vr_octave_conf, vr_duet"
+    by_key = {r[0]: r[1:] for r in _rows(dest, f"SELECT song_key, {cols} FROM songs")}
+    assert by_key["artist 1|song 1"] == (50.0, 70.0, 53.0, 60.0, 66.0, "notes", 0.9, 1)
+    assert by_key["artist 2|song 2"] == (45.0, 65.0, 48.0, 55.0, 61.0, "rough", None, None)
+    assert by_key["artist 3|song 3"] == (None,) * 8
+    artists = {r[0]: r[1:] for r in _rows(dest, "SELECT artist_key, vr_p10, vr_p50, vr_p90, vr_basis FROM artists")}
+    assert artists["artist 2"] == (48.0, 55.0, 61.0, "p412")
+    assert artists["artist 1"] == (None, None, None, None)
+    assert stats.coverage["vocal_range"] == 2 / 3
+
+
+def test_catalog_without_vocal_range_has_null_columns(tmp_path, make_rows):
+    dest = tmp_path / "catalog.db"
+    stats = build_catalog_db(make_rows(), dest, run="r")
+    assert _rows(dest, "SELECT count(*) FROM songs WHERE vr_p50 IS NOT NULL OR vr_tier IS NOT NULL") == [(0,)]
+    assert stats.coverage["vocal_range"] == 0.0

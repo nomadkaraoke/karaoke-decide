@@ -1,0 +1,9 @@
+#TITLE:Mixed Bag
+#ARTIST:The Lalas
+#BPM:120
+#GAP:0
+: 0 4 0 la
+F 4 4 30 hey
+R 8 4 -20 yo
+G 12 4 25 yo
+* 16 4 5 doo

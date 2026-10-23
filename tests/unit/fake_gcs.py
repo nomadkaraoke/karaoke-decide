@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from typing import Any
 
 
@@ -56,5 +57,10 @@ class FakeBucket:
     def blob(self, name: str) -> FakeBlob:
         return FakeBlob(self, name)
 
-    def list_blobs(self, prefix: str = "") -> list[FakeBlob]:
-        return [FakeBlob(self, n) for n in sorted(self.objects) if n.startswith(prefix)]
+    def list_blobs(self, prefix: str = "", match_glob: str | None = None) -> list[FakeBlob]:
+        names = [n for n in sorted(self.objects) if n.startswith(prefix)]
+        if match_glob is not None:
+            # GCS globs: `*` does not cross `/`
+            rx = re.compile("^" + "[^/]*".join(re.escape(p) for p in match_glob.split("*")) + "$")
+            names = [n for n in names if rx.match(n)]
+        return [FakeBlob(self, n) for n in names]

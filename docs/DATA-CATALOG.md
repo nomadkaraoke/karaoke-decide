@@ -1016,6 +1016,29 @@ JOIN `nomadkaraoke.karaoke_decide.divebar_catalog` d ON x.divebar_file_id = d.fi
 WHERE LOWER(k.Artist) = 'queen' AND LOWER(k.Title) = 'bohemian rhapsody'
 ```
 
+## Vocal range tables
+
+Built by the `vocal_range` step of `mb-refresh` (see [VOCAL-RANGE.md](VOCAL-RANGE.md)). Pitches are
+float MIDI note numbers. All columns NULLABLE.
+
+### song_vocal_range_sources
+One row per (song, source) before merging. `song_key`, `source` (`gen_measured|nomad_measured|ultrastar|gemini`),
+`source_id`, `artist`, `title`, `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `octave_confidence`,
+`lead_part`, `weight_s` (voiced seconds), `pop_rank`, `confidence`, `loaded_at`.
+
+### song_vocal_range
+Merged winner per `song_key` (source precedence gen_measured > nomad_measured > ultrastar > gemini):
+`low_midi`, `high_midi`, `p10`, `p50`, `p90`, `tier` (`measured|notes|estimated`), `source`,
+`octave_confidence`, `is_duet`, `n_sources`, `confidence`, and Phase 4 placeholders
+`crowd_comfortable`, `crowd_too_low`, `crowd_too_high` (always NULL for now).
+
+### artist_vocal_range
+Per `artist_key`: `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `basis`, `confidence`. Used as the
+`rough` fallback for songs without their own range.
+
+Also exported as TSVs under `gs://nomadkaraoke-musicbrainz-data/vocal-range/` and surfaced as `vr_*`
+columns in `catalog.db` (schema 2) and `offline.db` (plus its `artist_vocal_range` table).
+
 ---
 
 ## ETL Pipelines
@@ -1042,6 +1065,7 @@ Daily automated data pipelines running as Cloud Functions in the `nomadkaraoke` 
 | Job | Schedule | Data Flow |
 |-----|----------|-----------|
 | `mb-refresh` | Sun 10:00 UTC | MusicBrainz full dump → `musicbrainz_staging` → `mb_*`, `karaoke_recording_links` |
+| `vocal-range-gen` | on demand | gen vocals stems -> pyin -> `gs://.../vocal-range/gen_measured/` (read by the `mb-refresh` vocal_range step) |
 | `lb-refresh` | Mon + Thu 11:00 UTC (runs only for a new export) | ListenBrainz statistics dump → `listenbrainz_staging` → `lb_*` |
 
 ---
