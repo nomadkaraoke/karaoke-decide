@@ -135,6 +135,18 @@ def test_result_saves_profile_rules(client: TestClient, fs: RouteFirestore) -> N
     VoiceProfileOut.model_validate(saved)
 
 
+def test_refetching_an_old_result_never_overwrites_a_newer_profile(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    _post_attempt(client, sid, _attempt(song, 0))
+    assert _result(client, sid)["profile_saved"] is True  # no profile before: saved
+    assert fs.cols["voice_sessions"][sid]["profile_saved"] is True
+    _store_profile(fs)  # a newer mic measurement
+    again = _result(client, sid)
+    assert again["profile_saved"] is True  # the stored outcome of the session
+    assert _stored_profile(fs) == PROFILE_BASE
+
+
 @pytest.mark.parametrize(
     ("existing", "saved"),
     [(None, True), ({"method": "self", "confidence": "low"}, True), ({"method": "session", "evidence_count": 4,
@@ -250,6 +262,7 @@ def test_attempt_writes_user_song_fields(client: TestClient, fs: RouteFirestore)
     _post_attempt(client, sid, body)
     doc_id = loved_doc_id(USER_ID, song["song_key"])  # no kn_id row exists: the song_key row
     row = _user_song(fs, doc_id)
+    assert "id" not in row
     assert row["user_id"] == USER_ID and row["song_key"] == song["song_key"]
     assert row["artist"] == song["artist"] and row["title"] == song["title"]
     assert row["source"] == "voice_session" and row["sources"] == ["voice_session"]
@@ -334,6 +347,32 @@ def test_outputs_applied_on_retry_after_a_failed_write(
     assert fs.cols["voice_attempts"][f"{sid}:1"]["outputs_applied"] is True
 
 
+def test_result_applies_outputs_an_attempt_missed(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An attempt stored without its outputs (and never retried) is applied by result, once."""
+    real = vss.user_song_row
+    calls = {"n": 0}
+
+    def flaky(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("firestore blip")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(vss, "user_song_row", flaky)
+    sid = _create(client)
+    song = _next(client, sid)
+    with pytest.raises(RuntimeError, match="firestore blip"):
+        client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, _quiz(feel="loved")))
+    assert "user_songs" not in fs.cols
+    _result(client, sid)
+    _result(client, sid)
+    assert _user_song(fs, loved_doc_id(USER_ID, song["song_key"]))["times_sung"] == 1
+    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["plays"] == 1
+    assert fs.cols["voice_attempts"][f"{sid}:1"]["outputs_applied"] is True
+
+
 def test_loved_calls_love(client: TestClient, fs: RouteFirestore, hidden: FakeHidden) -> None:
     sid = _create(client)
     song = _next(client, sid)
@@ -359,8 +398,7 @@ def test_session_key_hint(client: TestClient, fs: RouteFirestore) -> None:
         song = _next(client, sid)
         _post_attempt(client, sid, _attempt(song, i, quiz))
         hints.append(_user_song(fs, loved_doc_id(USER_ID, song["song_key"]))["session_key_hint"])
-    assert hints[1] == "octave"
-    assert hints[0] in ("down", "up") and hints[2] in ("down", "up")
+    assert hints == ["down", "octave", "up"]  # too high -> down a key; too low -> up
 
 
 # ---------------------------------------------------------------- version stats

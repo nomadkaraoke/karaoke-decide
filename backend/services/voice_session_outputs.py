@@ -113,7 +113,6 @@ def user_song_row(
     song, quiz = attempt["song"], attempt["quiz"]
     if existing is None:
         row: dict[str, Any] = {
-            "id": row_id,
             "song_id": attempt["song_key"],
             "source": SESSION_SOURCE,
             "play_count": 0,

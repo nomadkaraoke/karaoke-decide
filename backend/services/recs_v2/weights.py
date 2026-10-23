@@ -29,6 +29,7 @@ SONG_YTMUSIC = 0.8
 # Explicit user adds: known_songs / enjoy_singing (known_songs_service) and "manual" (love endpoint).
 MANUAL_SOURCES = frozenset({"manual", "known_songs", "enjoy_singing"})
 SONG_DEFAULT = 0.6  # quiz or any other source
+SESSION_SOURCE = "voice_session"
 # Voice session labels (user_songs ``session_*`` fields, on whatever row the song has; see context._map_songs).
 SONG_SESSION_YES = 1.0  # "would you sing it?" yes / yes in another key
 SONG_SESSION_FINE = 0.6  # felt fine
@@ -65,6 +66,8 @@ def song_weight(doc: dict[str, object]) -> float:
     loved = doc.get("loved")  # "Love it" marker (song_feedback_service.is_loved); None on legacy rows
     if loved is True or (source in MANUAL_SOURCES and not (source == "manual" and loved is False)):
         return SONG_MANUAL
+    if source == SESSION_SOURCE:  # a pool song tried in a voice session: no taste signal by itself
+        return 0.0
     if source in PLAY_COUNT_SOURCES:
         return lastfm_song(to_int(doc.get("playcount")))
     if source == "spotify":

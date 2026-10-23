@@ -3,7 +3,7 @@
 Firestore:
 
 * ``voice_sessions/{id}`` = ``{user_id, setup, state, created_at, updated_at, tired_count, skips,
-  prior_profile, pending_song_key, last_offer, done_reason}``. ``skips`` entries are
+  prior_profile, pending_song_key, last_offer, done_reason, profile_saved}``. ``skips`` entries are
   ``{song_key, reason, video_id, artist_key, link_out, at, done}`` (a retried skip is not appended
   twice); ``prior_profile`` is the 3c voice profile at setup (the prior, frozen for the session); ``last_offer`` is ``{song_key, reason_type, link_out}``.
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
@@ -28,8 +28,9 @@ attempt doc's ``outputs_applied`` marker (so a retried POST, or a retry after a 
 counts it exactly once): the song's ``user_songs`` row (``choose_user_song_row``: the
 ``{user_id}:{kn_id}`` row when it exists, else ``loved_doc_id``) gets ``times_sung`` + 1 and the
 session labels, and ``voice_version_stats/{video_id}`` its counters; a "loved" feel then calls
-"Love it". ``result`` saves the session's voice profile (``should_save``) and lists the songs that
-suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
+"Love it". ``result`` first applies any attempt whose outputs were missed, then, only on the
+transition to done, saves the session's voice profile (``should_save``; the outcome is kept as
+``profile_saved`` and returned on later fetches), and lists the songs that suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
 
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
 (``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
@@ -799,12 +800,17 @@ class VoiceSessionService:
         """The result for any session state (zero attempts: the prior, partial); marks the session done."""
         session = await self._owned(user.id, session_id)
         attempts = await self._attempts(user.id, session_id)
+        for a in sorted(attempts, key=lambda a: int(a["n"])):
+            await self._apply_outputs(user.id, session, attempts, a)  # any attempt whose outputs were missed
         state = await asyncio.to_thread(rebuild_state, session, attempts)
         done_reason: DoneReason | None = check(state) or session.get("done_reason")
         # summary() reads "not warm now" as "never warm"; warmth can step down mid-session, so use ever-warm.
         state.warmth = "warm" if _ever_warm(session, attempts) else state.warmth
         s = await asyncio.to_thread(summary, state, done_reason)
-        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts)
+        first = session.get("state") != "done"  # only finishing a session may save its profile
+        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=first)
+        if not first:
+            saved = bool(session.get("profile_saved"))
         suited = await self._suited(user, profile)
         loved: dict[str, LovedSongOut] = {}
         for a in sorted(attempts, key=lambda a: int(a["n"])):
@@ -814,7 +820,10 @@ class VoiceSessionService:
                     a["song_key"],
                     LovedSongOut(song_key=a["song_key"], artist=song.get("artist", ""), title=song.get("title", "")),
                 )
-        await self._update(session_id, {"state": "done", "done_reason": done_reason})
+        done: dict[str, Any] = {"state": "done", "done_reason": done_reason}
+        if first:
+            done["profile_saved"] = saved
+        await self._update(session_id, done)
         return ResultOut(
             voice_type=s.voice_type,
             between=s.between,
@@ -833,19 +842,20 @@ class VoiceSessionService:
         )
 
     async def _save_profile(
-        self, user_id: str, session_id: str, s: ResultSummary, evidence_count: int
+        self, user_id: str, session_id: str, s: ResultSummary, evidence_count: int, *, may_save: bool
     ) -> tuple[VoiceProfileOut | None, bool]:
-        """(the profile the result stands for, whether it was saved).
+        """(the profile the result stands for, whether it was saved now).
 
-        The session's profile is saved over no profile or a self-reported one, and over a measured one
-        unless its confidence is 'low'. Unsaved, it is still the result's profile (for ``suited``); with
-        no range evidence there is none and the stored profile stands."""
+        On the transition to done (``may_save``) the session's profile is saved over no profile or a
+        self-reported one, and over a measured one unless its confidence is 'low'; re-fetching a done
+        session's result never saves (it must not overwrite a newer profile). Unsaved, it is still the
+        result's profile (for ``suited``); with no range evidence there is none and the stored profile stands."""
         existing = await self._profiles.get(user_id)
         now = datetime.now(UTC)
         derived = session_profile(s, evidence_count, session_id, now)
         if derived is None:
             return existing, False
-        if should_save(s.confidence_label, existing):
+        if may_save and should_save(s.confidence_label, existing):
             try:
                 return await self._profiles.put(user_id, derived), True
             except VoiceProfileUserNotFoundError:

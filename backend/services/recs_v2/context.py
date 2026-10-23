@@ -98,6 +98,14 @@ def _kn_id(song_id: object) -> int | None:
     return int(s) if s.isdigit() else None
 
 
+def _row_sources(d: dict[str, Any]) -> list[str]:
+    """The row's ``sources``; rows written before the field existed have just their ``source``."""
+    sources = d.get("sources")
+    if isinstance(sources, list):
+        return [str(s) for s in sources]
+    return [str(d["source"])] if d.get("source") else []
+
+
 def _map_songs(
     reader: CatalogReader, docs: list[dict[str, Any]]
 ) -> tuple[dict[str, float], list[tuple[str, str, str]], dict[str, int], set[str]]:
@@ -106,7 +114,8 @@ def _map_songs(
 
     Voice-session labels come from the ``session_*`` fields whatever the row's ``source``: "yes" /
     "yes in another key" and a "fine" feel raise the weight (max wins); "no" puts the song in
-    ``session_no`` and out of the known songs."""
+    ``session_no`` and out of the known songs. A row whose only source is ``voice_session`` has no
+    base weight (known only through a label) and never counts toward its artist."""
     kn_keys = reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
     known: dict[str, float] = {}
     no_karaoke: dict[str, tuple[str, str, str]] = {}
@@ -124,10 +133,13 @@ def _map_songs(
             has_karaoke = reader.match_kn(artist, title) is not None or reader.has_karaoke_key(key)
         if d.get("session_would_sing") == "no":
             session_no.add(key)
-        known[key] = max(known.get(key, 0.0), w.song_weight(d), w.session_song_weight(d) or 0.0)
-        if not has_karaoke:
-            no_karaoke.setdefault(key, (key, artist, title))
-        if artist and d.get("source") != "quiz":  # quiz seeds 5 songs per liked artist; affinity already covers it
+        weight = max(w.song_weight(d), w.session_song_weight(d) or 0.0)
+        if weight > 0:  # a voice_session-only row is known only through a session label
+            known[key] = max(known.get(key, 0.0), weight)
+            if not has_karaoke:
+                no_karaoke.setdefault(key, (key, artist, title))
+        # quiz seeds 5 songs per liked artist (affinity already covers it); voice-session pool songs probe range
+        if artist and d.get("source") != "quiz" and _row_sources(d) != [w.SESSION_SOURCE]:
             artist_songs.setdefault(artist_key(artist), set()).add(key)
     for key in session_no:
         known.pop(key, None)

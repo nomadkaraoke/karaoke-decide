@@ -281,3 +281,30 @@ async def test_session_labels_apply_whatever_the_row_source(reader: CatalogReade
 
 def test_session_weights() -> None:
     assert (w.SONG_SESSION_YES, w.SONG_SESSION_FINE, w.SESSION_NO_PENALTY) == (1.0, 0.6, 0.15)
+
+
+async def test_session_only_rows_are_not_taste(reader: CatalogReader) -> None:
+    """Pool songs probe range, not taste: a voice_session-only row is known only through a session label
+    and never makes its artist a known artist."""
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Meh Song", session_feel="not_for_me", sources=["voice_session"]),
+            _session("No Song", session_would_sing="no", session_feel="fine"),
+            _session("Yes Song", session_would_sing="yes", sources=["voice_session"]),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Yes Song"): w.SONG_SESSION_YES}
+    assert ctx.known_without_karaoke == [(song_key("Weezer", "Yes Song"), "Weezer", "Yes Song")]
+    assert artist_key("Weezer") not in ctx.artists
+    assert w.song_weight({"source": "voice_session"}) == 0.0
+
+
+async def test_session_row_with_another_source_still_signals_the_artist(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[_session("Export", source="spotify_export", sources=["spotify_export", "voice_session"],
+                             playcount=3, session_feel="not_for_me")]
+    )  # fmt: skip
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Export"): w.SONG_LASTFM_MID}
+    assert artist_key("Weezer") in ctx.artists
