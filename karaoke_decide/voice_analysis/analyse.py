@@ -28,6 +28,10 @@ Queue outcomes, all terminal so the hourly fetch never restarts this job for the
 
 A transient storage error while fetching a song's vocals (503, 500, 429, deadline, connection)
 is a WARNING and leaves that song ``separated`` for the next run: its audio cost Spotify budget.
+A transient BigQuery / GCS error anywhere else (the Spotify query, the load ``.result()``) is a
+WARNING too: the run stops cleanly and uncommitted songs stay ``separated``. When the run's first
+``COMMIT_EVERY`` songs all raise the same exception type (a broken image or dependency, not bad
+stems), the run stops without committing them, they stay ``separated``, and ONE ERROR is logged.
 BigQuery or GCS answering 403 / 404 (infra not applied yet) is a WARNING: the run stops, nothing
 uncommitted is marked, and the next hourly hand-off retries. voice.db is published by the CLI.
 """
@@ -45,16 +49,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any, TypeVar
 
-import requests
-from google.api_core.exceptions import (
-    DeadlineExceeded,
-    Forbidden,
-    InternalServerError,
-    NotFound,
-    ServiceUnavailable,
-    TooManyRequests,
-)
-from google.auth.exceptions import TransportError
+from google.api_core.exceptions import Forbidden, NotFound
 from google.cloud import bigquery
 
 from karaoke_decide.catalog.bq_source import P
@@ -76,6 +71,7 @@ from karaoke_decide.voice_analysis.markers import (
 )
 from karaoke_decide.voice_pool.queue import FETCH_COLLECTION
 from karaoke_decide.voice_pool.separate import GEN_BUCKET
+from karaoke_decide.voice_pool.transient import TRANSIENT_ERRORS
 
 __all__ = [
     "ANALYSIS_TABLE",
@@ -98,16 +94,7 @@ MAX_BYTES_ANALYSIS = MAX_BYTES_BATCH
 TOO_LITTLE_VOICE = "too_little_voice"
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _INFRA_MISSING = (NotFound, Forbidden)
-_TRANSIENT = (
-    ServiceUnavailable,
-    DeadlineExceeded,
-    TooManyRequests,
-    InternalServerError,
-    ConnectionError,
-    requests.exceptions.ConnectionError,
-    requests.exceptions.Timeout,
-    TransportError,
-)
+_TRANSIENT = TRANSIENT_ERRORS  # shared with the fetch job (voice_pool.transient)
 
 SPOTIFY_ANALYSIS_SQL = f"""
 WITH sec AS (
@@ -318,6 +305,7 @@ class _Shard:
         self.updates: list[tuple[str, str, dict[str, Any]]] = []  # (pool_id, outcome, update)
         self.done: Counter[str] = Counter()  # committed outcomes
         self.deferred = 0  # left separated after a transient storage error
+        self.last_error = ""  # the latest per-song analysis error, for the systematic-failure ERROR
 
     def load_csv(self) -> None:
         """A retried task keeps the rows it already wrote."""
@@ -367,7 +355,9 @@ async def run_analyse(
 ) -> dict[str, Any]:
     """Analyse this task's share of ``separated`` songs (see module doc). Returns
     ``{run, task_index, task_count, listed, analysed, too_little_voice, failed, deferred, all_failed,
-    blocked}`` (``deferred``: left ``separated`` after a transient storage error)."""
+    blocked, systematic}`` (``deferred``: left ``separated`` after a transient storage error;
+    ``blocked``: why the run stopped early (infra missing or a transient BigQuery / GCS error);
+    ``systematic``: the exception type when the run's first ``COMMIT_EVERY`` songs all raised it)."""
     docs = await fs.query_documents(FETCH_COLLECTION, filters=[("status", "==", "separated")])
     mine = set(shard([d["id"] for d in docs], task_index, task_count))
     todo = sorted((d for d in docs if d["id"] in mine), key=lambda d: (d.get("updated_at") or _EPOCH, d["id"]))
@@ -377,25 +367,51 @@ async def run_analyse(
     if not todo:
         logger.info("voice analysis %s task %d/%d: nothing separated in this shard", run, task_index, task_count)
         return {**out, "analysed": 0, "too_little_voice": 0, "failed": 0, "deferred": 0, "all_failed": False,
-                "blocked": None}  # fmt: skip
+                "blocked": None, "systematic": None}  # fmt: skip
 
     data = gcs.bucket(DATA_BUCKET)
     work = _Shard(fs, gcs, bq, run, task_index)
+    systematic: str | None = None  # exception type when the first COMMIT_EVERY songs all failed alike
     try:
         work.load_csv()
         spotify = fetch_spotify(bq, (d.get("spotify_id") for d in todo))
         ultrastar = load_ultrastar(data, {d["song_key"] for d in todo})
+        first: list[str] = []  # outcomes of the run's first COMMIT_EVERY songs
         for doc in todo:
-            await _analyse_one(doc, gcs, spotify, ultrastar, work)
+            outcome = await _analyse_one(doc, gcs, spotify, ultrastar, work)
+            if len(first) < COMMIT_EVERY:
+                first.append(outcome)
+                if len(first) == COMMIT_EVERY and len(set(first)) == 1 and outcome.startswith("error:"):
+                    # Same exception for every one of the first songs: the image or a dependency is
+                    # broken, not the stems. Failing them would throw away their Spotify budget and
+                    # GPU time, so nothing of this batch is committed and they stay separated.
+                    work.updates = []
+                    systematic = outcome.removeprefix("error:")
+                    break
             if work.pending() >= COMMIT_EVERY:
                 await work.commit()
-        await work.commit()
+        else:
+            await work.commit()
         blocked = None
     except InfraUnavailableError as e:
         logger.warning(
             "voice analysis %s: %s; infra pending? Uncommitted songs stay separated for the next run", run, e
         )
         blocked = str(e)
+    except _TRANSIENT as e:  # BigQuery / GCS blip outside one song's vocals: try again next run
+        logger.warning(
+            "voice analysis %s: transient error (%s: %s); uncommitted songs stay separated for the next run",
+            run, type(e).__name__, e,
+        )  # fmt: skip
+        blocked = f"transient {type(e).__name__}: {e}"
+    if systematic:
+        log = logger.error if task_index == 0 else logger.warning
+        log(
+            "voice analysis: the first %d songs of a run all failed with the same error; stopped, songs stay"
+            " separated (broken analysis image or dependency?)",
+            COMMIT_EVERY,
+            extra={"json_fields": {"run": run, "exception_type": systematic, "sample_error": work.last_error[:500]}},
+        )
     done = work.done
     summary = {
         **out,
@@ -405,8 +421,9 @@ async def run_analyse(
         "deferred": work.deferred,
         "all_failed": bool(done["error"]) and done["error"] == len(todo),
         "blocked": blocked,
+        "systematic": systematic,
     }
-    if summary["all_failed"]:
+    if summary["all_failed"] and not systematic:
         # A real failure (bad image, broken decoder): one ERROR per execution, from task 0.
         log = logger.error if task_index == 0 else logger.warning
         log("voice analysis %s: every song failed (%d); see the WARNINGs above", run, done["error"])
@@ -420,7 +437,9 @@ async def _analyse_one(
     spotify: dict[str, SpotifyInfo],
     ultrastar: dict[str, UltraStarSong],
     work: _Shard,
-) -> None:
+) -> str:
+    """Analyse one song into ``work``; returns its outcome (``analysed``, ``too_little_voice``,
+    ``missing``, ``deferred`` or ``error:<ExceptionType>``)."""
     pid = doc["id"]
     now = datetime.now(UTC)
     uri = doc.get("vocals_gcs")
@@ -431,7 +450,7 @@ async def _analyse_one(
             work.updates.append(
                 (pid, "missing", {"status": "failed", "error": "vocals stem missing", "updated_at": now})
             )
-            return
+            return "missing"
         y, sr = _infra(f"read {uri}", lambda: load_audio(blob))
         frames = vocal_frames(y, sr)
         voiced_s = len(frames.t) * FRAME_S
@@ -455,13 +474,14 @@ async def _analyse_one(
             pid, doc.get("song_key"), type(e).__name__, e,
         )  # fmt: skip
         work.deferred += 1
-        return
+        return "deferred"
     except Exception as e:  # noqa: BLE001 - one bad stem (decode / analysis) must not stop the shard
         logger.warning("voice analysis: %s (%s) failed: %s: %s", pid, doc.get("song_key"), type(e).__name__, e)
         work.updates.append(
             (pid, "error", {"status": "failed", "error": f"analysis: {type(e).__name__}: {e}", "updated_at": now})
         )
-        return
+        work.last_error = f"{type(e).__name__}: {e}"
+        return f"error:{type(e).__name__}"
     base = {"status": "analysed", "analysis_version": ANALYSIS_VERSION, "analysed_at": now, "updated_at": now}
     if markers is None:
         logger.info(
@@ -470,8 +490,9 @@ async def _analyse_one(
         work.updates.append(
             (pid, TOO_LITTLE_VOICE, {**base, "markers": None, "analysis_note": TOO_LITTLE_VOICE, "error": None})
         )
-        return
+        return TOO_LITTLE_VOICE
     row = analysis_row(doc, markers, spotify.get(doc.get("spotify_id") or ""), now)
     work.bq_rows.append(row)
     work.add_csv_row(_csv_row(doc, markers))
     work.updates.append((pid, "analysed", {**base, "markers": row, "analysis_note": None, "error": None}))
+    return "analysed"

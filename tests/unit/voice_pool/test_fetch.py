@@ -525,7 +525,10 @@ async def test_unexpected_runner_failure_lets_the_run_finish_then_raises_once(fs
     with pytest.raises(fetch.JobRunnerFailedError) as exc:
         await go(fs, ff, runner, gcs, clock)
     assert isinstance(exc.value.__cause__, AttributeError)
-    assert "2 Cloud Run job call(s) failed" in str(exc.value)  # collect + separate checks
+    assert str(exc.value) == fetch.JobRunnerFailedError.MESSAGE  # stable text; details in log_extra
+    fields = exc.value.log_extra["json_fields"]
+    assert fields["run"] == "20261022-130000" and fields["failed_calls"] == 2  # collect + separate checks
+    assert "list_executions" in fields["first_error"]
     assert statuses(fs)[queued[0]] == "downloading"  # the download step still ran
     assert statuses(fs)[sep] == "separating"  # unknown running state: never requeued as stale
     assert {statuses(fs)[i] for i in fetched} == {"fetched"}  # no second separation submitted
@@ -551,3 +554,103 @@ async def test_runner_helpers_still_raise_without_an_error_list(fs, gcs, clock):
     await seed(fs, 1, status="separated")
     with pytest.raises(AttributeError):
         await fetch.maybe_analyse(fs, FakeRunner(fail={"voice-pool-analyse": AttributeError("x")}))
+
+
+# ------------------------------------------------------------------ final-review fixes
+
+
+def _failed_downloads(ff, ids, error="spotify capture: account region blocked"):
+    for k, pid in enumerate(ids):
+        ff.statuses[f"dl{k}"] = (200, {"download_id": f"dl{k}", "status": "failed", "error": error})
+
+
+async def test_systematic_download_failures_are_one_error_and_stop_submissions(fs, ff, runner, gcs, clock, caplog):
+    ids = await seed(fs, 5, prefix="dl", status="downloading")
+    for k, pid in enumerate(ids):
+        fs.cols[FETCH][pid]["flacfetch_id"] = f"dl{k}"
+    _failed_downloads(ff, ids[:4])
+    ff.statuses["dl4"] = (200, {"download_id": "dl4", "status": "cancelled", "error": None})
+    queued = await seed(fs, 3, prefix="q")
+    out = await go(fs, ff, runner, gcs, clock)
+    assert (out["submitted"], out["refused_code"]) == (0, "downloads_failing")
+    assert ff.started == [] and {statuses(fs)[q] for q in queued} == {"queued"}  # no budget spent
+    assert {statuses(fs)[i] for i in ids} == {"queued"} and all(fs.cols[FETCH][i]["attempts"] == 1 for i in ids)
+    (err,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert err.getMessage() == "voice pool fetch: downloads are failing systematically; no new downloads this run"
+    fields = err.json_fields
+    assert fields["top_error"] == "spotify capture: account region blocked" and fields["top_error_count"] == 4
+    assert fields["failures"] == 5 and fields["run"] == "20261022-130000"
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "download of" in r.getMessage()]
+    assert len(warnings) == 5  # each failure on its own
+
+
+@pytest.mark.parametrize(("failures", "successes"), [(4, 0), (5, 1)])
+async def test_few_failures_or_any_success_keep_submitting(fs, ff, runner, gcs, clock, caplog, failures, successes):
+    ids = await seed(fs, failures + successes, prefix="dl", status="downloading")
+    for k, pid in enumerate(ids):
+        fs.cols[FETCH][pid]["flacfetch_id"] = f"dl{k}"
+    _failed_downloads(ff, ids[:failures])
+    for k in range(failures, failures + successes):
+        ff.statuses[f"dl{k}"] = (200, {"download_id": f"dl{k}", "status": "complete", "gcs_path": "gs://b/a.flac"})
+    ff.budgets = [(200, ALLOWED), (200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    await seed(fs, 2, prefix="q")
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] >= 1 and out["refused_code"] != "downloads_failing"
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+async def test_hung_download_counts_a_failed_attempt_after_2h(fs, ff, runner, gcs, clock):
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    hung, fresh, legacy = await seed(fs, 3, prefix="h", status="downloading")
+    for k, (pid, hours) in enumerate(((hung, 2.5), (fresh, 1.0))):
+        fs.cols[FETCH][pid].update(flacfetch_id=f"dl{k}", download_started_at=ts(clock, hours))
+        ff.statuses[f"dl{k}"] = (200, {"download_id": f"dl{k}", "status": "downloading"})
+    # submitted before download_started_at existed: falls back to updated_at
+    fs.cols[FETCH][legacy].update(flacfetch_id="dl2", updated_at=ts(clock, 3))
+    ff.statuses["dl2"] = (200, {"download_id": "dl2", "status": "queued"})
+    await go(fs, ff, runner, gcs, clock)
+    for pid in (hung, legacy):
+        doc = fs.cols[FETCH][pid]
+        assert (doc["status"], doc["attempts"], doc["flacfetch_id"]) == ("queued", 1, None)
+        assert "after 2 h" in doc["error"]
+    assert statuses(fs)[fresh] == "downloading" and fs.cols[FETCH][fresh]["attempts"] == 0
+
+
+async def test_submission_records_download_start(fs, ff, runner, gcs, clock):
+    ff.budgets = [(200, ALLOWED), (200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    (pid,) = await seed(fs, 1)
+    await go(fs, ff, runner, gcs, clock)
+    assert fs.cols[FETCH][pid]["download_started_at"] == datetime.fromtimestamp(clock.now(), UTC)
+
+
+@pytest.mark.parametrize(
+    "exc_name", ["ServiceUnavailable", "DeadlineExceeded", "InternalServerError", "TooManyRequests"]
+)
+async def test_transient_cloud_run_errors_are_warnings(fs, ff, gcs, clock, caplog, exc_name):
+    import google.api_core.exceptions as gexc
+
+    from tests.unit.voice_pool.conftest import FakeRunner
+
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    await seed(fs, 1, status="separated")
+    runner = FakeRunner(fail={"voice-pool-analyse": getattr(gexc, exc_name)("blip")})
+    out = await go(fs, ff, runner, gcs, clock)  # no JobRunnerFailedError
+    assert out["analyse_started"] is False
+    assert any(r.levelno == logging.WARNING and "transient" in r.getMessage() for r in caplog.records)
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+async def test_transient_error_starting_separation_reverts_claims(fs, ff, gcs, clock, caplog):
+    from google.api_core.exceptions import ServiceUnavailable
+
+    from tests.unit.voice_pool.conftest import FakeRunner
+
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    ids = await seed(fs, 25, status="fetched", fetched_at=ts(clock, 1))
+    runner = FakeRunner(fail={separate.SEPARATE_JOB: ServiceUnavailable("blip")})
+    runner.is_running = lambda job, region: False  # type: ignore[method-assign]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["separating"] == 0
+    assert {statuses(fs)[i] for i in ids} == {"fetched"}
+    assert all(fs.cols[FETCH][i]["manifest_run"] is None for i in ids)
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]

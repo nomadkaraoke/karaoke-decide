@@ -7,6 +7,10 @@ availability.db) and Firestore ``voice_version_stats`` (singer feedback; its ``e
 verdict beats the probe's).
 BigQuery ``song_voice_analysis`` stays the source of record; the queue holds the same rows.
 
+``pool`` lists every queued song (fetching, separating and analysed alike), so it is larger than
+what a session can play. Session candidates are ``pool JOIN analysis`` (on ``song_key``): only
+songs with markers, which excludes songs still in the pipeline and ``too_little_voice`` ones.
+
 Published to ``gs://nomadkaraoke-musicbrainz-data/voice/<run>/voice.db.gz`` (gzip mtime 0), then
 ``voice/latest.json`` = ``{run, sha256, songs, analysed, built_at}`` LAST (``sha256`` of the
 uncompressed db, as for catalog.db), then only the newest ``KEEP_RUNS`` ``voice/<run>/`` dirs are

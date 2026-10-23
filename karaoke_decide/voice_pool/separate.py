@@ -1,7 +1,8 @@
 """Hand-off to karaoke-gen's GPU vocal separation job, and collection of its results.
 
-``submit_batch`` writes a manifest (``gs://karaoke-gen-storage-nomadkaraoke/voice-pool/manifests/
-<run>.jsonl``, lines ``{"id", "audio"}``) and runs gen's ``voice-pool-separate-job`` (us-east4,
+``submit_batch`` claims the songs (``fetched`` -> ``separating``, transactionally), writes a
+manifest (``gs://karaoke-gen-storage-nomadkaraoke/voice-pool/manifests/<run>.jsonl``, lines
+``{"id", "audio"}``) and runs gen's ``voice-pool-separate-job`` (us-east4,
 GPU, ``parallelism=1``, 3600 s per task, no retries) with up to ``SONGS_PER_TASK`` songs per task.
 The worker writes ``<run>.results/part-<task>.jsonl`` lines ``{"id", "ok", "vocals", "seconds",
 "error"}``; ``collect_results`` applies them. A song still without a result ``STALE_AFTER_S`` after
@@ -126,23 +127,61 @@ def _ts(now: Callable[[], float]) -> datetime:
     return datetime.fromtimestamp(now(), UTC)
 
 
+class _NotFetchedError(Exception):
+    pass
+
+
+async def claim_for_separation(fs: Any, pid: str, run: str, stamp: datetime) -> bool:
+    """Atomically move ``pid`` from ``fetched`` to ``separating`` under ``run``; False when it is no
+    longer ``fetched`` (an overlapping fetch execution took it)."""
+
+    def transform(data: dict[str, Any] | None) -> dict[str, Any]:
+        if data is None or data.get("status") != "fetched":
+            raise _NotFetchedError
+        return {**data, "status": "separating", "manifest_run": run, "separating_at": stamp, "updated_at": stamp}
+
+    try:
+        await fs.transform_document_atomically(FETCH_COLLECTION, pid, transform)
+    except _NotFetchedError:
+        return False
+    return True
+
+
 async def submit_batch(
     fs: Any, gcs: Any, runner: JobRunner, items: list[dict[str, Any]], run: str, *, now: Callable[[], float] = time.time
-) -> str:
-    """Separate up to ``MAX_BATCH`` of ``items`` (the rest wait for the next run); returns the
-    execution name. The songs become ``separating`` only once the execution has started."""
-    batch = items[:MAX_BATCH]
-    uri = write_manifest(gcs, run, batch)
-    execution = runner.run(SEPARATE_JOB, SEPARATE_REGION, args=[*WORKER_ARGS, uri], task_count=task_count(len(batch)))
+) -> tuple[str | None, int]:
+    """Separate up to ``MAX_BATCH`` of ``items`` (the rest wait for the next run); returns
+    ``(execution name, songs)``, ``(None, 0)`` when another run had already claimed them all.
+
+    Each song is claimed transactionally (``fetched`` -> ``separating``) before the manifest is
+    written, so overlapping fetch executions never separate a song twice. If the manifest write
+    or the job start fails, the claims are reverted (back to ``fetched``) and the error re-raised.
+    """
     stamp = _ts(now)
-    for item in batch:
-        await fs.update_document(
-            FETCH_COLLECTION,
-            item["id"],
-            {"status": "separating", "manifest_run": run, "separating_at": stamp, "updated_at": stamp},
+    batch: list[dict[str, Any]] = []
+    for item in items:
+        if len(batch) >= MAX_BATCH:
+            break
+        if await claim_for_separation(fs, item["id"], run, stamp):
+            batch.append(item)
+    if not batch:
+        logger.info("voice pool: every fetched song was claimed by another run; nothing to separate")
+        return None, 0
+    try:
+        uri = write_manifest(gcs, run, batch)
+        execution = runner.run(
+            SEPARATE_JOB, SEPARATE_REGION, args=[*WORKER_ARGS, uri], task_count=task_count(len(batch))
         )
+    except BaseException:
+        for item in batch:
+            await fs.update_document(
+                FETCH_COLLECTION,
+                item["id"],
+                {"status": "fetched", "manifest_run": None, "separating_at": None, "updated_at": _ts(now)},
+            )
+        raise
     logger.info("voice pool: %d songs to separation (%s, %d tasks)", len(batch), execution, task_count(len(batch)))
-    return execution
+    return execution, len(batch)
 
 
 def _read_results(gcs: Any, run: str) -> dict[str, dict[str, Any]]:

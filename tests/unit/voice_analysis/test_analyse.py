@@ -344,3 +344,70 @@ async def test_transient_vocals_error_leaves_song_separated(frames, monkeypatch,
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert len(warnings) == 1 and flaky in warnings[0]
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+def test_transient_errors_are_shared_with_the_fetch_job() -> None:
+    from karaoke_decide.voice_pool import fetch, transient
+
+    assert analyse._TRANSIENT is transient.TRANSIENT_ERRORS
+    assert fetch.TRANSIENT_ERRORS is transient.TRANSIENT_ERRORS
+
+
+@pytest.mark.parametrize("exc", [ServiceUnavailable("503"), DeadlineExceeded("slow"), ConnectionError("reset")])
+@pytest.mark.parametrize("where", ["query", "load"])
+async def test_transient_bigquery_error_stops_cleanly_and_marks_nothing(frames, caplog, exc, where) -> None:
+    """The Spotify query or the load job's .result() hitting a blip: WARNING, songs stay separated."""
+    caplog.set_level(logging.INFO)
+    fs, gcs = MemoryFs(), FakeGcs()
+    pids = await _seed(fs, gcs, SONGS[:3])
+    bq = FakeBq(fail=exc) if where == "query" else FakeBq(fail_load=exc)
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert out["blocked"] and out["blocked"].startswith("transient ") and out["analysed"] == 0
+    assert {fs.cols[FETCH][p]["status"] for p in pids} == {"separated"}
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+async def test_first_batch_failing_alike_stops_and_keeps_songs_separated(frames, monkeypatch, caplog) -> None:
+    """A broken image (same exception for every one of the first COMMIT_EVERY songs) must not
+    burn the songs: nothing is committed, they stay separated, ONE ERROR with a stable message."""
+    monkeypatch.setattr(analyse, "COMMIT_EVERY", 4)
+
+    def boom(y: Any, sr: int) -> Any:
+        raise ImportError(f"libsndfile missing ({y})")  # varies per song; the type doesn't
+
+    monkeypatch.setattr(analyse, "vocal_frames", boom)
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    pids = await _seed(fs, gcs, SONGS[:6])
+    out = await analyse.run_analyse(fs, gcs, bq, run="r9", limit=None, task_index=0, task_count=1)
+    assert out["systematic"] == "ImportError" and out["failed"] == 0 and out["all_failed"] is False
+    assert {fs.cols[FETCH][p]["status"] for p in pids} == {"separated"}
+    assert all(fs.cols[FETCH][p]["error"] is None for p in pids)
+    assert bq.loads == [] and not [n for n in gcs.bucket(DATA).objects if "pool_measured" in n]
+    (err,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert "%" not in err.getMessage() and "libsndfile" not in err.getMessage()  # stable text
+    assert err.json_fields["run"] == "r9" and err.json_fields["exception_type"] == "ImportError"
+    assert "libsndfile" in err.json_fields["sample_error"]
+
+
+async def test_systematic_stop_from_other_tasks_is_a_warning(frames, monkeypatch, caplog) -> None:
+    monkeypatch.setattr(analyse, "COMMIT_EVERY", 2)
+    monkeypatch.setattr(analyse, "vocal_frames", lambda y, sr: (_ for _ in ()).throw(ImportError("x")))
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    await _seed(fs, gcs, SONGS)
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=1, task_count=2)
+    assert out["systematic"] == "ImportError"
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+async def test_mixed_failures_in_the_first_batch_are_per_song(frames, monkeypatch) -> None:
+    """Different exception types (or any success) among the first songs: bad stems, marked failed."""
+    monkeypatch.setattr(analyse, "COMMIT_EVERY", 3)
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    pids = await _seed(fs, gcs, SONGS[:3])
+    errors = iter([ValueError("a"), RuntimeError("b"), ValueError("c")])
+    monkeypatch.setattr(analyse, "vocal_frames", lambda y, sr: (_ for _ in ()).throw(next(errors)))
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert out["systematic"] is None and out["failed"] == 3
+    assert {fs.cols[FETCH][p]["status"] for p in pids} == {"failed"}
+    assert all(fs.cols[FETCH][p]["error"].startswith("analysis: ") for p in pids)

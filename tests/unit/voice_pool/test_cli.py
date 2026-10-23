@@ -192,8 +192,18 @@ def test_fetch_runner_failure_logs_one_error_and_exits_1(no_bq, monkeypatch, cap
     monkeypatch.setattr("backend.services.firestore_service.FirestoreService", MagicMock())
 
     async def boom(*a, **kw):
-        raise fetch.JobRunnerFailedError("voice pool fetch r: 1 Cloud Run job call(s) failed") from AttributeError("x")
+        raise fetch.JobRunnerFailedError("r7", [AttributeError("x")]) from AttributeError("x")
 
     monkeypatch.setattr(fetch, "run_fetch", boom)
     assert cli.main(["fetch"]) == 1
-    assert [r.levelno for r in caplog.records if r.levelno >= logging.ERROR] == [logging.ERROR]
+    (err,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert err.getMessage() == "voice pool fetch failed"  # stable; the run id is a json field
+    assert err.json_fields["run"] == "r7" and err.json_fields["failed_calls"] == 1
+
+
+def test_format_analyse_shows_a_systematic_stop():
+    text = cli.format_analyse({
+        "run": "r", "task_index": 0, "task_count": 1, "listed": 30, "analysed": 0, "too_little_voice": 0,
+        "failed": 0, "deferred": 0, "blocked": None, "systematic": "ImportError",
+    })  # fmt: skip
+    assert "first songs all failed with ImportError" in text

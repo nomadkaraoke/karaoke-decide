@@ -53,6 +53,24 @@ gcloud storage cat gs://nomadkaraoke-musicbrainz-data/voice/selection/<run>/cove
 If the report says `below_minimum` (fewer than 600 songs) or lists empty strata, stop and decide
 before fetching. A preview without writes: `--args=select,--n,1000,--dry-run`.
 
+Then prove one download end to end **before** resuming the scheduler:
+
+```bash
+# One short fetch run by hand: a 60 s deadline submits one or two downloads, not an hour's worth
+gcloud run jobs execute voice-pool-fetch --region us-central1 --args=fetch,--deadline-s,60 --wait
+# ~15 min later: another short run polls flacfetch and moves finished songs to `fetched`
+gcloud run jobs execute voice-pool-fetch --region us-central1 --args=fetch,--deadline-s,60 --wait
+gcloud run jobs execute voice-pool-fetch --region us-central1 --args=status --wait
+```
+
+The status must show `fetched` ≥ 1 (and the audio under
+`gs://karaoke-gen-storage-nomadkaraoke/voice-pool/audio/`). If downloads only fail, read their
+`error` in Firestore `voice_pool_fetch` (each failure is also a WARNING in the job's logs) and fix
+that first. Once a run sees 5 or more failures and no success, it logs one ERROR
+("downloads are failing systematically", with the most common error in `json_fields.top_error`)
+and stops submitting for that run, so a broken setup can't keep spending Spotify budget. Only
+then resume the scheduler (below).
+
 ## Pausing and resuming the fetch scheduler
 
 The scheduler is created **paused**. Pulumi ignores its `paused` field afterwards, so a
@@ -101,8 +119,13 @@ flacfetch enforces the budget itself, so the pool can't crowd out customer downl
 - At most 2 batch downloads run at once, with at least 30 s between batch starts. Batch
   downloads are refused while a customer (interactive) Spotify download is queued or running.
   Customer downloads are never refused, only counted.
-- The fetch job also waits a random 45 to 180 s between submissions, and stops when flacfetch
-  answers 429 (`spotify_budget`, `batch_busy`, ...).
+- The fetch job also waits a random 45 to 180 s between submissions. When flacfetch says "not
+  now" (a closed budget gate or a 429 such as `batch_busy`, `batch_gap`, `spotify_budget`), the
+  job waits the `retry_after_s` it gives if that still fits before the run's 3300 s deadline,
+  then retries the same song; otherwise it stops submitting for this run. Short gates are waited
+  out; an exhausted 24 h budget ends the run.
+- A download still unfinished 2 h after it was submitted counts as a failed attempt (a hung
+  capture), so it can't hold its place forever. A song fails for good after 3 attempts.
 
 Read the budget directly:
 
@@ -134,7 +157,7 @@ on its own. There is no `--reanalyse` flag yet. To re-analyse after a marker cha
    from google.cloud import firestore
    db = firestore.Client(project="nomadkaraoke")
    for doc in db.collection("voice_pool_fetch").where("status", "==", "analysed").stream():
-       if doc.get("vocals_gcs"):
+       if (doc.to_dict() or {}).get("vocals_gcs"):
            doc.reference.update({"status": "separated", "updated_at": firestore.SERVER_TIMESTAMP})
    ```
 
@@ -143,8 +166,33 @@ on its own. There is no `--reanalyse` flag yet. To re-analyse after a marker cha
    for a trial run first.
 5. Resume the scheduler.
 
-The weekly vocal-range refresh picks up the rewritten `pool_measured` CSVs on its next run. To
-rebuild voice.db alone, without analysing: `--args=publish`.
+The weekly vocal-range refresh picks up the new `pool_measured` CSVs on its next run. Note that
+these CSVs **accumulate per run**: every analyse run writes
+`vocal-range/pool_measured/<run>/part-*.csv`, nothing prunes them, and the refresh reads every
+run's parts. After a full re-analysis, an older run's row for the same song is still read
+alongside the new one, so delete the older run dirs (`gcloud storage rm -r
+gs://nomadkaraoke-musicbrainz-data/vocal-range/pool_measured/<old run>/`, `/gcp-admin`) if
+only the new ranges should count. To rebuild voice.db alone, without analysing: `--args=publish`.
+
+### Songs failed by a broken analysis image
+
+If the first 25 songs of an analyse run all raise the same exception type, the run stops without
+failing them (they stay `separated`) and logs one ERROR, "the first 25 songs of a run all failed
+with the same error", with `exception_type` and `sample_error` in `json_fields`. Fix the image and
+the next hourly hand-off retries them. Songs failed before that guard, or in a run of fewer than
+25 songs, are `failed` with an `error` starting `analysis:`. Their stems are intact, so after the
+fix put them back (Firestore write, `/gcp-admin`):
+
+```python
+from google.cloud import firestore
+db = firestore.Client(project="nomadkaraoke")
+for doc in db.collection("voice_pool_fetch").where("status", "==", "failed").stream():
+    d = doc.to_dict() or {}
+    if d.get("vocals_gcs") and str(d.get("error") or "").startswith("analysis:"):
+        doc.reference.update({"status": "separated", "error": None, "updated_at": firestore.SERVER_TIMESTAMP})
+```
+
+Download and separation failures have other `error` texts and are not touched by this.
 
 ## Cost
 
@@ -172,4 +220,10 @@ Personal pools (later tasks) carry a global guard of $20 a month of estimated co
 - **Songs stuck in `separating`**: after 5 h without a result they go back to `fetched` with
   one more attempt. After 3 attempts they become `failed`. Check the gen job's executions in
   us-east4.
-- **`failed` songs**: the queue doc's `error` field says why. Look at the error before retrying a song by hand.
+- **ERROR "voice pool fetch: Cloud Run job calls failed unexpectedly this run"**: a Cloud Run
+  call failed with something other than missing / forbidden / transient. The rest of the run
+  still happened; `json_fields` has the run id, the number of failed calls and the first error.
+- **ERROR "voice pool fetch: downloads are failing systematically"**: see "First run" above;
+  `json_fields.top_error` is the most common flacfetch error.
+- **`failed` songs**: the queue doc's `error` field says why. Look at the error before retrying a
+  song by hand (analysis failures: see "Songs failed by a broken analysis image").

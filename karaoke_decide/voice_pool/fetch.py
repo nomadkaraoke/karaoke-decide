@@ -20,9 +20,15 @@ One run (``run_fetch``):
 
 flacfetch outages and missing / forbidden jobs or GCS objects (the infra lands separately) are
 WARNINGs: the run carries on with the other steps. Misconfiguration (e.g. a rejected API key) raises.
-Any other Cloud Run job failure (an API error or a bug in the runner) is a WARNING when it happens;
-the run carries on, then raises ``JobRunnerFailedError`` once at the end, which the CLI logs as the
-run's one ERROR.
+Transient Cloud Run API errors (503, 500, 429, deadline, connection) are WARNINGs too. Any other
+Cloud Run job failure (an API error or a bug in the runner) is a WARNING when it happens; the run
+carries on, then raises ``JobRunnerFailedError`` once at the end, which the CLI logs as the run's
+one ERROR.
+
+Each failed download is a WARNING. A ``downloading`` song still unfinished ``DOWNLOAD_TIMEOUT_S``
+(2 h) after submission counts as a failed attempt (a hung capture). When one run sees
+``SYSTEMATIC_DOWNLOAD_FAILURES`` (5) or more failures and no success, it logs ONE ERROR naming the
+most common error (in ``json_fields``) and submits nothing new: each attempt costs Spotify budget.
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ import asyncio
 import logging
 import random
 import time
+from collections import Counter
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -45,6 +52,7 @@ from karaoke_decide.voice_pool.flacfetch_client import (
     Refused,
 )
 from karaoke_decide.voice_pool.separate import JobRunner
+from karaoke_decide.voice_pool.transient import TRANSIENT_ERRORS
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +63,12 @@ MIN_WAIT_S = 30.0  # flacfetch's minimum gap between batch starts
 MAX_EXPECTED_DURATION_S = 1200  # flacfetch's expected_duration_s limit
 QUEUE_SCAN = 1000
 CLAIM_GRACE_S = 600  # a claimed song without a flacfetch id is orphaned (crash) after this
+# A download still not finished this long after it was submitted is treated as hung (a stuck
+# capture): it counts a failed attempt, so the song can't hold its place forever.
+DOWNLOAD_TIMEOUT_S = 2 * 3600
+# This many download failures in one run with no success = something systematic (account,
+# region, flacfetch bug): ONE ERROR, and no new downloads this run (each one costs budget).
+SYSTEMATIC_DOWNLOAD_FAILURES = 5
 SEPARATE_AT = 25
 SEPARATE_AFTER_S = 6 * 3600
 ANALYSE_JOB = "voice-pool-analyse"
@@ -82,7 +96,16 @@ async def _update(fs: Any, pid: str, data: dict[str, Any], now: Now) -> None:
 async def _retry_or_fail(fs: Any, doc: dict[str, Any], error: str, now: Now) -> None:
     attempts = int(doc.get("attempts") or 0) + 1
     status = "failed" if attempts >= MAX_ATTEMPTS else "queued"
-    await _update(fs, doc["id"], {"status": status, "attempts": attempts, "flacfetch_id": None, "error": error}, now)
+    logger.warning(
+        "voice pool: download of %s (%s) failed (attempt %d/%d, now %s): %s",
+        doc["id"], doc.get("song_key"), attempts, MAX_ATTEMPTS, status, error,
+    )  # fmt: skip
+    await _update(
+        fs,
+        doc["id"],
+        {"status": status, "attempts": attempts, "flacfetch_id": None, "download_started_at": None, "error": error},
+        now,
+    )
 
 
 def _uploaded_audio(gcs: Any, pid: str) -> str | None:
@@ -97,10 +120,11 @@ def _uploaded_audio(gcs: Any, pid: str) -> str | None:
     return uri if exists else None
 
 
-async def poll_downloads(fs: Any, ff: FlacfetchClient, gcs: Any, now: Now) -> tuple[int, int]:
-    """Step 1; returns ``(polled, fetched)``."""
+async def poll_downloads(fs: Any, ff: FlacfetchClient, gcs: Any, now: Now) -> tuple[int, int, Counter[str]]:
+    """Step 1; returns ``(polled, fetched, failures)`` (``failures``: count per error string)."""
     docs = await fs.query_documents(FETCH, filters=[("status", "==", "downloading")])
     polled = fetched = 0
+    failures: Counter[str] = Counter()
     for doc in docs:
         if not doc.get("flacfetch_id") and (_stamp(now) - doc["updated_at"]).total_seconds() < CLAIM_GRACE_S:
             continue  # claimed by a run that is starting it right now
@@ -119,8 +143,16 @@ async def poll_downloads(fs: Any, ff: FlacfetchClient, gcs: Any, now: Now) -> tu
             )
             fetched += 1
         elif st.get("status") in ("complete", "failed", "cancelled"):
-            await _retry_or_fail(fs, doc, st.get("error") or f"flacfetch {st.get('status')} without a GCS file", now)
-    return polled, fetched
+            error = st.get("error") or f"flacfetch {st.get('status')} without a GCS file"
+            await _retry_or_fail(fs, doc, error, now)
+            failures[error] += 1
+        else:
+            started = doc.get("download_started_at") or doc["updated_at"]
+            if (_stamp(now) - started).total_seconds() > DOWNLOAD_TIMEOUT_S:
+                error = f"flacfetch download still {st.get('status')} after {DOWNLOAD_TIMEOUT_S // 3600} h"
+                await _retry_or_fail(fs, doc, error, now)
+                failures[error] += 1
+    return polled, fetched, failures
 
 
 def _unfetchable(doc: dict[str, Any]) -> str | None:
@@ -195,7 +227,9 @@ async def submit_downloads(
                 logger.warning("voice pool: flacfetch unavailable (%s); no more downloads this run", e)
                 return submitted, e.code
             if not isinstance(started, Refused):
-                await _update(fs, doc["id"], {"flacfetch_id": started, "error": None}, now)
+                await _update(
+                    fs, doc["id"], {"flacfetch_id": started, "download_started_at": _stamp(now), "error": None}, now
+                )
                 submitted += 1
                 break
             await _update(fs, doc["id"], {"status": "queued", "flacfetch_id": None}, now)
@@ -212,17 +246,31 @@ async def submit_downloads(
 
 
 class JobRunnerFailedError(RuntimeError):
-    """A Cloud Run job call failed unexpectedly (not a missing / forbidden job) during a run."""
+    """Cloud Run job calls failed unexpectedly (not missing / forbidden / transient) during a run.
+
+    The message is stable (one error-monitor pattern); the run id, count and first error are in
+    ``log_extra`` (Cloud Logging ``json_fields``), which the CLI attaches to its ERROR."""
+
+    MESSAGE = "voice pool fetch: Cloud Run job calls failed unexpectedly this run"
+
+    def __init__(self, run: str, errors: list[Exception]) -> None:
+        super().__init__(self.MESSAGE)
+        self.log_extra = {
+            "json_fields": {"run": run, "failed_calls": len(errors), "first_error": repr(errors[0])[:500]}
+        }
 
 
 def _job_call(what: str, fn: Callable[[], Any], default: Any, errors: list[Exception] | None = None) -> Any:
-    """``fn()``; a missing / forbidden job is a WARNING. Any other failure (an API error, or a bug
-    such as an AttributeError) is appended to ``errors`` (``run_fetch`` raises once, after the other
-    steps) and ``default`` is returned; without ``errors`` it propagates."""
+    """``fn()``; a missing / forbidden job or a transient API error is a WARNING. Any other failure
+    (an API error, or a bug such as an AttributeError) is appended to ``errors`` (``run_fetch``
+    raises once, after the other steps) and ``default`` is returned; without ``errors`` it propagates."""
     try:
         return fn()
     except _JOB_UNAVAILABLE as e:
         logger.warning("voice pool: can't %s yet (%s); infra pending?", what, e)
+        return default
+    except TRANSIENT_ERRORS as e:
+        logger.warning("voice pool: %s hit a transient error (%s: %s); next run retries", what, type(e).__name__, e)
         return default
     except Exception as e:
         if errors is None:
@@ -273,19 +321,23 @@ async def maybe_separate(
     if _job_call(check, lambda: runner.is_running(separate.SEPARATE_JOB, separate.SEPARATE_REGION), True, errors):
         logger.info("voice pool: %d fetched, separation already running; next run", len(docs))
         return 0
+    # submit_batch reverts its claims (back to ``fetched``) before any of these reach us.
     try:
-        await separate.submit_batch(fs, gcs, runner, docs, run, now=now)
+        _, songs = await separate.submit_batch(fs, gcs, runner, docs, run, now=now)
     except _JOB_UNAVAILABLE as e:
         logger.warning("voice pool: can't run %s yet (%s); infra pending?", separate.SEPARATE_JOB, e)
+        return 0
+    except TRANSIENT_ERRORS as e:
+        logger.warning("voice pool: separation hand-off hit a transient error (%s: %s); next run retries",
+                       type(e).__name__, e)  # fmt: skip
         return 0
     except Exception as e:
         if errors is None:
             raise
-        # Songs only become ``separating`` once the execution started, so they stay ``fetched``.
         logger.warning("voice pool: submitting separation failed unexpectedly (%r); carrying on", e)
         errors.append(e)
         return 0
-    return min(len(docs), separate.MAX_BATCH)
+    return songs
 
 
 async def maybe_analyse(fs: Any, runner: JobRunner, errors: list[Exception] | None = None) -> bool:
@@ -314,8 +366,20 @@ async def run_fetch(
     """One scheduler run (see module doc). Returns ``{run, polled, fetched, submitted, refused_code,
     separated, requeued, separating, analyse_started}``."""
     deadline = now() + deadline_s
-    polled, fetched = await poll_downloads(fs, ff, gcs, now)
-    submitted, refused_code = await submit_downloads(fs, ff, deadline=deadline, rng=rng, sleep=sleep, now=now)
+    polled, fetched, failures = await poll_downloads(fs, ff, gcs, now)
+    downloads_failing = sum(failures.values()) >= SYSTEMATIC_DOWNLOAD_FAILURES and fetched == 0
+    submitted: int
+    refused_code: str | None
+    if downloads_failing:
+        top_error, top_count = failures.most_common(1)[0]
+        logger.error(
+            "voice pool fetch: downloads are failing systematically; no new downloads this run",
+            extra={"json_fields": {"run": run, "failures": sum(failures.values()), "fetched": fetched,
+                                   "top_error": top_error[:500], "top_error_count": top_count}},
+        )  # fmt: skip
+        submitted, refused_code = 0, "downloads_failing"
+    else:
+        submitted, refused_code = await submit_downloads(fs, ff, deadline=deadline, rng=rng, sleep=sleep, now=now)
     errors: list[Exception] = []
     separated, requeued = await collect_separations(fs, gcs, runner, now, errors)
     separating = await maybe_separate(fs, gcs, runner, run, now, errors)
@@ -332,12 +396,14 @@ async def run_fetch(
         "analyse_started": analyse_started,
     }
     logger.info("voice pool fetch %s: %s", run, out)
-    if errors:
+    if errors and downloads_failing:  # this run already logged its one ERROR
+        logger.warning(
+            "voice pool fetch %s: %d Cloud Run job call(s) also failed; first: %r", run, len(errors), errors[0]
+        )
+    elif errors:
         # One failure for the run (the CLI logs it as this run's one ERROR and exits 1), raised
         # only after the queue, downloads and the other hand-offs have had their turn.
-        raise JobRunnerFailedError(
-            f"voice pool fetch {run}: {len(errors)} Cloud Run job call(s) failed; first: {errors[0]!r}"
-        ) from errors[0]
+        raise JobRunnerFailedError(run, errors) from errors[0]
     return out
 
 

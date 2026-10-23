@@ -15,7 +15,7 @@ WARNING and exits 0. ``status`` prints the fetch queue's counts per status and t
 ``separated`` songs (``voice_analysis.analyse.run_analyse``; ``CLOUD_RUN_TASK_INDEX`` / ``_COUNT``,
 run id = ``--run``, else the shared ``CLOUD_RUN_EXECUTION``), then task 0 publishes voice.db from
 everything committed so far (``voicedb.publish_from_queue``; skipped when the run was blocked
-by missing infra or every song failed). With several tasks, rows another
+by missing infra or a transient error, every song failed, or the first songs all failed alike). With several tasks, rows another
 task commits after task 0's publish reach voice.db on the next analyse run or ``publish``.
 ``publish [--catalog PATH --availability PATH]`` rebuilds and publishes voice.db alone.
 
@@ -91,6 +91,8 @@ def format_analyse(out: dict[str, Any]) -> str:
         f" {out['analysed']} analysed, {out['too_little_voice']} too little voice, {out['failed']} failed,"
         f" {out.get('deferred', 0)} deferred"
     )
+    if out.get("systematic"):
+        line += f"\n  stopped: the first songs all failed with {out['systematic']}; they stay separated"
     return line + (f"\n  blocked: {out['blocked']}" if out["blocked"] else "")
 
 
@@ -254,8 +256,8 @@ def _analyse(args: argparse.Namespace) -> int:
         out = await run_analyse(
             fs, gcs, bq, run=resolve_run_id(args.run), limit=args.limit, task_index=task_index, task_count=task_count
         )
-        # all_failed already logged this run's one ERROR; a publish failure would be a second.
-        if task_index != 0 or out["blocked"] or out.get("all_failed"):
+        # all_failed / systematic already logged this run's one ERROR; a publish failure would be a second.
+        if task_index != 0 or out["blocked"] or out.get("all_failed") or out.get("systematic"):
             return out, None, False
         return out, await _publish_voice_db(args, settings, fs, gcs), True
 
@@ -310,6 +312,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = {"select": _select, "fetch": _fetch, "status": _status, "analyse": _analyse, "publish": _publish}
     try:
         return int(commands[args.cmd](args))
-    except Exception:
-        logger.exception("voice pool %s failed", args.cmd)
+    except Exception as e:
+        # Stable message; per-run details (e.g. JobRunnerFailedError's run id) go in json_fields.
+        logger.exception("voice pool %s failed", args.cmd, extra=getattr(e, "log_extra", None))
         return 1

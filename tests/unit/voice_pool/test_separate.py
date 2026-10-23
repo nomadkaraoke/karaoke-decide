@@ -57,8 +57,8 @@ async def test_manifest_lines_and_task_count(fs, gcs, runner):
         "audio": f"gs://{GEN}/voice-pool/audio/{items[3]['id']}/original.flac",
     }
 
-    execution = await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW)
-    assert execution.endswith("voice-pool-separate-job-1")
+    execution, songs = await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW)
+    assert execution is not None and execution.endswith("voice-pool-separate-job-1") and songs == 41
     (call,) = runner.calls
     assert call == {
         "job": "voice-pool-separate-job",
@@ -94,7 +94,8 @@ async def test_failed_job_start_leaves_items_fetched(fs, gcs):
     runner = FakeRunner(fail={separate.SEPARATE_JOB: RuntimeError("quota")})
     with pytest.raises(RuntimeError, match="quota"):
         await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW)
-    assert {fs.cols[FETCH][i["id"]]["status"] for i in items} == {"fetched"}
+    assert {fs.cols[FETCH][i["id"]]["status"] for i in items} == {"fetched"}  # claims reverted
+    assert {fs.cols[FETCH][i["id"]]["manifest_run"] for i in items} == {None}
 
 
 def _results(gcs, run: str, part: int, lines: list[Any]) -> None:
@@ -196,3 +197,42 @@ def test_cloud_run_job_runner_creates_both_clients_lazily(monkeypatch):
     assert runner.is_running("voice-pool-analyse", "us-central1") is False
     assert made == ["executions"]
     assert runner.client is runner.client and made == ["executions", "jobs"]
+
+
+async def test_submit_batch_claims_transactionally_and_skips_taken_songs(fs, gcs, runner):
+    items = await fetched(fs, 5)
+    # an overlapping execution claimed two of them after this run listed them
+    for i in items[:2]:
+        fs.cols[FETCH][i["id"]].update(status="separating", manifest_run="other")
+    execution, songs = await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW)
+    assert execution is not None and songs == 3
+    body = gcs.bucket(GEN).objects["voice-pool/manifests/r1.jsonl"].decode()
+    assert [json.loads(x)["id"] for x in body.splitlines()] == [i["id"] for i in items[2:]]
+    assert [fs.cols[FETCH][i["id"]]["manifest_run"] for i in items] == ["other", "other", "r1", "r1", "r1"]
+    assert runner.calls[0]["task_count"] == 1
+
+
+async def test_submit_batch_with_everything_taken_starts_nothing(fs, gcs, runner):
+    items = await fetched(fs, 2)
+    for i in items:
+        fs.cols[FETCH][i["id"]]["status"] = "separating"
+    assert await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW) == (None, 0)
+    assert runner.calls == [] and "voice-pool/manifests/r1.jsonl" not in gcs.bucket(GEN).objects
+
+
+async def test_failed_manifest_write_reverts_claims(fs, runner):
+    from tests.unit.voice_pool.conftest import FakeGcs
+
+    class BrokenGcs(FakeGcs):
+        def bucket(self, name: str) -> Any:
+            b = super().bucket(name)
+            b.blob = lambda n: (_ for _ in ()).throw(OSError("disk"))
+            return b
+
+    items = await fetched(fs, 3)
+    with pytest.raises(OSError):
+        await separate.submit_batch(fs, BrokenGcs(), runner, items, "r1", now=lambda: NOW)
+    for i in items:
+        doc = fs.cols[FETCH][i["id"]]
+        assert (doc["status"], doc["manifest_run"], doc["separating_at"]) == ("fetched", None, None)
+    assert runner.calls == []
