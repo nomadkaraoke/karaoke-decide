@@ -315,6 +315,9 @@ cloud_run_service = gcp.cloudrunv2.Service(
                     # hides itself unless the MetaBrainz secrets and DECIDE_TOKEN_KEY are all present).
                     {"name": "LISTENBRAINZ_OAUTH_ENABLED", "value": "true"},
                     {"name": "PUBLIC_API_BASE_URL", "value": "https://decide.nomadkaraoke.com"},
+                    # Phase 3d voice session: voice.db (voice/latest.json) and user recordings.
+                    {"name": "VOICE_DATA_BUCKET", "value": "nomadkaraoke-musicbrainz-data"},
+                    {"name": "VOICE_RECORDINGS_BUCKET", "value": "nomadkaraoke-voice-recordings"},
                     # Secrets from Secret Manager
                     {
                         "name": "JWT_SECRET",
@@ -434,6 +437,16 @@ cloud_run_service = gcp.cloudrunv2.Service(
                             }
                         },
                     },
+                    # Phase 3d: admin auth for the voice admin routes (karaoke-gen's secret, same project).
+                    {
+                        "name": "ADMIN_TOKENS",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "admin-tokens",
+                                "version": "latest",
+                            }
+                        },
+                    },
                 ],
                 "resources": {
                     "limits": {
@@ -515,6 +528,8 @@ REQUIRED_SECRETS = [
     "metabrainz-client-id",
     "metabrainz-client-secret",
     "decide-token-key",
+    # Phase 3d: karaoke-gen's admin token list (gen's Pulumi owns the secret; decide only reads it).
+    "admin-tokens",
     # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 
@@ -1400,6 +1415,313 @@ vocal_range_gen_job = gcp.cloudrunv2.Job(
     opts=pulumi.ResourceOptions(
         ignore_changes=["template.template.containers[0].image"],
     ),
+)
+
+# =============================================================================
+# Voice pool (Phase 3d): select -> fetch -> gen separate -> analyse -> voice.db
+# =============================================================================
+# voice-pool-select (on demand) picks ~1,000 songs and queues them in Firestore
+# voice_pool_fetch; voice-pool-fetch (hourly, scheduler created PAUSED) downloads them through
+# flacfetch under its Spotify budget, hands batches to karaoke-gen's GPU voice-pool-separate-job
+# (us-east4, owned by gen's Pulumi) and starts voice-pool-analyse, which writes BigQuery
+# song_voice_analysis, vocal-range/pool_measured/ CSVs and voice/<run>/voice.db.gz.
+# Runbook: docs/VOICE-POOL.md. CI pins the three jobs' images once they exist.
+
+VOICE_POOL_SELECT_JOB_NAME = "voice-pool-select"
+VOICE_POOL_FETCH_JOB_NAME = "voice-pool-fetch"
+VOICE_POOL_ANALYSE_JOB_NAME = "voice-pool-analyse"
+# Owned by karaoke-gen's Pulumi (gen #1217); referenced by name, never imported here.
+VOICE_POOL_SEPARATE_JOB = "projects/nomadkaraoke/locations/us-east4/jobs/voice-pool-separate-job"
+# Created by hand (flacfetch's API); decide only reads them.
+VOICE_POOL_SECRETS = {
+    "FLACFETCH_API_URL": "flacfetch-api-url",
+    "FLACFETCH_API_KEY": "flacfetch-api-key",
+}
+VOICE_RECORDINGS_BUCKET = "nomadkaraoke-voice-recordings"
+
+voice_pool_sa = gcp.serviceaccount.Account(
+    "voice-pool-sa",
+    account_id="voice-pool",
+    display_name="Voice Pool Jobs",
+    description="Runs voice-pool-select / -fetch / -analyse and starts gen's voice-pool-separate-job",
+    project=project,
+)
+voice_pool_member = voice_pool_sa.email.apply(lambda email: f"serviceAccount:{email}")
+
+# Firestore voice_pool_fetch queue.
+gcp.projects.IAMMember(
+    "voice-pool-datastore-user",
+    project=project,
+    role="roles/datastore.user",
+    member=voice_pool_member,
+)
+# BigQuery: Spotify ids / sections (reads), voice_pool_songs + song_voice_analysis (created on
+# first write; dataEditor on the dataset covers tables.create).
+gcp.projects.IAMMember(
+    "voice-pool-bq-job-user",
+    project=project,
+    role="roles/bigquery.jobUser",
+    member=voice_pool_member,
+)
+gcp.bigquery.DatasetIamMember(
+    "voice-pool-bq-editor-prod",
+    project=project,
+    dataset_id=bigquery_dataset.dataset_id,
+    role="roles/bigquery.dataEditor",
+    member=voice_pool_member,
+)
+# gen bucket: audio/, stems/ and manifests/ under voice-pool/ only. Listing the separation
+# results (voice-pool/manifests/<run>.results/) checks storage.objects.list on the BUCKET, and
+# an IAM condition can't limit a list to a prefix, so (as for vocal-range-gen) the bucket
+# resource itself is allowed: object names are listable, reads and writes stay in voice-pool/.
+gcp.storage.BucketIAMMember(
+    "voice-pool-gen-storage-writer",
+    bucket=GEN_STORAGE_BUCKET,
+    role="roles/storage.objectAdmin",
+    member=voice_pool_member,
+    condition={
+        "title": "voice-pool prefix only",
+        "description": "voice-pool jobs may only read and write voice-pool/ (bucket-level list allowed)",
+        "expression": (
+            f'resource.name.startsWith("projects/_/buckets/{GEN_STORAGE_BUCKET}/objects/voice-pool/")'
+            ' || resource.type == "storage.googleapis.com/Bucket"'
+        ),
+    },
+)
+# Read catalog/, vocal-range/ (UltraStar zip) etc. on the decide data bucket, and
+# availability.db on kn-data.
+for _name, _bucket in [("musicbrainz-data", MUSICBRAINZ_DATA_BUCKET), ("kn-data", KN_DATA_BUCKET)]:
+    gcp.storage.BucketIAMMember(
+        f"voice-pool-{_name}-reader",
+        bucket=_bucket,
+        role="roles/storage.objectViewer",
+        member=voice_pool_member,
+    )
+# Write voice/ (selection coverage, voice.db runs, latest.json) and vocal-range/pool_measured/
+# (the measured-range CSVs the weekly vocal-range refresh in mb-refresh reads; mb-refresh's
+# SA already holds unconditioned objectAdmin on this bucket). Prefixes only: IAM conditions
+# have no regex. Listing is covered by the objectViewer grant above.
+gcp.storage.BucketIAMMember(
+    "voice-pool-musicbrainz-data-writer",
+    bucket=MUSICBRAINZ_DATA_BUCKET,
+    role="roles/storage.objectAdmin",
+    member=voice_pool_member,
+    condition={
+        "title": "voice and pool_measured prefixes only",
+        "description": "voice-pool jobs may only write voice/ and vocal-range/pool_measured/",
+        "expression": (
+            f'resource.name.startsWith("projects/_/buckets/{MUSICBRAINZ_DATA_BUCKET}/objects/voice/")'
+            f' || resource.name.startsWith("projects/_/buckets/{MUSICBRAINZ_DATA_BUCKET}/objects/vocal-range/pool_measured/")'
+        ),
+    },
+)
+voice_pool_secret_access = [
+    gcp.secretmanager.SecretIamMember(
+        f"voice-pool-secret-access-{_secret}",
+        project=project,
+        secret_id=_secret,
+        role="roles/secretmanager.secretAccessor",
+        member=voice_pool_member,
+    )
+    for _secret in VOICE_POOL_SECRETS.values()
+]
+# Start gen's GPU separation with per-run args + task_count (needs runWithOverrides, which
+# run.invoker lacks), and list its executions (JobRunner.is_running: run.executions.list;
+# run.viewer is the narrowest predefined role with it). Both scoped to that one job.
+gcp.cloudrunv2.JobIamMember(
+    "voice-pool-separate-executor",
+    project=project,
+    location="us-east4",
+    name=VOICE_POOL_SEPARATE_JOB,
+    role="roles/run.jobsExecutorWithOverrides",
+    member=voice_pool_member,
+)
+gcp.cloudrunv2.JobIamMember(
+    "voice-pool-separate-viewer",
+    project=project,
+    location="us-east4",
+    name=VOICE_POOL_SEPARATE_JOB,
+    role="roles/run.viewer",
+    member=voice_pool_member,
+)
+
+_VOICE_POOL_ENVS = [
+    {"name": "ENVIRONMENT", "value": environment},
+    {"name": "GOOGLE_CLOUD_PROJECT", "value": project},
+    {"name": "GOOGLE_CLOUD_PROJECT_NUMBER", "value": PROJECT_NUMBER},
+]
+
+voice_pool_select_job = gcp.cloudrunv2.Job(
+    "voice-pool-select-job",
+    name=VOICE_POOL_SELECT_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "karaoke_decide.voice_pool"],
+                    "args": ["select"],
+                    "envs": _VOICE_POOL_ENVS,
+                    # catalog.db + availability.db are decompressed into in-memory /tmp.
+                    "resources": {"limits": {"cpu": "2", "memory": "4Gi"}},
+                }
+            ],
+            "service_account": voice_pool_sa.email,
+            "timeout": "3600s",
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),
+)
+
+voice_pool_fetch_job = gcp.cloudrunv2.Job(
+    "voice-pool-fetch-job",
+    name=VOICE_POOL_FETCH_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "template": {
+            "containers": [
+                {
+                    # CI pins this to the deployed commit SHA (gcloud run jobs update --image).
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide:latest",
+                    "commands": ["python", "-m", "karaoke_decide.voice_pool"],
+                    "args": ["fetch"],
+                    "envs": [
+                        *_VOICE_POOL_ENVS,
+                        *[
+                            {
+                                "name": _env,
+                                "value_source": {"secret_key_ref": {"secret": _secret, "version": "latest"}},
+                            }
+                            for _env, _secret in VOICE_POOL_SECRETS.items()
+                        ],
+                    ],
+                    "resources": {"limits": {"cpu": "1", "memory": "1Gi"}},
+                }
+            ],
+            "service_account": voice_pool_sa.email,
+            # The run stops submitting at --deadline-s 3300, then waits out spacing and the
+            # separation / analyse hand-offs. Longer than the hourly interval: two runs may
+            # overlap briefly, which the transactional queue claim makes safe (both stay inside
+            # flacfetch's Spotify budget).
+            "timeout": "3900s",
+            # No retry: the next hourly run picks up where this one stopped.
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(
+        ignore_changes=["template.template.containers[0].image"],
+        depends_on=voice_pool_secret_access,
+    ),
+)
+
+voice_pool_analyse_job = gcp.cloudrunv2.Job(
+    "voice-pool-analyse-job",
+    name=VOICE_POOL_ANALYSE_JOB_NAME,
+    project=project,
+    location=region,
+    deletion_protection=False,
+    template={
+        "task_count": 1,
+        "parallelism": 1,
+        "template": {
+            "containers": [
+                {
+                    # 3c's vocal-analysis image (librosa/ffmpeg); CI pins it to the commit SHA.
+                    "image": f"{region}-docker.pkg.dev/{project}/karaoke-repo/karaoke-decide-vocal:latest",
+                    "commands": ["python", "-m", "karaoke_decide.voice_pool"],
+                    "args": ["analyse"],
+                    "envs": _VOICE_POOL_ENVS,
+                    "resources": {"limits": {"cpu": "4", "memory": "8Gi"}},
+                }
+            ],
+            "service_account": voice_pool_sa.email,
+            "timeout": "21600s",
+            "max_retries": 0,
+        },
+    },
+    opts=pulumi.ResourceOptions(ignore_changes=["template.template.containers[0].image"]),
+)
+
+# fetch starts analyse with args overrides, so runWithOverrides (not run.invoker); run.viewer
+# lets is_running list its executions.
+gcp.cloudrunv2.JobIamMember(
+    "voice-pool-analyse-executor",
+    project=project,
+    location=region,
+    name=voice_pool_analyse_job.name,
+    role="roles/run.jobsExecutorWithOverrides",
+    member=voice_pool_member,
+)
+gcp.cloudrunv2.JobIamMember(
+    "voice-pool-analyse-viewer",
+    project=project,
+    location=region,
+    name=voice_pool_analyse_job.name,
+    role="roles/run.viewer",
+    member=voice_pool_member,
+)
+
+voice_pool_fetch_invoker = gcp.cloudrunv2.JobIamMember(
+    "voice-pool-fetch-scheduler-invoker",
+    project=project,
+    location=region,
+    name=voice_pool_fetch_job.name,
+    role="roles/run.invoker",
+    member=voice_pool_member,
+)
+
+# Hourly at :07. Created PAUSED: Andrew resumes it after the selection run
+# (`gcloud scheduler jobs resume voice-pool-fetch-hourly --location us-central1`). Pulumi
+# ignores `paused` afterwards, so a later `pulumi up` never re-pauses (or resumes) it.
+gcp.cloudscheduler.Job(
+    "voice-pool-fetch-scheduler",
+    name="voice-pool-fetch-hourly",
+    description="Voice pool: fetch queued songs under flacfetch's Spotify budget, hand off to separation/analysis",
+    project=project,
+    region=region,
+    schedule="7 * * * *",
+    time_zone="UTC",
+    attempt_deadline="60s",
+    paused=True,
+    http_target={
+        "uri": voice_pool_fetch_job.name.apply(
+            lambda name: f"https://run.googleapis.com/v2/projects/{project}/locations/{region}/jobs/{name}:run"
+        ),
+        "http_method": "POST",
+        "oauth_token": {
+            "service_account_email": voice_pool_sa.email,
+            "scope": "https://www.googleapis.com/auth/cloud-platform",
+        },
+    },
+    opts=pulumi.ResourceOptions(depends_on=[voice_pool_fetch_invoker], ignore_changes=["paused"]),
+)
+
+# Voice-session recordings (Phase 3d B1): voice-recordings/<user_id>/<session_id>/<n>.<ext>,
+# kept until the user deletes them or their account (no lifecycle, no versioning).
+voice_recordings_bucket = gcp.storage.Bucket(
+    "voice-recordings-bucket",
+    name=VOICE_RECORDINGS_BUCKET,
+    project=project,
+    location="US-CENTRAL1",
+    uniform_bucket_level_access=True,
+    public_access_prevention="enforced",
+    versioning={"enabled": False},
+    opts=pulumi.ResourceOptions(protect=True),
+)
+# The main API (default compute SA) uploads, lists and deletes recordings. That SA also holds
+# project-level storage.admin today; this grant keeps working if that is ever narrowed.
+gcp.storage.BucketIAMMember(
+    "voice-recordings-api-admin",
+    bucket=voice_recordings_bucket.name,
+    role="roles/storage.objectAdmin",
+    member=f"serviceAccount:{PROJECT_NUMBER}-compute@developer.gserviceaccount.com",
 )
 
 pulumi.export("song_index_public_bucket", song_index_public_bucket.name)
