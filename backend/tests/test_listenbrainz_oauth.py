@@ -691,3 +691,38 @@ async def test_shielded_refresh_task_is_referenced_until_done(db: FakeDb) -> Non
     gate.set()
     await asyncio.sleep(0.05)
     assert not mss._background_refreshes  # done-callback dropped it (and retrieved its exception)
+
+
+# --- account change resets the poll cursor ----------------------------------------------------
+
+_POLL_STATE: dict[str, Any] = {
+    "lb_last_listen_ts": 1700000000,
+    "lb_last_listen_at": "2026-10-01T00:00:00+00:00",
+    "lb_last_polled_at": "2026-10-02T00:00:00+00:00",
+    "lb_stale": True,
+    "lb_pending_import": {"id": "42", "status": "waiting"},
+}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("path", ["oauth", "username"])
+@pytest.mark.parametrize("new_name,reset", [("someone-else", True), ("e2e-listener", False)])
+async def test_reconnect_resets_poll_cursor_only_when_account_changes(
+    db: FakeDb, path: str, new_name: str, reset: bool
+) -> None:
+    svc = _service(db)
+    await _lb_service(db, svc, 3600)  # connected as e2e-listener
+    await db.update_document("music_services", LB_DOC, dict(_POLL_STATE))
+    if path == "oauth":
+        await svc.create_listenbrainz_oauth_service(
+            USER, {"access_token": "meba_n", "refresh_token": "meba_r2", "expires_in": 3600}, new_name
+        )
+    else:
+        svc.listenbrainz.get_user_info = AsyncMock(  # type: ignore[attr-defined]
+            return_value=MagicMock(username=new_name, listen_count=1)
+        )
+        await svc.create_listenbrainz_service(USER, new_name)
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None
+    for key, value in _POLL_STATE.items():
+        assert stored.get(key) == (None if reset else value), key

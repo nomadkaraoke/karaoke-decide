@@ -589,6 +589,7 @@ class MusicServiceService:
                     "token_expires_at": None,
                     "error_code": None,
                     "updated_at": now.isoformat(),
+                    **self._lb_poll_reset(existing.service_username, lb_username),
                 },
             )
             return MusicService(
@@ -635,6 +636,15 @@ class MusicServiceService:
 
         return self._doc_to_music_service(service_data)
 
+    _LB_POLL_FIELDS = ("lb_last_listen_ts", "lb_last_listen_at", "lb_last_polled_at", "lb_stale", "lb_pending_import")
+
+    @classmethod
+    def _lb_poll_reset(cls, old_username: str | None, new_username: str) -> dict[str, Any]:
+        """Poller state to clear when the connected ListenBrainz account changes (so the next poll backfills)."""
+        if old_username and old_username.casefold() != new_username.casefold():
+            return dict.fromkeys(cls._LB_POLL_FIELDS)
+        return {}
+
     async def create_listenbrainz_oauth_service(
         self, user_id: str, tokens: dict[str, Any], username: str
     ) -> MusicService:
@@ -665,6 +675,7 @@ class MusicServiceService:
         if existing:
             if existing.get("sync_status") == "syncing":
                 del fields["sync_status"]  # a sync in flight owns its status
+            fields.update(self._lb_poll_reset(existing.get("service_username"), username))
             await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
             return self._doc_to_music_service({**existing, **fields})
 
