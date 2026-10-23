@@ -1,4 +1,4 @@
-"""``python -m karaoke_decide.voice_pool <select|fetch|analyse|publish|status>``.
+"""``python -m karaoke_decide.voice_pool <select|fetch|status|analyse|publish>``.
 
 ``select --n 1000 [--dry-run] [--no-probe] [--run RUN] [--catalog PATH --availability PATH]``
 picks the shared pool (``select.run_select``) and prints its coverage report. catalog.db and
@@ -10,6 +10,14 @@ only: no Spotify ids then, so nothing could be fetched. ``--no-probe`` needs ``-
 hand-offs (``fetch.run_fetch``); without ``FLACFETCH_API_URL`` / ``FLACFETCH_API_KEY`` it logs a
 WARNING and exits 0. ``status`` prints the fetch queue's counts per status and the Spotify budget.
 
+``analyse [--run RUN] [--limit N] [--catalog PATH --availability PATH]`` (the
+``voice-pool-analyse`` job, on 3c's ``karaoke-decide-vocal`` image) analyses this task's shard of
+``separated`` songs (``voice_analysis.analyse.run_analyse``; ``CLOUD_RUN_TASK_INDEX`` / ``_COUNT``,
+run id = ``--run``, else the shared ``CLOUD_RUN_EXECUTION``), then task 0 publishes voice.db from
+everything committed so far (``voicedb.publish_from_queue``). With several tasks, rows another
+task commits after task 0's publish reach voice.db on the next analyse run or ``publish``.
+``publish [--catalog PATH --availability PATH]`` rebuilds and publishes voice.db alone.
+
 A failure logs ONE ERROR and exits 1.
 """
 
@@ -18,8 +26,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
 import random
 import sys
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,7 +37,6 @@ from typing import Any
 logger = logging.getLogger("voice_pool")
 
 CATALOG_WAIT_S = 240.0
-PENDING = {"analyse": "Task A7", "publish": "Task A7"}
 FLACFETCH_TIMEOUT_S = 30.0
 
 
@@ -73,6 +82,20 @@ def format_status(out: dict[str, Any]) -> str:
             f" (24 h), {b['batch_in_flight']} in flight, gate {gate}"
         )
     return "\n".join(lines)
+
+
+def format_analyse(out: dict[str, Any]) -> str:
+    line = (
+        f"voice pool analyse {out['run']} task {out['task_index']}/{out['task_count']}: {out['listed']} listed,"
+        f" {out['analysed']} analysed, {out['too_little_voice']} too little voice, {out['failed']} failed"
+    )
+    return line + (f"\n  blocked: {out['blocked']}" if out["blocked"] else "")
+
+
+def format_publish(pointer: dict[str, Any] | None) -> str:
+    if pointer is None:
+        return "voice.db: nothing to publish (empty pool)"
+    return f"voice.db {pointer['run']}: {pointer['songs']} songs, {pointer['analysed']} analysed"
 
 
 def _open_reader(args: argparse.Namespace, settings: Any) -> Any:
@@ -188,6 +211,72 @@ def _status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _clients(settings: Any) -> tuple[Any, Any]:
+    from google.cloud import storage  # type: ignore[attr-defined]
+
+    from backend.services.firestore_service import FirestoreService
+
+    return FirestoreService(settings), storage.Client(project=settings.google_cloud_project or None)
+
+
+async def _publish_voice_db(args: argparse.Namespace, settings: Any, fs: Any, gcs: Any) -> dict[str, Any] | None:
+    from karaoke_decide.voice_pool.voicedb import VOICE_BUCKET, publish_from_queue
+
+    reader = _open_reader(args, settings)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            return await publish_from_queue(fs, gcs.bucket(VOICE_BUCKET), reader, Path(tmp))
+    finally:
+        if args.catalog:  # ours; the catalog store's shared reader stays open
+            reader.close()
+
+
+def _analyse(args: argparse.Namespace) -> int:
+    from backend.config import get_backend_settings
+    from karaoke_decide.etl.vocal_range_gen import resolve_run_id
+    from karaoke_decide.voice_analysis.analyse import run_analyse
+
+    settings = get_backend_settings()
+    if settings.bigquery_disabled:
+        print("BIGQUERY_DISABLED is set: analyse needs BigQuery", file=sys.stderr)
+        return 2
+    from google.cloud import bigquery
+
+    fs, gcs = _clients(settings)
+    bq = bigquery.Client(project=settings.google_cloud_project or None)
+    task_index = int(os.environ.get("CLOUD_RUN_TASK_INDEX", "0"))
+    task_count = int(os.environ.get("CLOUD_RUN_TASK_COUNT", "1"))
+
+    async def go() -> tuple[dict[str, Any], dict[str, Any] | None, bool]:
+        # One event loop for both steps: the async Firestore client is bound to it.
+        out = await run_analyse(
+            fs, gcs, bq, run=resolve_run_id(args.run), limit=args.limit, task_index=task_index, task_count=task_count
+        )
+        if task_index != 0 or out["blocked"]:
+            return out, None, False
+        return out, await _publish_voice_db(args, settings, fs, gcs), True
+
+    out, pointer, published = asyncio.run(go())
+    print(format_analyse(out))
+    if published:
+        print(format_publish(pointer))
+    return 0
+
+
+def _publish(args: argparse.Namespace) -> int:
+    from backend.config import get_backend_settings
+
+    settings = get_backend_settings()
+    fs, gcs = _clients(settings)
+    print(format_publish(asyncio.run(_publish_voice_db(args, settings, fs, gcs))))
+    return 0
+
+
+def _catalog_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--catalog", help="catalog.db path (with --availability)")
+    p.add_argument("--availability", help="availability.db path (with --catalog)")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m karaoke_decide.voice_pool", description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -196,26 +285,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dry-run", action="store_true", help="report only: no queue, BigQuery or GCS writes")
     p.add_argument("--no-probe", action="store_true", help="skip the YouTube oEmbed probe")
     p.add_argument("--run", default=datetime.now(UTC).strftime("%Y%m%d-%H%M%S"), help="run id (default: now, UTC)")
-    p.add_argument("--catalog", help="catalog.db path (with --availability)")
-    p.add_argument("--availability", help="availability.db path (with --catalog)")
+    _catalog_args(p)
     f = sub.add_parser("fetch", help="Hourly: download queued songs under flacfetch's Spotify budget, hand off")
     f.add_argument("--run", default=datetime.now(UTC).strftime("%Y%m%d-%H%M%S"), help="run id (default: now, UTC)")
     f.add_argument("--deadline-s", type=float, default=3300.0, help="stop submitting after this long (default 3300)")
     sub.add_parser("status", help="Fetch queue counts per status + the Spotify budget")
-    for name, task in PENDING.items():
-        sub.add_parser(name, help=f"not implemented yet ({task})")
+    a = sub.add_parser("analyse", help="Markers for this task's separated songs, then (task 0) publish voice.db")
+    a.add_argument("--run", default=None, help="run id (default: CLOUD_RUN_EXECUTION, else now UTC)")
+    a.add_argument("--limit", type=int, default=None, help="analyse at most this many songs")
+    _catalog_args(a)
+    pub = sub.add_parser("publish", help="Rebuild voice.db from the queue + catalog and publish it")
+    _catalog_args(pub)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.cmd in PENDING:
-        print(f"voice_pool {args.cmd}: not implemented yet ({PENDING[args.cmd]})", file=sys.stderr)
-        return 2
     from karaoke_decide.etl.refresh_common import configure_logging
 
     configure_logging()
-    commands = {"select": _select, "fetch": _fetch, "status": _status}
+    commands = {"select": _select, "fetch": _fetch, "status": _status, "analyse": _analyse, "publish": _publish}
     try:
         return int(commands[args.cmd](args))
     except Exception:

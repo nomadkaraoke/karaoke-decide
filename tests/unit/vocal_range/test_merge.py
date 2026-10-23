@@ -168,3 +168,21 @@ def test_notes_songs_count_for_songs_basis():
     songs = [_song(f"s{i}", 60, tier="notes") for i in range(3)]
     (r,) = artist_ranges(songs, {f"s{i}": "a1" for i in range(3)}, [], lambda r: True, {}, {}, {})
     assert r.basis == "songs" and r.confidence is None
+
+
+def test_pool_measured_precedence():
+    # gen_measured > pool_measured > nomad_measured > ultrastar > gemini; pool_measured is "measured".
+    rows = [
+        row(source="gemini", lo=1),
+        row(source="ultrastar", lo=2),
+        row(source="nomad_measured", lo=3),
+        row(source="pool_measured", lo=4),
+        row(source="gen_measured", lo=5),
+    ]
+    (m,) = merge_songs(rows, ALL)
+    assert (m.source, m.low_midi) == ("gen_measured", 5)
+    (m,) = merge_songs(rows[:4], ALL)
+    assert (m.source, m.tier, m.low_midi, m.n_sources) == ("pool_measured", "measured", 4, 4)
+    # Like every measured source, < 20 voiced seconds is not eligible.
+    (m,) = merge_songs([row(source="pool_measured", weight=19.9), row(source="nomad_measured", lo=3)], ALL)
+    assert m.source == "nomad_measured"

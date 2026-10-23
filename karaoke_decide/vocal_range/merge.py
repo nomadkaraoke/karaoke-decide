@@ -6,8 +6,9 @@ Interpretation notes (where the spec was ambiguous):
   ``MergedSong.confidence`` / ``ArtistRange.confidence``; ``octave_confidence`` keeps only
   its octave meaning and is None for Gemini rows. A Gemini row needs ``confidence >= 0.3``
   (None fails) AND ``gemini_kept(row)`` (the calibrated popularity band).
-* Phase 3d: adding ``("pool_measured", "measured")`` to ``SOURCE_PRECEDENCE`` plus the
-  ``'pool_measured'`` Literal value is all that is needed; "measured" is derived from the tier.
+* Phase 3d: ``pool_measured`` (the voice-pool analyse job's pyin ranges of whole separated
+  songs) is a "measured" source ranked below gen's word-windowed measurements and above
+  NomadPC's; like every measured source it needs >= 20 voiced seconds.
 * Duplicates (several UltraStar files, several measured jobs) are resolved per
   ``lead_part``: keep the row whose p50 is closest to the group's median p50
   (ties -> the lower p50).
@@ -33,15 +34,16 @@ from typing import Literal
 
 from karaoke_decide.vocal_range.notes import VOICE_TYPES
 
-Source = Literal["gen_measured", "nomad_measured", "ultrastar", "gemini"]
+Source = Literal["gen_measured", "pool_measured", "nomad_measured", "ultrastar", "gemini"]
 
 MIN_MEASURED_WEIGHT_S = 20.0
 MIN_GEMINI_CONFIDENCE = 0.3
 MIN_SONGS_FOR_ARTIST = 3
 
-# (source, tier) in precedence order. Phase 3d: add ("pool_measured", "measured") here.
+# (source, tier) in precedence order.
 SOURCE_PRECEDENCE: tuple[tuple[str, str], ...] = (
     ("gen_measured", "measured"),
+    ("pool_measured", "measured"),
     ("nomad_measured", "measured"),
     ("ultrastar", "notes"),
     ("gemini", "estimated"),

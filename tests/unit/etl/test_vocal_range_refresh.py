@@ -356,6 +356,7 @@ def test_missing_gen_measured_is_info(tmp_path: Path, caplog: pytest.LogCaptureF
     assert summary["rows_per_source"].get("gen_measured", 0) == 0
     info = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
     assert any("gen_measured" in m for m in info)
+    assert any("pool_measured" in m for m in info)
     assert any("nomad_measured" in m for m in info)
     assert any("gemini" in m.lower() for m in info)
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
@@ -375,6 +376,38 @@ def test_gen_measured_csvs_are_read_from_gcs(tmp_path: Path) -> None:
     assert summary["rows_per_source"]["gen_measured"] == 1
     songs = next(rows for d, rows, _ in bq.loads if d == vr.STAGING_SONGS)
     assert next(r for r in songs if r["song_key"] == LALAS_KEY)["source"] == "gen_measured"
+
+
+def test_pool_measured_csvs_are_read_from_gcs(tmp_path: Path) -> None:
+    gcs = FakeGCS()
+    b = gcs.bucket_obj
+    b.objects["vocal-range/pool_measured/exec-1/part-0.csv"] = (
+        MEASURED_COLS + "\nabc123,The Lalas,Doo Wah Day,all,51,63,53,58,61,45\n"
+    ).encode()
+    b.objects["vocal-range/gen_measured/run1/part-0.csv"] = (
+        MEASURED_COLS + "\njob1,The Lalas,Doo Wah Day,all,50,62,52,57,60,40\n"
+    ).encode()
+    b.objects["vocal-range/pool_measured/exec-1/sub/part-1.csv"] = b"ignored (nested)"
+    rows = vr.load_pool_measured(b)
+    assert [(r.source, r.source_id, r.song_key, r.lead_part) for r in rows] == [
+        ("pool_measured", "abc123", LALAS_KEY, "all")
+    ]
+    summary, bq, _, _ = _step(tmp_path, gcs=gcs)
+    assert summary["rows_per_source"]["pool_measured"] == 1
+    songs = next(rows for d, rows, _ in bq.loads if d == vr.STAGING_SONGS)
+    # gen_measured outranks pool_measured for the same song.
+    assert next(r for r in songs if r["song_key"] == LALAS_KEY)["source"] == "gen_measured"
+
+
+def test_pool_measured_wins_without_gen_measured(tmp_path: Path) -> None:
+    gcs = FakeGCS()
+    gcs.bucket_obj.objects["vocal-range/pool_measured/exec-1/part-0.csv"] = (
+        MEASURED_COLS + "\nabc123,The Lalas,Doo Wah Day,all,51,63,53,58,61,45\n"
+    ).encode()
+    _, bq, _, _ = _step(tmp_path, gcs=gcs, measured=["n1,The Lalas,Doo Wah Day,all,40,60,42,50,58,90"])
+    songs = next(rows for d, rows, _ in bq.loads if d == vr.STAGING_SONGS)
+    lalas = next(r for r in songs if r["song_key"] == LALAS_KEY)
+    assert (lalas["source"], lalas["tier"], lalas["p50"]) == ("pool_measured", "measured", 58.0)
 
 
 def test_gemini_kept_rejects_rows_outside_bands() -> None:

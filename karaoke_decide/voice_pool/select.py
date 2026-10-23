@@ -37,8 +37,8 @@ from karaoke_decide.voice_pool.versions import (
     OEMBED_LIMITER,
     RateLimiter,
     choose_versions,
+    community_versions,
     probe_embeddable,
-    youtube_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -125,16 +125,7 @@ def _decade(value: str | None) -> str | None:
 def _community_versions(reader: CatalogReader, floor: int) -> dict[str, tuple[Version, ...]]:
     """``{song_key: versions}``: community versions with a YouTube id, ``rank`` = 0-based
     position in availability.db's own order (one entry per video)."""
-    out: dict[str, list[Version]] = {}
-    for r in reader.conn().execute(_VERSIONS_SQL, (floor,)):
-        vid = youtube_id(r["youtube_url"])
-        if vid is None:
-            continue
-        song = out.setdefault(r["song_key"], [])
-        if any(v.video_id == vid for v in song):
-            continue
-        song.append(Version(vid, r["brand_code"], r["brand_name"], len(song), None))
-    return {k: tuple(v) for k, v in out.items()}
+    return community_versions(reader.conn().execute(_VERSIONS_SQL, (floor,)))
 
 
 def _query(bq: Any, sql: str, params: list[bigquery.ArrayQueryParameter]) -> list[dict[str, Any]]:

@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -100,7 +101,24 @@ class VersionStats:
     embeddable: bool | None = None
 
 
-def _quality(s: VersionStats | None) -> float:
+def community_versions(rows: Iterable[Mapping[str, Any]]) -> dict[str, tuple[Version, ...]]:
+    """``{song_key: versions}`` from availability.db ``versions`` rows (``song_key``, ``brand_code``,
+    ``brand_name``, ``youtube_url``) given in availability rank order: rows without a YouTube id are
+    skipped, one entry per video, ``rank`` = 0-based position among the song's kept versions."""
+    out: dict[str, list[Version]] = {}
+    for r in rows:
+        vid = youtube_id(r["youtube_url"])
+        if vid is None:
+            continue
+        song = out.setdefault(r["song_key"], [])
+        if any(v.video_id == vid for v in song):
+            continue
+        song.append(Version(vid, r["brand_code"], r["brand_name"], len(song), None))
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def version_quality(s: VersionStats | None) -> float:
+    """``(good+1) / (good+not_great+0.5*early_exit+2)``; 0.5 without stats."""
     if s is None:
         return 0.5
     return (s.good + 1) / (s.good + s.not_great + 0.5 * s.early_exit + 2)
@@ -120,7 +138,7 @@ def choose_versions(versions: list[Version], stats: dict[str, VersionStats] | No
     def key(v: Version) -> tuple[bool, float, int, str]:
         s = stats.get(v.video_id)
         embeddable = s.embeddable if s is not None and s.embeddable is not None else v.embeddable
-        score = 0.6 * (1 / (1 + v.rank)) + 0.4 * _quality(s)
+        score = 0.6 * (1 / (1 + v.rank)) + 0.4 * version_quality(s)
         return (embeddable is False, -score, _BRAND_INDEX.get(v.brand_code, len(BRAND_ORDER)), v.video_id)
 
     return sorted(versions, key=key)
