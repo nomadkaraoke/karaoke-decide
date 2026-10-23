@@ -1,7 +1,7 @@
 """Read the published vocal-range tables (mb-refresh's ``vocal_range`` step) for the index builders.
 
 The step writes ``song_vocal_range`` / ``artist_vocal_range`` to BigQuery and the same rows as
-``gs://nomadkaraoke-musicbrainz-data/vocal-range/<run>/...tsv.gz`` (header row; NULL = empty cell;
+``gs://nomadkaraoke-musicbrainz-data/vocal-range/runs/<run>/...tsv.gz`` (header row; NULL = empty cell;
 bool = 1/0; a ``latest/`` copy is also kept), then ``vocal-range/latest.json`` =
 ``{run, sha256_song, sha256_artist, song_path, artist_path}`` LAST. Readers (song-index-build) fetch
 the pointer, then read the per-run ``song_path`` / ``artist_path`` and check the sha256, so a

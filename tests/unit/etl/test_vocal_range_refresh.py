@@ -243,6 +243,8 @@ def test_tables_written_and_pointer_last(tmp_path: Path) -> None:
     assert set(bucket.writes[-4:-1]) == {vr.SONG_TSV_BLOB, vr.ARTIST_TSV_BLOB, vr.SUMMARY_BLOB}
     pointer = json.loads(bucket.objects[vr.POINTER_BLOB])
     run_song, run_artist, run_summary = vr.run_blobs("20261025-030000")
+    assert run_song == "vocal-range/runs/20261025-030000/song_vocal_range.tsv.gz"
+    assert run_summary == "vocal-range/runs/20261025-030000/summary.json"
     assert pointer == {
         "run": "20261025-030000",
         "song_path": run_song,
@@ -487,9 +489,22 @@ def test_prune_runs_keeps_the_newest_four_and_never_other_prefixes() -> None:
     for name in others:
         bucket.objects[name] = b"x"
     vr.prune_runs(bucket, keep=runs[-1])
-    left = {n.split("/")[1] for n in bucket.objects if n.count("/") == 2 and n.split("/")[1][:4] == "2026"}
+    left = {n.split("/")[2] for n in bucket.objects if n.startswith(vr.RUNS_PREFIX)}
     assert left == set(runs[-4:])
     assert all(n in bucket.objects for n in others)
+
+
+def test_prune_never_deletes_the_pointer_run_even_if_old() -> None:
+    from tests.unit.fake_gcs import FakeBucket
+
+    bucket = FakeBucket()
+    runs = [f"2026101{d}-030000" for d in range(6)]
+    for r in runs:
+        for name in vr.run_blobs(r):
+            bucket.objects[name] = b"x"
+    vr.prune_runs(bucket, keep=runs[0])  # oldest run is the one the pointer names
+    assert all(n in bucket.objects for n in vr.run_blobs(runs[0]))
+    assert not any(n in bucket.objects for n in vr.run_blobs(runs[1]))
 
 
 def test_prune_failure_is_a_warning(caplog: pytest.LogCaptureFixture) -> None:

@@ -1036,7 +1036,7 @@ Merged winner per `song_key` (source precedence gen_measured > nomad_measured > 
 Per `artist_key`: `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `basis`, `confidence`. Used as the
 `rough` fallback for songs without their own range.
 
-Also exported as TSVs under `gs://nomadkaraoke-musicbrainz-data/vocal-range/` and surfaced as `vr_*`
+Also exported as TSVs under `gs://nomadkaraoke-musicbrainz-data/vocal-range/runs/<run>/` (pointer: `vocal-range/latest.json`) and surfaced as `vr_*`
 columns in `catalog.db` (schema 2) and `offline.db` (plus its `artist_vocal_range` table).
 
 ---
