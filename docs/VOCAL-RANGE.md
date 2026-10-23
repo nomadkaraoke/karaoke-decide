@@ -55,7 +55,7 @@ Apps: `catalog.db` (schema 2) gets per-song `vr_*` columns with a rough artist f
 ## API: how the app uses voice + fit (Phase 3c, API part)
 
 - `PUT /api/my/voice` stores the singer's measured or self-reported range (numbers only, never audio); see [API.md](API.md).
-- `GET /api/recommendations` (v2) reads that profile and adds, per song, `fit {bucket, transpose, octave, tier}`
+- `GET /api/my/recommendations/v2` reads that profile and adds, per song, `fit {bucket, transpose, octave, tier}`
   computed with `karaoke_decide/vocal_range/fit.py` against the song's `vr_*` columns in catalog.db. The best-match
   score gains `W_FIT (0.15) x` fit affinity; `singable=true` keeps fits/fitsIn only; `sort=fit` orders the flat list by fit.
   The response carries `voice {has_profile, method}`.
