@@ -498,3 +498,56 @@ async def test_fresh_claim_is_left_alone_but_orphaned_claim_is_recovered(fs, ff,
     out = await go(fs, ff, runner, gcs, clock)
     assert out["polled"] == 1 and statuses(fs)[fresh] == "downloading"
     assert (fs.cols[FETCH][orphan]["status"], fs.cols[FETCH][orphan]["attempts"]) == ("queued", 1)
+
+
+async def test_unexpected_runner_failure_lets_the_run_finish_then_raises_once(fs, ff, gcs, clock, caplog):
+    """A bug in the runner (e.g. AttributeError from a wrong client method) must not cost the
+    run's downloads or its other hand-offs: each failing call is a WARNING, the run finishes,
+    then raises ONE JobRunnerFailedError (the CLI's one ERROR)."""
+
+    class BrokenRunner:
+        calls: list[str] = []
+
+        def run(self, job: str, region: str, args: list[str] | None = None, task_count: int | None = None) -> str:
+            self.calls.append(job)
+            return f"projects/p/locations/{region}/jobs/{job}/executions/e1"
+
+        def is_running(self, job: str, region: str) -> bool:
+            if job == separate.SEPARATE_JOB:
+                raise AttributeError("'JobsClient' object has no attribute 'list_executions'")
+            return False
+
+    queued = await seed(fs, 1)
+    (sep,) = await seed(fs, 1, prefix="sep", status="separating", manifest_run="r0", separating_at=ts(clock, 1))
+    fetched = await seed(fs, 25, prefix="f", status="fetched", fetched_at=ts(clock, 1))
+    await seed(fs, 1, prefix="done", status="separated")
+    runner = BrokenRunner()
+    with pytest.raises(fetch.JobRunnerFailedError) as exc:
+        await go(fs, ff, runner, gcs, clock)
+    assert isinstance(exc.value.__cause__, AttributeError)
+    assert "2 Cloud Run job call(s) failed" in str(exc.value)  # collect + separate checks
+    assert statuses(fs)[queued[0]] == "downloading"  # the download step still ran
+    assert statuses(fs)[sep] == "separating"  # unknown running state: never requeued as stale
+    assert {statuses(fs)[i] for i in fetched} == {"fetched"}  # no second separation submitted
+    assert runner.calls == ["voice-pool-analyse"]  # analyse still started
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)  # the CLI logs the one ERROR
+
+
+async def test_unexpected_submit_failure_keeps_songs_fetched(fs, ff, runner, gcs, clock):
+    from tests.unit.voice_pool.conftest import FakeRunner
+
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    ids = await seed(fs, 25, status="fetched", fetched_at=ts(clock, 1))
+    broken = FakeRunner(fail={separate.SEPARATE_JOB: AttributeError("no run_job")})
+    broken.is_running = lambda job, region: False  # type: ignore[method-assign]
+    with pytest.raises(fetch.JobRunnerFailedError):
+        await go(fs, ff, broken, gcs, clock)
+    assert {statuses(fs)[i] for i in ids} == {"fetched"}
+
+
+async def test_runner_helpers_still_raise_without_an_error_list(fs, gcs, clock):
+    from tests.unit.voice_pool.conftest import FakeRunner
+
+    await seed(fs, 1, status="separated")
+    with pytest.raises(AttributeError):
+        await fetch.maybe_analyse(fs, FakeRunner(fail={"voice-pool-analyse": AttributeError("x")}))

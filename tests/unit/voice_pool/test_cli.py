@@ -179,3 +179,21 @@ def test_analyse_needs_bigquery(no_bq, capsys):
 
 def test_format_publish_empty():
     assert "nothing to publish" in cli.format_publish(None)
+
+
+def test_fetch_runner_failure_logs_one_error_and_exits_1(no_bq, monkeypatch, caplog):
+    from unittest.mock import MagicMock
+
+    from karaoke_decide.voice_pool import fetch
+
+    monkeypatch.setenv("FLACFETCH_API_URL", "https://flacfetch.invalid")
+    monkeypatch.setenv("FLACFETCH_API_KEY", "k")
+    monkeypatch.setattr("google.cloud.storage.Client", MagicMock())
+    monkeypatch.setattr("backend.services.firestore_service.FirestoreService", MagicMock())
+
+    async def boom(*a, **kw):
+        raise fetch.JobRunnerFailedError("voice pool fetch r: 1 Cloud Run job call(s) failed") from AttributeError("x")
+
+    monkeypatch.setattr(fetch, "run_fetch", boom)
+    assert cli.main(["fetch"]) == 1
+    assert [r.levelno for r in caplog.records if r.levelno >= logging.ERROR] == [logging.ERROR]

@@ -1704,7 +1704,9 @@ gcp.cloudscheduler.Job(
 )
 
 # Voice-session recordings (Phase 3d B1): voice-recordings/<user_id>/<session_id>/<n>.<ext>,
-# kept until the user deletes them or their account (no lifecycle, no versioning).
+# kept until the user deletes them or their account (no lifecycle, no versioning). Soft delete
+# is off (0 s retention) so "Delete my recordings" and account deletion really erase the audio
+# instead of keeping it restorable for 7 days.
 voice_recordings_bucket = gcp.storage.Bucket(
     "voice-recordings-bucket",
     name=VOICE_RECORDINGS_BUCKET,
@@ -1713,6 +1715,7 @@ voice_recordings_bucket = gcp.storage.Bucket(
     uniform_bucket_level_access=True,
     public_access_prevention="enforced",
     versioning={"enabled": False},
+    soft_delete_policy={"retention_duration_seconds": 0},
     opts=pulumi.ResourceOptions(protect=True),
 )
 # The main API (default compute SA) uploads, lists and deletes recordings. That SA also holds

@@ -43,21 +43,33 @@ class JobRunner(Protocol):
 
 
 class CloudRunJobRunner:
-    """``JobRunner`` over ``google.cloud.run_v2.JobsClient`` (doesn't wait for executions)."""
+    """``JobRunner`` over ``google.cloud.run_v2``: ``JobsClient.run_job`` starts an execution (it
+    doesn't wait for it), ``ExecutionsClient.list_executions`` says whether one is in progress."""
 
     RECENT_EXECUTIONS = 20  # newest first; a running execution is always among the latest
 
-    def __init__(self, project: str, client: Any = None) -> None:
+    def __init__(self, project: str, client: Any = None, executions_client: Any = None) -> None:
         self.project = project
         self._client = client
+        self._executions = executions_client
 
     @property
     def client(self) -> Any:
+        """The ``run_v2.JobsClient`` (created on first use)."""
         if self._client is None:
             from google.cloud import run_v2
 
             self._client = run_v2.JobsClient()
         return self._client
+
+    @property
+    def executions(self) -> Any:
+        """The ``run_v2.ExecutionsClient`` (created on first use)."""
+        if self._executions is None:
+            from google.cloud import run_v2
+
+            self._executions = run_v2.ExecutionsClient()
+        return self._executions
 
     def _job(self, job: str, region: str) -> str:
         return f"projects/{self.project}/locations/{region}/jobs/{job}"
@@ -77,7 +89,7 @@ class CloudRunJobRunner:
         from google.cloud import run_v2
 
         request = run_v2.ListExecutionsRequest(parent=self._job(job, region), page_size=self.RECENT_EXECUTIONS)
-        for i, execution in enumerate(self.client.list_executions(request=request)):
+        for i, execution in enumerate(self.executions.list_executions(request=request)):
             if i >= self.RECENT_EXECUTIONS:
                 break
             if execution.completion_time is None:

@@ -136,10 +136,16 @@ async def test_song_that_keeps_killing_its_task_fails(fs, gcs):
         assert (fs.cols[FETCH][pid]["status"], fs.cols[FETCH][pid]["attempts"]) == (status, attempt)
 
 
-def test_cloud_run_job_runner():
-    client = MagicMock()
+def _runner() -> tuple[separate.CloudRunJobRunner, MagicMock, MagicMock]:
+    # spec'd mocks: a method the real client class doesn't have raises AttributeError.
+    jobs = MagicMock(spec=run_v2.JobsClient)
+    executions = MagicMock(spec=run_v2.ExecutionsClient)
+    return separate.CloudRunJobRunner("nomadkaraoke", client=jobs, executions_client=executions), jobs, executions
+
+
+def test_cloud_run_job_runner_runs_jobs_with_overrides():
+    runner, client, _ = _runner()
     client.run_job.return_value = SimpleNamespace(metadata=SimpleNamespace(name="projects/p/.../executions/e1"))
-    runner = separate.CloudRunJobRunner("nomadkaraoke", client=client)
     assert runner.run("voice-pool-separate-job", "us-east4", args=["a", "b"], task_count=3) == (
         "projects/p/.../executions/e1"
     )
@@ -152,14 +158,41 @@ def test_cloud_run_job_runner():
     req = client.run_job.call_args.kwargs["request"]
     assert req.overrides.task_count == 0 and list(req.overrides.container_overrides[0].args) == ["analyse"]
 
-    client.list_executions.return_value = [
+
+def test_cloud_run_job_runner_lists_executions_on_the_executions_client():
+    runner, jobs, executions = _runner()
+    executions.list_executions.return_value = [
         run_v2.Execution(name="e2", completion_time=datetime(2026, 10, 22, tzinfo=UTC)),
         run_v2.Execution(name="e1"),
     ]
     assert runner.is_running("voice-pool-analyse", "us-central1") is True
-    lreq = client.list_executions.call_args.kwargs["request"]
+    lreq = executions.list_executions.call_args.kwargs["request"]
+    assert isinstance(lreq, run_v2.ListExecutionsRequest)
     assert lreq.parent == "projects/nomadkaraoke/locations/us-central1/jobs/voice-pool-analyse"
-    client.list_executions.return_value = [
+    executions.list_executions.return_value = [
         run_v2.Execution(name="e2", completion_time=datetime(2026, 10, 22, tzinfo=UTC))
     ]
     assert runner.is_running("voice-pool-analyse", "us-central1") is False
+    assert not jobs.method_calls  # nothing asked of the jobs client
+
+
+def test_jobs_client_has_no_list_executions():
+    """The bug this guards: JobsClient has no list_executions (it lives on ExecutionsClient)."""
+    assert not hasattr(run_v2.JobsClient, "list_executions")
+    assert hasattr(run_v2.ExecutionsClient, "list_executions") and hasattr(run_v2.JobsClient, "run_job")
+    jobs = MagicMock(spec=run_v2.JobsClient)
+    with pytest.raises(AttributeError):
+        jobs.list_executions(request=run_v2.ListExecutionsRequest(parent="projects/p/locations/l/jobs/j"))
+
+
+def test_cloud_run_job_runner_creates_both_clients_lazily(monkeypatch):
+    made: list[str] = []
+    jobs_cls, executions_cls = run_v2.JobsClient, run_v2.ExecutionsClient
+    monkeypatch.setattr(run_v2, "JobsClient", lambda: made.append("jobs") or MagicMock(spec=jobs_cls))
+    monkeypatch.setattr(run_v2, "ExecutionsClient", lambda: made.append("executions") or MagicMock(spec=executions_cls))
+    runner = separate.CloudRunJobRunner("nomadkaraoke")
+    assert made == []
+    runner.executions.list_executions.return_value = []
+    assert runner.is_running("voice-pool-analyse", "us-central1") is False
+    assert made == ["executions"]
+    assert runner.client is runner.client and made == ["executions", "jobs"]

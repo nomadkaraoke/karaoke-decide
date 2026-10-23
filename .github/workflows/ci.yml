@@ -386,6 +386,9 @@ jobs:
             --region ${{ env.REGION }}
 
       - name: Update voice-pool-select job image
+        id: voice_pool_select_update
+        # Non-critical: never skip the later deploy/verify steps.
+        continue-on-error: true
         # Same as lb-poll: pin the on-demand voice-pool selection job to the deployed image (skipped until Pulumi creates it).
         run: |
           if ! out=$(gcloud run jobs describe voice-pool-select --region ${{ env.REGION }} 2>&1); then
@@ -400,6 +403,9 @@ jobs:
             --region ${{ env.REGION }}
 
       - name: Update voice-pool-fetch job image
+        id: voice_pool_fetch_update
+        # Non-critical: never skip the later deploy/verify steps.
+        continue-on-error: true
         # Same as lb-poll: pin the hourly voice-pool fetch job to the deployed image (skipped until Pulumi creates it).
         run: |
           if ! out=$(gcloud run jobs describe voice-pool-fetch --region ${{ env.REGION }} 2>&1); then
@@ -412,6 +418,10 @@ jobs:
           gcloud run jobs update voice-pool-fetch \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}
+
+      - name: Warn if voice-pool job image updates failed
+        if: steps.voice_pool_select_update.outcome == 'failure' || steps.voice_pool_fetch_update.outcome == 'failure'
+        run: echo "::warning::voice-pool-select / voice-pool-fetch image update failed (non-blocking; prod deploy unaffected)"
 
       - name: Deploy search service
         # Same image, different command. Settings must match infrastructure/__main__.py

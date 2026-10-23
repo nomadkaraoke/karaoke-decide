@@ -20,6 +20,9 @@ One run (``run_fetch``):
 
 flacfetch outages and missing / forbidden jobs or GCS objects (the infra lands separately) are
 WARNINGs: the run carries on with the other steps. Misconfiguration (e.g. a rejected API key) raises.
+Any other Cloud Run job failure (an API error or a bug in the runner) is a WARNING when it happens;
+the run carries on, then raises ``JobRunnerFailedError`` once at the end, which the CLI logs as the
+run's one ERROR.
 """
 
 from __future__ import annotations
@@ -208,15 +211,30 @@ async def submit_downloads(
     return submitted, None
 
 
-def _job_call(what: str, fn: Callable[[], Any], default: Any) -> Any:
+class JobRunnerFailedError(RuntimeError):
+    """A Cloud Run job call failed unexpectedly (not a missing / forbidden job) during a run."""
+
+
+def _job_call(what: str, fn: Callable[[], Any], default: Any, errors: list[Exception] | None = None) -> Any:
+    """``fn()``; a missing / forbidden job is a WARNING. Any other failure (an API error, or a bug
+    such as an AttributeError) is appended to ``errors`` (``run_fetch`` raises once, after the other
+    steps) and ``default`` is returned; without ``errors`` it propagates."""
     try:
         return fn()
     except _JOB_UNAVAILABLE as e:
         logger.warning("voice pool: can't %s yet (%s); infra pending?", what, e)
         return default
+    except Exception as e:
+        if errors is None:
+            raise
+        logger.warning("voice pool: %s failed unexpectedly (%r); carrying on with the other steps", what, e)
+        errors.append(e)
+        return default
 
 
-async def collect_separations(fs: Any, gcs: Any, runner: JobRunner, now: Now) -> tuple[int, int]:
+async def collect_separations(
+    fs: Any, gcs: Any, runner: JobRunner, now: Now, errors: list[Exception] | None = None
+) -> tuple[int, int]:
     """Step 3; returns ``(separated, sent_back)`` over every run with songs still separating."""
     docs = await fs.query_documents(FETCH, filters=[("status", "==", "separating")])
     runs = sorted({d["manifest_run"] for d in docs if d.get("manifest_run")})
@@ -226,6 +244,7 @@ async def collect_separations(fs: Any, gcs: Any, runner: JobRunner, now: Now) ->
         f"check {separate.SEPARATE_JOB}",
         lambda: runner.is_running(separate.SEPARATE_JOB, separate.SEPARATE_REGION),
         True,
+        errors,
     )
     separated = sent_back = 0
     for run in runs:
@@ -239,7 +258,9 @@ async def collect_separations(fs: Any, gcs: Any, runner: JobRunner, now: Now) ->
     return separated, sent_back
 
 
-async def maybe_separate(fs: Any, gcs: Any, runner: JobRunner, run: str, now: Now) -> int:
+async def maybe_separate(
+    fs: Any, gcs: Any, runner: JobRunner, run: str, now: Now, errors: list[Exception] | None = None
+) -> int:
     """Step 4; returns the number of songs sent to separation."""
     docs = await fs.query_documents(FETCH, filters=[("status", "==", "fetched")])
     if not docs:
@@ -249,7 +270,7 @@ async def maybe_separate(fs: Any, gcs: Any, runner: JobRunner, run: str, now: No
     if len(docs) < SEPARATE_AT and oldest_s <= SEPARATE_AFTER_S:
         return 0
     check = f"check {separate.SEPARATE_JOB}"
-    if _job_call(check, lambda: runner.is_running(separate.SEPARATE_JOB, separate.SEPARATE_REGION), True):
+    if _job_call(check, lambda: runner.is_running(separate.SEPARATE_JOB, separate.SEPARATE_REGION), True, errors):
         logger.info("voice pool: %d fetched, separation already running; next run", len(docs))
         return 0
     try:
@@ -257,17 +278,24 @@ async def maybe_separate(fs: Any, gcs: Any, runner: JobRunner, run: str, now: No
     except _JOB_UNAVAILABLE as e:
         logger.warning("voice pool: can't run %s yet (%s); infra pending?", separate.SEPARATE_JOB, e)
         return 0
+    except Exception as e:
+        if errors is None:
+            raise
+        # Songs only become ``separating`` once the execution started, so they stay ``fetched``.
+        logger.warning("voice pool: submitting separation failed unexpectedly (%r); carrying on", e)
+        errors.append(e)
+        return 0
     return min(len(docs), separate.MAX_BATCH)
 
 
-async def maybe_analyse(fs: Any, runner: JobRunner) -> bool:
+async def maybe_analyse(fs: Any, runner: JobRunner, errors: list[Exception] | None = None) -> bool:
     """Step 5; whether an analyse execution was started."""
     if not await fs.query_documents(FETCH, filters=[("status", "==", "separated")], limit=1):
         return False
-    if _job_call(f"check {ANALYSE_JOB}", lambda: runner.is_running(ANALYSE_JOB, ANALYSE_REGION), True):
+    if _job_call(f"check {ANALYSE_JOB}", lambda: runner.is_running(ANALYSE_JOB, ANALYSE_REGION), True, errors):
         return False
     return bool(
-        _job_call(f"run {ANALYSE_JOB}", lambda: runner.run(ANALYSE_JOB, ANALYSE_REGION, args=["analyse"]), None)
+        _job_call(f"run {ANALYSE_JOB}", lambda: runner.run(ANALYSE_JOB, ANALYSE_REGION, args=["analyse"]), None, errors)
     )
 
 
@@ -288,9 +316,10 @@ async def run_fetch(
     deadline = now() + deadline_s
     polled, fetched = await poll_downloads(fs, ff, gcs, now)
     submitted, refused_code = await submit_downloads(fs, ff, deadline=deadline, rng=rng, sleep=sleep, now=now)
-    separated, requeued = await collect_separations(fs, gcs, runner, now)
-    separating = await maybe_separate(fs, gcs, runner, run, now)
-    analyse_started = await maybe_analyse(fs, runner)
+    errors: list[Exception] = []
+    separated, requeued = await collect_separations(fs, gcs, runner, now, errors)
+    separating = await maybe_separate(fs, gcs, runner, run, now, errors)
+    analyse_started = await maybe_analyse(fs, runner, errors)
     out = {
         "run": run,
         "polled": polled,
@@ -303,6 +332,12 @@ async def run_fetch(
         "analyse_started": analyse_started,
     }
     logger.info("voice pool fetch %s: %s", run, out)
+    if errors:
+        # One failure for the run (the CLI logs it as this run's one ERROR and exits 1), raised
+        # only after the queue, downloads and the other hand-offs have had their turn.
+        raise JobRunnerFailedError(
+            f"voice pool fetch {run}: {len(errors)} Cloud Run job call(s) failed; first: {errors[0]!r}"
+        ) from errors[0]
     return out
 
 

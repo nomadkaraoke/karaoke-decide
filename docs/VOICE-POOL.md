@@ -19,6 +19,7 @@ section of `infrastructure/__main__.py`. Pipeline diagram:
 | `voice-pool-analyse` | Cloud Run job, started by fetch (`karaoke-decide-vocal` image, 4 CPU / 8 GiB, 6 h, 1 task). Computes markers, then publishes voice.db. | us-central1, SA `voice-pool` |
 | Queue | Firestore `voice_pool_fetch/{pool_id}`; status `queued → downloading → fetched → separating → separated → analysed` (or `failed`) | |
 | Audio and stems | `gs://karaoke-gen-storage-nomadkaraoke/voice-pool/{audio,stems,manifests}/` (gen's retention rules don't touch `voice-pool/`) | |
+| Recordings | `gs://nomadkaraoke-voice-recordings/voice-recordings/<user_id>/<session_id>/<n>.<ext>`: private, no versioning, no lifecycle, and **soft delete off**, so "Delete my recordings" and account deletion erase the audio at once (nothing restorable afterwards) | |
 | Outputs | BigQuery `karaoke_decide.voice_pool_songs`, `karaoke_decide.song_voice_analysis` ([DATA-CATALOG.md](DATA-CATALOG.md#voice-pool-tables)); `gs://nomadkaraoke-musicbrainz-data/vocal-range/pool_measured/<run>/part-*.csv` (read by the weekly vocal-range refresh as `pool_measured`); `gs://nomadkaraoke-musicbrainz-data/voice/<run>/voice.db.gz` + `voice/latest.json` (3 runs kept); `voice/selection/<run>/coverage.json` | |
 
 Every job logs at most one ERROR per run. Missing infra (403/404 before `pulumi up`) is a

@@ -687,6 +687,8 @@ def test_voice_recordings_bucket_is_private_and_kept() -> None:
     assert kw["uniform_bucket_level_access"] is True
     assert kw["public_access_prevention"] == "enforced"
     assert kw["versioning"] == {"enabled": False}
+    # Privacy: a user's delete must really erase the audio (no 7-day soft-delete copy).
+    assert kw["soft_delete_policy"] == {"retention_duration_seconds": 0}
     assert "lifecycle_rules" not in kw
     admin = _kwargs(_resource_call(tree, "BucketIAMMember", "voice-recordings-api-admin"), consts)
     assert admin["role"] == "roles/storage.objectAdmin"
@@ -721,3 +723,14 @@ def test_voice_pool_job_images_are_pinned_by_ci(job: str, repo: str) -> None:
     else:
         assert "karaoke-decide-vocal" not in image
     assert f"::warning::{job} does not exist yet" in steps[0]["run"]  # skipped, not failed, until Pulumi
+    # Non-blocking: a describe/update failure can't skip the later search deploy + verify steps.
+    assert steps[0].get("continue-on-error") is True
+    step_id = steps[0]["id"]
+    warns = [s for s in _ci_steps() if f"steps.{step_id}.outcome == 'failure'" in str(s.get("if", ""))]
+    assert len(warns) == 1 and "::warning::" in warns[0]["run"]
+
+
+def test_steps_after_the_voice_pool_updates_still_run() -> None:
+    names = [s.get("name", "") for s in _ci_steps()]
+    last_voice = max(i for i, n in enumerate(names) if n.startswith("Update voice-pool-"))
+    assert names.index("Deploy search service") < last_voice < names.index("Verify deployment")
