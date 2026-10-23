@@ -1033,7 +1033,8 @@ gcp.storage.BucketIAMMember(
 # Read mb-refresh's vocal ranges for offline.db's vr_* columns, BY NAME (the job never lists
 # this bucket, so the condition needs no objectListPrefix clause). Narrowed to what the job
 # reads: the pointer vocal-range/latest.json (and latest/*), plus the per-run dirs
-# vocal-range/<YYYYMMDD-HHMMSS>/ that the pointer's song_path/artist_path name. NOT
+# vocal-range/runs/<YYYYMMDD-HHMMSS>/ that the pointer's song_path/artist_path name (IAM
+# conditions have no regex/matches(), hence the runs/ prefix: two startsWith clauses). NOT
 # vocal-range/ultrastar/ (full UltraStar files with lyrics) or vocal-range/gen_measured/.
 # Until applied, the job logs one WARNING per build and publishes offline.db with NULL vr_*.
 gcp.storage.BucketIAMMember(
@@ -1047,9 +1048,9 @@ gcp.storage.BucketIAMMember(
         "expression": pulumi.Output.concat(
             'resource.name.startsWith("projects/_/buckets/',
             musicbrainz_bucket.name,
-            '/objects/vocal-range/latest") || resource.name.matches("^projects/_/buckets/',
+            '/objects/vocal-range/latest") || resource.name.startsWith("projects/_/buckets/',
             musicbrainz_bucket.name,
-            '/objects/vocal-range/[0-9]{8}-[0-9]{6}/.*$")',
+            '/objects/vocal-range/runs/")',
         ),
     },
 )
@@ -1349,8 +1350,12 @@ gcp.projects.IAMMember(
 )
 # Write (and list/read back for resume) only under vocal-range/gen_measured/. objectAdmin
 # overwrites the task's checkpointed part file. Object reads/writes match on the object
-# name; `storage.objects.list` is checked against the BUCKET resource, so the condition
-# needs a separate clause on the list prefix attribute.
+# name. `storage.objects.list` is checked against the BUCKET resource, and Google documents
+# that listing cannot be limited to a prefix by an IAM condition (the
+# storage.googleapis.com/objectListPrefix API attribute is supported ONLY in Credential Access
+# Boundaries; in a conditional binding it makes Cloud Storage calls fail unexpectedly), so the
+# documented form is: object-name prefix OR the bucket resource itself. Reads, writes and
+# deletes stay confined to gen_measured/; only the bucket's object NAMES are listable.
 gcp.storage.BucketIAMMember(
     "vocal-range-gen-musicbrainz-data-writer",
     bucket=MUSICBRAINZ_DATA_BUCKET,
@@ -1358,11 +1363,10 @@ gcp.storage.BucketIAMMember(
     member=vocal_range_gen_member,
     condition={
         "title": "vocal-range gen_measured prefix only",
-        "description": "vocal-range-gen may only write and read vocal-range/gen_measured/",
+        "description": "vocal-range-gen may only write and read vocal-range/gen_measured/ (bucket-level list allowed)",
         "expression": (
             f'resource.name.startsWith("projects/_/buckets/{MUSICBRAINZ_DATA_BUCKET}/objects/vocal-range/gen_measured/")'
-            ' || (resource.type == "storage.googleapis.com/Bucket" && '
-            'api.getAttribute("storage.googleapis.com/objectListPrefix", "").startsWith("vocal-range/gen_measured/"))'
+            ' || resource.type == "storage.googleapis.com/Bucket"'
         ),
     },
 )

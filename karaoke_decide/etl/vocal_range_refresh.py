@@ -25,7 +25,7 @@ Outputs, in this order (``latest.json`` LAST, so a failure leaves last week's po
 
 1. BigQuery load jobs (WRITE_TRUNCATE) of ``song_vocal_range_sources``, ``song_vocal_range`` and
    ``artist_vocal_range`` into ``musicbrainz_staging``; a failed load touches no prod table.
-2. ``vocal-range/<run>/{song,artist}_vocal_range.tsv.gz`` + ``<run>/summary.json``, and the
+2. ``vocal-range/runs/<run>/{song,artist}_vocal_range.tsv.gz`` + ``<run>/summary.json``, and the
    same three under ``vocal-range/latest/`` (kept for compatibility).
 3. Copy jobs (WRITE_TRUNCATE, retried) staging -> ``karaoke_decide``, as for the MB tables.
 4. ``vocal-range/latest.json`` = ``{run, song_path, artist_path, sha256_song, sha256_artist}``
@@ -88,13 +88,17 @@ SUMMARY_BLOB = f"{PREFIX}/latest/summary.json"
 POINTER_BLOB = f"{PREFIX}/latest.json"
 # Per-run copies (the pointer names them, so readers never pair a pointer with another run's
 # TSVs); latest/ above is kept for older readers. Keep the newest KEEP_RUNS run dirs.
+# Runs live under vocal-range/runs/ (not vocal-range/<run>/) because IAM conditions have no regex:
+# song-index-build's grant is startsWith(latest) || startsWith(runs/), so ultrastar/ and
+# gen_measured/ stay unreadable to it.
+RUNS_PREFIX = f"{PREFIX}/runs/"
 KEEP_RUNS = 4
-_RUN_DIR_RE = re.compile(rf"^{re.escape(PREFIX)}/(\d{{8}}-\d{{6}})/")
+_RUN_DIR_RE = re.compile(rf"^{re.escape(RUNS_PREFIX)}(\d{{8}}-\d{{6}})/")
 
 
 def run_blobs(run: str) -> tuple[str, str, str]:
     """(song TSV, artist TSV, summary) object names for ``run``."""
-    d = f"{PREFIX}/{run}"
+    d = f"{RUNS_PREFIX}{run}"
     return f"{d}/song_vocal_range.tsv.gz", f"{d}/artist_vocal_range.tsv.gz", f"{d}/summary.json"
 
 
@@ -613,7 +617,7 @@ def prune_runs(bucket: Any, keep: str) -> None:
     a failure is one WARNING (the next run prunes again); latest/, ultrastar/ etc. are never touched."""
     try:
         runs: dict[str, list[Any]] = {}
-        for blob in bucket.list_blobs(prefix=f"{PREFIX}/"):
+        for blob in bucket.list_blobs(prefix=RUNS_PREFIX):
             m = _RUN_DIR_RE.match(blob.name)
             if m:
                 runs.setdefault(m.group(1), []).append(blob)
@@ -624,7 +628,7 @@ def prune_runs(bucket: Any, keep: str) -> None:
         if doomed:
             logger.info(f"vocal_range: pruned old runs {doomed}")
     except Exception:  # noqa: BLE001 - housekeeping only
-        logger.warning("vocal_range: pruning old vocal-range/<run>/ dirs failed (retried next run)", exc_info=True)
+        logger.warning("vocal_range: pruning old vocal-range/runs/<run>/ dirs failed (retried next run)", exc_info=True)
 
 
 # --------------------------------------------------------------------------

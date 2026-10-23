@@ -26,8 +26,8 @@ is what the mobile TypeScript port must match.
 BigQuery (`nomadkaraoke.karaoke_decide`): `song_vocal_range_sources`, `song_vocal_range`,
 `artist_vocal_range` (columns in [DATA-CATALOG.md](DATA-CATALOG.md#vocal-range-tables)).
 
-GCS (`gs://nomadkaraoke-musicbrainz-data/vocal-range/`): `<run>/{song,artist}_vocal_range.tsv.gz`,
-`<run>/summary.json`, a `latest/` copy, and `latest.json` (written last:
+GCS (`gs://nomadkaraoke-musicbrainz-data/vocal-range/`): `runs/<run>/{song,artist}_vocal_range.tsv.gz`,
+`runs/<run>/summary.json`, a `latest/` copy, and `latest.json` (written last:
 `{run, song_path, artist_path, sha256_song, sha256_artist}`).
 
 Apps: `catalog.db` (schema 2) gets per-song `vr_*` columns with a rough artist fallback;
@@ -66,7 +66,8 @@ build reads the BigQuery tables.
 
 1. `pulumi up` in `infrastructure/` (SA, IAM, the `vocal-range-gen` job). The bucket-list clause
    belongs to `vocal-range-gen`; the `song-index-build` grant is read-by-name (no list) and
-   narrowed to `vocal-range/latest*` and the per-run `vocal-range/<YYYYMMDD-HHMMSS>/` dirs, so it
+   narrowed to `vocal-range/latest*` and `vocal-range/runs/` (two `startsWith` clauses; IAM
+   conditions have no regex, which is why per-run outputs live under `runs/`), so it
    cannot read `ultrastar/` or `gen_measured/`. Order matters: the first CI run on main must push
    `karaoke-decide-vocal:latest` before the job can be created.
 2. `gcloud run jobs execute vocal-range-gen --region us-central1` (about 452 stems exist).

@@ -521,8 +521,9 @@ def test_vocal_range_bucket_grant_has_list_clause() -> None:
         expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
     assert "objects/vocal-range/gen_measured/" in expr
     assert 'resource.type == "storage.googleapis.com/Bucket"' in expr
-    assert 'api.getAttribute("storage.googleapis.com/objectListPrefix", "")' in expr
-    assert '.startsWith("vocal-range/gen_measured/")' in expr
+    # Google: objectListPrefix is only valid in Credential Access Boundaries, not IAM bindings
+    assert "getAttribute" not in expr and "objectListPrefix" not in expr
+    assert "matches(" not in expr
 
 
 def test_song_index_build_reads_vocal_range_by_name() -> None:
@@ -540,9 +541,11 @@ def test_song_index_build_reads_vocal_range_by_name() -> None:
         expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
     # built from the bucket resource's name, not a hardcoded bucket string
     assert "musicbrainz_bucket.name" in expr and "/objects/vocal-range/" in expr
-    # narrowed: pointer + latest/ and per-run dirs only (run id = %Y%m%d-%H%M%S)
+    # narrowed: pointer + latest/ and vocal-range/runs/ only. IAM conditions have no regex.
+    assert "matches(" not in expr
     assert '/objects/vocal-range/latest")' in expr
-    assert "[0-9]{8}-[0-9]{6}/.*$" in expr
+    assert '/objects/vocal-range/runs/")' in expr
+    assert expr.count("startsWith(") == 2
     assert "ultrastar" not in expr and "gen_measured" not in expr
     assert "startsWith(\"projects/_/buckets/', musicbrainz_bucket.name, '/objects/vocal-range/\")" not in expr
     assert "nomadkaraoke-musicbrainz-data" not in expr
