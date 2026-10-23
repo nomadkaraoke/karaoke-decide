@@ -286,15 +286,47 @@ def test_requeued_pending_job_is_not_stalled_while_a_retry_is_scheduled(
     assert r.json()["active_job"]["status"] == "pending"
 
 
-@pytest.mark.parametrize("age", [5, None])
-def test_trigger_sync_new_job_when_latest_not_stalled(
-    auth_client: TestClient, mock_firestore_service: MagicMock, mock_cloud_tasks_service: MagicMock, age: int | None
+@pytest.mark.parametrize(
+    ("status", "age"),
+    [
+        (SyncJobStatus.IN_PROGRESS, 5),
+        (SyncJobStatus.PENDING, 5),
+        (SyncJobStatus.PENDING, STALE_JOB_THRESHOLD_SECONDS + 300),
+    ],
+)
+def test_trigger_sync_returns_live_job_without_new_job_or_task(
+    auth_client: TestClient,
+    mock_firestore_service: MagicMock,
+    mock_cloud_tasks_service: MagicMock,
+    status: SyncJobStatus,
+    age: int,
 ) -> None:
-    """A live job (fresh heartbeat) or a finished one is not reused."""
-    job = _job(SyncJobStatus.IN_PROGRESS, age_seconds=age) if age else _job(SyncJobStatus.COMPLETED, age_seconds=999)
+    """A live (healthy pending / in-progress) job is returned as-is: no sibling job, no extra task."""
+    job = _job(status, age_seconds=age)
+    mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
+    r = auth_client.post("/api/services/sync", headers={"Authorization": "Bearer test-token"})
+    assert r.status_code == 202
+    assert r.json()["job_id"] == JOB_ID
+    mock_firestore_service.set_document.assert_not_called()
+    mock_cloud_tasks_service.create_sync_task.assert_not_called()
+
+
+def test_trigger_sync_new_job_when_latest_is_finished(
+    auth_client: TestClient, mock_firestore_service: MagicMock, mock_cloud_tasks_service: MagicMock
+) -> None:
+    job = _job(SyncJobStatus.COMPLETED, age_seconds=999)
     mock_firestore_service.query_documents = AsyncMock(return_value=[job.to_dict()])
     r = auth_client.post("/api/services/sync", headers={"Authorization": "Bearer test-token"})
     assert r.status_code == 202
     assert r.json()["job_id"] != JOB_ID
     mock_firestore_service.set_document.assert_called_once()
     assert mock_cloud_tasks_service.create_sync_task.call_args.kwargs["job_id"] != JOB_ID
+
+
+def test_resumed_run_clears_stale_error() -> None:
+    job = _job(SyncJobStatus.IN_PROGRESS, age_seconds=STALE_JOB_THRESHOLD_SECONDS + 5)
+    job.error = "lastfm down"
+    fs = FakeFirestore(job)
+    assert _client(fs, _sync_service()).post("/internal/sync/process", json=BODY).status_code == 200
+    assert fs.docs[JOB_ID]["status"] == "completed"
+    assert fs.docs[JOB_ID]["error"] is None

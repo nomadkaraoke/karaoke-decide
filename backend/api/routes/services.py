@@ -433,9 +433,9 @@ async def spotify_callback(
 
     # Handle OAuth errors
     if error:
-        code = "denied" if error == "access_denied" else "spotify_error"
+        reason = "denied" if error == "access_denied" else "spotify_error"
         return RedirectResponse(
-            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={code}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={reason}",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -1095,8 +1095,11 @@ async def _start_sync_job(user_id: str, settings: BackendSettings, firestore: Fi
     return job_id
 
 
-async def _find_stalled_job(user_id: str, firestore: FirestoreService) -> str | None:
-    """The user's latest sync job id if it is stalled (dead heartbeat or lost task), else None."""
+async def _find_resumable_job(user_id: str, firestore: FirestoreService) -> tuple[str, bool] | None:
+    """The user's latest sync job as (id, stalled) if it is still live (pending/in progress), else None.
+
+    stalled=True means a dead heartbeat or lost task (needs a re-enqueue); False means it is healthy.
+    """
     docs = await firestore.query_documents(
         collection="sync_jobs",
         filters=[("user_id", "==", user_id)],
@@ -1105,8 +1108,11 @@ async def _find_stalled_job(user_id: str, firestore: FirestoreService) -> str | 
         limit=1,
     )
     for data in docs:
-        if data and SyncJob.from_dict(data).is_stalled():
-            return str(data["id"])
+        if not data:
+            continue
+        job = SyncJob.from_dict(data)
+        if job.status in (SyncJobStatus.PENDING, SyncJobStatus.IN_PROGRESS):
+            return str(data["id"]), job.is_stalled()
     return None
 
 
@@ -1128,8 +1134,16 @@ async def trigger_sync(
     """
     locale = get_locale_from_request(request)
     try:
-        stalled_id = await _find_stalled_job(user.id, firestore)
-        if stalled_id:
+        live = await _find_resumable_job(user.id, firestore)
+        if live and not live[1]:
+            # A healthy job is already running or queued: hand back its id, no sibling job or task.
+            return SyncJobStartResponse(
+                job_id=live[0],
+                status="in_progress",
+                message=t(locale, "services.syncStarted"),
+            )
+        if live:
+            stalled_id = live[0]
             # Resume the stalled job instead of starting a second one next to it.
             try:
                 get_cloud_tasks_service(settings).create_sync_task(job_id=stalled_id, user_id=user.id)

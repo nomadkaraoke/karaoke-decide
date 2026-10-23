@@ -108,8 +108,8 @@ async def process_sync_task(
                 for r in results
             ]
             j.completed_at = j.updated_at = datetime.now(UTC)
-            if errors:
-                j.error = "; ".join(errors)
+            # Always assign: a resumed run must not keep a stale error from an earlier attempt.
+            j.error = "; ".join(errors) if errors else None
 
         # Only the run that still owns the job may record its outcome.
         done = await _update_owned(firestore, job_id, run_id, complete)
