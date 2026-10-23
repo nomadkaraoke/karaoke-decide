@@ -151,7 +151,7 @@ def check_estimate(estimate_path: Path, requests_path: Path, model: str) -> dict
     """Load estimate.json and verify it belongs to the current requests.jsonl and model; ValueError if not."""
     if not estimate_path.exists():
         raise ValueError(f"{estimate_path} is missing: run `estimate` first")
-    est = json.loads(estimate_path.read_text())
+    est: dict[str, Any] = json.loads(estimate_path.read_text())
     if est.get("model") != model:
         raise ValueError(f"estimate is for model {est.get('model')!r}, not {model!r}: re-run `estimate`")
     if est.get("requests") != requests_fingerprint(requests_path):
