@@ -474,7 +474,13 @@
     "redirectingBack": "Te redirecționăm înapoi...",
     "connectionFailed": "Conexiunea a eșuat",
     "tryAgain": "Încearcă din nou",
-    "backToHome": "Înapoi acasă"
+    "backToHome": "Înapoi acasă",
+    "spotifyErrorDenied": "Ai refuzat accesul pe Spotify, așa că nu s-a conectat nimic.",
+    "spotifyErrorExchangeFailed": "Nu am putut finaliza conectarea la Spotify. Te rugăm să încerci din nou.",
+    "spotifyErrorInvalidState": "Acest link de conectare a expirat. Te rugăm să iei procesul de la capăt.",
+    "spotifyErrorMissingParams": "Răspunsul de conectare de la Spotify a fost incomplet. Te rugăm să încerci din nou.",
+    "spotifyErrorSpotify": "Spotify a raportat o problemă la conectare. Te rugăm să încerci din nou.",
+    "spotifyErrorUnknown": "A apărut o eroare necunoscută"
   },
   "admin": {
     "backToApp": "Înapoi la aplicație",

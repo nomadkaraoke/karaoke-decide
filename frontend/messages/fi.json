@@ -474,7 +474,13 @@
     "redirectingBack": "Ohjataan sinut takaisin...",
     "connectionFailed": "Yhdistäminen epäonnistui",
     "tryAgain": "Yritä uudelleen",
-    "backToHome": "Takaisin etusivulle"
+    "backToHome": "Takaisin etusivulle",
+    "spotifyErrorDenied": "Hylkäsit käyttöoikeuden Spotifyssa, joten mitään ei yhdistetty.",
+    "spotifyErrorExchangeFailed": "Yhteyden muodostamista Spotifyhin ei voitu viedä loppuun. Yritä uudelleen.",
+    "spotifyErrorInvalidState": "Tämä yhteyslinkki on vanhentunut. Aloita alusta.",
+    "spotifyErrorMissingParams": "Spotifyn yhteysvastaus oli puutteellinen. Yritä uudelleen.",
+    "spotifyErrorSpotify": "Spotify ilmoitti ongelmasta yhdistämisen aikana. Yritä uudelleen.",
+    "spotifyErrorUnknown": "Tapahtui tuntematon virhe."
   },
   "admin": {
     "backToApp": "Takaisin sovellukseen",

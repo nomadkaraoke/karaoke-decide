@@ -474,7 +474,13 @@
     "redirectingBack": "Du wirst zurückgeleitet...",
     "connectionFailed": "Verbindung fehlgeschlagen",
     "tryAgain": "Erneut versuchen",
-    "backToHome": "Zurück zur Startseite"
+    "backToHome": "Zurück zur Startseite",
+    "spotifyErrorDenied": "Du hast den Zugriff bei Spotify abgelehnt, daher wurde keine Verbindung hergestellt.",
+    "spotifyErrorExchangeFailed": "Die Verbindung mit Spotify konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+    "spotifyErrorInvalidState": "Dieser Verbindungslink ist abgelaufen. Bitte versuche es von vorn.",
+    "spotifyErrorMissingParams": "Die Antwort zur Verbindung von Spotify war unvollständig. Bitte versuche es erneut.",
+    "spotifyErrorSpotify": "Spotify hat beim Verbinden ein Problem gemeldet. Bitte versuche es erneut.",
+    "spotifyErrorUnknown": "Ein unbekannter Fehler ist aufgetreten"
   },
   "admin": {
     "backToApp": "Zurück zur App",

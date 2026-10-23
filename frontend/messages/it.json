@@ -474,7 +474,13 @@
     "redirectingBack": "Reindirizzamento in corso...",
     "connectionFailed": "Connessione fallita",
     "tryAgain": "Riprova",
-    "backToHome": "Torna alla Home"
+    "backToHome": "Torna alla Home",
+    "spotifyErrorDenied": "Hai negato l'accesso su Spotify, quindi non è stato collegato nulla.",
+    "spotifyErrorExchangeFailed": "Non siamo riusciti a completare il collegamento a Spotify. Riprova.",
+    "spotifyErrorInvalidState": "Questo link di collegamento è scaduto. Riprova dall'inizio.",
+    "spotifyErrorMissingParams": "La risposta di connessione da Spotify era incompleta. Riprova.",
+    "spotifyErrorSpotify": "Spotify ha segnalato un problema durante il collegamento. Riprova.",
+    "spotifyErrorUnknown": "Si è verificato un errore sconosciuto"
   },
   "admin": {
     "backToApp": "Torna all'app",

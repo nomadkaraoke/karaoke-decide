@@ -474,7 +474,13 @@
     "redirectingBack": "Redirection en cours...",
     "connectionFailed": "Échec de la connexion",
     "tryAgain": "Réessayer",
-    "backToHome": "Retour à l'accueil"
+    "backToHome": "Retour à l'accueil",
+    "spotifyErrorDenied": "Tu as refusé l'accès sur Spotify, rien n'a donc été connecté.",
+    "spotifyErrorExchangeFailed": "Impossible de finaliser la connexion à Spotify. Réessaie, s'il te plaît.",
+    "spotifyErrorInvalidState": "Ce lien de connexion a expiré. Merci de recommencer.",
+    "spotifyErrorMissingParams": "La réponse envoyée par Spotify est incomplète. Réessaie, s'il te plaît.",
+    "spotifyErrorSpotify": "Spotify a rencontré une erreur lors de la connexion. Réessaie, s'il te plaît.",
+    "spotifyErrorUnknown": "Une erreur inconnue s'est produite."
   },
   "admin": {
     "backToApp": "Retour à l'application",

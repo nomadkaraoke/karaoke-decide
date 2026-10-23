@@ -313,6 +313,34 @@ class TestSpotifyCallback:
         assert response.status_code == 302
         assert "spotify/error" in response.headers["location"]
 
+    @pytest.mark.parametrize(
+        ("error", "code"), [("access_denied", "denied"), ("server_error", "spotify_error"), ("x y&z", "spotify_error")]
+    )
+    def test_callback_error_maps_to_code(self, auth_client: TestClient, error: str, code: str) -> None:
+        response = auth_client.get(
+            "/api/services/spotify/callback", params={"error": error, "state": "s"}, follow_redirects=False
+        )
+
+        assert response.headers["location"].endswith(f"spotify/error?message={code}")
+
+    def test_callback_exception_redirects_with_code_not_text(
+        self,
+        auth_client: TestClient,
+        mock_music_service_service: MagicMock,
+    ) -> None:
+        """Exception text (which can carry Spotify response bodies) never reaches the redirect URL."""
+        mock_music_service_service.spotify.exchange_code = AsyncMock(side_effect=RuntimeError("secret detail xyz"))
+
+        response = auth_client.get(
+            "/api/services/spotify/callback",
+            params={"code": "auth-code", "state": "test-state-0123456789"},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["location"].endswith("spotify/error?message=exchange_failed")
+        assert "secret" not in response.headers["location"]
+
     def test_callback_missing_params_redirects(
         self,
         auth_client: TestClient,

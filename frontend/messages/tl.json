@@ -474,7 +474,13 @@
     "redirectingBack": "Nire-redirect ka pabalik...",
     "connectionFailed": "Nabigo ang Koneksyon",
     "tryAgain": "Subukan Muli",
-    "backToHome": "Bumalik sa Home"
+    "backToHome": "Bumalik sa Home",
+    "spotifyErrorDenied": "Tinanggihan mo ang access sa Spotify, kaya walang naikonekta.",
+    "spotifyErrorExchangeFailed": "Hindi namin nakumpleto ang pagkonekta sa Spotify. Pakisubukan muli.",
+    "spotifyErrorInvalidState": "Nag-expire na ang link ng koneksyong ito. Pakisubukang magsimula muli.",
+    "spotifyErrorMissingParams": "Hindi kumpleto ang tugon sa koneksyon mula sa Spotify. Pakisubukan muli.",
+    "spotifyErrorSpotify": "Nagkaproblema ang Spotify habang kumokonekta. Pakisubukan muli.",
+    "spotifyErrorUnknown": "May naganap na hindi malamang error"
   },
   "admin": {
     "backToApp": "Bumalik sa App",

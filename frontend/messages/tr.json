@@ -474,7 +474,13 @@
     "redirectingBack": "Geri yönlendiriliyorsun...",
     "connectionFailed": "Bağlantı Başarısız",
     "tryAgain": "Tekrar Dene",
-    "backToHome": "Ana Sayfaya Dön"
+    "backToHome": "Ana Sayfaya Dön",
+    "spotifyErrorDenied": "Spotify üzerinden erişimi reddettiğin için hiçbir bağlantı kurulmadı.",
+    "spotifyErrorExchangeFailed": "Spotify bağlantısı tamamlanamadı. Lütfen tekrar dene.",
+    "spotifyErrorInvalidState": "Bu bağlantı linkinin süresi doldu. Lütfen işlemi baştan başlat.",
+    "spotifyErrorMissingParams": "Spotify'dan gelen bağlantı yanıtı eksikti. Lütfen tekrar dene.",
+    "spotifyErrorSpotify": "Spotify bağlanırken bir sorun bildirdi. Lütfen tekrar dene.",
+    "spotifyErrorUnknown": "Bilinmeyen bir hata oluştu."
   },
   "admin": {
     "backToApp": "Uygulamaya Dön",

@@ -474,7 +474,13 @@
     "redirectingBack": "Je wordt teruggestuurd...",
     "connectionFailed": "Koppelen mislukt",
     "tryAgain": "Probeer opnieuw",
-    "backToHome": "Terug naar Home"
+    "backToHome": "Terug naar Home",
+    "spotifyErrorDenied": "Je hebt de toegang op Spotify geweigerd, dus er is niets gekoppeld.",
+    "spotifyErrorExchangeFailed": "We konden de koppeling met Spotify niet voltooien. Probeer het opnieuw.",
+    "spotifyErrorInvalidState": "Deze verbindingslink is verlopen. Probeer het opnieuw vanaf het begin.",
+    "spotifyErrorMissingParams": "Het antwoord van Spotify was onvolledig. Probeer het opnieuw.",
+    "spotifyErrorSpotify": "Spotify meldde een probleem tijdens het verbinden. Probeer het opnieuw.",
+    "spotifyErrorUnknown": "Er is een onbekende fout opgetreden."
   },
   "admin": {
     "backToApp": "Terug naar app",

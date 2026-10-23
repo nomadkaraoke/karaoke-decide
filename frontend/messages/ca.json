@@ -474,7 +474,13 @@
     "redirectingBack": "Redirigint-te de nou...",
     "connectionFailed": "La connexió ha fallat",
     "tryAgain": "Torna-ho a provar",
-    "backToHome": "Torna a l'inici"
+    "backToHome": "Torna a l'inici",
+    "spotifyErrorDenied": "Has denegat l'accés a Spotify, de manera que no s'ha connectat res.",
+    "spotifyErrorExchangeFailed": "No hem pogut completar la connexió amb Spotify. Torna-ho a provar.",
+    "spotifyErrorInvalidState": "Aquest enllaç de connexió ha caducat. Torna a començar.",
+    "spotifyErrorMissingParams": "La resposta de connexió de Spotify era incompleta. Torna-ho a provar.",
+    "spotifyErrorSpotify": "Spotify ha informat d'un problema en connectar. Torna-ho a provar.",
+    "spotifyErrorUnknown": "S'ha produït un error desconegut"
   },
   "admin": {
     "backToApp": "Torna a l'aplicació",

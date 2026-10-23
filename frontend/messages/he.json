@@ -474,7 +474,13 @@
     "redirectingBack": "מעביר אותך חזרה...",
     "connectionFailed": "החיבור נכשל",
     "tryAgain": "נסה שוב",
-    "backToHome": "חזרה לדף הבית"
+    "backToHome": "חזרה לדף הבית",
+    "spotifyErrorDenied": "דחית את בקשת הגישה ב-Spotify, ולכן החשבון לא חובר.",
+    "spotifyErrorExchangeFailed": "לא הצלחנו להשלים את החיבור ל-Spotify. כדאי לנסות שוב.",
+    "spotifyErrorInvalidState": "פג תוקפו של קישור החיבור הזה. יש להתחיל מחדש.",
+    "spotifyErrorMissingParams": "תגובת החיבור שהתקבלה מ-Spotify לא הייתה מלאה. יש לנסות שוב.",
+    "spotifyErrorSpotify": "התקבלה שגיאה מ-Spotify במהלך החיבור. יש לנסות שוב.",
+    "spotifyErrorUnknown": "אירעה שגיאה לא ידועה"
   },
   "admin": {
     "backToApp": "חזרה לאפליקציה",

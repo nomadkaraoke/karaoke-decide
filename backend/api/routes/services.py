@@ -434,7 +434,7 @@ async def spotify_callback(
     # Handle OAuth errors
     if error:
         return RedirectResponse(
-            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={quote(error, safe='')}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={'denied' if error == 'access_denied' else 'spotify_error'}",
             status_code=status.HTTP_302_FOUND,
         )
 
@@ -470,10 +470,10 @@ async def spotify_callback(
             status_code=status.HTTP_302_FOUND,
         )
 
-    except Exception as e:
-        error_msg = quote(str(e)[:100], safe="")  # URL-encode for safety
+    except Exception:
+        logger.warning("Spotify callback exchange failed", exc_info=True)
         return RedirectResponse(
-            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message={error_msg}",
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=exchange_failed",
             status_code=status.HTTP_302_FOUND,
         )
 

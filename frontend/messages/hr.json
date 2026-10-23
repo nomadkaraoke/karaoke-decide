@@ -474,7 +474,13 @@
     "redirectingBack": "Preusmjeravamo te natrag...",
     "connectionFailed": "Povezivanje nije uspjelo",
     "tryAgain": "Pokušaj ponovno",
-    "backToHome": "Natrag na početnu"
+    "backToHome": "Natrag na početnu",
+    "spotifyErrorDenied": "Pristup na Spotifyju je odbijen pa ništa nije povezano.",
+    "spotifyErrorExchangeFailed": "Nismo uspjeli dovršiti povezivanje sa Spotifyjem. Pokušaj ponovno.",
+    "spotifyErrorInvalidState": "Poveznica za povezivanje je istekla. Pokreni postupak ispočetka.",
+    "spotifyErrorMissingParams": "Odgovor na povezivanje sa Spotifyja nije bio potpun. Pokušaj ponovno.",
+    "spotifyErrorSpotify": "Spotify je prijavio problem prilikom povezivanja. Pokušaj ponovno.",
+    "spotifyErrorUnknown": "Došlo je do nepoznate pogreške"
   },
   "admin": {
     "backToApp": "Natrag u aplikaciju",

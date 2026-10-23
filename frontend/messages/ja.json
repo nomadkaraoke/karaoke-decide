@@ -474,7 +474,13 @@
     "redirectingBack": "元のページへリダイレクトしています...",
     "connectionFailed": "連携に失敗しました",
     "tryAgain": "もう一度試す",
-    "backToHome": "ホームに戻る"
+    "backToHome": "ホームに戻る",
+    "spotifyErrorDenied": "Spotifyへのアクセスが拒否されたため、連携は行われませんでした。",
+    "spotifyErrorExchangeFailed": "Spotifyとの接続を完了できませんでした。もう一度お試しください。",
+    "spotifyErrorInvalidState": "接続リンクの有効期限が切れています。最初からやり直してください。",
+    "spotifyErrorMissingParams": "Spotifyからの接続レスポンスが不完全でした。もう一度お試しください。",
+    "spotifyErrorSpotify": "接続中にSpotifyで問題が発生しました。もう一度お試しください。",
+    "spotifyErrorUnknown": "不明なエラーが発生しました"
   },
   "admin": {
     "backToApp": "アプリに戻る",

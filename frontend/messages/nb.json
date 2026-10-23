@@ -474,7 +474,13 @@
     "redirectingBack": "Omdirigerer deg tilbake...",
     "connectionFailed": "Tilkobling mislyktes",
     "tryAgain": "Prøv igjen",
-    "backToHome": "Tilbake til forsiden"
+    "backToHome": "Tilbake til forsiden",
+    "spotifyErrorDenied": "Du avslo tilgang på Spotify, så ingenting ble koblet til.",
+    "spotifyErrorExchangeFailed": "Vi kunne ikke fullføre tilkoblingen til Spotify. Prøv igjen.",
+    "spotifyErrorInvalidState": "Denne tilkoblingslenken har utløpt. Start på nytt.",
+    "spotifyErrorMissingParams": "Svaret fra Spotify var ufullstendig. Prøv igjen.",
+    "spotifyErrorSpotify": "Spotify meldte om et problem under tilkoblingen. Prøv igjen.",
+    "spotifyErrorUnknown": "Det oppsto en ukjent feil"
   },
   "admin": {
     "backToApp": "Tilbake til appen",

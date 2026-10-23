@@ -474,7 +474,13 @@
     "redirectingBack": "Přesměrováváme tě zpět...",
     "connectionFailed": "Připojení selhalo",
     "tryAgain": "Zkusit znovu",
-    "backToHome": "Zpět na hlavní stránku"
+    "backToHome": "Zpět na hlavní stránku",
+    "spotifyErrorDenied": "Na Spotify jsi přístup nepovolil/a, takže se nic nepřipojilo.",
+    "spotifyErrorExchangeFailed": "Připojení ke Spotify se nepodařilo dokončit. Zkus to prosím znovu.",
+    "spotifyErrorInvalidState": "Platnost tohoto odkazu pro připojení vypršela. Zkus to prosím od začátku.",
+    "spotifyErrorMissingParams": "Odpověď o připojení ze Spotify byla neúplná. Zkus to prosím znovu.",
+    "spotifyErrorSpotify": "Spotify při připojování hlásí chybu. Zkus to prosím znovu.",
+    "spotifyErrorUnknown": "Došlo k neznámé chybě."
   },
   "admin": {
     "backToApp": "Zpět do aplikace",

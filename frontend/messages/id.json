@@ -474,7 +474,13 @@
     "redirectingBack": "Mengarahkan Anda kembali...",
     "connectionFailed": "Koneksi Gagal",
     "tryAgain": "Coba Lagi",
-    "backToHome": "Kembali ke Beranda"
+    "backToHome": "Kembali ke Beranda",
+    "spotifyErrorDenied": "Anda menolak akses di Spotify, jadi tidak ada yang terhubung.",
+    "spotifyErrorExchangeFailed": "Kami tidak dapat menyelesaikan proses penghubungan ke Spotify. Silakan coba lagi.",
+    "spotifyErrorInvalidState": "Tautan koneksi ini telah kedaluwarsa. Silakan mulai lagi dari awal.",
+    "spotifyErrorMissingParams": "Respons koneksi dari Spotify tidak lengkap. Silakan coba lagi.",
+    "spotifyErrorSpotify": "Spotify mengalami masalah saat menghubungkan. Silakan coba lagi.",
+    "spotifyErrorUnknown": "Terjadi kesalahan yang tidak diketahui"
   },
   "admin": {
     "backToApp": "Kembali ke Aplikasi",

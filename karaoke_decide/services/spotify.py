@@ -1,11 +1,19 @@
 """Spotify API client for Karaoke Decide."""
 
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import httpx
 
 from karaoke_decide.core.config import Settings
 from karaoke_decide.core.exceptions import ExternalServiceError, RateLimitError
+
+
+class SpotifyInvalidGrantError(ExternalServiceError):
+    """The refresh token is no longer usable (revoked or expired): the user must reconnect."""
+
+    def __init__(self) -> None:
+        super().__init__("Spotify", "invalid_grant")
 
 
 class SpotifyClient:
@@ -39,7 +47,7 @@ class SpotifyClient:
             "scope": " ".join(self.SCOPES),
             "state": state,
         }
-        query = "&".join(f"{k}={v}" for k, v in params.items())
+        query = urlencode(params, quote_via=quote)
         return f"{self.AUTH_URL}?{query}"
 
     async def exchange_code(self, code: str) -> dict[str, Any]:
@@ -73,11 +81,21 @@ class SpotifyClient:
                 auth=(self.client_id, self.client_secret),
             )
 
+            if response.status_code == 400 and self._is_invalid_grant(response):
+                raise SpotifyInvalidGrantError()
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"Token refresh failed: {response.text}")
 
             result: dict[str, Any] = response.json()
             return result
+
+    @staticmethod
+    def _is_invalid_grant(response: httpx.Response) -> bool:
+        try:
+            body = response.json()
+        except ValueError:
+            return False
+        return isinstance(body, dict) and body.get("error") == "invalid_grant"
 
     async def get_current_user(self, access_token: str) -> dict[str, Any]:
         """Get current user's profile."""
