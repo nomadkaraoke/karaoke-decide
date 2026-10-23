@@ -211,7 +211,10 @@ class VoiceRecordingService:
         # A delete-all that ran while this upload was in flight may have missed the object, so undo it.
         purge = await self._fs.get_document(PURGES_COLLECTION, user_id)
         purged_at = _as_utc(purge.get("purged_at")) if purge else None
-        if purged_at is not None and purged_at >= started:
+        # delete-all withdraws consent before it lists objects, so consent gone now means our put may have been missed.
+        current = await self._fs.get_document(SESSIONS_COLLECTION, session_id) or {}
+        withdrawn = (current.get("setup") or {}).get("record") is not True
+        if withdrawn or (purged_at is not None and purged_at >= started):
             try:
                 await asyncio.to_thread(self._delete_blob, name)
                 await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)

@@ -533,3 +533,28 @@ def test_replaced_object_cleanup_failure_does_not_fail_upload(
     assert not any(r.levelname == "ERROR" for r in caplog.records)
     assert c.delete("/api/voice/recordings").json() == {"deleted": 2}  # orphan swept by delete-all
     assert bucket.objects == {}
+
+
+@pytest.mark.asyncio
+async def test_upload_undoes_itself_when_consent_withdrawn_mid_flight(bucket: FakeBucket) -> None:
+    """Delete-all's purge marker can predate the upload's start; withdrawn consent alone must trigger the undo."""
+    rfs = RacingFirestore()
+    _seed(rfs)
+    svc = VoiceRecordingService(rfs, bucket)  # type: ignore[arg-type]
+
+    async def withdraw() -> None:
+        await rfs.update_document("voice_sessions", "s1", {"setup": {"record": False}})
+
+    rfs.hook = withdraw  # no purge marker is written at all
+    with pytest.raises(vrs.RecordingsDeletedError):
+        await svc.upload(
+            USER,
+            session_id="s1",
+            attempt_n=1,
+            duration_s=1.0,
+            device=None,
+            content_type="audio/mp4",
+            file=io.BytesIO(AUDIO),
+        )
+    assert bucket.objects == {}
+    assert rfs.cols["voice_recordings"] == {}
