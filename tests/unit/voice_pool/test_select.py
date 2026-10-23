@@ -235,3 +235,40 @@ def test_without_bigquery_uses_catalog_durations(reader, caplog):
     assert cands and all(c.spotify_id is None and not c.has_ultrastar for c in cands)
     assert all(120_000 <= c.duration_ms <= 420_000 for c in cands)
     assert "BigQuery disabled" in caplog.text
+
+
+@pytest.fixture
+def old_reader(catalog_db, availability_db, tmp_path):
+    """A catalog.db built before schema 2: no songs.vr_* columns."""
+    import shutil
+    import sqlite3
+
+    from karaoke_decide.catalog.reader import CatalogReader
+
+    old = tmp_path / "catalog.db"
+    shutil.copy(catalog_db, old)
+    con = sqlite3.connect(old)
+    for (name,) in con.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql LIKE '%vr_%'").fetchall():
+        con.execute(f'DROP INDEX "{name}"')
+    cols = [r[1] for r in con.execute("PRAGMA table_info(songs)") if r[1].startswith("vr_")]
+    for c in cols:
+        con.execute(f"ALTER TABLE songs DROP COLUMN {c}")
+    con.commit()
+    con.close()
+    assert cols
+    r = CatalogReader(old, availability_db)
+    yield r
+    r.close()
+
+
+def test_catalog_without_vocal_range_columns_warns_once(old_reader, fake_bq, caplog):
+    cands = select.load_candidates(old_reader, fake_bq(), n=1000)
+    assert cands and all(c.vr_p50 is None and c.vr_span is None and c.vr_tier is None for c in cands)
+    warns = [r for r in caplog.records if "predates vocal-range" in r.getMessage()]
+    assert len(warns) == 1 and warns[0].levelno == logging.WARNING
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+def test_require_vocal_range_raises_on_old_catalog(old_reader, fake_bq):
+    with pytest.raises(select.VocalRangeMissingError):
+        select.load_candidates(old_reader, fake_bq(), n=10, require_vocal_range=True)

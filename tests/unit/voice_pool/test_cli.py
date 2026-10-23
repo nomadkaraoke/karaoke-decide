@@ -207,3 +207,43 @@ def test_format_analyse_shows_a_systematic_stop():
         "failed": 0, "deferred": 0, "blocked": None, "systematic": "ImportError",
     })  # fmt: skip
     assert "first songs all failed with ImportError" in text
+
+
+def _old_catalog(catalog_db: Path, tmp_path: Path) -> Path:
+    import shutil
+    import sqlite3
+
+    old = tmp_path / "old_catalog.db"
+    shutil.copy(catalog_db, old)
+    con = sqlite3.connect(old)
+    for (name,) in con.execute("SELECT name FROM sqlite_master WHERE type='index' AND sql LIKE '%vr_%'").fetchall():
+        con.execute(f'DROP INDEX "{name}"')
+    for (c,) in [(r[1],) for r in con.execute("PRAGMA table_info(songs)") if r[1].startswith("vr_")]:
+        con.execute(f"ALTER TABLE songs DROP COLUMN {c}")
+    con.commit()
+    con.close()
+    return old
+
+
+def test_select_old_catalog_works_and_require_flag_exits_2(
+    no_bq, catalog_db: Path, availability_db: Path, tmp_path: Path, caplog, capsys
+):
+    old = _old_catalog(catalog_db, tmp_path)
+    argv = [
+        "select",
+        "--n",
+        "20",
+        "--dry-run",
+        "--no-probe",
+        "--catalog",
+        str(old),
+        "--availability",
+        str(availability_db),
+    ]
+    assert cli.main(argv) == 0
+    assert "picked" in capsys.readouterr().out
+    caplog.clear()
+    assert cli.main([*argv, "--require-vocal-range"]) == 2
+    assert "picked" not in capsys.readouterr().out
+    assert sum("predates vocal-range" in r.getMessage() for r in caplog.records) == 1
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)

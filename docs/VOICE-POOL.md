@@ -50,6 +50,11 @@ gcloud run jobs execute voice-pool-select --region us-central1 --args=select,--n
 gcloud storage cat gs://nomadkaraoke-musicbrainz-data/voice/selection/<run>/coverage.json
 ```
 
+If the catalog predates vocal-range data (WARNING "catalog.db predates vocal-range data"), either
+wait for the Sunday mb-refresh or run select without `--require-vocal-range` (the default: register/span
+strata are then 'unknown'). With `--args=select,--n,1000,--require-vocal-range` the job exits 2 and
+selects nothing instead.
+
 If the report says `below_minimum` (fewer than 600 songs) or lists empty strata, stop and decide
 before fetching. A preview without writes: `--args=select,--n,1000,--dry-run`.
 

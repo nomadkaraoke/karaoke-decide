@@ -1,6 +1,6 @@
 """``python -m karaoke_decide.voice_pool <select|fetch|status|analyse|publish>``.
 
-``select --n 1000 [--dry-run] [--no-probe] [--run RUN] [--catalog PATH --availability PATH]``
+``select --n 1000 [--dry-run] [--no-probe] [--require-vocal-range] [--run RUN] [--catalog PATH --availability PATH]``
 picks the shared pool (``select.run_select``) and prints its coverage report. catalog.db and
 availability.db load like the API's (``CATALOG_LOCAL_DIR`` / ``SONG_INDEX_LOCAL_DIR``, else GCS)
 unless both paths are given. ``BIGQUERY_DISABLED=1`` (local stack) is allowed for ``--dry-run``
@@ -129,7 +129,7 @@ def _select(args: argparse.Namespace) -> int:
     import httpx
 
     from backend.config import get_backend_settings
-    from karaoke_decide.voice_pool.select import run_select
+    from karaoke_decide.voice_pool.select import VocalRangeMissingError, run_select
 
     if args.no_probe and not args.dry_run:
         print("--no-probe is only allowed with --dry-run (a real run must probe embeddability)", file=sys.stderr)
@@ -156,9 +156,20 @@ def _select(args: argparse.Namespace) -> int:
         with httpx.Client(headers=headers) as http:
             summary = asyncio.run(
                 run_select(
-                    reader, bq, fs, http, n=args.n, run=args.run, dry_run=args.dry_run, gcs=gcs, probe=not args.no_probe
+                    reader,
+                    bq,
+                    fs,
+                    http,
+                    n=args.n,
+                    run=args.run,
+                    dry_run=args.dry_run,
+                    gcs=gcs,
+                    probe=not args.no_probe,
+                    require_vocal_range=args.require_vocal_range,
                 )
             )
+    except VocalRangeMissingError:  # already logged as the one WARNING; nothing was selected
+        return 2
     finally:
         if args.catalog:  # ours; the catalog store's shared reader stays open
             reader.close()
@@ -288,6 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("select", help="Pick the shared pool, probe embeddability, queue it for fetch")
     p.add_argument("--n", type=int, default=1000, help="pool target (default 1000)")
     p.add_argument("--dry-run", action="store_true", help="report only: no queue, BigQuery or GCS writes")
+    p.add_argument(
+        "--require-vocal-range",
+        action="store_true",
+        help="exit 2 (selecting nothing) if catalog.db predates vocal-range data (default: select with unknown strata)",
+    )
     p.add_argument("--no-probe", action="store_true", help="skip the YouTube oEmbed probe")
     p.add_argument("--run", default=datetime.now(UTC).strftime("%Y%m%d-%H%M%S"), help="run id (default: now, UTC)")
     _catalog_args(p)
