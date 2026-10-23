@@ -203,6 +203,22 @@ scripts/local-stack.sh status | down | logs [api|search] | env
   curl -H "Authorization: Bearer $T" 127.0.0.1:8030/api/my/recommendations/v2   # sections
   ```
 
+### Local stack: fakes
+
+The local stack's API always runs with **`DECIDE_FAKE_EXTERNALS=1`** and **`DECIDE_INLINE_TASKS=1`**, so no import ever leaves the machine. The app refuses to start with either flag when `ENVIRONMENT=production`.
+
+- **Fakes** (`backend/fakes/`, mounted at `/fake` only with the flag): ListenBrainz (`/fake/listenbrainz/1`: `user/{u}/listen-count`, `user/{u}/listens` with `min_ts`/`max_ts`/`count` like LB, `stats/user/{u}/artists|recordings`, `validate-token`, `POST import-listens/`, `GET import-listens/{id}/` which says `in_progress` on the first check and `completed` from the second), MetaBrainz OAuth (`/fake/metabrainz/oauth2/authorize|token|userinfo`: authorize skips consent and 302s straight back to the callback with `code=fake-<n>`; token checks the PKCE S256 verifier; refresh tokens rotate), the Spotify embed page (`/fake/spotify/embed/playlist/fixtureplaylist0000001`, every other id 404s; ids are 22 characters, so paste `https://open.spotify.com/playlist/fixtureplaylist0000001`), Last.fm (`/fake/lastfm/2.0/?method=user.getinfo|user.gettoptracks|user.gettopartists|user.getlovedtracks|user.getrecenttracks`; no loved tracks, no scrobbles) and Gemini (`FakeScreenshotExtractor`: artist "Muse" 0.95, song "Adele" / "Hello" 0.9, artist "The Invented Band" 0.6, unmatched in the fixture catalog).
+- **Env** `scripts/local-stack.sh` exports, all on the API's own port (`DECIDE_LOCAL_PORT`, default 8030; Android reaches it through `adb reverse`): `PUBLIC_API_BASE_URL=http://127.0.0.1:$PORT`, `LISTENBRAINZ_API_BASE=…/fake/listenbrainz/1`, `METABRAINZ_BASE_URL=…/fake/metabrainz`, `SPOTIFY_EMBED_BASE=…/fake/spotify`, `LASTFM_API_BASE=…/fake/lastfm/2.0/`, `LISTENBRAINZ_OAUTH_ENABLED=1`, `METABRAINZ_CLIENT_ID=fake`, `METABRAINZ_CLIENT_SECRET=fake`, and `DECIDE_TOKEN_KEY` set to a **test-only** Fernet key committed in the script. `GEMINI_API_KEY` is unset. So `GET /api/services/capabilities` reports `screenshot_import` and `listenbrainz_oauth` both `true`.
+- **Inline tasks:** `CloudTasksService.create_sync_task` POSTs `{PUBLIC_API_BASE_URL}/internal/sync/process` as a background asyncio task instead of creating a Cloud Task (non-production needs no OIDC). It runs as its own request, so the enqueuing request returns at once. There are no retries: a failed run is logged at WARNING.
+- **Default state:** `fixture-user` exists on ListenBrainz (5 recent listens) and Last.fm (3 top tracks, 3 top artists), and MetaBrainz OAuth signs in as `fixture-user`. All fake state is in memory: restarting the API drops issued tokens, so reconnect ListenBrainz after a restart.
+- **Test API** (with `DECIDE_TEST_API=1`; 409 `fake_externals_disabled` while the fakes are off):
+  - `PUT /api/test/fake-externals {"knobs": {...}}`: resets every fake to the defaults, then sets the knobs. Knobs: `metabrainz=deny` (authorize returns `error=access_denied`), `metabrainz_user=<name>`, `spotify_embed=changed` (the import answers 422), `screenshot=fail` (extract answers 503). Unknown knobs are a 422.
+  - `POST /api/test/fake-listenbrainz/users {"username", "listens": [{"artist","title","listened_at"}]}`
+  - `POST /api/test/fake-lastfm/users {"username", "top_tracks": [{"artist","title","playcount"}], "top_artists": [{"name","playcount"}]}`
+  - `POST /api/test/listenbrainz/poll` runs the `lb-poll` job's poller once (listens and pending imports).
+- Running a second stack next to another session's: `DECIDE_LOCAL_PORT=8031 SEARCH_LOCAL_PORT=8022 scripts/local-stack.sh up`. Avoid port 8021 on macOS: launchd holds it for the ftp-proxy service.
+- Tests: `backend/tests/test_fakes.py` runs the app in a real uvicorn server pointed at its own `/fake` routes.
+
 ### Playwright against the local stacks
 
 Drive the web app in a real browser against gen's local stack (:8010) and decide's (:8030/:8020), with profiles seeded via `/api/test/profile/seed`.

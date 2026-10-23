@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
 from backend.api.deps import (
@@ -22,6 +22,7 @@ from backend.api.deps import (
     get_settings,
 )
 from backend.config import BackendSettings
+from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
@@ -227,3 +228,78 @@ async def poll_listenbrainz(
     """Run the daily ``lb-poll`` job's poller once, in-process (local stack and Maestro)."""
     report: PollReport = await poller.run(settings.lb_poll_budget_seconds)
     return PollReportResponse(**vars(report))
+
+
+# ---------------------------------------------------------------------------------------------
+# DECIDE_FAKE_EXTERNALS (backend.fakes): reset the fakes, set knobs, seed fake users.
+# ---------------------------------------------------------------------------------------------
+
+
+def require_fakes(settings: Annotated[BackendSettings, Depends(get_settings)]) -> None:
+    if not settings.decide_fake_externals:
+        raise HTTPException(status.HTTP_409_CONFLICT, "fake_externals_disabled")
+
+
+FakesOn = Depends(require_fakes)
+
+
+class FakeExternalsBody(BaseModel):
+    knobs: dict[str, str] = Field(default_factory=dict)
+
+
+class FakeListenIn(BaseModel):
+    artist: str
+    title: str
+    listened_at: int
+
+
+class FakeListenBrainzUserBody(BaseModel):
+    username: str = Field(min_length=1)
+    listens: list[FakeListenIn] = Field(default_factory=list)
+
+
+class FakeTopTrack(BaseModel):
+    artist: str
+    title: str
+    playcount: int = 1
+
+
+class FakeTopArtist(BaseModel):
+    name: str
+    playcount: int = 1
+
+
+class FakeLastFmUserBody(BaseModel):
+    username: str = Field(min_length=1)
+    top_tracks: list[FakeTopTrack] = Field(default_factory=list)
+    top_artists: list[FakeTopArtist] = Field(default_factory=list)
+
+
+@router.put("/fake-externals", dependencies=[FakesOn])
+async def set_fake_externals(body: FakeExternalsBody) -> dict[str, dict[str, str]]:
+    """Reset every fake (codes, tokens, imports, seeded users back to the defaults) and set the knobs.
+
+    Knobs: ``metabrainz=deny``, ``metabrainz_user=<name>``, ``spotify_embed=changed``, ``screenshot=fail``.
+    """
+    unknown = sorted(set(body.knobs) - KNOWN_KNOBS)
+    if unknown:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown knobs: {', '.join(unknown)}")
+    STATE.reset(body.knobs)
+    return {"knobs": STATE.knobs}
+
+
+@router.post("/fake-listenbrainz/users", dependencies=[FakesOn])
+async def seed_fake_listenbrainz_user(body: FakeListenBrainzUserBody) -> dict[str, Any]:
+    """Create or replace a fake ListenBrainz user and their listens."""
+    STATE.lb_users[body.username] = [FakeListen(x.artist, x.title, x.listened_at) for x in body.listens]
+    return {"username": body.username, "listens": len(body.listens)}
+
+
+@router.post("/fake-lastfm/users", dependencies=[FakesOn])
+async def seed_fake_lastfm_user(body: FakeLastFmUserBody) -> dict[str, Any]:
+    """Create or replace a fake Last.fm user's top tracks and top artists."""
+    STATE.lastfm_users[body.username] = FakeLastFmUser(
+        top_tracks=[t.model_dump() for t in body.top_tracks],
+        top_artists=[a.model_dump() for a in body.top_artists],
+    )
+    return {"username": body.username, "top_tracks": len(body.top_tracks), "top_artists": len(body.top_artists)}

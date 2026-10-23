@@ -382,6 +382,23 @@ class TestCatalogDbMatching:
         mock_catalog_service.batch_match_tracks.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_bigquery_is_created_only_when_needed(
+        self, ready_lookup: "CatalogLookup", monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Under BIGQUERY_DISABLED (the local stack) matching against a loaded catalog.db still works."""
+        from backend.services import track_matcher as tm
+
+        def no_bigquery() -> None:
+            raise RuntimeError("bigquery disabled")
+
+        monkeypatch.setattr(tm, "BigQueryCatalogService", no_bigquery)
+        matcher = TrackMatcher(catalog_lookup=ready_lookup)
+        results = await matcher.batch_match_tracks([{"artist": "Toto", "title": "Africa"}])
+        assert results[0].catalog_song is not None
+        with pytest.raises(RuntimeError, match="bigquery disabled"):
+            matcher.catalog_service  # noqa: B018  (the fallback is built on first use)
+
+    @pytest.mark.asyncio
     async def test_track_matcher_falls_back_to_bigquery_while_warming_up(self, mock_catalog_service: MagicMock) -> None:
         from backend.services.catalog_lookup import CatalogLookup
         from backend.services.catalog_store import CatalogStore

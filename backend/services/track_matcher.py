@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import re
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -77,19 +78,30 @@ class TrackMatcher:
 
     def __init__(
         self,
-        catalog_service: BigQueryCatalogService,
+        catalog_service: BigQueryCatalogService | None = None,
         catalog_lookup: "CatalogLookup | None" = None,
     ):
         """Initialize the track matcher.
 
         Args:
-            catalog_service: BigQuery catalog service for searching songs (fallback).
+            catalog_service: BigQuery catalog service for searching songs (fallback). Created on
+                first use when omitted, so a BIGQUERY_DISABLED process (the local stack) can still
+                match against catalog.db.
             catalog_lookup: Optional catalog.db lookup for instant matching.
         """
-        self.catalog_service = catalog_service
+        self._catalog_service = catalog_service
+        self._catalog_service_lock = threading.Lock()
         self.catalog_lookup = catalog_lookup
         self._compiled_title_patterns = [re.compile(p, re.IGNORECASE) for p in self.TITLE_REMOVE_PATTERNS]
         self._compiled_artist_patterns = [re.compile(p, re.IGNORECASE) for p in self.ARTIST_REMOVE_PATTERNS]
+
+    @property
+    def catalog_service(self) -> BigQueryCatalogService:
+        if self._catalog_service is None:
+            with self._catalog_service_lock:
+                if self._catalog_service is None:
+                    self._catalog_service = BigQueryCatalogService()
+        return self._catalog_service
 
     def normalize_text(self, text: str) -> str:
         """Normalize text for matching.
@@ -393,8 +405,6 @@ def get_track_matcher(
     from backend.services.catalog_lookup import get_catalog_lookup
 
     if _track_matcher is None or catalog_service is not None:
-        if catalog_service is None:
-            catalog_service = BigQueryCatalogService()
         if catalog_lookup is None:
             catalog_lookup = get_catalog_lookup()
         _track_matcher = TrackMatcher(catalog_service, catalog_lookup)
