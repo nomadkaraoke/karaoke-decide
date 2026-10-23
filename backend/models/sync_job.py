@@ -5,6 +5,27 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+# An in-progress job with no heartbeat for this long is stalled (its instance died or hung).
+# BigQuery matching can take 3+ minutes for large track sets, so 5 minutes is reasonable.
+STALE_JOB_THRESHOLD_SECONDS = 300
+
+# A PENDING job is waiting for a Cloud Tasks delivery. A failed run is requeued as PENDING and the
+# queue retries it after up to max_backoff (600 s, infrastructure/__main__.py), so it only counts
+# as lost (stalled) once it has waited longer than that.
+STALE_PENDING_THRESHOLD_SECONDS = 900
+
+# A job that fails (or is resumed after stalling) this many times is marked failed for good.
+MAX_SYNC_RESUMES = 5
+
+
+class RunSupersededError(Exception):
+    """Another delivery claimed this sync job; the current run must stop writing.
+
+    Raised by the progress callback. Per-service sync wrappers must re-raise it ahead of
+    their broad ``except Exception`` handlers so a superseded run stops at once and leaves
+    per-service status to the run that now owns the job.
+    """
+
 
 class SyncJobStatus(str, Enum):
     """Sync job status values."""
@@ -59,6 +80,23 @@ class SyncJob:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
+    resume_count: int = 0
+    run_id: str | None = None  # token of the run that owns the job; only that run may write results
+
+    def is_stalled(self, now: datetime | None = None) -> bool:
+        """True if the job should be running (running, or queued) but nothing has touched it for too long.
+
+        A pending job past STALE_PENDING_THRESHOLD_SECONDS has lost its Cloud Task (or exhausted
+        the queue's retries); before that a scheduled retry may still be on its way.
+        """
+        if self.status == SyncJobStatus.IN_PROGRESS:
+            threshold = STALE_JOB_THRESHOLD_SECONDS
+        elif self.status == SyncJobStatus.PENDING:
+            threshold = STALE_PENDING_THRESHOLD_SECONDS
+        else:
+            return False
+        age = ((now or datetime.now(UTC)) - self.updated_at).total_seconds()
+        return age > threshold
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to Firestore document dict."""
@@ -90,6 +128,8 @@ class SyncJob:
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "resume_count": self.resume_count,
+            "run_id": self.run_id,
         }
 
     @classmethod
@@ -127,4 +167,6 @@ class SyncJob:
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(UTC),
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(UTC),
             completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            resume_count=data.get("resume_count", 0),
+            run_id=data.get("run_id"),
         )

@@ -9,6 +9,7 @@ from backend.config import BackendSettings
 from backend.services.music_service_service import MusicServiceError, MusicServiceService
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
+from karaoke_decide.services.spotify import SpotifyInvalidGrantError
 
 
 @pytest.fixture
@@ -329,6 +330,41 @@ class TestServiceCRUD:
         mock_firestore.update_document.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_spotify_reconnect_clears_needs_reconnect(
+        self,
+        service: MusicServiceService,
+        mock_firestore: MagicMock,
+        sample_spotify_service: MusicService,
+    ) -> None:
+        """Reconnecting after a dead refresh token clears error_code and the error status."""
+        now = datetime.now(UTC)
+        mock_firestore.get_document = AsyncMock(
+            return_value={
+                "id": sample_spotify_service.id,
+                "user_id": sample_spotify_service.user_id,
+                "service_type": "spotify",
+                "service_user_id": sample_spotify_service.service_user_id,
+                "service_username": sample_spotify_service.service_username,
+                "access_token": "old-token",
+                "refresh_token": "revoked-refresh",
+                "token_expires_at": (now - timedelta(hours=1)).isoformat(),
+                "sync_status": "error",
+                "sync_error": "Spotify access expired. Reconnect Spotify.",
+                "error_code": "needs_reconnect",
+                "created_at": sample_spotify_service.created_at.isoformat(),
+                "updated_at": sample_spotify_service.updated_at.isoformat(),
+            }
+        )
+        tokens = {"access_token": "fresh-access", "refresh_token": "fresh-refresh", "expires_in": 3600}
+
+        await service.create_or_update_spotify_service("user_123", tokens, {"id": "spotify-user"})
+
+        written = mock_firestore.update_document.call_args.args[2]
+        assert written["error_code"] is None
+        assert written["sync_status"] == "idle"
+        assert written["sync_error"] is None
+
+    @pytest.mark.asyncio
     async def test_create_lastfm_service(self, service: MusicServiceService, mock_firestore: MagicMock) -> None:
         """Creates Last.fm service connection."""
         mock_firestore.get_document = AsyncMock(return_value=None)  # No existing service
@@ -527,6 +563,39 @@ class TestTokenRefresh:
 
         with pytest.raises(MusicServiceError, match="Failed to refresh"):
             await service.refresh_spotify_token_if_needed(expired_service)
+
+    @pytest.mark.asyncio
+    async def test_invalid_grant_sets_needs_reconnect(
+        self, service: MusicServiceService, mock_firestore: MagicMock, mock_spotify_client: MagicMock
+    ) -> None:
+        """A revoked refresh token flags the connection so the summary shows needs_reconnect."""
+        now = datetime.now(UTC)
+        expired = MusicService(
+            id="user_123_spotify",
+            user_id="user_123",
+            service_type="spotify",
+            service_user_id="spotify-123",
+            service_username="User",
+            access_token="old-token",
+            refresh_token="revoked-refresh-token",
+            token_expires_at=now - timedelta(minutes=10),
+            created_at=now,
+            updated_at=now,
+        )
+        stored = {"user_id": "user_123", "service_type": "spotify", "refresh_token": "revoked-refresh-token"}
+        written: dict = {}
+
+        async def transform(collection: str, doc_id: str, fn: object) -> None:
+            written.update(fn(stored))  # type: ignore[operator]
+
+        mock_firestore.transform_document_atomically = AsyncMock(side_effect=transform)
+        mock_spotify_client.refresh_token = AsyncMock(side_effect=SpotifyInvalidGrantError())
+
+        with pytest.raises(MusicServiceError, match="reconnected"):
+            await service.refresh_spotify_token_if_needed(expired)
+
+        assert written["sync_status"] == "error"
+        assert written["error_code"] == "needs_reconnect"
 
     @pytest.mark.asyncio
     async def test_get_valid_spotify_token(

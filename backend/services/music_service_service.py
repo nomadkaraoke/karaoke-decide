@@ -19,7 +19,7 @@ from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperToken
 from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.metabrainz_oauth import MetaBrainzInvalidGrantError, MetaBrainzOAuth
-from karaoke_decide.services.spotify import SpotifyClient
+from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError
 
 if TYPE_CHECKING:
     from backend.services.token_cipher import TokenCipher
@@ -401,7 +401,12 @@ class MusicServiceService:
                 "access_token": self._cipher.encrypt(tokens.get("access_token")),
                 "token_expires_at": token_expires_at.isoformat(),
                 "updated_at": now.isoformat(),
+                # A reconnect clears a needs_reconnect flag left by a dead refresh token
+                "error_code": None,
             }
+            if existing.sync_status == "error":
+                update_data["sync_status"] = "idle"
+                update_data["sync_error"] = None
 
             # Only update refresh_token if provided (Spotify doesn't always return it)
             if tokens.get("refresh_token"):
@@ -900,6 +905,13 @@ class MusicServiceService:
         # Refresh token
         try:
             tokens = await self.spotify.refresh_token(service.refresh_token)
+        except SpotifyInvalidGrantError:
+            service_id = self._get_service_id(service.user_id, "spotify")
+            logger.warning("Spotify refresh token for %s was revoked or expired; needs reconnect", service_id)
+            await self._mark_needs_reconnect(
+                service_id, "Spotify access expired. Reconnect Spotify.", service.refresh_token
+            )
+            raise MusicServiceError("Spotify needs to be reconnected")
         except ExternalServiceError as e:
             raise MusicServiceError(f"Failed to refresh Spotify token: {e}")
 
@@ -1004,20 +1016,24 @@ class MusicServiceService:
         except Exception:
             logger.warning("Could not release ListenBrainz refresh lease %s", service_id, exc_info=True)
 
-    _NEEDS_RECONNECT_FIELDS: dict[str, Any] = {
-        "sync_status": "error",
-        "sync_error": "ListenBrainz access expired. Reconnect ListenBrainz.",
-        "error_code": "needs_reconnect",
-        "refresh_lease_until": None,
-    }
+    _LB_RECONNECT_MESSAGE = "ListenBrainz access expired. Reconnect ListenBrainz."
 
     async def _mark_listenbrainz_needs_reconnect(self, service_id: str, used_refresh_token: str | None = None) -> bool:
+        return await self._mark_needs_reconnect(service_id, self._LB_RECONNECT_MESSAGE, used_refresh_token)
+
+    async def _mark_needs_reconnect(self, service_id: str, message: str, used_refresh_token: str | None = None) -> bool:
         """Mark the connection ``needs_reconnect``; returns whether it was marked.
 
         With ``used_refresh_token``, only if the stored refresh token is still that one: a
         reconnect that landed meanwhile stored fresh tokens, which must not be flagged dead.
         """
-        fields = {**self._NEEDS_RECONNECT_FIELDS, "updated_at": datetime.now(UTC).isoformat()}
+        fields = {
+            "sync_status": "error",
+            "sync_error": message,
+            "error_code": "needs_reconnect",
+            "refresh_lease_until": None,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
         if used_refresh_token is None:
             await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
             return True

@@ -474,7 +474,13 @@
     "redirectingBack": "Omdirigerer dig tilbage...",
     "connectionFailed": "Forbindelse mislykkedes",
     "tryAgain": "Prøv igen",
-    "backToHome": "Tilbage til forsiden"
+    "backToHome": "Tilbage til forsiden",
+    "spotifyErrorDenied": "Du afviste adgang på Spotify, så der blev ikke oprettet forbindelse.",
+    "spotifyErrorExchangeFailed": "Vi kunne ikke fuldføre forbindelsen til Spotify. Prøv venligst igen.",
+    "spotifyErrorInvalidState": "Dette forbindelseslink er udløbet. Start venligst forfra.",
+    "spotifyErrorMissingParams": "Forbindelsessvaret fra Spotify var ufuldstændigt. Prøv venligst igen.",
+    "spotifyErrorSpotify": "Spotify meldte om et problem under oprettelse af forbindelsen. Prøv venligst igen.",
+    "spotifyErrorUnknown": "Der opstod en ukendt fejl"
   },
   "admin": {
     "backToApp": "Tilbage til app",

@@ -474,7 +474,13 @@
     "redirectingBack": "Mengalihkan anda kembali...",
     "connectionFailed": "Sambungan Gagal",
     "tryAgain": "Cuba Lagi",
-    "backToHome": "Kembali ke Laman Utama"
+    "backToHome": "Kembali ke Laman Utama",
+    "spotifyErrorDenied": "Anda telah menolak akses di Spotify, jadi tiada apa yang disambungkan.",
+    "spotifyErrorExchangeFailed": "Kami tidak dapat melengkapkan sambungan ke Spotify. Sila cuba lagi.",
+    "spotifyErrorInvalidState": "Pautan sambungan ini telah tamat tempoh. Sila cuba semula dari awal.",
+    "spotifyErrorMissingParams": "Maklum balas sambungan daripada Spotify tidak lengkap. Sila cuba lagi.",
+    "spotifyErrorSpotify": "Spotify melaporkan masalah semasa menyambung. Sila cuba lagi.",
+    "spotifyErrorUnknown": "Ralat yang tidak diketahui telah berlaku"
   },
   "admin": {
     "backToApp": "Kembali ke Apl",

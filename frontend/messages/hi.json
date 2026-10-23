@@ -474,7 +474,13 @@
     "redirectingBack": "तुम्हें वापस रीडायरेक्ट किया जा रहा है...",
     "connectionFailed": "कनेक्शन विफल",
     "tryAgain": "फिर से कोशिश करो",
-    "backToHome": "होम पर वापस जाओ"
+    "backToHome": "होम पर वापस जाओ",
+    "spotifyErrorDenied": "तुमने Spotify पर अनुमति देने से मना कर दिया, इसलिए कुछ भी कनेक्ट नहीं हुआ।",
+    "spotifyErrorExchangeFailed": "हम Spotify से कनेक्ट नहीं कर सके। कृपया फिर से कोशिश करो।",
+    "spotifyErrorInvalidState": "यह कनेक्शन लिंक एक्सपायर हो चुका है। कृपया फिर से शुरू करो।",
+    "spotifyErrorMissingParams": "Spotify से कनेक्शन रिस्पॉन्स अधूरा था। कृपया फिर से कोशिश करो।",
+    "spotifyErrorSpotify": "कनेक्ट करते समय Spotify की तरफ से कोई समस्या आई। कृपया फिर से कोशिश करो।",
+    "spotifyErrorUnknown": "कोई अज्ञात गड़बड़ी हुई"
   },
   "admin": {
     "backToApp": "ऐप पर वापस जाओ",

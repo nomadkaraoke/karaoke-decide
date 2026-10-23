@@ -474,7 +474,13 @@
     "redirectingBack": "Omdirigerar dig tillbaka...",
     "connectionFailed": "Anslutning misslyckades",
     "tryAgain": "Försök igen",
-    "backToHome": "Tillbaka till startsidan"
+    "backToHome": "Tillbaka till startsidan",
+    "spotifyErrorDenied": "Du nekade åtkomst på Spotify, så inget anslöts.",
+    "spotifyErrorExchangeFailed": "Vi kunde inte slutföra anslutningen till Spotify. Försök igen.",
+    "spotifyErrorInvalidState": "Den här anslutningslänken har upphört att gälla. Börja om på nytt.",
+    "spotifyErrorMissingParams": "Anslutningssvaret från Spotify var ofullständigt. Försök igen.",
+    "spotifyErrorSpotify": "Spotify rapporterade ett problem vid anslutningen. Försök igen.",
+    "spotifyErrorUnknown": "Ett okänt fel inträffade"
   },
   "admin": {
     "backToApp": "Tillbaka till appen",

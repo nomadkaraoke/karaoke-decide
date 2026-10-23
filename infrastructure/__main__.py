@@ -147,9 +147,11 @@ sync_tasks_queue = gcp.cloudtasks.Queue(
         "max_concurrent_dispatches": 5,
     },
     retry_config={
-        "max_attempts": 3,
-        "min_backoff": "10s",
-        "max_backoff": "300s",
+        # 503 "in_progress" retries must span the 300 s stale window, and the 5-resume cap
+        # (backend.models.sync_job.MAX_SYNC_RESUMES) must be reachable.
+        "max_attempts": 10,
+        "min_backoff": "60s",
+        "max_backoff": "600s",
         "max_doublings": 3,
     },
     stackdriver_logging_config={

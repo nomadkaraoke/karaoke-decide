@@ -474,7 +474,13 @@
     "redirectingBack": "Presmerovávam ťa späť...",
     "connectionFailed": "Pripojenie zlyhalo",
     "tryAgain": "Skúsiť znova",
-    "backToHome": "Späť domov"
+    "backToHome": "Späť domov",
+    "spotifyErrorDenied": "V službe Spotify si zamietol prístup, takže sa nič neprepojilo.",
+    "spotifyErrorExchangeFailed": "Prepojenie so službou Spotify sa nepodarilo dokončiť. Skús to znova, prosím.",
+    "spotifyErrorInvalidState": "Platnosť tohto odkazu na prepojenie vypršala. Začni, prosím, odznova.",
+    "spotifyErrorMissingParams": "Odpoveď o prepojení zo služby Spotify bola neúplná. Skús to znova, prosím.",
+    "spotifyErrorSpotify": "Služba Spotify nahlásila pri pripájaní problém. Skús to znova, prosím.",
+    "spotifyErrorUnknown": "Vyskytla sa neznáma chyba"
   },
   "admin": {
     "backToApp": "Späť do aplikácie",

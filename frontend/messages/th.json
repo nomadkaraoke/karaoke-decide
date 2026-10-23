@@ -474,7 +474,13 @@
     "redirectingBack": "กำลังพาคุณกลับไป...",
     "connectionFailed": "การเชื่อมต่อล้มเหลว",
     "tryAgain": "ลองอีกครั้ง",
-    "backToHome": "กลับไปหน้าแรก"
+    "backToHome": "กลับไปหน้าแรก",
+    "spotifyErrorDenied": "คุณปฏิเสธการเข้าถึงบน Spotify จึงไม่มีการเชื่อมต่อใดๆ เกิดขึ้น",
+    "spotifyErrorExchangeFailed": "เราไม่สามารถเชื่อมต่อกับ Spotify ได้อย่างสมบูรณ์ โปรดลองอีกครั้ง",
+    "spotifyErrorInvalidState": "ลิงก์การเชื่อมต่อนี้หมดอายุแล้ว โปรดเริ่มใหม่อีกครั้ง",
+    "spotifyErrorMissingParams": "ข้อมูลการตอบกลับจาก Spotify ไม่ครบถ้วน โปรดลองอีกครั้ง",
+    "spotifyErrorSpotify": "Spotify แจ้งปัญหาขณะเชื่อมต่อ โปรดลองอีกครั้ง",
+    "spotifyErrorUnknown": "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ"
   },
   "admin": {
     "backToApp": "กลับไปที่แอป",

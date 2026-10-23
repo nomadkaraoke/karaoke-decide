@@ -474,7 +474,13 @@
     "redirectingBack": "Σε ανακατευθύνουμε πίσω...",
     "connectionFailed": "Η Σύνδεση Απέτυχε",
     "tryAgain": "Προσπάθησε Ξανά",
-    "backToHome": "Πίσω στην Αρχική"
+    "backToHome": "Πίσω στην Αρχική",
+    "spotifyErrorDenied": "Απέρριψες την πρόσβαση στο Spotify, οπότε δεν συνδέθηκε τίποτα.",
+    "spotifyErrorExchangeFailed": "Δεν μπορέσαμε να ολοκληρώσουμε τη σύνδεση με το Spotify. Δοκίμασε ξανά.",
+    "spotifyErrorInvalidState": "Αυτός ο σύνδεσμος σύνδεσης έχει λήξει. Δοκίμασε από την αρχή.",
+    "spotifyErrorMissingParams": "Η απάντηση σύνδεσης από το Spotify ήταν ελλιπής. Δοκίμασε ξανά.",
+    "spotifyErrorSpotify": "Το Spotify ανέφερε ένα πρόβλημα κατά τη σύνδεση. Δοκίμασε ξανά.",
+    "spotifyErrorUnknown": "Παρουσιάστηκε άγνωστο σφάλμα"
   },
   "admin": {
     "backToApp": "Πίσω στην Εφαρμογή",

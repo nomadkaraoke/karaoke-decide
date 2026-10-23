@@ -188,7 +188,7 @@ Screenshot (Gemini Flash, AI Studio key), public Spotify playlist (embed page), 
 
 ### 2c. ListenBrainz poller (`lb-poll` Cloud Run Job)
 
-Daily at 06:30 UTC, Cloud Scheduler runs the `lb-poll` job (`python -m backend.jobs.lb_poll`, same image, SA `lb-poll`, 1800 s, no retries). It waits for catalog.db (exits 1 without it), then polls every ListenBrainz connection (never-polled first, then the oldest): the first poll backfills up to 20 pages (`play_mode=max`), later polls add new listens since the cursor (`add`). It shares a 25 req/min rate gate, marks `lb_stale` after 30 days without listens, and checks a pending export import first. It stops starting users when the 1500 s budget is spent. It logs one INFO summary per run and at most one ERROR. Local/e2e: `POST /api/test/listenbrainz/poll`.
+Daily at 06:30 UTC, Cloud Scheduler runs the `lb-poll` job (`python -m backend.jobs.lb_poll`, same image, SA `lb-poll`, 1800 s, no retries). It waits for catalog.db (exits 1 without it), then polls every ListenBrainz connection (never-polled first, then the oldest): the first poll backfills up to 20 pages (`play_mode=max`), later polls add new listens since the cursor (`add`). It shares a 25 req/min rate gate, marks `lb_stale` after 30 days without listens, and checks a pending export import first. It stops starting users when the 1500 s budget is spent. It logs one INFO summary per run and at most one ERROR, as JSON lines with `severity` (`configure_job_logging`, the lb-refresh/mb-refresh format) so Cloud Logging and the error monitor classify them. Local/e2e: `POST /api/test/listenbrainz/poll`.
 
 ### 3. Listening History Sync
 
@@ -211,6 +211,15 @@ POST /api/services/sync
             │
             └─→ (same flow as Spotify; artists ranked by appearances, source "apple_music")
 ```
+
+**How a sync runs (resume and fencing).** `POST /api/services/sync` writes a `sync_jobs` doc (`pending`) and enqueues a Cloud Task to `/internal/sync/process`.
+- **Claim.** Each delivery claims the job in one Firestore transaction (`_claim_job` in `backend/api/routes/internal.py`). A claim sets `in_progress`, a fresh `updated_at` and a new `run_id`. If another run's heartbeat is fresh, the delivery gets a 503 (`Retry-After: 60`), so Cloud Tasks retries later instead of racing it. Claiming a stalled job counts as a resume. At `MAX_SYNC_RESUMES` (5) the job is failed instead.
+- **Heartbeat and fencing.** The running delivery heartbeats `updated_at` every 60 s. Every write (heartbeat, progress, result, failure) is a transaction that checks the job's `run_id` still matches. When a newer run has taken over, the progress callback raises `RunSupersededError` (`backend/models/sync_job.py`). Every per-service wrapper in `SyncService` re-raises it ahead of its broad error handler, so a superseded run stops at once, writes no per-service status, and answers 503.
+- **Resume.** Last.fm resumes from its scrobble checkpoint (`oldest_scrobble_timestamp`). A run that fails puts the job back to `pending` and answers 500, so Cloud Tasks retries it.
+- **Stalled.** An `in_progress` job is stalled after 300 s with no heartbeat. A `pending` job is stalled after 900 s, longer than the queue's 600 s max backoff, so a scheduled retry is never reported as lost. `GET /sync/status` shows `stalled`. `POST /sync` re-enqueues the stalled job instead of starting a second one.
+- **Queue** (`music-sync-queue`, `infrastructure/__main__.py`): `max_attempts` 10, backoff 60 s → 600 s, `max_doublings` 3. These retries span the 300 s stale window, and the 5-resume cap can still be reached.
+
+**Background work stays off the event loop.** Sync and imports run on the API service. Their blocking steps run on a bounded `ThreadPoolExecutor(max_workers=2, thread_name_prefix="ingest")` through `run_ingest` (`backend/services/ingest_executor.py`). Those steps are `TrackMatcher.batch_match_tracks` (normalising, catalog.db or the BigQuery fallback), the Last.fm artist-metadata BigQuery lookup, export-chunk aggregation, and `ImportIngestService`'s resolve, group and doc building. They never take threads from the default executor, which user requests' `asyncio.to_thread` calls (catalog search, recs) share. That executor has `min(32, cpus + 4)` workers, which is 5 on 1 vCPU. Startup logs `os.cpu_count()` and both pool sizes. `backend/tests/test_event_loop_responsiveness.py` checks that `/api/health` stays fast during a 5,000-track match and during a 20,000-track export chunk.
 
 ### 4. Song Discovery
 

@@ -474,7 +474,13 @@
     "redirectingBack": "원래 화면으로 돌아가는 중...",
     "connectionFailed": "연결 실패",
     "tryAgain": "다시 시도",
-    "backToHome": "홈으로 돌아가기"
+    "backToHome": "홈으로 돌아가기",
+    "spotifyErrorDenied": "Spotify에서 권한 요청을 거부하여 연결되지 않았습니다.",
+    "spotifyErrorExchangeFailed": "Spotify 연결을 완료하지 못했습니다. 다시 시도해 주세요.",
+    "spotifyErrorInvalidState": "연결 링크가 만료되었습니다. 처음부터 다시 진행해 주세요.",
+    "spotifyErrorMissingParams": "Spotify의 연결 응답 정보가 완전하지 않습니다. 다시 시도해 주세요.",
+    "spotifyErrorSpotify": "Spotify 연결 중 문제가 발생했습니다. 다시 시도해 주세요.",
+    "spotifyErrorUnknown": "알 수 없는 오류가 발생했습니다."
   },
   "admin": {
     "backToApp": "앱으로 돌아가기",

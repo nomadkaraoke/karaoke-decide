@@ -474,7 +474,13 @@
     "redirectingBack": "جاري توجيهك للعودة...",
     "connectionFailed": "فشل الاتصال",
     "tryAgain": "حاول مرة أخرى",
-    "backToHome": "العودة للرئيسية"
+    "backToHome": "العودة للرئيسية",
+    "spotifyErrorDenied": "لقد رفضت منح الإذن على Spotify، لذلك لم يتم ربط أي شيء.",
+    "spotifyErrorExchangeFailed": "تعذّر علينا إكمال الاتصال بـ Spotify. يُرجى المحاولة مرة أخرى.",
+    "spotifyErrorInvalidState": "انتهت صلاحية رابط الاتصال هذا. يُرجى البدء من جديد.",
+    "spotifyErrorMissingParams": "استجابة الاتصال الواردة من Spotify غير مكتملة. يُرجى المحاولة مرة أخرى.",
+    "spotifyErrorSpotify": "أبلغ Spotify عن مشكلة أثناء الاتصال. يُرجى المحاولة مرة أخرى.",
+    "spotifyErrorUnknown": "حدث خطأ غير معروف"
   },
   "admin": {
     "backToApp": "العودة للتطبيق",

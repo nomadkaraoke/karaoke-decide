@@ -474,7 +474,13 @@
     "redirectingBack": "Redirecionando você de volta...",
     "connectionFailed": "Falha na Conexão",
     "tryAgain": "Tentar Novamente",
-    "backToHome": "Voltar ao Início"
+    "backToHome": "Voltar ao Início",
+    "spotifyErrorDenied": "Você recusou o acesso no Spotify, então nada foi conectado.",
+    "spotifyErrorExchangeFailed": "Não foi possível concluir a conexão com o Spotify. Tente novamente.",
+    "spotifyErrorInvalidState": "Este link de conexão expirou. Tente começar novamente.",
+    "spotifyErrorMissingParams": "A resposta de conexão do Spotify estava incompleta. Tente novamente.",
+    "spotifyErrorSpotify": "O Spotify relatou um problema ao conectar. Tente novamente.",
+    "spotifyErrorUnknown": "Ocorreu um erro desconhecido"
   },
   "admin": {
     "backToApp": "Voltar para o App",

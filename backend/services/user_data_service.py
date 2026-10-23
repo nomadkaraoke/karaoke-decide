@@ -6,6 +6,7 @@ Provides functionality for the My Data page, including:
 - Data aggregation for summary view
 """
 
+import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -518,7 +519,7 @@ class UserDataService:
         # Look up metadata from BigQuery
         if self._bigquery_catalog:
             try:
-                metadata = self._bigquery_catalog.lookup_artist_by_name(artist_name)
+                metadata = await asyncio.to_thread(self._bigquery_catalog.lookup_artist_by_name, artist_name)
                 if metadata:
                     artist_data["genres"] = metadata.genres
                     artist_data["popularity"] = metadata.popularity

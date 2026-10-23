@@ -6,6 +6,7 @@ karaoke songs they might enjoy singing.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Literal
@@ -279,7 +280,7 @@ class RecommendationService:
         # Section 3: Crowd Pleasers (popular karaoke songs for discovery)
         crowd_pleasers: list[Recommendation] = []
         if has_karaoke is not False:
-            popular_songs = self._get_popular_songs(limit=self.CROWD_PLEASER_LIMIT * 5)
+            popular_songs = await asyncio.to_thread(self._get_popular_songs, limit=self.CROWD_PLEASER_LIMIT * 5)
             scored_popular = []
             for song in popular_songs:
                 if song["id"] not in context.known_song_ids:
@@ -646,7 +647,8 @@ class RecommendationService:
 
         # Strategy 1: Songs from known artists (not already in library)
         if context.known_artists:
-            artist_songs = self._get_songs_by_artists(
+            artist_songs = await asyncio.to_thread(  # BigQuery
+                self._get_songs_by_artists,
                 list(context.known_artists)[:50],  # Limit artists
                 limit=limit,
             )
@@ -670,7 +672,7 @@ class RecommendationService:
 
         # Strategy 2: Popular karaoke songs (crowd pleasers)
         if len(scored) < limit:
-            popular_songs = self._get_popular_songs(limit=limit)
+            popular_songs = await asyncio.to_thread(self._get_popular_songs, limit=limit)
 
             for song in popular_songs:
                 if song["id"] not in context.known_song_ids:
@@ -947,7 +949,7 @@ class RecommendationService:
         Returns:
             List of Recommendation objects.
         """
-        songs = self._get_popular_songs(limit)
+        songs = await asyncio.to_thread(self._get_popular_songs, limit=limit)
 
         return [
             Recommendation(

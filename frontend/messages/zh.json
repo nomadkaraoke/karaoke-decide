@@ -474,7 +474,13 @@
     "redirectingBack": "正在重定向返回...",
     "connectionFailed": "连接失败",
     "tryAgain": "重试",
-    "backToHome": "返回首页"
+    "backToHome": "返回首页",
+    "spotifyErrorDenied": "您拒绝了 Spotify 的授权，因此未能建立连接。",
+    "spotifyErrorExchangeFailed": "未能完成与 Spotify 的连接，请重试。",
+    "spotifyErrorInvalidState": "连接已过期，请重新开始。",
+    "spotifyErrorMissingParams": "来自 Spotify 的连接响应不完整，请重试。",
+    "spotifyErrorSpotify": "连接时 Spotify 反馈出现问题，请重试。",
+    "spotifyErrorUnknown": "发生未知错误"
   },
   "admin": {
     "backToApp": "返回应用",

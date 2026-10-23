@@ -13,6 +13,7 @@ from backend.api.routes import internal_api_router, router
 from backend.config import BackendSettings, get_backend_settings
 from backend.logging_config import configure_logging
 from backend.services.catalog_store import get_catalog_store
+from backend.services.ingest_executor import log_pool_sizes
 from karaoke_decide.core.lazy_import import preload
 
 configure_logging()
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     settings = get_backend_settings()
     logger.info(f"Starting Karaoke Decide API ({settings.environment})")
+    log_pool_sizes()
 
     preloading = preload(PRELOAD_MODULES)
 

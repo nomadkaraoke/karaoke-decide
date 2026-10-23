@@ -474,7 +474,13 @@
     "redirectingBack": "Đang chuyển hướng bạn quay lại...",
     "connectionFailed": "Kết nối thất bại",
     "tryAgain": "Thử lại",
-    "backToHome": "Quay lại trang chủ"
+    "backToHome": "Quay lại trang chủ",
+    "spotifyErrorDenied": "Bạn đã từ chối cấp quyền truy cập trên Spotify, nên chưa có tài khoản nào được kết nối.",
+    "spotifyErrorExchangeFailed": "Chúng tôi không thể hoàn tất kết nối với Spotify. Vui lòng thử lại.",
+    "spotifyErrorInvalidState": "Liên kết kết nối đã hết hạn. Vui lòng thử lại từ đầu.",
+    "spotifyErrorMissingParams": "Phản hồi kết nối từ Spotify không đầy đủ thông tin. Vui lòng thử lại.",
+    "spotifyErrorSpotify": "Spotify gặp sự cố trong quá trình kết nối. Vui lòng thử lại.",
+    "spotifyErrorUnknown": "Đã xảy ra lỗi không xác định"
   },
   "admin": {
     "backToApp": "Quay lại ứng dụng",

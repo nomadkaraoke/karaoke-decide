@@ -474,7 +474,13 @@
     "redirectingBack": "Przekierowywanie z powrotem...",
     "connectionFailed": "Połączenie nie powiodło się",
     "tryAgain": "Spróbuj ponownie",
-    "backToHome": "Powrót na stronę główną"
+    "backToHome": "Powrót na stronę główną",
+    "spotifyErrorDenied": "Dostęp w Spotify został przez Ciebie odrzucony, więc nic nie połączono.",
+    "spotifyErrorExchangeFailed": "Nie udało się dokończyć łączenia ze Spotify. Spróbuj ponownie.",
+    "spotifyErrorInvalidState": "Ten link autoryzacyjny wygasł. Spróbuj od początku.",
+    "spotifyErrorMissingParams": "Odpowiedź ze Spotify była niekompletna. Spróbuj ponownie.",
+    "spotifyErrorSpotify": "Spotify zgłosiło problem podczas łączenia. Spróbuj ponownie.",
+    "spotifyErrorUnknown": "Wystąpił nieznany błąd"
   },
   "admin": {
     "backToApp": "Powrót do aplikacji",

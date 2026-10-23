@@ -6,7 +6,7 @@ import pytest
 
 from karaoke_decide.core.config import Settings
 from karaoke_decide.core.exceptions import ExternalServiceError, RateLimitError
-from karaoke_decide.services.spotify import SpotifyClient
+from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError
 
 
 @pytest.fixture
@@ -75,6 +75,14 @@ class TestGetAuthUrl:
         """Test auth URL includes redirect URI."""
         url = spotify_client.get_auth_url("state")
         assert "redirect_uri=" in url
+
+    def test_auth_url_encodes_scope_and_redirect(self, spotify_client: SpotifyClient) -> None:
+        """Scopes are joined with %20 and the redirect URI is fully percent-encoded."""
+        spotify_client.redirect_uri = "https://example.com/api/services/spotify/callback"
+        url = spotify_client.get_auth_url("state")
+
+        assert f"scope={'%20'.join(SpotifyClient.SCOPES)}&" in url
+        assert "redirect_uri=https%3A%2F%2Fexample.com%2Fapi%2Fservices%2Fspotify%2Fcallback" in url
 
 
 class TestExchangeCode:
@@ -147,6 +155,34 @@ class TestRefreshToken:
 
             with pytest.raises(ExternalServiceError):
                 await spotify_client.refresh_token("bad_token")
+
+    @pytest.mark.asyncio
+    async def test_refresh_invalid_grant_raises(self, spotify_client: SpotifyClient) -> None:
+        """A 400 invalid_grant means the user must reconnect: a dedicated error type."""
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = '{"error":"invalid_grant","error_description":"Refresh token revoked"}'
+        mock_response.json.return_value = {"error": "invalid_grant", "error_description": "Refresh token revoked"}
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+
+            with pytest.raises(SpotifyInvalidGrantError):
+                await spotify_client.refresh_token("revoked")
+
+    @pytest.mark.asyncio
+    async def test_refresh_other_400_is_plain_external_error(self, spotify_client: SpotifyClient) -> None:
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "<html>bad</html>"
+        mock_response.json.side_effect = ValueError("not json")
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.post = AsyncMock(return_value=mock_response)
+
+            with pytest.raises(ExternalServiceError) as exc:
+                await spotify_client.refresh_token("x")
+            assert not isinstance(exc.value, SpotifyInvalidGrantError)
 
 
 class TestApiRequest:

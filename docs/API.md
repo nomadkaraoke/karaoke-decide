@@ -626,7 +626,17 @@ Redirects to frontend success/error page.
 | state | string | CSRF protection state token |
 | error | string | Error code if auth failed |
 
-**Response:** Redirect to `{frontend_url}/services/spotify/success` or `{frontend_url}/services/spotify/error?message=...`
+**Response:** Redirect to `{frontend_url}/services/spotify/success` or `{frontend_url}/services/spotify/error?message=<code>`. The code is a fixed value. It is never Spotify's raw error text or an exception message.
+
+| `message` | Meaning |
+|-----------|---------|
+| `denied` | The user declined on Spotify (`error=access_denied`) |
+| `spotify_error` | Spotify returned any other `error` |
+| `missing_params` | No `code` or `state` |
+| `invalid_state` | The state is malformed, unknown or expired |
+| `exchange_failed` | The token exchange or profile fetch failed (details are logged at WARNING) |
+
+A reconnect clears a `needs_reconnect` flag (`error_code`) and an `error` sync status. Those are left when a refresh token is revoked (Spotify `invalid_grant`).
 
 ### POST /api/services/lastfm/connect
 
@@ -817,6 +827,8 @@ Trigger async listening history sync for all connected services. Sync runs in ba
 }
 ```
 
+If the user's latest job is stalled, it is re-enqueued and returned with `"status": "stalled"` instead of a new job.
+
 ### GET /api/services/sync/status
 
 Get current sync status for all connected services and any active sync job.
@@ -855,7 +867,9 @@ Get current sync status for all connected services and any active sync job.
 }
 ```
 
-**Job statuses:** `pending`, `in_progress`, `completed`, `failed`
+**Job statuses:** `pending`, `in_progress`, `stalled`, `completed`, `failed`
+
+`stalled` is computed when the status is read; it is never stored. It means the job should be running but nothing has touched it. For an `in_progress` job that is no heartbeat for 300 s, because its instance died or hung. For a `pending` job it is 900 s, because its Cloud Task was lost or ran out of retries. A Cloud Tasks retry, or the next `POST /api/services/sync`, resumes a stalled job from its checkpoint.
 
 ---
 

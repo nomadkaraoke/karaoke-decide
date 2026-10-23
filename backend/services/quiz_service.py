@@ -150,7 +150,7 @@ class QuizService:
         when BigQuery is disabled or fails, so a quiz submit never fails on this enrichment."""
         if not self.settings.bigquery_disabled:
             try:
-                mbid_map = self.catalog.lookup_mbids_by_names(names)
+                mbid_map = await asyncio.to_thread(self.catalog.lookup_mbids_by_names, names)  # BigQuery
                 # Keys use lookup_mbids_by_names' own normalization.
                 found = [mbid_map.get(self.catalog.normalize_for_matching(n), "") for n in names]
                 return [m for m in found if m]
@@ -425,7 +425,7 @@ class QuizService:
             # MBID-First: Look up MBIDs for seed artists to enable more accurate matching
             seed_artist_mbids: list[str] = []
             try:
-                mbid_map = self.catalog.lookup_mbids_by_names(all_seed_artists)
+                mbid_map = await asyncio.to_thread(self.catalog.lookup_mbids_by_names, all_seed_artists)
                 # Use same normalization as lookup_mbids_by_names for consistent keys
                 seed_artist_mbids = [mbid_map.get(self.catalog.normalize_for_matching(a), "") for a in all_seed_artists]
                 seed_artist_mbids = [m for m in seed_artist_mbids if m]  # Filter empty
@@ -1733,7 +1733,7 @@ class QuizService:
             spotify_to_mbid: dict[str, str] = {}
             if spotify_ids and not self.settings.bigquery_disabled:
                 try:
-                    spotify_to_mbid = self.catalog.lookup_mbids_by_spotify_ids(spotify_ids)
+                    spotify_to_mbid = await asyncio.to_thread(self.catalog.lookup_mbids_by_spotify_ids, spotify_ids)
                 except Exception:
                     # Enrichment only: the artists are saved without an MBID rather than failing the submit.
                     logger.warning("Quiz submit: Spotify->MBID lookup failed", exc_info=True)

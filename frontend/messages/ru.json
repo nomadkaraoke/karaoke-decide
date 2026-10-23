@@ -474,7 +474,13 @@
     "redirectingBack": "Перенаправляем тебя обратно...",
     "connectionFailed": "Ошибка подключения",
     "tryAgain": "Попробовать снова",
-    "backToHome": "Вернуться на главную"
+    "backToHome": "Вернуться на главную",
+    "spotifyErrorDenied": "Ты отклонил доступ к Spotify, поэтому ничего не было подключено.",
+    "spotifyErrorExchangeFailed": "Не удалось завершить подключение к Spotify. Пожалуйста, попробуй ещё раз.",
+    "spotifyErrorInvalidState": "Срок действия ссылки для подключения истёк. Пожалуйста, начни сначала.",
+    "spotifyErrorMissingParams": "Ответ от Spotify при подключении был неполным. Пожалуйста, попробуй ещё раз.",
+    "spotifyErrorSpotify": "Spotify сообщил об ошибке при подключении. Пожалуйста, попробуй ещё раз.",
+    "spotifyErrorUnknown": "Произошла неизвестная ошибка."
   },
   "admin": {
     "backToApp": "Вернуться в приложение",

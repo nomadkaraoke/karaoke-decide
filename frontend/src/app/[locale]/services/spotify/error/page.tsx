@@ -7,18 +7,19 @@ import { useTranslations } from "next-intl";
 import { XIcon, SpotifyIcon } from "@/components/icons";
 import { Button } from "@/components/ui";
 
-function safeDecodeURIComponent(str: string): string {
-  try {
-    return decodeURIComponent(str);
-  } catch {
-    return str;
-  }
-}
+const ERROR_KEYS: Record<string, string> = {
+  denied: "spotifyErrorDenied",
+  spotify_error: "spotifyErrorSpotify",
+  missing_params: "spotifyErrorMissingParams",
+  invalid_state: "spotifyErrorInvalidState",
+  exchange_failed: "spotifyErrorExchangeFailed",
+};
 
 function ErrorContent() {
   const searchParams = useSearchParams();
   const t = useTranslations('services');
-  const message = searchParams.get("message") || "An unknown error occurred";
+  const code = searchParams.get("message") ?? "";
+  const message = t(ERROR_KEYS[code] ?? "spotifyErrorUnknown");
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
@@ -36,7 +37,7 @@ function ErrorContent() {
         <h1 className="text-2xl font-bold text-[var(--text)] mb-2">
           {t("connectionFailed")}
         </h1>
-        <p className="text-[var(--text-muted)] mb-6">{safeDecodeURIComponent(message)}</p>
+        <p className="text-[var(--text-muted)] mb-6">{message}</p>
 
         <div className="space-y-3">
           <Link href="/services">

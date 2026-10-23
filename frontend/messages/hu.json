@@ -474,7 +474,13 @@
     "redirectingBack": "Átirányítás vissza...",
     "connectionFailed": "A csatlakozás sikertelen",
     "tryAgain": "Próbáld újra",
-    "backToHome": "Vissza a kezdőlapra"
+    "backToHome": "Vissza a kezdőlapra",
+    "spotifyErrorDenied": "Elutasítottad a hozzáférést a Spotifyon, így nem történt összekapcsolás.",
+    "spotifyErrorExchangeFailed": "Nem sikerült befejezni a Spotify-összekapcsolást. Kérjük, próbáld újra.",
+    "spotifyErrorInvalidState": "Ez a kapcsolódási link lejárt. Kérjük, kezdd újra a folyamatot.",
+    "spotifyErrorMissingParams": "A Spotifytól érkező kapcsolódási válasz hiányos volt. Kérjük, próbáld újra.",
+    "spotifyErrorSpotify": "A Spotify hibát jelzett a kapcsolódás során. Kérjük, próbáld újra.",
+    "spotifyErrorUnknown": "Ismeretlen hiba történt."
   },
   "admin": {
     "backToApp": "Vissza az alkalmazásba",
