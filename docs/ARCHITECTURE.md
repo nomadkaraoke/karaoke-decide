@@ -308,6 +308,23 @@ sung_records:
   - (user_id ASC, sung_at DESC)
 ```
 
+## Personal data
+
+Voice recordings are the one class of user audio decide stores. They are recorded only with the
+session's consent (`setup.record = true` at upload time), kept private, and never expire.
+
+- **Storage**: objects `voice-recordings/<user_id>/<session_id>/<n>.m4a|.wav` in the private
+  `VOICE_RECORDINGS_BUCKET` (`nomadkaraoke-voice-recordings`, soft delete off, so a delete is real
+  erasure); Firestore `voice_recordings/{session_id}:{n}` (`gcs_path` = the object name) and
+  `voice_attempts.recording_id`. `VOICE_RECORDINGS_LOCAL_DIR` swaps the bucket for a directory (local stack, tests).
+- **User deletion**: `DELETE /api/voice/recordings` (open to every signed-in user, even with the voice flag off)
+  calls `VoiceRecordingService.delete_all_for_user(user_id)`: lists and deletes every object under the user's
+  prefix, deletes every `voice_recordings` doc, clears `recording_id` on the user's attempts, returns the
+  number erased, and is idempotent (a second call returns 0).
+- **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST call
+  `VoiceRecordingService.delete_all_for_user(user.id)` before removing the user, and fail the request (so it
+  can be retried) if that raises. Any new store of user audio must be added to that call.
+
 ## Security Considerations
 
 1. **OAuth Tokens**: Encrypted at rest in Firestore, refreshed automatically

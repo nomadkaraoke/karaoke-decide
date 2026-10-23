@@ -29,6 +29,7 @@ from backend.services.voice_data_store import (
     VoiceDataUnavailable,
     VoiceReader,
 )
+from backend.services.voice_recording_service import LocalBucket
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
 from karaoke_decide.voice_pool.queue import FETCH_COLLECTION, enqueue
@@ -161,6 +162,8 @@ async def get_voice_reader(store: Annotated[VoiceDataStore, Depends(get_voice_st
 
 def get_recordings_bucket(settings: Settings) -> Any:
     """The private recordings bucket (tests override this with a fake)."""
+    if settings.voice_recordings_local_dir:
+        return LocalBucket(settings.voice_recordings_local_dir)
     return catalog_store._storage_client().bucket(settings.voice_recordings_bucket)
 
 

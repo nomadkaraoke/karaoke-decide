@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     voice_session_open: bool = False
     # Private user recordings (voice-recordings/<user_id>/<session_id>/<n>.<ext>).
     voice_recordings_bucket: str = "nomadkaraoke-voice-recordings"
+    voice_recordings_local_dir: str = ""  # a directory instead of the bucket (local stack, tests)
     # Make every BigQuery client construction fail (local stack / tests: no GCP).
     bigquery_disabled: bool = False
 
