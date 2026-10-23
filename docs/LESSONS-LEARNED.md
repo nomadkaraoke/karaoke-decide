@@ -15,6 +15,20 @@ Accumulated wisdom from building Nomad Karaoke Decide. Add entries as you learn 
 
 ## Entries
 
+### 2026-10-22: Sync on the API service: fence retried runs, keep blocking work off the loop
+
+**Context:** Cloud Tasks redelivers `/internal/sync/process` after a 5xx or a dead instance. Before this, a retry either exited ("already in progress") and left the job stuck, or ran next to a still-live run. Separately, the app saw 0 s 500s during an Apple Music sync right after a deploy.
+
+**Lesson:**
+- Those 500s were platform-side, not caused by sync load. Cloud Run routed three requests to the retired revision (00192), 7 and 12 minutes after traffic had moved to 00193 and its instances had shut down. The requests got a 500 before any instance was assigned: no instance id and no app log. The serving instance had CPU p99 ≤ 0.69, memory ≤ 0.32 of 2 GiB and concurrency 6 of 80. `/api/health` answered in 3–20 ms throughout the sync.
+- Real blocking existed anyway. The Last.fm artist-metadata BigQuery lookup ran synchronously on the event loop for about 11 s, and so did the TrackMatcher BigQuery fallback.
+- A broad `except Exception` in a per-service wrapper swallowed the "superseded" signal. A fenced-off run then kept going and wrote `error` statuses.
+
+**Recommendation:**
+- Retried tasks: claim in a transaction, heartbeat, and fence every write on a `run_id`. Answer 503 while another run is alive. Re-raise control-flow exceptions (`RunSupersededError`) ahead of broad handlers.
+- Any blocking or O(n) CPU step on the sync/import paths goes through `run_ingest` (the 2-worker ingest pool), never straight onto the loop or the default executor.
+- A 0 s 500 with no `labels.instanceId` is a platform routing fault, not app load. Check the revision against the traffic split before changing capacity.
+
 ### 2026-10-22: Rolling a Cloud Run service needs read on its image repo
 
 **Context:** song-index-build failed every day from 2026-10-20 with `403 Permission 'artifactregistry.repositories.downloadArtifacts' denied on .../karaoke-repo` while updating karaoke-decide-search. It had `run.developer` on the service and actAs on its runtime SA, but no grant on the image repo.
