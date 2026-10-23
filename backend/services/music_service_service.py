@@ -37,6 +37,24 @@ class MusicServiceError(Exception):
     pass
 
 
+class ListenBrainzTokenUnavailableError(MusicServiceError):
+    """The ListenBrainz token can't be had right now (refresh busy or MetaBrainz down); retry later.
+
+    Unlike its parent, the connection itself is fine: callers should answer 503, not needs_reconnect.
+    """
+
+
+# Strong references to in-flight shielded token refreshes, so a cancelled caller can't let the
+# task be garbage-collected mid-refresh (asyncio keeps only weak references to tasks).
+_background_refreshes: set[asyncio.Task[str]] = set()
+
+
+def _forget_refresh(task: asyncio.Task[str]) -> None:
+    _background_refreshes.discard(task)
+    if not task.cancelled():
+        task.exception()  # retrieved: no "exception was never retrieved" noise; callers already saw it
+
+
 class MusicServiceService:
     """Service for managing music service connections.
 
@@ -623,7 +641,8 @@ class MusicServiceService:
         """Store a ListenBrainz connection authorised through MetaBrainz OAuth.
 
         Tokens are encrypted at rest. Reconnecting replaces the tokens, clears a
-        ``needs_reconnect`` error and keeps the sync history.
+        ``needs_reconnect`` error and any refresh lease, and keeps the sync history (an
+        in-progress ``syncing`` status is left alone).
         """
         service_id = self._get_service_id(user_id, "listenbrainz")
         now = datetime.now(UTC)
@@ -638,11 +657,14 @@ class MusicServiceService:
             "sync_status": "idle",
             "sync_error": None,
             "error_code": None,
+            "refresh_lease_until": None,
             "updated_at": now.isoformat(),
         }
 
         existing = await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
         if existing:
+            if existing.get("sync_status") == "syncing":
+                del fields["sync_status"]  # a sync in flight owns its status
             await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
             return self._doc_to_music_service({**existing, **fields})
 
@@ -927,7 +949,8 @@ class MusicServiceService:
 
     REFRESH_LEASE_SECONDS = 90
     REFRESH_CALL_TIMEOUT_SECONDS = 45.0
-    REFRESH_WAIT_SECONDS = 20.0
+    # Waiters must outlast a holder's refresh call (REFRESH_CALL_TIMEOUT_SECONDS) plus its write.
+    REFRESH_WAIT_SECONDS = 50.0
     REFRESH_POLL_SECONDS = 0.2
 
     @staticmethod
@@ -970,18 +993,60 @@ class MusicServiceService:
         except Exception:
             logger.warning("Could not release ListenBrainz refresh lease %s", service_id, exc_info=True)
 
-    async def _mark_listenbrainz_needs_reconnect(self, service_id: str) -> None:
-        await self.firestore.update_document(
-            self.SERVICES_COLLECTION,
-            service_id,
-            {
-                "sync_status": "error",
-                "sync_error": "ListenBrainz access expired. Reconnect ListenBrainz.",
-                "error_code": "needs_reconnect",
-                "updated_at": datetime.now(UTC).isoformat(),
-                "refresh_lease_until": None,
-            },
-        )
+    _NEEDS_RECONNECT_FIELDS: dict[str, Any] = {
+        "sync_status": "error",
+        "sync_error": "ListenBrainz access expired. Reconnect ListenBrainz.",
+        "error_code": "needs_reconnect",
+        "refresh_lease_until": None,
+    }
+
+    async def _mark_listenbrainz_needs_reconnect(self, service_id: str, used_refresh_token: str | None = None) -> bool:
+        """Mark the connection ``needs_reconnect``; returns whether it was marked.
+
+        With ``used_refresh_token``, only if the stored refresh token is still that one: a
+        reconnect that landed meanwhile stored fresh tokens, which must not be flagged dead.
+        """
+        fields = {**self._NEEDS_RECONNECT_FIELDS, "updated_at": datetime.now(UTC).isoformat()}
+        if used_refresh_token is None:
+            await self.firestore.update_document(self.SERVICES_COLLECTION, service_id, fields)
+            return True
+
+        def mark(doc: dict[str, Any] | None) -> dict[str, Any] | None:
+            if doc is None or self._decrypt(doc.get("refresh_token"), doc) != used_refresh_token:
+                raise _LeaseHeldError  # reconnected (or disconnected) meanwhile: leave it alone
+            return {**doc, **fields}
+
+        try:
+            await self.firestore.transform_document_atomically(self.SERVICES_COLLECTION, service_id, mark)
+        except _LeaseHeldError:
+            return False
+        return True
+
+    def _undecryptable_oauth_tokens(self, doc: dict[str, Any] | None) -> bool:
+        """An OAuth ListenBrainz doc whose stored tokens this process's key can't decrypt.
+
+        Only counts with a key configured: a process missing ``DECIDE_TOKEN_KEY`` is misconfigured,
+        which says nothing about the connection itself.
+        """
+        if not doc or doc.get("auth") != "oauth" or not self._cipher.enabled:
+            return False
+        for field in ("access_token", "refresh_token"):
+            value = doc.get(field)
+            if not value:
+                continue
+            try:
+                self._cipher.decrypt(value)
+            except Exception:
+                return True
+        return False
+
+    async def _bail_if_undecryptable(self, service_id: str, doc: dict[str, Any] | None) -> None:
+        """A failed decrypt leaves no usable token: flag the connection rather than let it die silently."""
+        if not self._undecryptable_oauth_tokens(doc):
+            return
+        logger.warning("ListenBrainz tokens for %s can't be decrypted (key rotated?); needs reconnect", service_id)
+        await self._mark_listenbrainz_needs_reconnect(service_id)
+        raise MusicServiceError("ListenBrainz needs to be reconnected")
 
     def _fresh_listenbrainz_token(self, doc: dict[str, Any] | None) -> str | None:
         if not doc:
@@ -1003,10 +1068,21 @@ class MusicServiceService:
         if that fails the connection is marked ``needs_reconnect`` (the new refresh token is lost).
         A dead refresh token also marks it ``sync_status="error"``, ``error_code="needs_reconnect"``.
 
+        Stored OAuth tokens that no longer decrypt (key rotated) also mark ``needs_reconnect``.
+
         Raises:
-            MusicServiceError: No OAuth token (username connection), or refresh failed.
+            ListenBrainzTokenUnavailableError: Timed out waiting for another caller's refresh, or
+                MetaBrainz failed transiently: retry later; the connection is fine.
+            MusicServiceError: No OAuth token (username connection), or it needs reconnecting.
         """
-        if service.service_type != "listenbrainz" or not service.access_token:
+        if service.service_type != "listenbrainz":
+            raise MusicServiceError("ListenBrainz is not connected with OAuth")
+        service_id = self._get_service_id(service.user_id, "listenbrainz")
+        if not service.access_token or not service.refresh_token:
+            await self._bail_if_undecryptable(
+                service_id, await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
+            )
+        if not service.access_token:
             raise MusicServiceError("ListenBrainz is not connected with OAuth")
 
         buffer = timedelta(minutes=self.TOKEN_REFRESH_BUFFER_MINUTES)
@@ -1015,7 +1091,6 @@ class MusicServiceService:
         if not service.refresh_token:
             raise MusicServiceError("No refresh token available")
 
-        service_id = self._get_service_id(service.user_id, "listenbrainz")
         deadline = asyncio.get_running_loop().time() + self.REFRESH_WAIT_SECONDS
         while True:
             doc = await self.firestore.get_document(self.SERVICES_COLLECTION, service_id)
@@ -1029,7 +1104,7 @@ class MusicServiceService:
                 if lease:
                     return await self._refresh_listenbrainz_holding_lease(service, service_id, lease)
             if asyncio.get_running_loop().time() > deadline:
-                raise MusicServiceError("Timed out waiting for the ListenBrainz token refresh")
+                raise ListenBrainzTokenUnavailableError("Timed out waiting for the ListenBrainz token refresh")
             await asyncio.sleep(self.REFRESH_POLL_SECONDS)
 
     async def _refresh_listenbrainz_holding_lease(self, service: MusicService, service_id: str, lease: str) -> str:
@@ -1046,6 +1121,7 @@ class MusicServiceService:
             refresh_token = self._doc_to_music_service(doc).refresh_token
             if not refresh_token:
                 await self._release_refresh_lease(service_id)
+                await self._bail_if_undecryptable(service_id, doc)
                 raise MusicServiceError("No refresh token available")
         except MusicServiceError:
             raise
@@ -1054,21 +1130,23 @@ class MusicServiceService:
             raise
         # Shielded: once MetaBrainz may have rotated the token, cancellation must not stop us
         # persisting it.
-        return await asyncio.shield(
-            asyncio.ensure_future(self._refresh_and_store(service.user_id, service_id, lease, refresh_token))
-        )
+        task = asyncio.ensure_future(self._refresh_and_store(service.user_id, service_id, lease, refresh_token))
+        _background_refreshes.add(task)
+        task.add_done_callback(_forget_refresh)
+        return await asyncio.shield(task)
 
     async def _refresh_and_store(self, user_id: str, service_id: str, lease: str, refresh_token: str) -> str:
         try:
             async with asyncio.timeout(self.REFRESH_CALL_TIMEOUT_SECONDS):
                 tokens = await self.metabrainz.refresh(refresh_token)
         except MetaBrainzInvalidGrantError:
+            if not await self._mark_listenbrainz_needs_reconnect(service_id, refresh_token):
+                raise ListenBrainzTokenUnavailableError("ListenBrainz was reconnected meanwhile")
             logger.warning("ListenBrainz refresh token rejected for user %s; needs reconnect", user_id)
-            await self._mark_listenbrainz_needs_reconnect(service_id)
             raise MusicServiceError("ListenBrainz needs to be reconnected")
         except (ExternalServiceError, TimeoutError) as e:
             await self._release_refresh_lease(service_id)
-            raise MusicServiceError(f"Failed to refresh ListenBrainz token: {e}")
+            raise ListenBrainzTokenUnavailableError(f"Failed to refresh ListenBrainz token: {e}")
         except BaseException:
             await self._release_refresh_lease(service_id)
             raise
@@ -1092,16 +1170,20 @@ class MusicServiceService:
         try:
             await self.firestore.transform_document_atomically(self.SERVICES_COLLECTION, service_id, store)
         except BaseException:
+            try:
+                marked = await self._mark_listenbrainz_needs_reconnect(service_id, refresh_token)
+            except Exception:
+                logger.error("Could not mark ListenBrainz needs_reconnect for user %s", user_id, exc_info=True)
+                marked = True
+            if not marked:
+                # A reconnect replaced the tokens while we refreshed: its tokens are the live ones.
+                raise ListenBrainzTokenUnavailableError("ListenBrainz was reconnected meanwhile")
             logger.error(
                 "Could not store rotated ListenBrainz tokens for user %s; the old refresh token is revoked, "
                 "user must reconnect",
                 user_id,
                 exc_info=True,
             )
-            try:
-                await self._mark_listenbrainz_needs_reconnect(service_id)
-            except Exception:
-                logger.error("Could not mark ListenBrainz needs_reconnect for user %s", user_id, exc_info=True)
             raise MusicServiceError("ListenBrainz needs to be reconnected")
         return access_token
 

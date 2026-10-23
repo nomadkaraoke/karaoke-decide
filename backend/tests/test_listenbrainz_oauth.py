@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import copy
+import hashlib
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import parse_qs, urlparse
 
@@ -15,7 +17,12 @@ from fastapi.testclient import TestClient
 
 from backend.api.deps import get_current_user, get_music_service_service_dep, get_settings
 from backend.config import BackendSettings
-from backend.services.music_service_service import MusicServiceError, MusicServiceService
+from backend.services import music_service_service as mss
+from backend.services.music_service_service import (
+    ListenBrainzTokenUnavailableError,
+    MusicServiceError,
+    MusicServiceService,
+)
 from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import User
 from karaoke_decide.services.listenbrainz import ListenBrainzUserInfo
@@ -134,6 +141,11 @@ def _start(client: TestClient, return_to: str = "app") -> str:
     return str(parse_qs(urlparse(resp.json()["auth_url"]).query)["state"][0])
 
 
+def _s256(verifier: str) -> str:
+    """RFC 7636 S256: base64url(sha256(verifier)) without padding."""
+    return base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+
+
 def _callback(client: TestClient, **params: str) -> Any:
     return client.get("/api/services/listenbrainz/oauth/callback", params=params, follow_redirects=False)
 
@@ -165,7 +177,7 @@ def test_start_builds_pkce_url(make_client: Any, db: FakeDb) -> None:
     assert state_doc["service_type"] == "listenbrainz"
     assert state_doc["extra"]["return_to"] == "web"
     assert len(state_doc["extra"]["code_verifier"]) >= 43
-    assert q["code_challenge"][0] != state_doc["extra"]["code_verifier"]
+    assert q["code_challenge"][0] == _s256(state_doc["extra"]["code_verifier"])
 
 
 def test_start_rejects_unknown_return_to(make_client: Any) -> None:
@@ -179,8 +191,13 @@ def test_start_rejects_unknown_return_to(make_client: Any) -> None:
 
 def test_callback_app_redirects_to_scheme(make_client: Any, db: FakeDb) -> None:
     client, svc = make_client()
-    state = _start(client, "app")
-    code_verifier = db.doc("oauth_states", state)["extra"]["code_verifier"]  # type: ignore[index]
+    resp = client.get("/api/services/listenbrainz/oauth/start", params={"return_to": "app"})
+    q = parse_qs(urlparse(resp.json()["auth_url"]).query)
+    state = q["state"][0]
+    state_doc = db.doc("oauth_states", state)
+    assert state_doc is not None
+    code_verifier = state_doc["extra"]["code_verifier"]
+    assert q["code_challenge"] == [_s256(code_verifier)]  # the verifier sent at exchange matches the challenge
 
     resp = _callback(client, code="the-code", state=state)
 
@@ -232,10 +249,20 @@ def test_callback_missing_params(make_client: Any) -> None:
 
 def test_callback_invalid_state(make_client: Any) -> None:
     client, svc = make_client()
-    resp = _callback(client, code="c", state="forged")
+    resp = _callback(client, code="c", state="forged-state-0123456789")
     assert resp.status_code == 302
     assert resp.headers["location"].endswith("listenbrainz=error&reason=invalid_state")
     svc.metabrainz.exchange_code.assert_not_awaited()
+
+
+@pytest.mark.parametrize("state", ["short", "a/b/c-0123456789abcdef", "x" * 129, "bad state 0123456789"])
+def test_callback_malformed_state_is_invalid_without_a_lookup(make_client: Any, state: str) -> None:
+    client, svc = make_client()
+    svc.verify_oauth_state = AsyncMock(side_effect=AssertionError("looked up"))
+    resp = _callback(client, code="c", state=state)
+    assert resp.status_code == 302
+    assert resp.headers["location"].endswith("listenbrainz=error&reason=invalid_state")
+    svc.verify_oauth_state.assert_not_awaited()
 
 
 def test_callback_state_of_another_service_is_invalid(make_client: Any) -> None:
@@ -376,6 +403,18 @@ async def test_oauth_state_extra_round_trips(db: FakeDb) -> None:
     assert data == {"user_id": USER, "service_type": "listenbrainz", "return_to": "app", "code_verifier": "v"}
 
 
+@pytest.mark.asyncio
+async def test_oauth_state_extra_cannot_override_identity(db: FakeDb) -> None:
+    svc = _service(db)
+    state = await svc.create_oauth_state(
+        USER, "listenbrainz", extra={"user_id": "someone-else", "service_type": "spotify", "return_to": "web"}
+    )
+    data = await svc.verify_oauth_state(state)
+    assert data is not None
+    assert data["user_id"] == USER and data["service_type"] == "listenbrainz"
+    assert data["return_to"] == "web"
+
+
 def test_callback_after_oauth_switched_off_stores_nothing(make_client: Any, db: FakeDb) -> None:
     client, svc = make_client()
     state = _start(client, "app")
@@ -390,7 +429,7 @@ def test_callback_after_oauth_switched_off_stores_nothing(make_client: Any, db: 
 async def test_concurrent_callers_share_one_refresh(db: FakeDb) -> None:
     svc = _service(db)
     service = await _lb_service(db, svc, 60)
-    refresh = svc.metabrainz.refresh  # type: ignore[attr-defined]
+    refresh = cast(AsyncMock, svc.metabrainz.refresh)
 
     async def slow_refresh(_: str) -> dict[str, Any]:
         await asyncio.sleep(0.05)  # the second caller arrives while the first is mid-refresh
@@ -410,9 +449,9 @@ async def test_refresh_uses_stored_refresh_token_not_a_stale_caller_copy(db: Fak
     stale = await _lb_service(db, svc, 60)
     await svc.get_listenbrainz_token(stale)  # rotates r -> refresh2 and stores it
     await db.update_document("music_services", LB_DOC, {"token_expires_at": datetime.now(UTC).isoformat()})
-    refresh = svc.metabrainz.refresh  # type: ignore[attr-defined]
+    refresh = cast(AsyncMock, svc.metabrainz.refresh)
     await svc.get_listenbrainz_token(stale)  # `stale` still holds the old "meba_r"
-    assert refresh.await_args.args == ("meba_refresh2",)
+    assert refresh.await_args is not None and refresh.await_args.args == ("meba_refresh2",)
 
 
 @pytest.mark.asyncio
@@ -422,13 +461,10 @@ async def test_failed_write_after_refresh_marks_needs_reconnect(db: FakeDb, capl
     real_transform = db.transform_document_atomically
 
     async def failing_transform(collection: str, doc_id: str, transform: Any) -> Any:
-        if doc_id == LB_DOC and db.doc(collection, doc_id).get("refresh_lease_until"):  # type: ignore[union-attr]
-            probe = transform(db.doc(collection, doc_id))
-            if (
-                probe
-                and "access_token" in probe
-                and probe["access_token"] != db.doc(collection, doc_id)["access_token"]
-            ):  # type: ignore[index]
+        current = db.doc(collection, doc_id)
+        if doc_id == LB_DOC and current is not None and current.get("refresh_lease_until"):
+            probe = transform(copy.deepcopy(current))
+            if probe and "access_token" in probe and probe["access_token"] != current["access_token"]:
                 raise RuntimeError("firestore down")
         return await real_transform(collection, doc_id, transform)
 
@@ -482,10 +518,10 @@ async def test_transient_holder_failure_lets_a_waiter_refresh_once(db: FakeDb) -
         svc.get_listenbrainz_token(service), svc.get_listenbrainz_token(service), return_exceptions=True
     )
     results = [first, second]
-    assert sorted(type(r).__name__ for r in results) == ["MusicServiceError", "str"]
-    assert calls == 1 or calls == 2
-    # A later caller finds the lease released and refreshes (or reads the stored token) without errors.
+    assert sorted(type(r).__name__ for r in results) == ["ListenBrainzTokenUnavailableError", "str"]
+    # A later caller reads the token the waiter stored: exactly one retry refresh, no third.
     assert await svc.get_listenbrainz_token(service) == "meba_access2"
+    assert calls == 2
     assert db.doc("music_services", LB_DOC)["refresh_lease_until"] is None  # type: ignore[index]
 
 
@@ -543,3 +579,115 @@ async def test_cancel_after_refresh_still_stores_tokens(db: FakeDb) -> None:
     await asyncio.sleep(0.2)
     reread = await svc.get_service(USER, "listenbrainz")
     assert reread is not None and reread.refresh_token == "meba_refresh2"
+
+
+# --- review follow-ups: decrypt failure, reconnect, waiter timeout, task references ----------
+
+
+@pytest.mark.asyncio
+async def test_undecryptable_oauth_tokens_mark_needs_reconnect(db: FakeDb) -> None:
+    await _lb_service(db, _service(db), 3600)  # encrypted with KEY
+    rotated = _service(db, _settings(decide_token_key="Hn2zDl8b0n8YJ2dZ9mH1vC5xQe3WkTt7uR4aPs6LfGo="))
+    service = await rotated.get_service(USER, "listenbrainz")
+    assert service is not None and service.access_token is None
+    with pytest.raises(MusicServiceError) as exc:
+        await rotated.get_listenbrainz_token(service)
+    assert not isinstance(exc.value, ListenBrainzTokenUnavailableError)
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None and stored["error_code"] == "needs_reconnect" and stored["sync_status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_missing_key_does_not_mark_needs_reconnect(db: FakeDb) -> None:
+    await _lb_service(db, _service(db), 3600)
+    keyless = _service(db, _settings(decide_token_key=""))  # this process is misconfigured, not the connection
+    service = await keyless.get_service(USER, "listenbrainz")
+    with pytest.raises(MusicServiceError):
+        await keyless.get_listenbrainz_token(service)  # type: ignore[arg-type]
+    assert db.doc("music_services", LB_DOC)["error_code"] is None  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_reconnect_keeps_syncing_status_and_clears_lease(db: FakeDb) -> None:
+    svc = _service(db)
+    await _lb_service(db, svc, 3600)
+    await db.update_document(
+        "music_services",
+        LB_DOC,
+        {"sync_status": "syncing", "refresh_lease_until": "2999-01-01T00:00:00+00:00", "error_code": "needs_reconnect"},
+    )
+    await svc.create_listenbrainz_oauth_service(
+        USER, {"access_token": "meba_new", "refresh_token": "meba_r2", "expires_in": 3600}, "e2e-listener"
+    )
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None
+    assert stored["sync_status"] == "syncing"
+    assert stored["refresh_lease_until"] is None and stored["error_code"] is None
+
+
+@pytest.mark.asyncio
+async def test_reconnect_resets_error_status_to_idle(db: FakeDb) -> None:
+    svc = _service(db)
+    await _lb_service(db, svc, 3600)
+    await db.update_document("music_services", LB_DOC, {"sync_status": "error", "error_code": "needs_reconnect"})
+    await svc.create_listenbrainz_oauth_service(
+        USER, {"access_token": "meba_new", "refresh_token": "meba_r2", "expires_in": 3600}, "e2e-listener"
+    )
+    assert db.doc("music_services", LB_DOC)["sync_status"] == "idle"  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_reconnect_during_refresh_is_not_flagged_dead(db: FakeDb) -> None:
+    svc = _service(db)
+    service = await _lb_service(db, svc, 60)
+
+    async def refresh_while_user_reconnects(_: str) -> dict[str, Any]:
+        await svc.create_listenbrainz_oauth_service(
+            USER, {"access_token": "meba_new", "refresh_token": "meba_r2", "expires_in": 3600}, "e2e-listener"
+        )  # clears our lease: the store below must fail, but the fresh connection must survive
+        return {"access_token": "meba_access2", "refresh_token": "meba_refresh2", "expires_in": 3600}
+
+    cast(AsyncMock, svc.metabrainz.refresh).side_effect = refresh_while_user_reconnects
+    with pytest.raises(ListenBrainzTokenUnavailableError):
+        await svc.get_listenbrainz_token(service)
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None and stored["error_code"] is None
+    reread = await svc.get_service(USER, "listenbrainz")
+    assert reread is not None and reread.refresh_token == "meba_r2"
+
+
+@pytest.mark.asyncio
+async def test_waiter_timeout_is_retryable_not_needs_reconnect(db: FakeDb) -> None:
+    svc = _service(db)
+    service = await _lb_service(db, svc, 60)
+    await db.update_document("music_services", LB_DOC, {"refresh_lease_until": "2999-01-01T00:00:00+00:00"})
+    svc.REFRESH_WAIT_SECONDS = 0.3
+    with pytest.raises(ListenBrainzTokenUnavailableError):
+        await svc.get_listenbrainz_token(service)
+    assert db.doc("music_services", LB_DOC)["error_code"] is None  # type: ignore[index]
+
+
+def test_waiters_outlast_the_refresh_call() -> None:
+    assert MusicServiceService.REFRESH_WAIT_SECONDS > MusicServiceService.REFRESH_CALL_TIMEOUT_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_shielded_refresh_task_is_referenced_until_done(db: FakeDb) -> None:
+    svc = _service(db)
+    service = await _lb_service(db, svc, 60)
+    gate = asyncio.Event()
+
+    async def slow(_: str) -> dict[str, Any]:
+        await gate.wait()
+        raise ExternalServiceError("MetaBrainz", "503")
+
+    cast(AsyncMock, svc.metabrainz.refresh).side_effect = slow
+    caller = asyncio.create_task(svc.get_listenbrainz_token(service))
+    await asyncio.sleep(0.05)
+    assert len(mss._background_refreshes) == 1
+    caller.cancel()  # the caller goes away; the refresh task must stay referenced
+    await asyncio.sleep(0)
+    assert len(mss._background_refreshes) == 1
+    gate.set()
+    await asyncio.sleep(0.05)
+    assert not mss._background_refreshes  # done-callback dropped it (and retrieved its exception)

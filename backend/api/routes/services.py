@@ -5,9 +5,10 @@ Handles OAuth flows, service connections, and sync operations.
 
 import html
 import logging
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any, Literal, cast, get_args
+from typing import Annotated, Any, Literal, TypeGuard, cast, get_args
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -36,7 +37,7 @@ from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportSource
-from backend.services.music_service_service import MusicServiceError
+from backend.services.music_service_service import ListenBrainzTokenUnavailableError, MusicServiceError
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -402,6 +403,15 @@ async def connect_spotify(
     return SpotifyConnectResponse(auth_url=auth_url)
 
 
+# States are ``secrets.token_urlsafe`` strings; anything else is forged or mangled and never
+# reaches Firestore (a document id with "/" or of odd length would 500 there).
+_OAUTH_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+
+
+def _well_formed_state(state: str | None) -> TypeGuard[str]:
+    return state is not None and _OAUTH_STATE_RE.fullmatch(state) is not None
+
+
 @router.get("/spotify/callback")
 async def spotify_callback(
     music_service: MusicServiceServiceDep,
@@ -439,7 +449,7 @@ async def spotify_callback(
         )
 
     # Verify OAuth state
-    state_data = await music_service.verify_oauth_state(state)
+    state_data = await music_service.verify_oauth_state(state) if _well_formed_state(state) else None
     if not state_data:
         return RedirectResponse(
             url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=invalid_state",
@@ -648,6 +658,11 @@ async def upload_listenbrainz_export(
 
     try:
         token = await music_service.get_listenbrainz_token(service)
+    except ListenBrainzTokenUnavailableError as e:
+        logger.warning("ListenBrainz token unavailable for %s: %s", user.id, e)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "listenbrainz_unavailable", headers={"Retry-After": "30"}
+        )
     except MusicServiceError:
         raise HTTPException(status.HTTP_409_CONFLICT, "needs_reconnect")
 
@@ -663,7 +678,7 @@ async def upload_listenbrainz_export(
                 latest = None
             if latest and latest not in LB_IMPORT_TERMINAL_STATUSES:
                 raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
-        filename = file.filename if (file.filename or "").lower().endswith(".zip") else "spotify-export.zip"
+        filename = file.filename if file.filename and file.filename.lower().endswith(".zip") else "spotify-export.zip"
         import_id = await lb.submit_import(token, data, filename)
     except ListenBrainzImportInProgressError:
         raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
@@ -695,7 +710,7 @@ async def listenbrainz_oauth_callback(
     Errors redirect with a fixed reason code, never exception text. An unknown state can't
     say where the user came from, so it returns to the web page.
     """
-    state_data = await music_service.verify_oauth_state(state) if state else None
+    state_data = await music_service.verify_oauth_state(state) if _well_formed_state(state) else None
     if state_data is not None and state_data.get("service_type") != "listenbrainz":
         state_data = None
     return_to = state_data.get("return_to", "web") if state_data else "web"

@@ -292,7 +292,7 @@ class TestSpotifyCallback:
         """Successful callback redirects to frontend success page."""
         response = auth_client.get(
             "/api/services/spotify/callback",
-            params={"code": "auth-code", "state": "test-state"},
+            params={"code": "auth-code", "state": "test-state-0123456789"},
             follow_redirects=False,
         )
 
@@ -306,7 +306,7 @@ class TestSpotifyCallback:
         """OAuth error redirects to frontend error page."""
         response = auth_client.get(
             "/api/services/spotify/callback",
-            params={"error": "access_denied", "state": "test-state"},
+            params={"error": "access_denied", "state": "test-state-0123456789"},
             follow_redirects=False,
         )
 
@@ -336,12 +336,32 @@ class TestSpotifyCallback:
 
         response = auth_client.get(
             "/api/services/spotify/callback",
-            params={"code": "auth-code", "state": "invalid-state"},
+            params={"code": "auth-code", "state": "invalid-state-0123456789"},
             follow_redirects=False,
         )
 
         assert response.status_code == 302
         assert "invalid_state" in response.headers["location"]
+
+    @pytest.mark.parametrize("state", ["short", "a/b/c-0123456789abcdef", "x" * 129, "bad state 0123456789"])
+    def test_malformed_state_is_invalid_without_a_lookup(
+        self,
+        auth_client: TestClient,
+        mock_music_service_service: MagicMock,
+        state: str,
+    ) -> None:
+        """A state outside the token_urlsafe charset never reaches Firestore (no 500 on a bad doc id)."""
+        mock_music_service_service.verify_oauth_state = AsyncMock(side_effect=AssertionError("looked up"))
+
+        response = auth_client.get(
+            "/api/services/spotify/callback",
+            params={"code": "auth-code", "state": state},
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 302
+        assert response.headers["location"].endswith("spotify/error?message=invalid_state")
+        mock_music_service_service.verify_oauth_state.assert_not_awaited()
 
 
 class TestLastFmConnect:

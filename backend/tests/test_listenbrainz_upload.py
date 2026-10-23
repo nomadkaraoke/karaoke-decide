@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 
 from backend.api.deps import get_current_user, get_music_service_service_dep, get_settings
 from backend.api.routes.services import LISTENBRAINZ_UPLOAD_MAX_BYTES
-from backend.services.music_service_service import MusicServiceService
+from backend.services.music_service_service import ListenBrainzTokenUnavailableError, MusicServiceService
 from backend.tests.test_listenbrainz_oauth import LB_DOC, USER, FakeDb, _settings
 from karaoke_decide.core.exceptions import ExternalServiceError
 from karaoke_decide.core.models import User
@@ -70,11 +70,11 @@ async def test_upload_requires_oauth_409(client: TestClient, db: FakeDb) -> None
     assert client.post(URL, files=FILES).json()["detail"] == "not_oauth_connected"  # not connected at all
     svc = MusicServiceService(
         _settings(),
-        db,
+        db,  # type: ignore[arg-type]
         listenbrainz_client=MagicMock(
             get_user_info=AsyncMock(return_value=MagicMock(username="e2e-listener", listen_count=1))
         ),
-    )  # type: ignore[arg-type]
+    )
     await svc.create_listenbrainz_service(USER, "e2e-listener")  # username-only connection
     resp = client.post(URL, files=FILES)
     assert resp.status_code == 409 and resp.json()["detail"] == "not_oauth_connected"
@@ -203,3 +203,17 @@ async def test_stale_pending_import_is_ignored(client: TestClient, db: FakeDb, l
     await _connect(db, lb_pending_import={"id": "41", "status": "waiting", "submitted_at": old})
     assert client.post(URL, files=FILES).status_code == 200
     lb.get_import_status.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_token_refresh_busy_is_retryable_503(client: TestClient, db: FakeDb, lb: MagicMock) -> None:
+    await _connect(db)
+    with patch.object(
+        MusicServiceService,
+        "get_listenbrainz_token",
+        AsyncMock(side_effect=ListenBrainzTokenUnavailableError("busy")),
+    ):
+        resp = client.post(URL, files=FILES)
+    assert resp.status_code == 503 and resp.json()["detail"] == "listenbrainz_unavailable"
+    assert resp.headers["retry-after"] == "30"
+    lb.submit_import.assert_not_awaited()
