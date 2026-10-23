@@ -9,6 +9,7 @@ of CPU work) and check that a concurrent ``/api/health`` still answers within 20
 from __future__ import annotations
 
 import asyncio
+import threading
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -17,11 +18,13 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
+from backend.services.ingest_executor import INGEST_EXECUTOR
 from backend.services.track_matcher import TrackMatcher
 from karaoke_decide.services.bigquery_catalog import SongResult
 
 BQ_ROUND_TRIP_S = 1.0  # a blocking BigQuery query, like the 11 s artist lookup seen in prod
 HEALTH_BUDGET_S = 0.2
+CPU_HEALTH_BUDGET_S = 0.5  # CPU-bound work shares the GIL with the loop: a looser bound, not flaky
 LEAD_S = 0.05
 
 
@@ -56,21 +59,25 @@ async def _health_latency_during(work: Callable[[], Coroutine[Any, Any, Any]]) -
     return elapsed, result
 
 
-def _slow_bigquery(result: Any) -> Callable[..., Any]:
-    """A stand-in for a blocking BigQuery call that returns ``result``."""
+def _slow_bigquery(result: Any, threads: list[str] | None = None) -> Callable[..., Any]:
+    """A stand-in for a blocking BigQuery call that returns ``result`` (records its thread's name)."""
 
     def call(*args: Any, **kwargs: Any) -> Any:
+        if threads is not None:
+            threads.append(threading.current_thread().name)
         time.sleep(BQ_ROUND_TRIP_S)
         return result
 
     return call
 
 
-def _slow_bq_matcher() -> TrackMatcher:
+def _slow_bq_matcher(threads: list[str] | None = None) -> TrackMatcher:
     """A matcher whose catalog.db isn't loaded, so it falls back to a (blocking) BigQuery query."""
     catalog = MagicMock()
 
     def batch_match_tracks(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], SongResult]:
+        if threads is not None:
+            threads.append(threading.current_thread().name)
         time.sleep(BQ_ROUND_TRIP_S)
         a, t = pairs[0]
         return {(a, t): SongResult(id=1, artist=a, title=t, brands="x", brand_count=1)}
@@ -80,12 +87,14 @@ def _slow_bq_matcher() -> TrackMatcher:
 
 
 async def test_health_answers_while_5000_tracks_match_via_bigquery() -> None:
-    matcher = _slow_bq_matcher()
+    threads: list[str] = []
+    matcher = _slow_bq_matcher(threads)
     tracks = _tracks(5000)
 
     elapsed, matched = await _health_latency_during(lambda: matcher.batch_match_tracks(tracks))
 
     assert elapsed < HEALTH_BUDGET_S, f"/api/health took {elapsed:.3f}s during a 5,000-track match"
+    assert threads and all(t.startswith("ingest") for t in threads), threads  # not the default pool
     assert len(matched) == 5000
     assert sum(1 for m in matched if m.catalog_song is not None) == 1
 
@@ -129,22 +138,22 @@ async def test_health_answers_during_lastfm_artist_metadata_lookup(monkeypatch: 
         return_value=[{"name": f"Fixture Artist {i}", "playcount": "3", "rank": i + 1} for i in range(1000)]
     )
     service = SyncService(MagicMock(), firestore, MagicMock(), lastfm_client=lastfm, track_matcher=MagicMock())
-    monkeypatch.setattr(service, "_get_spotify_metadata_for_artists", _slow_bigquery({}))
+    threads: list[str] = []
+    monkeypatch.setattr(service, "_get_spotify_metadata_for_artists", _slow_bigquery({}, threads))
 
     elapsed, stored = await _health_latency_during(
         lambda: service._fetch_and_store_lastfm_artists("fixture-user", "fixture-user")
     )
 
     assert elapsed < HEALTH_BUDGET_S
+    assert threads and threads[0].startswith("ingest"), threads
     assert stored == 1000
 
 
-async def test_health_answers_during_a_20000_track_export_chunk() -> None:
-    """A full Spotify export chunk: route-side aggregation plus ingest's matching and row building."""
-    from backend.api.routes.imports_export import SpotifyExportRequest, _ingest_chunk
-    from backend.services.import_ingest_service import ImportIngestService
+def _export_chunk_request(n_tracks: int) -> Any:
+    from backend.api.routes.imports_export import SpotifyExportRequest
 
-    body = SpotifyExportRequest.model_validate(
+    return SpotifyExportRequest.model_validate(
         {
             "generated_at": "2026-10-01",
             "chunk_index": 0,
@@ -159,25 +168,64 @@ async def test_health_answers_during_a_20000_track_export_chunk() -> None:
                     "first_ts": 1,
                     "last_ts": 2,
                 }
-                for t in _tracks(20000)
+                for t in _tracks(n_tracks)
             ],
             "liked": [{"artist": f"Fixture Artist {i}", "title": f"Liked {i}"} for i in range(5000)],
             "playlists": [],
         }
     )
+
+
+async def _export_chunk_latency(matcher: TrackMatcher) -> tuple[float, Any]:
+    """/api/health latency while a 20,000-track export chunk (plus 5,000 liked) is ingested."""
+    from backend.api.routes.imports_export import _ingest_chunk
+    from backend.services.import_ingest_service import ImportIngestService
+
+    body = _export_chunk_request(20000)
     db = MagicMock()
     db.get_document = AsyncMock(return_value=None)
     db.get_many = AsyncMock(return_value={})
     db.batch_set = AsyncMock()
     db.transform_document_atomically = AsyncMock(side_effect=lambda c, i, fn: fn(None))
-    ingest = ImportIngestService(db, track_matcher=_slow_bq_matcher(), reader=lambda: None)
+    ingest = ImportIngestService(db, track_matcher=matcher, reader=lambda: None)
 
-    elapsed, response = await _health_latency_during(
+    return await _health_latency_during(
         lambda: _ingest_chunk(ingest, "fixture-user", "spotify_export", "extended:2026-10-01", body)
     )
 
+
+async def test_health_answers_during_a_20000_track_export_chunk() -> None:
+    """A full Spotify export chunk: route-side aggregation plus ingest's matching and row building."""
+    elapsed, response = await _export_chunk_latency(_slow_bq_matcher())
+
     assert elapsed < HEALTH_BUDGET_S, f"/api/health took {elapsed:.3f}s during a 20,000-track chunk"
     assert response.songs_added == 25000
+
+
+async def test_health_answers_during_a_20000_track_export_chunk_with_a_fast_matcher() -> None:
+    """With catalog.db answering instantly, the chunk is all CPU work (normalise, group, build docs)."""
+    lookup = MagicMock()
+    lookup.store.status = "ready"
+    lookup.match.return_value = None
+
+    elapsed, response = await _export_chunk_latency(TrackMatcher(MagicMock(), catalog_lookup=lookup))
+
+    assert elapsed < CPU_HEALTH_BUDGET_S, f"/api/health took {elapsed:.3f}s during a CPU-only 20,000-track chunk"
+    assert response.songs_added == 25000
+
+
+async def test_ingest_work_leaves_the_default_executor_free() -> None:
+    """With both ingest workers busy, a user request's asyncio.to_thread call still runs at once."""
+    release = threading.Event()
+    busy = [asyncio.get_running_loop().run_in_executor(INGEST_EXECUTOR, release.wait, 5) for _ in range(2)]
+    try:
+        started = time.perf_counter()
+        name = await asyncio.wait_for(asyncio.to_thread(lambda: threading.current_thread().name), timeout=1)
+        assert time.perf_counter() - started < HEALTH_BUDGET_S
+        assert not name.startswith("ingest")
+    finally:
+        release.set()
+        await asyncio.gather(*busy)
 
 
 async def test_catalog_search_route_runs_bigquery_off_the_loop(mock_catalog_service: MagicMock) -> None:

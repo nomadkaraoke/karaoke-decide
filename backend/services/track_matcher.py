@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from backend.services.ingest_executor import run_ingest
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService, SongResult
 
 if TYPE_CHECKING:
@@ -243,7 +244,7 @@ class TrackMatcher:
             return []
         # Normalising thousands of tracks is CPU work and the BigQuery fallback blocks: this runs on
         # the API service (sync tasks, imports), so all of it stays off the event loop.
-        return await asyncio.to_thread(self._batch_match_blocking, tracks)
+        return await run_ingest(self._batch_match_blocking, tracks)
 
     def _batch_match_blocking(self, tracks: list[dict[str, Any]]) -> list[MatchedTrack]:
         """``batch_match_tracks``'s work: normalise, look up (catalog.db or BigQuery), build results."""

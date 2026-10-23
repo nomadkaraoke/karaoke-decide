@@ -4,7 +4,6 @@ Fetches tracks from Spotify and Last.fm, matches them against the
 karaoke catalog, and creates UserSong records.
 """
 
-import asyncio
 import logging
 import re
 import uuid
@@ -16,6 +15,7 @@ from backend.config import BackendSettings
 from backend.models.sync_job import RunSupersededError
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportIngestService, IngestTrack
+from backend.services.ingest_executor import run_ingest
 from backend.services.music_service_service import MusicServiceError, MusicServiceService
 from backend.services.track_matcher import MatchedTrack, TrackMatcher
 from karaoke_decide.core.exceptions import ExternalServiceError
@@ -795,7 +795,7 @@ class SyncService:
             # Batch lookup Spotify metadata for all artists
             artist_names = [a.get("name", "") for a in artists if a.get("name")]
             # A blocking BigQuery query (~11 s for 1,000 artists): off the event loop.
-            spotify_metadata = await asyncio.to_thread(self._get_spotify_metadata_for_artists, artist_names)
+            spotify_metadata = await run_ingest(self._get_spotify_metadata_for_artists, artist_names)
             logger.info(f"Last.fm artists: found Spotify metadata for {len(spotify_metadata)} artists")
 
             for artist in artists:

@@ -19,7 +19,6 @@ incremental feeds such as the ListenBrainz poller). Timestamps are ISO strings.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import re
@@ -29,6 +28,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
 from backend.services.firestore_service import FirestoreService
+from backend.services.ingest_executor import run_ingest
 from backend.services.song_feedback_service import (
     USER_SONGS_COLLECTION,
     resolve_song_keys,
@@ -218,7 +218,7 @@ class ImportIngestService:
         )
         added, updated = await self._write_songs(user_id, source, tracks, matched, play_mode)
         if artists is None:
-            artists = await asyncio.to_thread(_derive_artists, tracks)
+            artists = await run_ingest(_derive_artists, tracks)
         artists_added = await self._write_artists(user_id, source, artists, play_mode)
         return IngestResult(
             artists_added=artists_added,
@@ -255,16 +255,16 @@ class ImportIngestService:
     ) -> tuple[int, int]:
         if not tracks:
             return 0, 0
-        keys, kn_ids = await asyncio.to_thread(self._resolve, tracks, matched)  # SQLite: off the loop
+        keys, kn_ids = await run_ingest(self._resolve, tracks, matched)  # SQLite: off the loop
         kn_rows = [f"{user_id}:{kn}" for kn in dict.fromkeys(kn_ids.values())]
         existing = await self.db.get_many(USER_SONGS_COLLECTION, kn_rows)
         # Grouping / doc building is O(tracks) CPU work (20,000+ per export chunk): off the loop too.
-        rows = await asyncio.to_thread(self._group_rows, user_id, source, tracks, matched, keys, kn_ids, existing)
+        rows = await run_ingest(self._group_rows, user_id, source, tracks, matched, keys, kn_ids, existing)
 
         missing = [r for r in rows if r not in existing]
         existing.update(await self.db.get_many(USER_SONGS_COLLECTION, missing))
 
-        docs = await asyncio.to_thread(self._build_docs, user_id, source, rows, existing, mode)
+        docs = await run_ingest(self._build_docs, user_id, source, rows, existing, mode)
         await self.db.batch_set(USER_SONGS_COLLECTION, docs, merge=True)
         updated = sum(1 for r in rows if r in existing)
         return len(rows) - updated, updated

@@ -9,7 +9,6 @@ chunk is a no-op that returns the stored totals.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, date, datetime
 from typing import Any, Literal
@@ -25,6 +24,7 @@ from backend.services.import_ingest_service import (
     IngestArtist,
     IngestTrack,
 )
+from backend.services.ingest_executor import run_ingest
 from karaoke_decide.song_search.text_normalize import identity_normalize
 
 logger = logging.getLogger(__name__)
@@ -181,8 +181,8 @@ async def _ingest_chunk(
     # Ingest first, record after: a failed ingest leaves the chunk unrecorded so the phone's retry
     # re-sends it. Two racing posts of one chunk both ingest, which "max" mode makes harmless.
     # Up to 20,000 tracks plus liked / playlist refs to normalise and sum: CPU work, off the loop.
-    tracks = await asyncio.to_thread(_ingest_tracks, body)
-    chunk_artists = await asyncio.to_thread(_chunk_artist_plays, tracks)
+    tracks = await run_ingest(_ingest_tracks, body)
+    chunk_artists = await run_ingest(_chunk_artist_plays, tracks)
     artists = await _cumulative_artists(ingest, user_id, source, export_key, body.chunk_index, chunk_artists)
     result = await ingest.ingest(user_id, source, tracks, artists=artists, play_mode="max")
     outcome: dict[str, Any] = {}
