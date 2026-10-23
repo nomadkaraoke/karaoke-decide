@@ -106,6 +106,12 @@ def _row_sources(d: dict[str, Any]) -> list[str]:
     return [str(d["source"])] if d.get("source") else []
 
 
+def _base_weight(d: dict[str, Any]) -> float:
+    """``song_weight`` of the row's best source: imports keep the first ``source`` and only add to
+    ``sources`` (a row a voice session created can later carry real listens). Loved/manual rules hold."""
+    return max([w.song_weight(d), *(w.song_weight({**d, "source": s}) for s in _row_sources(d))])
+
+
 def _map_songs(
     reader: CatalogReader, docs: list[dict[str, Any]]
 ) -> tuple[dict[str, float], list[tuple[str, str, str]], dict[str, int], set[str]]:
@@ -133,7 +139,7 @@ def _map_songs(
             has_karaoke = reader.match_kn(artist, title) is not None or reader.has_karaoke_key(key)
         if d.get("session_would_sing") == "no":
             session_no.add(key)
-        weight = max(w.song_weight(d), w.session_song_weight(d) or 0.0)
+        weight = max(_base_weight(d), w.session_song_weight(d) or 0.0)
         if weight > 0:  # a voice_session-only row is known only through a session label
             known[key] = max(known.get(key, 0.0), weight)
             if not has_karaoke:

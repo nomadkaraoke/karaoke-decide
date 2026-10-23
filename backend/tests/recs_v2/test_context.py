@@ -308,3 +308,11 @@ async def test_session_row_with_another_source_still_signals_the_artist(reader: 
     ctx = await _ctx(reader, fs)
     assert ctx.known_songs == {song_key("Weezer", "Export"): w.SONG_LASTFM_MID}
     assert artist_key("Weezer") in ctx.artists
+
+
+async def test_session_created_row_later_imported_weighs_by_its_best_source(reader: CatalogReader) -> None:
+    """Imports keep a row's first ``source`` and only add to ``sources``: weigh the best of them."""
+    fs = FakeFirestore(user_songs=[_session("Later Export", sources=["voice_session", "spotify_export"], playcount=12)])
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {song_key("Weezer", "Later Export"): w.SONG_LASTFM_HIGH}
+    assert artist_key("Weezer") in ctx.artists
