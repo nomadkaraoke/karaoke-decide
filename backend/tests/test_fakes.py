@@ -16,6 +16,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -505,6 +506,42 @@ def test_flag_refused_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(main, "get_backend_settings", lambda s=settings: s)
         with pytest.raises(RuntimeError, match="production"):
             main.create_app()
+
+
+def test_flag_refused_in_staging(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = _settings(environment="staging", inline_tasks=True)
+    monkeypatch.setattr(main, "get_backend_settings", lambda: settings)
+    with pytest.raises(RuntimeError, match="DECIDE_INLINE_TASKS"):
+        main.create_app()
+
+
+def test_committed_test_token_key_refused_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    key = next(
+        line.split('"')[1]
+        for line in (Path(__file__).parents[2] / "scripts" / "local-stack.sh").read_text().splitlines()
+        if line.startswith("LOCAL_STACK_TOKEN_KEY=")
+    )
+    settings = _settings(environment="production", decide_token_key=key)
+    monkeypatch.setattr(main, "get_backend_settings", lambda: settings)
+    with pytest.raises(RuntimeError, match="test-only"):
+        main.create_app()
+    # The same key is fine outside production (it is the local stack's key).
+    ok = _settings(decide_token_key=key)
+    monkeypatch.setattr(main, "get_backend_settings", lambda: ok)
+    main.create_app()
+
+
+def test_inline_task_notes_ignored_delay(caplog: pytest.LogCaptureFixture) -> None:
+    service = cloud_tasks_service.CloudTasksService(_settings(inline_tasks=True))
+    service._inline_transport = httpx.MockTransport(lambda r: httpx.Response(200, json={}))
+
+    async def go() -> None:
+        with caplog.at_level("INFO"):
+            service.create_sync_task(job_id="job-2", user_id="u", delay_seconds=30)
+        await asyncio.gather(*cloud_tasks_service._INLINE_TASKS)
+
+    asyncio.run(go())
+    assert "delay_seconds=30 ignored" in caplog.text
 
 
 def test_fake_routes_not_mounted_without_flag(monkeypatch: pytest.MonkeyPatch) -> None:

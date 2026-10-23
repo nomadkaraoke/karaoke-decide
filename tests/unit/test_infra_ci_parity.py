@@ -392,7 +392,7 @@ def test_job_shape(pulumi_job: dict[str, Any]) -> None:
 # --------------------------------------------------------------------------
 
 
-def test_every_main_secret_is_granted(ci_main_deploy: dict[str, Any]) -> None:
+def test_main_service_secrets_have_pulumi_access(ci_main_deploy: dict[str, Any]) -> None:
     """Each secret CI mounts on the API has an accessor grant (REQUIRED_SECRETS or a dedicated one)."""
     consts = _module_constants(_pulumi_tree())
     granted = set(consts["REQUIRED_SECRETS"]) | {"decide-kjbox-secret"}  # decide_kjbox_secret_access

@@ -1,6 +1,7 @@
 """FastAPI application for Karaoke Decide."""
 
 import asyncio
+import hashlib
 import importlib
 import logging
 from collections.abc import AsyncGenerator
@@ -66,6 +67,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     store.close()
 
 
+# sha256 of the test-only Fernet key in scripts/local-stack.sh (the key itself is not embedded here).
+LOCAL_STACK_TOKEN_KEY_SHA256 = (
+    "cfad2078bd4624ad8c14bde1593741c4cb452524b3814f65149a08ab101efa71"  # gitleaks:allow (sha256 of a test-only key)
+)
+
+
 def _mount_test_support(app: FastAPI, settings: BackendSettings) -> None:
     """Task C1's local-stack test API: only with DECIDE_TEST_API on, never in production."""
     if not getattr(settings, "decide_test_api", False) or settings.is_production:
@@ -84,8 +91,14 @@ def _refuse_local_only_flags_in_production(settings: BackendSettings) -> None:
         )
         if flag
     ]
-    if on and settings.is_production:
-        raise RuntimeError(f"{', '.join(on)} must not be set in production")
+    if on and settings.environment != "development":
+        raise RuntimeError(f"{', '.join(on)} must not be set when environment is {settings.environment!r}")
+    if settings.is_production and settings.decide_token_key:
+        digest = hashlib.sha256(settings.decide_token_key.strip().encode()).hexdigest()
+        if digest == LOCAL_STACK_TOKEN_KEY_SHA256:
+            raise RuntimeError(
+                "DECIDE_TOKEN_KEY is the committed test-only local-stack key; refusing to start in production"
+            )
 
 
 def _mount_fakes(app: FastAPI, settings: BackendSettings) -> None:

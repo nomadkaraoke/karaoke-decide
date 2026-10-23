@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import re
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -89,6 +90,7 @@ class TrackMatcher:
             catalog_lookup: Optional catalog.db lookup for instant matching.
         """
         self._catalog_service = catalog_service
+        self._catalog_service_lock = threading.Lock()
         self.catalog_lookup = catalog_lookup
         self._compiled_title_patterns = [re.compile(p, re.IGNORECASE) for p in self.TITLE_REMOVE_PATTERNS]
         self._compiled_artist_patterns = [re.compile(p, re.IGNORECASE) for p in self.ARTIST_REMOVE_PATTERNS]
@@ -96,7 +98,9 @@ class TrackMatcher:
     @property
     def catalog_service(self) -> BigQueryCatalogService:
         if self._catalog_service is None:
-            self._catalog_service = BigQueryCatalogService()
+            with self._catalog_service_lock:
+                if self._catalog_service is None:
+                    self._catalog_service = BigQueryCatalogService()
         return self._catalog_service
 
     def normalize_text(self, text: str) -> str:

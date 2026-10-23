@@ -77,6 +77,8 @@ class CloudTasksService:
         """
         payload = {"job_id": job_id, "user_id": user_id}
         if self.settings.inline_tasks:
+            if delay_seconds > 0:
+                logger.info(f"Inline task inline:{job_id}: delay_seconds={delay_seconds} ignored locally")
             return self._run_inline("/internal/sync/process", payload, name=f"inline:{job_id}")
 
         # Build the Cloud Run URL for the internal endpoint
