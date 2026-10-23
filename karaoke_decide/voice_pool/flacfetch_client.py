@@ -4,8 +4,9 @@
 ``gs://<flacfetch's GCS_BUCKET>/<gcs_dir>/<filename>.flac`` and deletes locally. flacfetch may
 refuse it (429 ``{"detail": {"code", "retry_after_s"}}``): that comes back as ``Refused``.
 Outages (503 ``budget_unavailable``, other 5xx, connection errors, timeouts) raise
-``FlacfetchUnavailableError``: the caller stops for this run. Any other HTTP error (bad key, bad
-request) raises ``httpx.HTTPStatusError``: that is misconfiguration, a real failure.
+``FlacfetchUnavailableError``: the caller stops for this run. A 400 / 422 for one download raises
+``FlacfetchRejectedError`` (that song's problem). Any other HTTP error (401 / 403: bad key) raises
+``httpx.HTTPStatusError``: that is misconfiguration, a real failure.
 """
 
 from __future__ import annotations
@@ -25,6 +26,11 @@ class Refused:
 
     code: str
     retry_after_s: int
+
+
+class FlacfetchRejectedError(Exception):
+    """flacfetch rejected this one download request (400 / 422): a problem with the song, not
+    with flacfetch or our credentials."""
 
 
 class FlacfetchUnavailableError(Exception):
@@ -89,6 +95,8 @@ class FlacfetchClient:
             detail = _detail(resp)
             retry = detail.get("retry_after_s", resp.headers.get("Retry-After", 60))
             return Refused(str(detail.get("code", "refused")), int(retry))
+        if resp.status_code in (400, 422):
+            raise FlacfetchRejectedError(f"flacfetch rejected the download: HTTP {resp.status_code} {resp.text[:300]}")
         resp.raise_for_status()
         return str(resp.json()["download_id"])
 

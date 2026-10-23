@@ -5,7 +5,8 @@
 GPU, ``parallelism=1``, 3600 s per task, no retries) with up to ``SONGS_PER_TASK`` songs per task.
 The worker writes ``<run>.results/part-<task>.jsonl`` lines ``{"id", "ok", "vocals", "seconds",
 "error"}``; ``collect_results`` applies them. A song still without a result ``STALE_AFTER_S`` after
-its batch was submitted (the execution timed out or died) goes back to ``fetched``.
+its batch was submitted (the execution timed out or died) goes back to ``fetched``, counting an
+attempt, so a song that kills its task ends up ``failed`` instead of looping on the GPU.
 """
 
 from __future__ import annotations
@@ -157,7 +158,8 @@ async def collect_results(
 
     ``ok`` -> ``separated`` with ``vocals_gcs``; not ok -> ``fetched`` with ``attempts += 1``
     (``failed`` at ``MAX_ATTEMPTS``). Songs with no result after ``STALE_AFTER_S`` go back to
-    ``fetched`` (``requeue_stale=False`` while a separation execution is still running).
+    ``fetched`` with ``attempts += 1`` too (``requeue_stale=False`` while a separation execution
+    is still running).
     """
     docs = await fs.query_documents(
         FETCH_COLLECTION, filters=[("status", "==", "separating"), ("manifest_run", "==", run)]
@@ -182,7 +184,11 @@ async def collect_results(
         elif (
             requeue_stale and (stamp - (doc.get("separating_at") or doc["updated_at"])).total_seconds() > STALE_AFTER_S
         ):
-            update = {"status": "fetched", "manifest_run": None}
+            # The task died or timed out on it: maybe this song (OOM, too slow), so it counts.
+            attempts = int(doc.get("attempts") or 0) + 1
+            status = "failed" if attempts >= MAX_ATTEMPTS else "fetched"
+            error = f"no separation result {STALE_AFTER_S // 3600} h after run {run}"
+            update = {"status": status, "attempts": attempts, "error": error, "manifest_run": None}
             sent_back += 1
         else:
             continue

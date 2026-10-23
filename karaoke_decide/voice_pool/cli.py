@@ -81,7 +81,13 @@ def _open_reader(args: argparse.Namespace, settings: Any) -> Any:
     if args.catalog or args.availability:
         if not (args.catalog and args.availability):
             raise SystemExit("--catalog and --availability go together")
-        return CatalogReader(Path(args.catalog), Path(args.availability))
+        own = CatalogReader(Path(args.catalog), Path(args.availability))
+        try:
+            own.conn()  # fail now (and close) if the files can't be opened
+        except Exception:
+            own.close()
+            raise
+        return own
     from backend.services.catalog_store import get_catalog_store
 
     store = get_catalog_store()
@@ -119,12 +125,16 @@ def _select(args: argparse.Namespace) -> int:
         fs = FirestoreService(settings)
         gcs = storage.Client(project=settings.google_cloud_project or None)
     headers = {"User-Agent": "nomadkaraoke-voice-pool/1.0 (https://nomadkaraoke.com)"}
-    with httpx.Client(headers=headers) as http:
-        summary = asyncio.run(
-            run_select(
-                reader, bq, fs, http, n=args.n, run=args.run, dry_run=args.dry_run, gcs=gcs, probe=not args.no_probe
+    try:
+        with httpx.Client(headers=headers) as http:
+            summary = asyncio.run(
+                run_select(
+                    reader, bq, fs, http, n=args.n, run=args.run, dry_run=args.dry_run, gcs=gcs, probe=not args.no_probe
+                )
             )
-        )
+    finally:
+        if args.catalog:  # ours; the catalog store's shared reader stays open
+            reader.close()
     print(format_report(summary))
     return 0
 

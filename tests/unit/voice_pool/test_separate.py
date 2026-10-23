@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
+import pytest
 from google.cloud import run_v2
 
 from karaoke_decide.voice_pool import queue, separate
@@ -91,10 +92,8 @@ async def test_failed_job_start_leaves_items_fetched(fs, gcs):
 
     items = await fetched(fs, 3)
     runner = FakeRunner(fail={separate.SEPARATE_JOB: RuntimeError("quota")})
-    try:
+    with pytest.raises(RuntimeError, match="quota"):
         await separate.submit_batch(fs, gcs, runner, items, "r1", now=lambda: NOW)
-    except RuntimeError:
-        pass
     assert {fs.cols[FETCH][i["id"]]["status"] for i in items} == {"fetched"}
 
 
@@ -121,11 +120,20 @@ async def test_results_mark_separated_and_stale_run_requeues(fs, gcs, caplog):
     assert dd["status"] == "separating"  # no result yet, 1 h old: still running
     assert not any(r.levelno >= logging.ERROR for r in caplog.records)
 
-    # 5 h later with no result: the execution timed out or died -> back to fetched (attempts unchanged).
+    # 5 h later with no result: the execution timed out or died -> back to fetched, one attempt used.
     fs.cols[FETCH][d]["separating_at"] = at(5.1)
     assert await separate.collect_results(fs, gcs, "r1", now=lambda: NOW, requeue_stale=False) == (0, 0)
     assert await separate.collect_results(fs, gcs, "r1", now=lambda: NOW) == (0, 1)
-    assert (dd["status"], dd["attempts"], dd["manifest_run"]) == ("fetched", 0, None)
+    assert (dd["status"], dd["attempts"], dd["manifest_run"]) == ("fetched", 1, None)
+    assert "no separation result" in dd["error"]
+
+
+async def test_song_that_keeps_killing_its_task_fails(fs, gcs):
+    (pid,) = (i["id"] for i in await fetched(fs, 1))
+    for attempt, status in ((1, "fetched"), (2, "fetched"), (3, "failed")):
+        fs.cols[FETCH][pid].update(status="separating", manifest_run=f"r{attempt}", separating_at=at(5.5))
+        assert await separate.collect_results(fs, gcs, f"r{attempt}", now=lambda: NOW) == (0, 1)
+        assert (fs.cols[FETCH][pid]["status"], fs.cols[FETCH][pid]["attempts"]) == (status, attempt)
 
 
 def test_cloud_run_job_runner():

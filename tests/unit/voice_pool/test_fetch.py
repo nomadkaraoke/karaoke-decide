@@ -384,3 +384,117 @@ async def test_status_summary(fs, ff, clock):
     ff.down = True
     assert (await fetch.status_summary(fs, ff.client()))["budget"] is None
     assert (await fetch.status_summary(fs, None))["budget"] is None
+
+
+# ------------------------------------------------------------------ review fixes
+
+
+async def test_manifest_write_forbidden_is_warning_and_analyse_still_runs(fs, ff, runner, clock, caplog):
+    from google.api_core.exceptions import Forbidden
+
+    from tests.unit.voice_pool.conftest import FakeGcs
+
+    class ForbiddenGcs(FakeGcs):
+        def bucket(self, name: str) -> Any:
+            b = super().bucket(name)
+            b.blob = lambda n: (_ for _ in ()).throw(Forbidden(f"403 storage.objects.create on {n}"))
+            return b
+
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    ids = await seed(fs, 25, status="fetched", fetched_at=ts(clock, 1))
+    await seed(fs, 1, prefix="done", status="separated")
+    out = await go(fs, ff, runner, ForbiddenGcs(), clock)
+    assert out["separating"] == 0 and {statuses(fs)[i] for i in ids} == {"fetched"}
+    assert out["analyse_started"] is True and [c["job"] for c in runner.calls] == ["voice-pool-analyse"]
+    assert any(r.levelno == logging.WARNING and "403" in r.getMessage() for r in caplog.records)
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+async def test_unreadable_results_are_a_warning(fs, ff, runner, clock, caplog):
+    from google.api_core.exceptions import Forbidden
+
+    from tests.unit.voice_pool.conftest import FakeGcs
+
+    class ForbiddenList(FakeGcs):
+        def bucket(self, name: str) -> Any:
+            b = super().bucket(name)
+            b.list_blobs = lambda **kw: (_ for _ in ()).throw(Forbidden("403 storage.objects.list"))
+            return b
+
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    (i,) = await seed(fs, 1, status="separating", manifest_run="r0", separating_at=ts(clock, 1))
+    out = await go(fs, ff, runner, ForbiddenList(), clock)
+    assert out["separated"] == 0 and statuses(fs)[i] == "separating"
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+async def test_rejected_song_fails_alone_and_queue_moves_on(fs, ff, runner, gcs, clock):
+    bad, good = await seed(fs, 2)
+    ff.downloads = [(422, {"detail": [{"msg": "expected_duration_s too large"}]})]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 1 and out["refused_code"] is None
+    assert (fs.cols[FETCH][bad]["status"], fs.cols[FETCH][bad]["attempts"]) == ("queued", 1)
+    assert "422" in fs.cols[FETCH][bad]["error"] and fs.cols[FETCH][good]["status"] == "downloading"
+    assert [s["source_id"] for s in ff.started] == ["sp000001"]
+
+
+async def test_auth_failure_aborts_and_unclaims(fs, ff, runner, gcs, clock):
+    (i,) = await seed(fs, 1)
+    ff.downloads = [(401, {"detail": "Invalid API key"})]
+    with pytest.raises(httpx.HTTPStatusError):
+        await go(fs, ff, runner, gcs, clock)
+    assert statuses(fs)[i] == "queued" and fs.cols[FETCH][i]["attempts"] == 0
+
+
+async def test_claimed_song_is_skipped(fs, ff, runner, gcs, clock, monkeypatch):
+    taken, free = await seed(fs, 2)
+    real = fs.transform_document_atomically
+
+    async def racing(collection: str, doc_id: str, transform: Any) -> Any:
+        if doc_id == taken:  # another execution claimed it after our query
+            fs.cols[FETCH][taken].update(status="downloading", flacfetch_id="other")
+        return await real(collection, doc_id, transform)
+
+    monkeypatch.setattr(fs, "transform_document_atomically", racing)
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 1 and [s["source_id"] for s in ff.started] == ["sp000001"]
+    assert fs.cols[FETCH][taken]["flacfetch_id"] == "other"
+    assert fs.cols[FETCH][free]["flacfetch_id"] == "dl1" and statuses(fs)[free] == "downloading"
+
+
+async def test_refusal_and_outage_revert_the_claim(fs, ff, runner, gcs, clock):
+    (i,) = await seed(fs, 1)
+    ff.downloads = [refused("spotify_budget", 7200)]
+    await go(fs, ff, runner, gcs, clock)
+    assert statuses(fs)[i] == "queued" and fs.cols[FETCH][i]["flacfetch_id"] is None
+    ff.downloads = [(503, {"detail": {"code": "budget_unavailable", "retry_after_s": 60}})]
+    await go(fs, ff, runner, gcs, clock)
+    assert statuses(fs)[i] == "queued" and fs.cols[FETCH][i]["attempts"] == 0
+
+
+async def test_short_retry_waits_at_least_the_batch_gap(fs, ff, runner, gcs, clock):
+    await seed(fs, 1)
+    ff.downloads = [refused("batch_gap", 3)]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 1 and clock.sleeps == [fetch.MIN_WAIT_S] and fetch.MIN_WAIT_S == 30
+
+
+async def test_forgotten_download_with_audio_in_gcs_is_fetched(fs, ff, runner, gcs, clock):
+    uploaded, lost = await seed(fs, 2, status="downloading", flacfetch_id="gone")
+    gcs.bucket(GEN).objects[f"voice-pool/audio/{uploaded}/original.flac"] = b"fLaC"
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["fetched"] == 1
+    assert fs.cols[FETCH][uploaded]["status"] == "fetched"
+    assert fs.cols[FETCH][uploaded]["audio_gcs"] == f"gs://{GEN}/voice-pool/audio/{uploaded}/original.flac"
+    assert (fs.cols[FETCH][lost]["status"], fs.cols[FETCH][lost]["attempts"]) == ("queued", 1)
+
+
+async def test_fresh_claim_is_left_alone_but_orphaned_claim_is_recovered(fs, ff, runner, gcs, clock):
+    fresh, orphan = await seed(fs, 2, status="downloading", flacfetch_id=None)
+    fs.cols[FETCH][fresh]["updated_at"] = ts(clock, 0.05)  # 3 min: another run is starting it
+    fs.cols[FETCH][orphan]["updated_at"] = ts(clock, 1)  # crashed between claim and start
+    ff.budgets = [(200, {**ALLOWED, "batch_allowed_now": False, "retry_after_s": 9999})]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["polled"] == 1 and statuses(fs)[fresh] == "downloading"
+    assert (fs.cols[FETCH][orphan]["status"], fs.cols[FETCH][orphan]["attempts"]) == ("queued", 1)

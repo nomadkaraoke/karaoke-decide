@@ -121,6 +121,15 @@ class MemoryFs:
             raise KeyError(doc_id)
         col[doc_id].update(copy.deepcopy(data))
 
+    async def transform_document_atomically(self, collection: str, doc_id: str, transform: Any) -> Any:
+        col = self.cols.setdefault(collection, {})
+        new = transform(copy.deepcopy(col.get(doc_id)))  # may raise to abort without writing
+        if new is None:
+            col.pop(doc_id, None)
+        else:
+            col[doc_id] = copy.deepcopy(new)
+        return new
+
     async def count_documents(self, collection: str, filters: Any = None) -> int:
         return len(await self.query_documents(collection, filters))
 
