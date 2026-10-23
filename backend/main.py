@@ -15,6 +15,7 @@ from backend.config import BackendSettings, get_backend_settings
 from backend.logging_config import configure_logging
 from backend.services.catalog_store import get_catalog_store
 from backend.services.ingest_executor import log_pool_sizes
+from backend.services.voice_data_store import get_voice_data_store
 from karaoke_decide.core.lazy_import import preload
 
 configure_logging()
@@ -23,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 # The lifespan's outer bound on the catalog load, beyond the store's own budget.
 LIFESPAN_SLACK_S = 5.0
+# The lifespan's bound on the voice.db load (a small file; it keeps loading in the background past this).
+VOICE_LOAD_TIMEOUT_S = 20.0
 
 # Client libraries the services import lazily (cold start). The lifespan imports them in a
 # thread alongside the catalog load, so the first requests don't pay for them.
@@ -57,6 +60,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
     except TimeoutError:
         logger.warning("Recommendations catalog load overran its startup budget; starting warming_up")
+    # voice.db for the voice session: same contract (never blocks startup, warming_up without
+    # it), then a background task re-reads voice/latest.json and swaps in new runs.
+    voice = get_voice_data_store()
+    try:
+        await asyncio.wait_for(asyncio.to_thread(voice.load, settings), VOICE_LOAD_TIMEOUT_S)
+    except TimeoutError:
+        logger.warning("voice.db load overran its startup budget; voice session starts warming_up")
+    voice_refresh = asyncio.create_task(voice.refresh_forever(), name="voice-db-refresh")
     # Usually done by now (it ran alongside the catalog load); bounded so it can't hold startup.
     await asyncio.to_thread(preloading.join, PRELOAD_WAIT_S)
 
@@ -64,7 +75,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("Shutting down Karaoke Decide API")
+    voice_refresh.cancel()
     store.close()
+    voice.close()
 
 
 # sha256 of the test-only Fernet key in scripts/local-stack.sh (the key itself is not embedded here).

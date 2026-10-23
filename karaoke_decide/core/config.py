@@ -60,6 +60,16 @@ class Settings(BaseSettings):
     song_index_local_dir: str = ""
     catalog_load_timeout_s: float = 60
     catalog_dir: str = "/tmp/decide-catalog"  # download dir (in-memory on Cloud Run)
+
+    # Voice session (backend/services/voice_data_store.py). voice.db is published by the
+    # voice-pool jobs behind gs://<voice_data_bucket>/voice/latest.json and downloaded into
+    # <catalog_dir>/voice/<run>/; the pointer is re-read every voice_refresh_s. voice_local_dir
+    # (an already-built voice.db: local stack, tests) wins when set.
+    voice_data_bucket: str = "nomadkaraoke-musicbrainz-data"
+    voice_local_dir: str = ""
+    voice_refresh_s: float = 600
+    # Private user recordings (voice-recordings/<user_id>/<session_id>/<n>.<ext>).
+    voice_recordings_bucket: str = "nomadkaraoke-voice-recordings"
     # Make every BigQuery client construction fail (local stack / tests: no GCP).
     bigquery_disabled: bool = False
 
