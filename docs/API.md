@@ -659,11 +659,11 @@ Verified users. Start connecting ListenBrainz through MetaBrainz OAuth (authoriz
 
 ### POST /api/services/listenbrainz/upload-export
 
-Verified users, ListenBrainz connected with OAuth. Multipart `file` (a Spotify export `.zip`, at most 31,457,280 bytes). Hands the zip to ListenBrainz's importer (`POST /1/import-listens/`, `service=spotify`) with the user's token; nothing is ingested here. Response `{"import_id":"42","status":"waiting"}`, and `lb_pending_import={id,status,submitted_at}` is stored on the connection (shown as `pending_listenbrainz_import` in `/summary`). Errors (`detail`): `409 not_oauth_connected | needs_reconnect | import_in_progress`, `413 too_large`, `400 not_a_zip` (no `PK\x03\x04` magic), `429 rate_limited` (with `Retry-After`), `503 listenbrainz_unavailable`.
+Verified users, ListenBrainz connected with OAuth. Multipart `file` (a Spotify export `.zip`, at most 31,457,280 bytes). Hands the zip to ListenBrainz's importer (`POST /1/import-listens/`, `service=spotify`) with the user's token; nothing is ingested here. Response `{"import_id":"42","status":"waiting"}`, and `lb_pending_import={id,status,submitted_at}` is stored on the connection (shown as `pending_listenbrainz_import` in `/summary`). Errors (`detail`): `409 not_oauth_connected | needs_reconnect | import_in_progress`, `413 too_large`, `400 not_a_zip` (no `PK\x03\x04` magic), `429 rate_limited` (with `Retry-After`), `503 listenbrainz_unavailable` (ListenBrainz down, or the token refresh is busy or MetaBrainz failed transiently: `Retry-After: 30`; retry).
 
 ### GET /api/services/listenbrainz/oauth/callback
 
-No auth (MetaBrainz redirects here; the one-time state identifies the user). Query `code`, `state`, `error`. Stores the connection (`auth: "oauth"`, tokens encrypted with `DECIDE_TOKEN_KEY`) and answers `302` with `Cache-Control: no-store`:
+No auth (MetaBrainz redirects here; the one-time state identifies the user; a state outside `^[A-Za-z0-9_-]{16,128}$` is `invalid_state` without a lookup). Query `code`, `state`, `error`. Stores the connection (`auth: "oauth"`, tokens encrypted with `DECIDE_TOKEN_KEY`) and answers `302` with `Cache-Control: no-store`:
 - `return_to=app`: `nomadkaraoke://services/listenbrainz?status=connected` or `?status=error&reason=<code>` (tiny HTML body with a "Return to the app" link);
 - `return_to=web` (also used when the state is unknown): `{frontend_url}/en/music-i-know?listenbrainz=connected` or `?listenbrainz=error&reason=<code>`.
 

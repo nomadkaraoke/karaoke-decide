@@ -174,6 +174,18 @@ User → Connect Spotify → OAuth Flow → Tokens stored (encrypted)
 System → Periodic refresh → Keep tokens valid
 ```
 
+**Token cipher.** Service tokens (Spotify, Apple Music, ListenBrainz OAuth) are encrypted at rest with Fernet (`backend/services/token_cipher.py`, key `DECIDE_TOKEN_KEY` = Secret Manager `decide-token-key`) as `enc:v1:<token>`. Values without the prefix are legacy plaintext and still read. With no key, tokens stay plaintext and ListenBrainz OAuth is off. An OAuth ListenBrainz connection whose tokens no longer decrypt (key rotated) is marked `needs_reconnect`.
+
+**ListenBrainz OAuth (Phase 3b).** `GET /api/services/listenbrainz/oauth/start` → MetaBrainz authorize (PKCE S256, state in `oauth_states` with the verifier and `return_to`) → `/oauth/callback` stores `auth: "oauth"` tokens and 302s to the app scheme or the web page. Callbacks reject a state outside the `token_urlsafe` charset before any lookup. Live when `listenbrainz_oauth_active` (`LISTENBRAINZ_OAUTH_ENABLED`, MetaBrainz client id/secret, a valid `DECIDE_TOKEN_KEY`); otherwise the app hides the button. MetaBrainz rotates refresh tokens and revokes everything on reuse, so refreshes are serialised per user by a Firestore lease (`refresh_lease_until`, 90 s): the holder refreshes (45 s timeout) in a shielded task, and the others poll read-only for up to 50 s. A waiter timeout or a transient MetaBrainz failure is retryable (`503 listenbrainz_unavailable`), not `needs_reconnect`. `POST /listenbrainz/upload-export` proxies a Spotify export zip (≤ 30 MiB) to ListenBrainz's importer and records `lb_pending_import`.
+
+### 2b. Imports (Phase 3b)
+
+Screenshot (Gemini Flash, AI Studio key), public Spotify playlist (embed page), Spotify/Apple privacy-export aggregates (idempotent chunks) and YouTube Music playlists all go through `ImportIngestService` (`backend/services/import_ingest_service.py`). It matches tracks against catalog.db and merges additively into the shared `user_songs` / `user_artists` rows (the same row resolution as the karaoke log), with per-source summaries and remove-data in `/api/services/summary` and `/sources/{source}/data`.
+
+### 2c. ListenBrainz poller (`lb-poll` Cloud Run Job)
+
+Daily at 06:30 UTC, Cloud Scheduler runs the `lb-poll` job (`python -m backend.jobs.lb_poll`, same image, SA `lb-poll`, 1800 s, no retries). It waits for catalog.db (exits 1 without it), then polls every ListenBrainz connection (never-polled first, then the oldest): the first poll backfills up to 20 pages (`play_mode=max`), later polls add new listens since the cursor (`add`). It shares a 25 req/min rate gate, marks `lb_stale` after 30 days without listens, and checks a pending export import first. It stops starting users when the 1500 s budget is spent. It logs one INFO summary per run and at most one ERROR. Local/e2e: `POST /api/test/listenbrainz/poll`.
+
 ### 3. Listening History Sync
 
 ```
@@ -294,6 +306,7 @@ Additional tables from comprehensive Spotify metadata ETL:
 ## Deployment
 
 - **API**: Cloud Run (auto-scaling, 0-10 instances)
+- **Jobs**: `mb-refresh` (weekly), `lb-refresh` (twice weekly), `lb-poll` (daily ListenBrainz poller), `song-index-build` (daily)
 - **Search**: Cloud Run `karaoke-decide-search` (0-3 instances) + daily `song-index-build` job (see [Song search](#song-search))
 - **Database**: BigQuery (song catalog), Firestore (user data)
 - **Secrets**: Google Secret Manager
@@ -319,6 +332,9 @@ gcloud run deploy SERVICE_NAME \
 | `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
 | `postmark-server-token` | `POSTMARK_SERVER_TOKEN` | Email delivery |
 | `decide-gen-partner-secret` | `DECIDE_GEN_PARTNER_SECRET` | Search service only: gen catalog-resolve partner auth (secret owned by karaoke-gen's Pulumi) |
+| `gemini-api-key` | `GEMINI_API_KEY` | Screenshot import (AI Studio key; the screenshot card hides without it) |
+| `metabrainz-client-id` / `metabrainz-client-secret` | `METABRAINZ_CLIENT_ID` / `METABRAINZ_CLIENT_SECRET` | ListenBrainz connect via MetaBrainz OAuth (also mounted on the `lb-poll` job) |
+| `decide-token-key` | `DECIDE_TOKEN_KEY` | Fernet key for service tokens at rest (also on `lb-poll`) |
 | `decide-kjbox-secret` | `DECIDE_KJBOX_SECRET` | Main API: kjbox's karaoke-log partner auth (`X-Kjbox-Secret`). Pulumi creates the secret; its value is added by hand (`/gcp-admin`) and must exist before a deploy that mounts it. kjbox's `decide_kjbox_secret` config holds the same value. |
 
 **IAM requirement:** Cloud Run service account needs `roles/secretmanager.secretAccessor` on each secret. Managed via Pulumi in `infrastructure/__main__.py`.
