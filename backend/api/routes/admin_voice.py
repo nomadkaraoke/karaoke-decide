@@ -24,16 +24,20 @@ from backend.api.deps import AdminAccess, AuthServiceDep, FirestoreServiceDep, S
 from backend.config import BackendSettings
 from backend.services import catalog_store
 from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
+from backend.services.recs_v2.service import voice_range
 from backend.services.voice_data_store import (
     VoiceDataStore,
     VoiceDataUnavailable,
     VoiceReader,
 )
+from backend.services.voice_profile_service import VoiceProfileService
 from backend.services.voice_recording_service import LocalBucket
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
+from karaoke_decide.vocal_range.fit import UserVoiceRange
 from karaoke_decide.voice_pool.queue import FETCH_COLLECTION, enqueue
 from karaoke_decide.voice_session.labels import parse_good, parse_note
+from karaoke_decide.voice_session.predict import PREDICT_WEIGHTS, features, held_out, predict_good, replay
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +266,41 @@ class UserSongOut(BaseModel):
     prediction: PredictionOut | None = None  # Task E1
 
 
+_LEAD_GENDER = {
+    "bass": "male",
+    "baritone": "male",
+    "tenor": "male",
+    "alto": "female",
+    "mezzo": "female",
+    "soprano": "female",
+}
+
+
+async def _user_id(firestore: Any, auth: Any, email: str) -> str:
+    """The decide user id for an email (lookup only), or 404."""
+    profile = await firestore.get_document(auth.USERS_COLLECTION, auth._hash_email(email.strip().lower()))
+    user_id = profile.get("user_id") if profile else None
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+    return str(user_id)
+
+
+async def _voice(firestore: Any, user_id: str) -> tuple[UserVoiceRange | None, str | None]:
+    """The user's saved voice range and, from its voice type, a male/female register hint
+    (predict uses the hint only when the comfort centre sits between the registers)."""
+    profile = await VoiceProfileService(firestore).get(user_id)
+    if profile is None:
+        return None, None
+    return voice_range(profile), _LEAD_GENDER.get(profile.voice_type or "")
+
+
+def _prediction(voice: UserVoiceRange | None, analysis: Any, lead_gender: str | None) -> PredictionOut | None:
+    if voice is None or analysis is None:
+        return None
+    pred = predict_good(voice, analysis, lead_gender)
+    return PredictionOut(good=pred[0], p=pred[1]) if pred is not None else None
+
+
 def _sort_time(value: Any) -> str:
     return value.isoformat() if isinstance(value, datetime) else str(value or "")
 
@@ -274,11 +313,10 @@ async def user_songs(
     auth: AuthServiceDep,
     store: Annotated[VoiceDataStore, Depends(get_voice_store)],
 ) -> list[UserSongOut]:
-    """Every song the user labelled or attempted, with voice.db markers (lookup only: no profile is created)."""
-    profile = await firestore.get_document(auth.USERS_COLLECTION, auth._hash_email(email.strip().lower()))
-    user_id = profile.get("user_id") if profile else None
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+    """Every song the user labelled or attempted, with voice.db markers and, when the user has a
+    voice profile, the good/no prediction (lookup only: no profile is created)."""
+    user_id = await _user_id(firestore, auth, email)
+    voice, lead_gender = await _voice(firestore, user_id)
     labels = {
         d["song_key"]: d
         for d in await firestore.query_documents(LABELS_COLLECTION, filters=[("user_id", "==", user_id)])
@@ -302,6 +340,7 @@ async def user_songs(
                     artist=song.artist if song else (label or {}).get("artist"),
                     title=song.title if song else (label or {}).get("title"),
                     markers=dataclasses.asdict(analysis) if analysis else None,
+                    prediction=_prediction(voice, analysis, lead_gender),
                     label=LabelOut(
                         good=label.get("good"), tags=list(label.get("tags") or []), notes=label.get("notes") or ""
                     )
@@ -324,6 +363,76 @@ async def user_songs(
         return out
 
     return await asyncio.to_thread(build)
+
+
+# ---------------------------------------------------------------- agreement (sign-off gate)
+
+
+class AgreementRowOut(BaseModel):
+    song_key: str
+    artist: str | None
+    title: str | None
+    label: str
+    features: dict[str, float]
+    p: float
+    pred: bool
+
+
+class AgreementOut(BaseModel):
+    n: int
+    agree: int
+    rate: float
+    confusion: dict[str, int]
+    ready_for_signoff: bool
+    per_marker: dict[str, dict[str, float | None]]
+    weights: dict[str, float]
+    skipped_no_profile: int  # held-out songs not scored because the user has no voice profile
+    skipped_no_range: int  # held-out songs whose analysis row has no measured range
+    rows: list[AgreementRowOut]
+
+
+@router.get("/agreement", response_model=AgreementOut)
+async def agreement_report(
+    email: str,
+    _access: AdminAccess,
+    firestore: FirestoreServiceDep,
+    auth: AuthServiceDep,
+    reader: Annotated[VoiceReader, Depends(get_voice_reader)],
+) -> AgreementOut:
+    """The good/no prediction vs the user's yes/no labels on held-out songs (labelled, analysed,
+    never attempted in a session). ``rows`` carry each song's features for offline weight trials
+    (``scripts/voice/agreement.py --export``)."""
+    user_id = await _user_id(firestore, auth, email)
+    voice, lead_gender = await _voice(firestore, user_id)
+    labels = await firestore.query_documents(LABELS_COLLECTION, filters=[("user_id", "==", user_id)])
+    attempts = await firestore.query_documents(ATTEMPTS_COLLECTION, filters=[("user_id", "==", user_id)])
+    good = {d["song_key"]: d.get("good") for d in labels}
+
+    def build() -> tuple[list[dict[str, Any]], int, int]:
+        analyses = {k: a for k in good if (a := reader.analysis(k)) is not None}
+        keys = held_out(labels, attempts, analyses)
+        if voice is None:
+            return [], len(keys), 0
+        rows, no_range = [], 0
+        for key in keys:
+            x = features(voice, analyses[key], lead_gender)
+            if x is None:
+                no_range += 1
+                continue
+            song = reader.song(key)
+            rows.append(
+                {
+                    "song_key": key,
+                    "artist": song.artist if song else None,
+                    "title": song.title if song else None,
+                    "label": good[key],
+                    "features": x,
+                }
+            )
+        return rows, 0, no_range
+
+    rows, no_profile, no_range = await asyncio.to_thread(build)
+    return AgreementOut(**replay(rows, PREDICT_WEIGHTS), skipped_no_profile=no_profile, skipped_no_range=no_range)
 
 
 RECORDINGS_PREFIX = "voice-recordings/"
