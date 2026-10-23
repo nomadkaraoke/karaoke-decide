@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     voice_data_bucket: str = "nomadkaraoke-musicbrainz-data"
     voice_local_dir: str = ""
     voice_refresh_s: float = 600
+    # Open the voice session to every signed-in user (env VOICE_SESSION_OPEN); admins always have it.
+    voice_session_open: bool = False
     # Private user recordings (voice-recordings/<user_id>/<session_id>/<n>.<ext>).
     voice_recordings_bucket: str = "nomadkaraoke-voice-recordings"
     # Make every BigQuery client construction fail (local stack / tests: no GCP).

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.api.deps import AdminAccess, AuthServiceDep, FirestoreServiceDep, Settings
+from backend.api.deps import AdminAccess, AuthServiceDep, FirestoreServiceDep, Settings, get_voice_store
 from backend.config import BackendSettings
 from backend.services import catalog_store
 from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
@@ -28,7 +28,6 @@ from backend.services.voice_data_store import (
     VoiceDataStore,
     VoiceDataUnavailable,
     VoiceReader,
-    get_voice_data_store,
 )
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
@@ -150,11 +149,6 @@ async def import_labels(
 
 
 # ---------------------------------------------------------------- debug views
-
-
-def get_voice_store() -> VoiceDataStore:
-    """The lifespan-loaded voice.db store (tests override this)."""
-    return get_voice_data_store()
 
 
 async def get_voice_reader(store: Annotated[VoiceDataStore, Depends(get_voice_store)]) -> VoiceReader:

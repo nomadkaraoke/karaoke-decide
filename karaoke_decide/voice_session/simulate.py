@@ -97,7 +97,8 @@ def _sample(rng: random.Random, options: tuple[str, ...], model_p: list[float], 
     return rng.choices(options, weights=clean)[0]
 
 
-def _answer(rng: random.Random, true_h: Hyp, song: SongDemand, noise: float) -> tuple[Position, Difficulty]:
+def answer(rng: random.Random, true_h: Hyp, song: SongDemand, noise: float) -> tuple[Position, Difficulty]:
+    """A simulated singer's (position, difficulty) answers for one song (sung at likely_octave)."""
     o = likely_octave(true_h, song)
     pos_p = [likelihood_position(true_h, song, a, o) for a in _POSITIONS]
     diff_p = [likelihood_difficulty(true_h, song, a, o) for a in _DIFFICULTIES]
@@ -133,7 +134,7 @@ def simulate(
             done = "no_candidates"
             break
         cand = by_key[pick.song_key]
-        position, difficulty = _answer(rng, true_h, cand.demand, noise)
+        position, difficulty = answer(rng, true_h, cand.demand, noise)
         quiz = Quiz(
             feel="fine",
             position=position,

@@ -18,6 +18,7 @@ from backend.api.routes.quiz import router as quiz_router
 from backend.api.routes.recommendations import router as recommendations_router
 from backend.api.routes.services import router as services_router
 from backend.api.routes.voice import router as voice_router
+from backend.api.routes.voice_session import router as voice_session_router
 
 router = APIRouter()
 
@@ -35,6 +36,7 @@ router.include_router(known_songs_router, prefix="/known-songs", tags=["known-so
 router.include_router(karaoke_log_router, prefix="/my/karaoke-log", tags=["karaoke-log"])
 router.include_router(kjbox_partner_router, prefix="/partner/kjbox/karaoke-log", tags=["partner"])
 router.include_router(voice_router, prefix="/my", tags=["voice"])
+router.include_router(voice_session_router, prefix="/voice", tags=["voice-session"])
 router.include_router(admin_router, prefix="/admin", tags=["admin"])
 router.include_router(admin_voice_router, prefix="/admin/voice", tags=["admin-voice"])
 

@@ -74,7 +74,7 @@ class Quiz:
     position: Position
     difficulty: Difficulty | None
     knew: Literal["well", "partly", "barely"] | None
-    would_sing: Literal["yes", "yes_other_key", "no"]
+    would_sing: Literal["yes", "yes_other_key", "no"] | None
     would_work_if: frozenset[str]
     voice_now: Literal["fresh", "warm", "tired"] | None
     version_quality: Literal["good", "not_great"] | None
@@ -103,12 +103,20 @@ class Evidence:
 
 
 class VoiceProfileLike(Protocol):
-    """Stand-in for 3c's VoiceProfileOut (only the fields the prior needs)."""
+    """The fields of 3c's ``VoiceProfileOut`` the prior needs.
 
-    method: str  # 'mic' | 'self' | other
-    voice_type: str | None
-    voice_type_between: str | None  # the adjacent type when reported "between"
-    register: str | None  # 'low' | 'mid' | 'high' for register-only self profiles
+    The self-reported register is read by ``_profile_register``: ``VoiceProfileOut`` keeps it on
+    ``register_`` (values lower / middle / higher); simple stand-ins may use ``register`` (low / mid / high).
+    """
+
+    @property
+    def method(self) -> str: ...  # 'mic' | 'self' | other
+
+    @property
+    def voice_type(self) -> str | None: ...
+
+    @property
+    def voice_type_between(self) -> str | None: ...  # the adjacent type when reported "between"
 
 
 def _sigmoid(x: float) -> float:
@@ -116,7 +124,7 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def _usable_pitch(pitch: PitchSummary | None) -> bool:
+def usable_pitch(pitch: PitchSummary | None) -> bool:
     return pitch is not None and pitch.voiced_s >= MIN_VOICED_S and pitch.held_count >= MIN_HELD_FOR_PITCH
 
 
@@ -209,7 +217,7 @@ def likelihood_pitch(h: Hyp, pitch: PitchSummary | None) -> float:
 
     Returns 1.0 (no information) when the pitch summary is absent or too thin to use.
     """
-    if pitch is None or not _usable_pitch(pitch):
+    if pitch is None or not usable_pitch(pitch):
         return 1.0
     f_lo, f_hi = full(h)
     return _sigmoid((f_hi - pitch.held_high + 1) / 1.0) * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
@@ -241,6 +249,21 @@ def _register_band(centre: float) -> str:
     return "high"
 
 
+_REGISTERS = {"lower": "low", "middle": "mid", "higher": "high", "low": "low", "mid": "mid", "high": "high"}
+
+
+def _profile_register(profile: VoiceProfileLike) -> str | None:
+    """'low' | 'mid' | 'high' from ``register_`` (3c VoiceProfileOut), else ``register``.
+
+    Only strings count: on a pydantic model ``register`` is ABCMeta's classmethod, not a field.
+    """
+    for attr in ("register_", "register"):
+        value = getattr(profile, attr, None)
+        if isinstance(value, str):
+            return _REGISTERS.get(value)
+    return None
+
+
 def _type_prior(profile: VoiceProfileLike | None) -> dict[str, float]:
     types = list(VOICE_TYPES)
     weights = dict.fromkeys(types, 1.0)
@@ -257,9 +280,9 @@ def _type_prior(profile: VoiceProfileLike | None) -> dict[str, float]:
         for t in neighbours:
             weights[t] = near
         weights[profile.voice_type] = named
-    elif profile.method == "self" and profile.voice_type is None and profile.register in ("low", "mid", "high"):
+    elif profile.method == "self" and profile.voice_type is None and (register := _profile_register(profile)):
         for t, (lo, hi) in VOICE_TYPES.items():
-            if _register_band((lo + hi) / 2) == profile.register:
+            if _register_band((lo + hi) / 2) == register:
                 weights[t] = _REGISTER_WEIGHT
     return weights
 
@@ -283,7 +306,7 @@ class Posterior:
     def update(self, ev: Evidence) -> Posterior:
         octave = sung_octave(ev.song, ev.pitch)
         w_quiz = evidence_weight(ev, "quiz")
-        use_pitch = _usable_pitch(ev.pitch)
+        use_pitch = usable_pitch(ev.pitch)
         w_pitch = evidence_weight(ev, "pitch") if use_pitch else 0.0
         new: dict[Hyp, float] = {}
         for h, lp in self.log_p.items():

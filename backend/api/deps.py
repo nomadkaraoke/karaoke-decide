@@ -26,7 +26,9 @@ from backend.services.recs_v2.service import RecommendationServiceV2
 from backend.services.song_feedback_service import SongFeedbackService
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
+from backend.services.voice_data_store import VoiceDataStore, get_voice_data_store
 from backend.services.voice_profile_service import VoiceProfileService
+from backend.services.voice_session_service import VoiceSessionService
 from karaoke_decide.core.models import User
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
@@ -316,6 +318,21 @@ async def get_voice_profile_service(
     return VoiceProfileService(firestore)
 
 
+def get_voice_store() -> VoiceDataStore:
+    """The lifespan-loaded voice.db store (tests override this)."""
+    return get_voice_data_store()
+
+
+async def get_voice_session_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    voice: Annotated[VoiceDataStore, Depends(get_voice_store)],
+    catalog: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
+    feedback: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
+    recs: Annotated[RecommendationServiceV2, Depends(get_recommendation_service_v2_dep)],
+) -> VoiceSessionService:
+    return VoiceSessionService(firestore, voice, catalog, feedback, VoiceProfileService(firestore), recs)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -363,3 +380,5 @@ GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_serv
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
 ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]
 VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]
+VoiceDataStoreDep = Annotated[VoiceDataStore, Depends(get_voice_store)]
+VoiceSessionServiceDep = Annotated[VoiceSessionService, Depends(get_voice_session_service)]
