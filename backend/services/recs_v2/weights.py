@@ -99,3 +99,7 @@ ENERGY_MEDIUM_CENTER = 0.55  # "medium" peaks here and reaches 0 at +-0.5
 HITS_POPULARITY_BONUS = 0.05  # "hits": + bonus * pop
 DEEP_CUTS_OBSCURITY_BONUS = 0.03  # "deep_cuts": + bonus * (1 - pop) ...
 DEEP_CUTS_POPULARITY_PENALTY = 0.05  # ... - penalty * pop
+
+# vocal fit (voice profile x song vocal range); the one feature that can be negative.
+W_FIT = 0.15
+FIT_AFFINITY: dict[str, float] = {"fits": 1.0, "fitsIn": 0.7, "stretch": 0.2, "outside": -0.5}  # unknown: 0

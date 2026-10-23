@@ -85,7 +85,8 @@ def test_v2_shape(make_client: Callable[..., TestClient]) -> None:
     r = make_client(user_doc={"quiz_genres": ["rock"], "quiz_decades": ["1990s"]}).get(URL)
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"sections", "filters_applied", "next_cursor", "has_profile", "catalog_run"}
+    assert set(body) == {"sections", "filters_applied", "next_cursor", "has_profile", "catalog_run", "voice"}
+    assert body["voice"] == {"has_profile": False, "method": None}
     assert body["catalog_run"] == "fixture-run"
     assert body["has_profile"] is True
     assert body["next_cursor"] is None
@@ -104,7 +105,9 @@ def test_v2_shape(make_client: Callable[..., TestClient]) -> None:
         "has_karaoke_version",
         "karaoke",
         "facets",
+        "fit",
     }
+    assert song["fit"] is None  # no voice profile
     assert set(song["karaoke"]) == {"community", "commercial", "karafun", "brand_count"}
     assert set(song["facets"]) == {
         "decade",

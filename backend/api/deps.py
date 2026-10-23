@@ -25,6 +25,7 @@ from backend.services.recs_v2.service import RecommendationServiceV2
 from backend.services.song_feedback_service import SongFeedbackService
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
+from backend.services.voice_profile_service import VoiceProfileService
 from karaoke_decide.core.models import User
 from karaoke_decide.services.bigquery_catalog import BigQueryCatalogService
 
@@ -231,7 +232,7 @@ async def get_recommendation_service_v2_dep(
     feedback: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
 ) -> RecommendationServiceV2:
     """Get the v2 (catalog.db) recommendation service."""
-    return RecommendationServiceV2(firestore, store, feedback)
+    return RecommendationServiceV2(firestore, store, feedback, VoiceProfileService(firestore))
 
 
 async def get_playlist_service_dep(
@@ -287,6 +288,12 @@ async def get_karaoke_log_service(
     return KaraokeLogService(firestore, catalog=catalog, resolve_user=resolve_user, find_user=find_user)
 
 
+async def get_voice_profile_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+) -> VoiceProfileService:
+    return VoiceProfileService(firestore)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -332,3 +339,4 @@ UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_de
 GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
 ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]
+VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]

@@ -52,6 +52,17 @@ Apps: `catalog.db` (schema 2) gets per-song `vr_*` columns with a rough artist f
   `gemini_batch.py prepare` -> `estimate` (token count and cost, hard budget check) -> `submit`
   (only after Andrew's OK) -> `poll` -> `collect`, then commit the two `gemini_*.csv.gz`.
 
+## API: how the app uses voice + fit (Phase 3c, API part)
+
+- `PUT /api/my/voice` stores the singer's measured or self-reported range (numbers only, never audio); see [API.md](API.md).
+- `GET /api/my/recommendations/v2` reads that profile and adds, per song, `fit {bucket, transpose, octave, tier}`
+  computed with `karaoke_decide/vocal_range/fit.py` against the song's `vr_*` columns in catalog.db. The best-match
+  score gains `W_FIT (0.15) x` fit affinity; `singable=true` keeps fits/fitsIn only; `sort=fit` orders the flat list by fit.
+  The response carries `voice {has_profile, method}`.
+- `GET /api/catalog/songs/{song_key}/vocal-range` gives one song's range for a detail view.
+- Older catalog.db files without `vr_*` columns (and prod until the next catalog build) degrade to NULLs: `fit` is
+  null, Singable is empty and the app shows "no range data yet".
+
 ## What degrades gracefully
 
 Every optional input missing (UltraStar zip, a measured CSV, Gemini files, Wikidata) logs one INFO

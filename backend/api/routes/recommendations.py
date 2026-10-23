@@ -332,10 +332,14 @@ async def get_recommendations_v2(
     explicit: Literal["exclude", "include"] = "include",
     has_karaoke: Literal["yes", "make", "any"] = "any",
     library: Literal["any", "community", "karafun"] = "any",
+    singable: bool = False,
     sort: Sort = "best",
     cursor: Annotated[str | None, Query(max_length=64)] = None,
 ) -> RecommendationsV2Response:
-    """Catalog-backed recommendations: explained sections for ``sort=best``, else one paged flat list."""
+    """Catalog-backed recommendations: explained sections for ``sort=best``, else one paged flat list.
+
+    With a voice profile every song carries ``fit``; ``singable`` keeps fits / fitsIn songs and
+    ``sort=fit`` orders by fit. Without a profile ``singable`` is ignored (not echoed)."""
     filters = RecFilters(
         genre=genre or [],
         mood=mood or [],
@@ -349,6 +353,7 @@ async def get_recommendations_v2(
         explicit=explicit,
         has_karaoke=has_karaoke,
         library=library,
+        singable=singable,
     )
     try:
         return await service.recommend(user, filters, sort, cursor)

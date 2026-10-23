@@ -49,6 +49,7 @@ def score(c: Candidate, ctx: UserContextV2) -> Scored:
     nrg = energy_match(ctx.energy_pref, c.energy)
     pop = (c.popularity or 0) / 100
     brand = min(c.brand_count, w.BRAND_CAP) / w.BRAND_CAP
+    fit = w.FIT_AFFINITY.get(c.fit.bucket, 0.0) if c.fit is not None else 0.0  # no profile / no range: 0
 
     total = (
         w.SCORE_AFFINITY * aff
@@ -59,6 +60,7 @@ def score(c: Candidate, ctx: UserContextV2) -> Scored:
         + w.SCORE_ENERGY * nrg
         + w.SCORE_POPULARITY * pop
         + w.SCORE_BRANDS * brand
+        + w.W_FIT * fit
     )
     if ctx.crowd_pref == "hits":
         total += w.HITS_POPULARITY_BONUS * pop

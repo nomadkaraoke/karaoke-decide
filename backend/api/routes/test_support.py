@@ -30,6 +30,7 @@ from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLL
 from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
+from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
 
 router = APIRouter()
 
@@ -62,6 +63,11 @@ class SeedBody(BaseModel):
     artists: list[SeedArtist] = Field(default_factory=list)
     loved: list[str] = Field(default_factory=list)
     hidden: list[str] = Field(default_factory=list)
+
+
+class VoiceSeedBody(BaseModel):
+    email: str
+    profile: VoiceProfileIn
 
 
 def _split_key(song_key: str) -> tuple[str, str]:
@@ -127,6 +133,17 @@ async def seed_profile(body: SeedBody, fs: FirestoreDep, auth: AuthDep) -> dict[
     return {"user_id": user.id}
 
 
+@router.post("/voice/seed", status_code=status.HTTP_204_NO_CONTENT)
+async def seed_voice(body: VoiceSeedBody, fs: FirestoreDep, auth: AuthDep) -> Response:
+    """Set the user's voice profile (validated like PUT /api/my/voice) on their profile doc."""
+    await auth.resolve_gen_user(body.email)
+    profile = VoiceProfileOut(**body.profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
+    await fs.update_document(
+        USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json", by_alias=True)}
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/profile")
 async def read_profile(email: Annotated[str, Query()], fs: FirestoreDep, auth: AuthDep) -> dict[str, Any]:
     """The user's decide profile as seeded: an empty profile (user_id null) when none exists."""
@@ -145,6 +162,7 @@ async def read_profile(email: Annotated[str, Query()], fs: FirestoreDep, auth: A
         ],
         "loved": [s.song_key for s in await feedback.list_loved(user_id)] if user_id else [],
         "hidden": [s.song_key for s in await feedback.list_hidden(user_id)] if user_id else [],
+        "voice_profile": doc.get("voice_profile"),
     }
 
 

@@ -16,6 +16,7 @@ from backend.api.routes.playlists import router as playlists_router
 from backend.api.routes.quiz import router as quiz_router
 from backend.api.routes.recommendations import router as recommendations_router
 from backend.api.routes.services import router as services_router
+from backend.api.routes.voice import router as voice_router
 
 router = APIRouter()
 
@@ -32,6 +33,7 @@ router.include_router(playlists_router, prefix="/playlists", tags=["playlists"])
 router.include_router(known_songs_router, prefix="/known-songs", tags=["known-songs"])
 router.include_router(karaoke_log_router, prefix="/my/karaoke-log", tags=["karaoke-log"])
 router.include_router(kjbox_partner_router, prefix="/partner/kjbox/karaoke-log", tags=["partner"])
+router.include_router(voice_router, prefix="/my", tags=["voice"])
 router.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 # Internal routes (Cloud Tasks callbacks) - separate prefix outside /api

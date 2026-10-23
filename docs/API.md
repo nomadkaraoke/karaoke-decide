@@ -73,14 +73,16 @@ Useful for post-deploy verification and scheduled monitoring.
 ### GET /api/my/recommendations/v2
 
 Catalog-backed, explained recommendations (auth: decide JWT or gen session token). The web recommendations page uses this endpoint (all filters, sort and library). Query params (all optional):
-`genre` (multi), `mood` (multi), `energy` (low|mid|high), `decade` (multi), `popularity` (min 0-100), `popularity_max` (0-100), `lead_gender` (male|female|mixed), `duration` (short|medium|long), `classic` (bool), `explicit` (exclude|include), `has_karaoke` (yes|make|any), `library` (any|community|karafun), `sort` (best|popular|newest|oldest|shortest|az), `cursor`.
+`genre` (multi), `mood` (multi), `energy` (low|mid|high), `decade` (multi), `popularity` (min 0-100), `popularity_max` (0-100), `lead_gender` (male|female|mixed), `duration` (short|medium|long), `classic` (bool), `explicit` (exclude|include), `has_karaoke` (yes|make|any), `library` (any|community|karafun), `singable` (bool), `sort` (best|popular|newest|oldest|shortest|az|fit), `cursor`.
 
 `sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
 
 ```json
-{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}}]}],
- "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000"}
+{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}, "fit": {"bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "notes"}}]}],
+ "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000", "voice": {"has_profile": true, "method": "mic"}}
 ```
+
+Vocal fit (needs a voice profile, `PUT /api/my/voice`): each song's `fit` is `{bucket: fits|fitsIn|stretch|outside, transpose, octave, tier}` (`fitsIn` = sing it `transpose` semitones / `octave` shifted), or `null` without a profile or without a song vocal range. `best` adds `0.15 x` fit affinity (fits 1.0, fitsIn 0.7, stretch 0.2, outside -0.5, unknown 0). `singable=true` keeps fits/fitsIn only (songs without a range drop out); without a profile it is ignored and not echoed in `filters_applied`. `sort=fit` is the flat `all` list ordered by fit bucket (fits, fitsIn, stretch, outside), then fit score, then popularity; songs without a range sort last. Once `catalog.db` has the `vr_*` columns the SQL prefilter keeps only songs with a range; before the catalog rebuild (schema 1) it returns songs with `fit: null` in popularity order. Without a profile it falls back to popularity order. `has_profile` is the taste profile; `voice.has_profile` is the voice profile.
 
 Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded. `GET /api/my/recommendations/categorized` (v1) is unchanged and keeps working.
 
@@ -405,6 +407,29 @@ Get details for a specific song.
   "sources": ["karaokenerds"],
   "is_popular": true
 }
+```
+
+### GET / PUT / DELETE /api/my/voice
+
+The singer's voice profile, stored on their `decide_users` doc (auth required; verified, guest and gen-session users). Mic audio never reaches the server: the app sends only derived numbers, and unknown body keys are rejected (422).
+
+- `GET` -> `{"profile": null | {...}}` (an invalid stored profile is treated as unset).
+- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; 404 `not_found` if the user has no doc; 422 on an inconsistent body.
+- `DELETE` -> 204.
+
+```json
+{"low_midi": 40, "high_midi": 69, "comfort_low": 45, "comfort_high": 64, "voice_type": "baritone", "voice_type_between": "tenor",
+ "register": null, "confidence": "medium", "method": "mic", "measured_at": "2026-10-22T10:00:00Z"}
+```
+
+Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self, and `self` requires `confidence: low`.
+
+### GET /api/catalog/songs/{song_key}/vocal-range
+
+Public. A song's vocal range from `catalog.db` (MIDI numbers; `tier: rough` = the artist's range standing in; `is_duet` null when unknown). `range` is `null` for an unknown song or one without data. `503 warming_up` (`Retry-After: 30`) until `catalog.db` has loaded. URL-encode the key (`muse%7Cuprising`).
+
+```json
+{"song_key": "muse|uprising", "range": {"low": 48.0, "high": 70.0, "p10": 52.0, "p50": 59.0, "p90": 66.0, "tier": "notes", "octave_confidence": 0.92, "is_duet": false}}
 ```
 
 ### GET /api/catalog/songs/{song_id}/links
