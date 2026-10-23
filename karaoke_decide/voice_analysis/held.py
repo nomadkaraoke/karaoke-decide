@@ -3,11 +3,15 @@
 Algorithm (3c plan, Task 1):
 
 - sort by time; split into segments wherever consecutive frames are > ``max_gap_s`` apart;
-- per segment, smooth with a trailing rolling median over ``median_window_s``
-  (absorbs vibrato and short octave spikes);
+- per segment, smooth with a trailing rolling median over ``median_window_s``, inclusive
+  of a frame exactly that far back (absorbs vibrato and short octave spikes);
 - group consecutive smoothed values into runs while each stays within ``tol_cents`` of
   the run's median; a run lasting >= ``min_hold_s`` (last minus first frame time) is a
   held note ``(start, end, midi)`` with ``midi`` = the run's median.
+
+All three time boundaries use the TS ``eps = 1e-9`` (gap ``<= max_gap_s + EPS`` joins,
+window ``<= median_window_s + EPS`` is inside, hold ``>= min_hold_s - EPS`` counts), so
+frame times on exact boundaries give the same notes on both platforms.
 """
 
 from __future__ import annotations
@@ -18,6 +22,8 @@ import numpy as np
 
 if TYPE_CHECKING:
     from karaoke_decide.voice_analysis.markers import VocalFrames
+
+EPS = 1e-9  # matches findHeldNotes' eps
 
 
 def held_notes(
@@ -34,15 +40,13 @@ def held_notes(
     t = np.asarray(f.t, dtype=float)[order]
     midi = np.asarray(f.midi, dtype=float)[order]
 
-    breaks = np.flatnonzero(np.diff(t) > max_gap_s) + 1
+    breaks = np.flatnonzero(np.diff(t) > max_gap_s + EPS) + 1
     bounds = [0, *breaks.tolist(), len(t)]
     tol = tol_cents / 100
     notes: list[tuple[float, float, float]] = []
     for lo, hi in zip(bounds[:-1], bounds[1:]):
         seg_t, seg_m = t[lo:hi], midi[lo:hi]
-        # Trailing window [t_i - w, t_i]: first index whose time is >= t_i - w.
-        starts = np.searchsorted(seg_t, seg_t - median_window_s, side="left")
-        smooth = np.array([np.median(seg_m[s : i + 1]) for i, s in enumerate(starts)])
+        smooth = _rolling_median(seg_t, seg_m, median_window_s)
 
         run_start = 0
         run_med = float(smooth[0])
@@ -56,6 +60,17 @@ def held_notes(
     return notes
 
 
+def _rolling_median(t: np.ndarray, midi: np.ndarray, window_s: float) -> np.ndarray:
+    """Trailing median over frames with ``t[i] - t[lo] <= window_s + EPS`` (TS loop, verbatim)."""
+    out = np.empty(len(t))
+    lo = 0
+    for i in range(len(t)):
+        while t[i] - t[lo] > window_s + EPS:
+            lo += 1
+        out[i] = np.median(midi[lo : i + 1])
+    return out
+
+
 def _close(
     notes: list[tuple[float, float, float]],
     t: np.ndarray,
@@ -64,5 +79,5 @@ def _close(
     run_med: float,
     min_hold_s: float,
 ) -> None:
-    if t[last] - t[first] >= min_hold_s:
+    if t[last] - t[first] >= min_hold_s - EPS:
         notes.append((float(t[first]), float(t[last]), run_med))

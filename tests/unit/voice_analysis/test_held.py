@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from karaoke_decide.voice_analysis.held import held_notes
+from karaoke_decide.voice_analysis.held import _rolling_median, held_notes
 from karaoke_decide.voice_analysis.markers import VocalFrames
 
 
@@ -79,3 +79,36 @@ def test_held_notes_unsorted_and_empty():
     order = np.random.default_rng(0).permutation(len(f.t))
     shuffled = VocalFrames(t=f.t[order], midi=f.midi[order], rms_db=f.rms_db[order])
     assert held_notes(shuffled) == held_notes(f)
+
+
+# Exact-boundary cases on 0.02 s frames: float subtraction lands just past each limit,
+# and the TS eps (1e-9) keeps them inside. Times are rounded like real frame times.
+
+
+def _frames_at(times: list[float], midi: float = 50.0) -> VocalFrames:
+    t = np.array(times)
+    return VocalFrames(t=t, midi=np.full(len(t), midi), rms_db=np.zeros(len(t)))
+
+
+def test_gap_of_exactly_100ms_is_bridged():
+    head = [round(i * 0.02, 2) for i in range(10)]  # 0.00 .. 0.18
+    tail = [round(0.28 + i * 0.02, 2) for i in range(36)]  # 0.28 .. 0.98
+    assert tail[0] - head[-1] > 0.1  # 0.10000000000000003 in floats
+    notes = held_notes(_frames_at(head + tail))
+    assert len(notes) == 1
+    assert notes[0][0] == 0.0 and notes[0][1] == pytest.approx(0.98)
+
+
+def test_hold_of_exactly_500ms_counts():
+    times = [round(0.08 + i * 0.02, 2) for i in range(26)]  # 0.08 .. 0.58
+    assert times[-1] - times[0] < 0.5  # 0.49999999999999994 in floats
+    assert len(held_notes(_frames_at(times))) == 1
+
+
+def test_frame_exactly_200ms_back_is_inside_the_median_window():
+    t = np.array([round(0.36 + i * 0.02, 2) for i in range(11)])  # 0.36 .. 0.56
+    assert t[-1] - t[0] > 0.2  # 0.20000000000000007 in floats
+    midi = np.array([60.0, 50, 60, 50, 60, 50, 60, 50, 60, 50, 60])
+    # Without the first frame the last window is five 50s and five 60s (median 55);
+    # with it, six 60s win.
+    assert _rolling_median(t, midi, 0.2)[-1] == 60.0

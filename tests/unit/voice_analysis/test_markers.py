@@ -178,7 +178,7 @@ def test_key_changes_need_confidence():
     bare = compute_markers(f)
     assert (bare.key, bare.mode, bare.key_changes) == (None, None, 0)
     no_key = compute_markers(f, track=TrackAnalysis(key=-1, mode=1, key_confidence=0.0))
-    assert no_key.key is None
+    assert (no_key.key, no_key.mode) == (None, None)
 
 
 def test_vocal_frames_matches_analyze_vocals():
