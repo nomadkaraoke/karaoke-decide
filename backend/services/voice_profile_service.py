@@ -6,6 +6,9 @@ optional ``evidence_count`` / ``session_id`` fields (extend the Literal and add 
 ``method: 'session'`` must be added both to ``VoiceProfileIn.method`` and to ``RecVoice.method`` in
 ``backend/services/recs_v2/service.py``. ``VoiceProfileOut`` (the read model) ignores unknown stored
 keys, so a field written by a newer build never makes an older build treat the profile as unset.
+
+``method: 'session'`` (Phase 3d) is a profile measured by a voice session: ``evidence_count`` is the
+session's attempts with range evidence (at least 1) and ``session_id`` the session it came from.
 """
 
 from __future__ import annotations
@@ -39,8 +42,10 @@ class VoiceProfileIn(BaseModel):
     # Python name avoids shadowing BaseModel.register; JSON and Firestore key stay "register".
     register_: Literal["lower", "middle", "higher"] | None = Field(alias="register")
     confidence: Literal["low", "medium", "high"]
-    method: Literal["mic", "self"]
+    method: Literal["mic", "self", "session"]
     measured_at: datetime
+    evidence_count: int | None = Field(default=None, ge=0)
+    session_id: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -50,6 +55,8 @@ class VoiceProfileIn(BaseModel):
             raise ValueError("exactly one of voice_type / register must be set")
         if self.method == "self" and self.confidence != "low":
             raise ValueError("self-reported profiles must have confidence 'low'")
+        if self.method == "session" and (self.evidence_count or 0) < 1:
+            raise ValueError("session profiles need evidence_count >= 1")
         return self
 
 

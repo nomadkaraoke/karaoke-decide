@@ -70,11 +70,17 @@ class FakeCatalogStore:
 
 
 class FakeHidden:
+    """Hidden keys and "Love it" (the SongFeedbackService slice voice sessions use)."""
+
     def __init__(self) -> None:
         self.keys: set[str] = set()
+        self.loved: list[tuple[str, str, str, str]] = []
 
     async def hidden_keys(self, user_id: str) -> set[str]:
         return set(self.keys)
+
+    async def love(self, user_id: str, song_key: str, artist: str, title: str) -> None:
+        self.loved.append((user_id, song_key, artist, title))
 
 
 def _store(db: Path) -> VoiceDataStore:

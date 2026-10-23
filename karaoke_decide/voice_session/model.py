@@ -110,7 +110,7 @@ class VoiceProfileLike(Protocol):
     """
 
     @property
-    def method(self) -> str: ...  # 'mic' | 'self' | other
+    def method(self) -> str: ...  # 'mic' | 'self' | 'session' | other (a 'session' profile also has ``confidence``)
 
     @property
     def voice_type(self) -> str | None: ...
@@ -145,6 +145,16 @@ def _demands(h: Hyp, song: SongDemand, o: int) -> tuple[float, float, float, flo
         song.high + o - f_hi,
         f_lo - (song.low + o),
     )
+
+
+def key_shift_direction(posterior: Posterior, song: SongDemand) -> Literal["down", "up"]:
+    """Which way a singer who wants "another key" needs the song moved, for the MAP hypothesis.
+
+    Judged at the octave that hypothesis would sing the song in (``likely_octave``): ``down`` when the
+    song reaches further above the comfortable range than below it, else ``up``."""
+    h = max(posterior.log_p, key=lambda x: posterior.log_p[x])
+    d_high, d_low, _, _ = _demands(h, song, likely_octave(h, song))
+    return "down" if d_high > d_low else "up"
 
 
 def likely_octave(h: Hyp, song: SongDemand) -> int:
@@ -237,6 +247,15 @@ def _normalised(log_w: dict[Hyp, float]) -> dict[Hyp, float]:
 
 # Prior weights by profile method: (named type, adjacent/"between" type, others).
 _PRIOR_WEIGHTS = {"mic": (4.0, 2.0, 1.0), "self": (3.0, 1.5, 1.0)}
+
+
+def _prior_weights(profile: VoiceProfileLike) -> tuple[float, float, float] | None:
+    """A session profile weighs like mic when its confidence is medium / high, like self when low."""
+    if profile.method == "session":
+        return _PRIOR_WEIGHTS["mic" if getattr(profile, "confidence", None) in ("high", "medium") else "self"]
+    return _PRIOR_WEIGHTS.get(profile.method)
+
+
 _REGISTER_WEIGHT = 2.0
 
 
@@ -269,8 +288,8 @@ def _type_prior(profile: VoiceProfileLike | None) -> dict[str, float]:
     weights = dict.fromkeys(types, 1.0)
     if profile is None:
         return weights
-    if profile.voice_type in VOICE_TYPES and profile.method in _PRIOR_WEIGHTS:
-        named, near, other = _PRIOR_WEIGHTS[profile.method]
+    if profile.voice_type in VOICE_TYPES and (pw := _prior_weights(profile)) is not None:
+        named, near, other = pw
         weights = dict.fromkeys(types, other)
         if profile.voice_type_between in VOICE_TYPES:
             neighbours = [profile.voice_type_between]

@@ -235,3 +235,49 @@ async def test_import_artists_are_ranked_top_artists(reader: CatalogReader, sour
     ctx = await _ctx(reader, fs)
     assert ctx.artists[artist_key("Toto")].weight == pytest.approx(w.artist_top(1))
     assert ctx.artists[artist_key("Toto")].source == source
+
+
+def _session(title: str, source: str = "voice_session", **extra: Any) -> dict[str, Any]:
+    return _song(f"x:{title}", "Weezer", title, source=source, **extra)
+
+
+async def test_context_session_yes_is_known(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Yes Song", session_would_sing="yes", session_feel="not_for_me"),
+            _session("Other Key", session_would_sing="yes_other_key"),
+            _session("Fine Song", session_feel="fine"),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs[song_key("Weezer", "Yes Song")] == w.SONG_SESSION_YES
+    assert ctx.known_songs[song_key("Weezer", "Other Key")] == w.SONG_SESSION_YES
+    assert ctx.known_songs[song_key("Weezer", "Fine Song")] == w.SONG_SESSION_FINE
+    assert ctx.session_no == set()
+
+
+async def test_session_no_penalised_not_known(reader: CatalogReader) -> None:
+    fs = FakeFirestore(user_songs=[_session("No Song", session_would_sing="no", session_feel="fine")])
+    ctx = await _ctx(reader, fs)
+    k = song_key("Weezer", "No Song")
+    assert k in ctx.session_no and k not in ctx.known_songs
+
+
+async def test_session_labels_apply_whatever_the_row_source(reader: CatalogReader) -> None:
+    """A session attempt keeps an existing row's source: promotion reads the session_* fields."""
+    fs = FakeFirestore(
+        user_songs=[
+            _session("Yes Export", source="spotify_export", playcount=1, session_would_sing="yes"),
+            _session("No Export", source="spotify_export", playcount=50, session_would_sing="no"),
+            _session("Fine Loved", source="manual", loved=True, session_feel="fine"),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs[song_key("Weezer", "Yes Export")] == w.SONG_SESSION_YES  # 0.4 by plays alone
+    assert song_key("Weezer", "No Export") in ctx.session_no
+    assert song_key("Weezer", "No Export") not in ctx.known_songs
+    assert ctx.known_songs[song_key("Weezer", "Fine Loved")] == w.SONG_MANUAL  # max wins
+
+
+def test_session_weights() -> None:
+    assert (w.SONG_SESSION_YES, w.SONG_SESSION_FINE, w.SESSION_NO_PENALTY) == (1.0, 0.6, 0.15)

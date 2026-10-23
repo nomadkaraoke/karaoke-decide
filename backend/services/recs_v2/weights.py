@@ -29,6 +29,10 @@ SONG_YTMUSIC = 0.8
 # Explicit user adds: known_songs / enjoy_singing (known_songs_service) and "manual" (love endpoint).
 MANUAL_SOURCES = frozenset({"manual", "known_songs", "enjoy_singing"})
 SONG_DEFAULT = 0.6  # quiz or any other source
+# Voice session labels (user_songs ``session_*`` fields, on whatever row the song has; see context._map_songs).
+SONG_SESSION_YES = 1.0  # "would you sing it?" yes / yes in another key
+SONG_SESSION_FINE = 0.6  # felt fine
+SESSION_NO_PENALTY = 0.15  # "would you sing it?" no: subtracted from the score (scoring.score)
 # Sources whose playcount is real listens (Last.fm, Spotify / Apple privacy exports): weighed alike.
 PLAY_COUNT_SOURCES = frozenset({"lastfm", "spotify_export", "apple_export"})
 
@@ -71,6 +75,17 @@ def song_weight(doc: dict[str, object]) -> float:
         # Recent plays carry a playcount; library-only songs don't (like Spotify top vs saved).
         return SONG_SPOTIFY_TOP if to_int(doc.get("playcount")) else SONG_SPOTIFY_SAVED
     return SONG_DEFAULT
+
+
+def session_song_weight(doc: dict[str, object]) -> float | None:
+    """The weight a voice-session label gives the song (max'd with ``song_weight``), or None for none.
+
+    Reads only the ``session_*`` fields: an attempt on an existing row keeps the row's ``source``."""
+    if doc.get("session_would_sing") in ("yes", "yes_other_key"):
+        return SONG_SESSION_YES
+    if doc.get("session_feel") == "fine":
+        return SONG_SESSION_FINE
+    return None
 
 
 def to_int(v: object) -> int | None:

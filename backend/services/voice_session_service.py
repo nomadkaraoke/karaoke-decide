@@ -23,6 +23,14 @@ Session-state mapping onto C2's ``SessionState``:
   skip once the song has no version left to try (see ``skip``). "no_candidates" is set here, when
   ``choose_next`` finds nothing; Finish is the client calling ``result``.
 
+Outputs (Task C5, ``voice_session_outputs``): each attempt, once, in one transaction guarded by the
+attempt doc's ``outputs_applied`` marker (so a retried POST, or a retry after a failure part-way,
+counts it exactly once): the song's ``user_songs`` row (``choose_user_song_row``: the
+``{user_id}:{kn_id}`` row when it exists, else ``loved_doc_id``) gets ``times_sung`` + 1 and the
+session labels, and ``voice_version_stats/{video_id}`` its counters; a "loved" feel then calls
+"Love it". ``result`` saves the session's voice profile (``should_save``) and lists the songs that
+suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
+
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
 (``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
 embeddable version is offered once more as a link-out (``version.embeddable = false``).
@@ -40,7 +48,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import ValidationError
 
@@ -64,8 +72,17 @@ from backend.services.recs_v2 import weights as recs_weights
 from backend.services.recs_v2.context import HiddenKeysProvider, UserContextV2, build_context
 from backend.services.recs_v2.filters import RecFilters
 from backend.services.recs_v2.service import CatalogProvider, RecSong
+from backend.services.song_feedback_service import USER_SONGS_COLLECTION, choose_user_song_row, kn_id_for_song_key
 from backend.services.voice_data_store import VoiceReader
-from backend.services.voice_profile_service import VoiceProfileOut
+from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut, VoiceProfileUserNotFoundError
+from backend.services.voice_session_outputs import (
+    KeyHint,
+    bump_version_stats,
+    key_hint,
+    session_profile,
+    should_save,
+    user_song_row,
+)
 from karaoke_decide.core.models import User
 from karaoke_decide.voice_pool.models import Version
 from karaoke_decide.voice_pool.versions import VersionStats, choose_versions
@@ -77,10 +94,11 @@ from karaoke_decide.voice_session.model import (
     Posterior,
     Quiz,
     SongDemand,
+    key_shift_direction,
     usable_pitch,
 )
 from karaoke_decide.voice_session.select import CandidateSong, SessionState, choose_next, know_weight
-from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, check, summary
+from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, summary
 
 logger = logging.getLogger(__name__)
 
@@ -124,9 +142,25 @@ class VoiceStoreProvider(Protocol):
 class VoiceProfileProvider(Protocol):
     async def get(self, user_id: str) -> VoiceProfileOut | None: ...
 
+    async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut: ...
+
+
+class SessionFeedbackProvider(HiddenKeysProvider, Protocol):
+    """The slice of ``SongFeedbackService`` a session uses: hidden songs and "Love it"."""
+
+    async def love(self, user_id: str, song_key: str, artist: str, title: str) -> None: ...
+
 
 class SuitedRecommender(Protocol):
-    async def recommend(self, user: User, f: RecFilters, sort: Any = ..., cursor: str | None = ...) -> Any: ...
+    async def recommend(
+        self,
+        user: User,
+        f: RecFilters,
+        sort: Any = ...,
+        cursor: str | None = ...,
+        *,
+        profile: VoiceProfileOut | None = ...,
+    ) -> Any: ...
 
 
 # ---------------------------------------------------------------- pool index (per voice.db reader)
@@ -409,7 +443,7 @@ class VoiceSessionService:
         firestore: FirestoreService,
         voice: VoiceStoreProvider,
         catalog: CatalogProvider,
-        feedback: HiddenKeysProvider,
+        feedback: SessionFeedbackProvider,
         profiles: VoiceProfileProvider,
         recs: SuitedRecommender,
     ) -> None:
@@ -629,7 +663,7 @@ class VoiceSessionService:
         attempts = await self._attempts(user.id, session_id)
         started = _as_datetime(body.started_at)
         if (same := _matching_attempt(attempts, body.song_key, started)) is not None:
-            return await self._attempt_out(session, attempts, same)
+            return await self._attempt_out(user.id, session, attempts, same)
 
         index = await self._index()
         e = index.get(body.song_key)
@@ -668,7 +702,7 @@ class VoiceSessionService:
                 break
             attempts = await self._attempts(user.id, session_id)  # a concurrent attempt took n
             if (same := _matching_attempt(attempts, body.song_key, started)) is not None:
-                return await self._attempt_out(session, attempts, same)  # ...this very attempt, retried
+                return await self._attempt_out(user.id, session, attempts, same)  # ...this very attempt, retried
         else:
             raise AttemptLimitError(session_id)  # pragma: no cover  (3 concurrent writers)
 
@@ -678,11 +712,13 @@ class VoiceSessionService:
             session_id,
             {"tired_count": tired, "pending_song_key": None if pending == e.song_key else pending},
         )
-        return await self._attempt_out(session, attempts, attempts[-1])
+        return await self._attempt_out(user.id, session, attempts, attempts[-1])
 
     async def _attempt_out(
-        self, session: dict[str, Any], attempts: list[dict[str, Any]], attempt: dict[str, Any]
+        self, user_id: str, session: dict[str, Any], attempts: list[dict[str, Any]], attempt: dict[str, Any]
     ) -> AttemptOut:
+        """Apply the attempt's outputs (once) and return the rebuilt state."""
+        await self._apply_outputs(user_id, session, attempts, attempt)
         state = await asyncio.to_thread(rebuild_state, session, attempts)
         done = check(state)
         return AttemptOut(
@@ -692,6 +728,70 @@ class VoiceSessionService:
             done_reason=done,
             top_p=round(_top_p(state), 4),
         )
+
+    # ------------------------------------------------------------ outputs
+
+    async def _kn_id(self, song_key: str) -> int | None:
+        try:
+            reader = await asyncio.to_thread(self._catalog.require)
+        except CatalogUnavailable:
+            return None
+        return await asyncio.to_thread(kn_id_for_song_key, reader, song_key)
+
+    def _key_hint(
+        self, session: dict[str, Any], attempts: Sequence[dict[str, Any]], attempt: dict[str, Any]
+    ) -> KeyHint | None:
+        """The attempt's key hint; the direction is judged on the posterior up to and including it."""
+
+        def direction() -> Literal["down", "up"]:
+            upto = [a for a in attempts if int(a["n"]) <= int(attempt["n"])]
+            post = rebuild_state(session, upto).posterior
+            return key_shift_direction(post, _demand(attempt["song"]["demand"]))
+
+        return key_hint(attempt["quiz"], direction)
+
+    async def _apply_outputs(
+        self, user_id: str, session: dict[str, Any], attempts: Sequence[dict[str, Any]], attempt: dict[str, Any]
+    ) -> None:
+        """user_songs row + version stats for one attempt, exactly once; then "Love it" for a loved song."""
+        if attempt.get("outputs_applied"):
+            return
+        attempt_id = f"{attempt['session_id']}:{attempt['n']}"
+        song_key, video_id = attempt["song_key"], attempt["video_id"]
+        hint = await asyncio.to_thread(self._key_hint, session, attempts, attempt)
+        kn_id = await self._kn_id(song_key)
+
+        async def body(txn: Any) -> bool:
+            current = await txn.get(ATTEMPTS_COLLECTION, attempt_id)
+            if current is None or current.get("outputs_applied"):
+                return False
+            row_id, row = await choose_user_song_row(user_id, song_key, kn_id, txn.get)
+            stats = await txn.get(VERSION_STATS_COLLECTION, video_id)
+            now = datetime.now(UTC).isoformat()  # all reads done; writes from here on
+            txn.set(
+                USER_SONGS_COLLECTION,
+                row_id,
+                user_song_row(row, user_id=user_id, row_id=row_id, attempt=attempt, hint=hint, now=now),
+            )
+            txn.set(
+                VERSION_STATS_COLLECTION,
+                video_id,
+                bump_version_stats(stats, attempt["quiz"], bool(attempt.get("stopped_early"))),
+            )
+            txn.set(
+                ATTEMPTS_COLLECTION,
+                attempt_id,
+                {**{k: v for k, v in current.items() if k != "id"}, "outputs_applied": True},
+            )
+            return True
+
+        applied = await self._fs.run_transaction(body)
+        if applied and attempt["quiz"].get("feel") == "loved":
+            song = attempt.get("song") or {}
+            try:
+                await self._feedback.love(user_id, song_key, song.get("artist", ""), song.get("title", ""))
+            except Exception:
+                logger.warning("voice session: love failed for %s on %s", user_id, song_key, exc_info=True)
 
     # ------------------------------------------------------------ result
 
@@ -704,7 +804,8 @@ class VoiceSessionService:
         # summary() reads "not warm now" as "never warm"; warmth can step down mid-session, so use ever-warm.
         state.warmth = "warm" if _ever_warm(session, attempts) else state.warmth
         s = await asyncio.to_thread(summary, state, done_reason)
-        suited = await self._suited(user)
+        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts)
+        suited = await self._suited(user, profile)
         loved: dict[str, LovedSongOut] = {}
         for a in sorted(attempts, key=lambda a: int(a["n"])):
             if (a.get("quiz") or {}).get("feel") == "loved":
@@ -726,21 +827,37 @@ class VoiceSessionService:
             attempts=state.attempts,
             partial=done_reason != "confident",
             improve_hint=s.improve_hint,
-            profile_saved=False,  # Task C5 saves the session profile
+            profile_saved=saved,
             suited=suited,
             loved=list(loved.values()),
         )
 
-    async def _suited(self, user: User) -> list[RecSong]:
-        """recs v2 ``singable`` + ``sort=fit`` for the stored voice profile; [] without one.
+    async def _save_profile(
+        self, user_id: str, session_id: str, s: ResultSummary, evidence_count: int
+    ) -> tuple[VoiceProfileOut | None, bool]:
+        """(the profile the result stands for, whether it was saved).
 
-        recs v2 reads the saved profile only, so until Task C5 saves the session's profile this
-        reflects the profile the user had before the session.
-        """
+        The session's profile is saved over no profile or a self-reported one, and over a measured one
+        unless its confidence is 'low'. Unsaved, it is still the result's profile (for ``suited``); with
+        no range evidence there is none and the stored profile stands."""
+        existing = await self._profiles.get(user_id)
+        now = datetime.now(UTC)
+        derived = session_profile(s, evidence_count, session_id, now)
+        if derived is None:
+            return existing, False
+        if should_save(s.confidence_label, existing):
+            try:
+                return await self._profiles.put(user_id, derived), True
+            except VoiceProfileUserNotFoundError:
+                logger.warning("voice session %s: no decide_users doc for %s; profile not saved", session_id, user_id)
+        return VoiceProfileOut(**derived.model_dump(by_alias=True), updated_at=now), False
+
+    async def _suited(self, user: User, profile: VoiceProfileOut | None) -> list[RecSong]:
+        """recs v2 ``singable`` + ``sort=fit`` for ``profile``; [] without one."""
+        if profile is None:
+            return []
         try:
-            if await self._profiles.get(user.id) is None:
-                return []
-            res = await self._recs.recommend(user, RecFilters(singable=True), sort="fit")
+            res = await self._recs.recommend(user, RecFilters(singable=True), sort="fit", profile=profile)
         except Exception:
             logger.warning("voice session result: suited songs unavailable for %s", user.id, exc_info=True)
             return []

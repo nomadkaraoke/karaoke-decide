@@ -327,7 +327,8 @@ async def get_voice_session_service(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
     voice: Annotated[VoiceDataStore, Depends(get_voice_store)],
     catalog: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
-    feedback: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
+    # SongFeedbackService (hidden songs + "Love it"); tests override get_hidden_keys_provider with a fake.
+    feedback: Annotated[SongFeedbackService, Depends(get_hidden_keys_provider)],
     recs: Annotated[RecommendationServiceV2, Depends(get_recommendation_service_v2_dep)],
 ) -> VoiceSessionService:
     return VoiceSessionService(firestore, voice, catalog, feedback, VoiceProfileService(firestore), recs)

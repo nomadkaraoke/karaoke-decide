@@ -15,6 +15,7 @@ from karaoke_decide.voice_session.model import (
     SongDemand,
     comfort,
     full,
+    key_shift_direction,
     likelihood_difficulty,
     likelihood_pitch,
     likelihood_position,
@@ -32,6 +33,7 @@ class Profile:
     voice_type: str | None = None
     voice_type_between: str | None = None
     register: str | None = None
+    confidence: str | None = None
 
 
 def _top_type(post: Posterior) -> str:
@@ -313,6 +315,21 @@ def test_from_profile_self_and_register_and_none() -> None:
     assert high["alto"] == high["mezzo"] == high["soprano"] > high["tenor"]
     for p in (None, Profile(method="other", voice_type="tenor"), Profile(method="self")):
         assert Posterior.from_profile(p).type_marginal()["tenor"] == pytest.approx(1 / 6)
+
+
+@pytest.mark.parametrize(("confidence", "named"), [("high", 4), ("medium", 4), ("low", 3), (None, 3)])
+def test_from_profile_session_weights_follow_confidence(confidence: str | None, named: float) -> None:
+    """A saved session profile seeds the next session: mic weights when confident, self weights when low."""
+    marg = Posterior.from_profile(Profile(method="session", voice_type="tenor", confidence=confidence)).type_marginal()
+    assert marg["tenor"] / marg["bass"] == pytest.approx(named)
+
+
+def test_key_shift_direction_at_likely_octave() -> None:
+    post = Posterior({h: 0.0 if h == ("baritone", 0) else -50.0 for h in HYPOTHESES})  # comfort 50-64
+    assert key_shift_direction(post, SongDemand(low=50, high=66, p10=52, p50=58, p90=64)) == "down"
+    assert key_shift_direction(post, SongDemand(low=44, high=60, p10=46, p50=52, p90=58)) == "up"
+    # a higher-voice song the baritone takes down an octave, where it sits low: "up", not "down"
+    assert key_shift_direction(post, SongDemand(low=60, high=71, p10=62, p50=66, p90=69)) == "up"
 
 
 def test_full_estimate_wider_than_comfort() -> None:
