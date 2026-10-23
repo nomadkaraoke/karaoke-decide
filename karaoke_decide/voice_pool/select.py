@@ -88,12 +88,23 @@ POOL_SCHEMA = [
     )
 ]
 
+_VR_COLUMNS = ("vr_low", "vr_high", "vr_p50", "vr_tier", "vr_duet")
 _SONGS_SQL = """
 SELECT song_key, artist, title, artist_key, popularity, lead_gender, decade, energy,
-       vr_low, vr_high, vr_p50, vr_tier, vr_duet, duration_ms
+       {vr}, duration_ms
 FROM songs
 WHERE in_kn = 1 AND popularity >= ?
 """
+VR_MISSING_MSG = (
+    "catalog.db predates vocal-range data (songs.vr_* columns missing, added by schema 2): "
+    "register/span strata will be 'unknown'"
+)
+
+
+class VocalRangeMissingError(RuntimeError):
+    """The catalog has no songs.vr_* columns and the caller required them."""
+
+
 _VERSIONS_SQL = """
 SELECT v.song_key, v.brand_code, v.brand_name, v.youtube_url
 FROM av.versions v JOIN songs s ON s.song_key = v.song_key
@@ -168,8 +179,24 @@ def _vr_span(low: float | None, high: float | None) -> float | None:
     return None if low is None or high is None else float(high) - float(low)
 
 
+def _songs_sql(conn: Any, require_vocal_range: bool) -> str:
+    """``_SONGS_SQL`` with NULLs for the vr_* columns an older catalog.db lacks (one WARNING)."""
+    have = {r[1] for r in conn.execute("PRAGMA table_info(songs)")}
+    if all(c in have for c in _VR_COLUMNS):
+        return _SONGS_SQL.format(vr=", ".join(_VR_COLUMNS))
+    logger.warning(VR_MISSING_MSG)
+    if require_vocal_range:
+        raise VocalRangeMissingError(VR_MISSING_MSG)
+    return _SONGS_SQL.format(vr=", ".join(c if c in have else f"NULL AS {c}" for c in _VR_COLUMNS))
+
+
 def load_candidates(
-    reader: CatalogReader, bq: Any, *, min_pop: int = DEFAULT_MIN_POP, n: int = 1000
+    reader: CatalogReader,
+    bq: Any,
+    *,
+    min_pop: int = DEFAULT_MIN_POP,
+    n: int = 1000,
+    require_vocal_range: bool = False,
 ) -> list[PoolCandidate]:
     """Eligible pool songs (see module doc), most popular first; ``n`` is the pool target.
 
@@ -177,7 +204,7 @@ def load_candidates(
     floor = min(min_pop, MIN_POP_FLOOR)
     conn = reader.conn()
     versions = _community_versions(reader, floor)
-    songs = [r for r in conn.execute(_SONGS_SQL, (floor,)) if r["song_key"] in versions]
+    songs = [r for r in conn.execute(_songs_sql(conn, require_vocal_range), (floor,)) if r["song_key"] in versions]
     kn_by_song: dict[str, list[int]] = {}
     for kn, key in conn.execute(_KN_IDS_SQL, (floor,)):
         if key in versions:
@@ -334,6 +361,7 @@ async def run_select(
     gcs: Any = None,
     probe: bool = True,
     limiter: RateLimiter = OEMBED_LIMITER,
+    require_vocal_range: bool = False,
 ) -> dict[str, Any]:
     """Select the pool, probe embeddability, and (unless ``dry_run``) queue + record it.
 
@@ -342,7 +370,7 @@ async def run_select(
     dropped because no version can be embedded), ``enqueued``,
     ``songs`` (picked song keys, pick order), ``run`` and ``dry_run``. ``probe=False`` skips oEmbed.
     """
-    cands = _dedupe(load_candidates(reader, bq, n=n))
+    cands = _dedupe(load_candidates(reader, bq, n=n, require_vocal_range=require_vocal_range))
     prober = _Prober(http, limiter, probe)
     picks, dropped = _pick(cands, n, prober)
     report = coverage([(c, stratum) for c, stratum, _ in picks], n)
