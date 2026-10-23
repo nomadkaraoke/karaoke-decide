@@ -3,14 +3,16 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import html
 import logging
+import re
 import uuid
-from datetime import UTC, datetime
-from typing import Annotated, Any, Literal, cast, get_args
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Any, Literal, TypeGuard, cast, get_args
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
@@ -35,6 +37,7 @@ from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportSource
+from backend.services.music_service_service import ListenBrainzTokenUnavailableError, MusicServiceError
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -47,8 +50,14 @@ from backend.services.screenshot_import_service import (
     get_screenshot_extractor,
 )
 from backend.services.sync_service import ImportRateLimitedError
-from karaoke_decide.core.exceptions import NotFoundError, ValidationError
+from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.services.apple_music import AppleMusicNotConfiguredError
+from karaoke_decide.services.listenbrainz import (
+    LB_IMPORT_TERMINAL_STATUSES,
+    ListenBrainzImportInProgressError,
+    ListenBrainzRateLimitedError,
+)
+from karaoke_decide.services.metabrainz_oauth import new_pkce_pair
 from karaoke_decide.services.spotify_embed import (
     InvalidSpotifyPlaylistUrlError,
     SpotifyEmbedFetchError,
@@ -394,6 +403,15 @@ async def connect_spotify(
     return SpotifyConnectResponse(auth_url=auth_url)
 
 
+# States are ``secrets.token_urlsafe`` strings; anything else is forged or mangled and never
+# reaches Firestore (a document id with "/" or of odd length would 500 there).
+_OAUTH_STATE_RE = re.compile(r"^[A-Za-z0-9_-]{16,128}$")
+
+
+def _well_formed_state(state: str | None) -> TypeGuard[str]:
+    return state is not None and _OAUTH_STATE_RE.fullmatch(state) is not None
+
+
 @router.get("/spotify/callback")
 async def spotify_callback(
     music_service: MusicServiceServiceDep,
@@ -431,7 +449,7 @@ async def spotify_callback(
         )
 
     # Verify OAuth state
-    state_data = await music_service.verify_oauth_state(state)
+    state_data = await music_service.verify_oauth_state(state) if _well_formed_state(state) else None
     if not state_data:
         return RedirectResponse(
             url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=invalid_state",
@@ -536,6 +554,198 @@ async def connect_listenbrainz(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e),
         )
+
+
+# -----------------------------------------------------------------------------
+# ListenBrainz via MetaBrainz OAuth (authorization code + PKCE)
+# -----------------------------------------------------------------------------
+
+ListenBrainzReturnTo = Literal["app", "web"]
+ListenBrainzOAuthReason = Literal["denied", "missing_params", "invalid_state", "exchange_failed", "validate_failed"]
+
+_APP_RETURN_PAGE = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nomad Karaoke</title></head>
+<body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 16px">
+<p><a href="{url}">Return to the app</a></p></body></html>"""
+
+
+class ListenBrainzOAuthStartResponse(BaseModel):
+    auth_url: str
+
+
+@router.get("/listenbrainz/oauth/start", response_model=ListenBrainzOAuthStartResponse)
+async def listenbrainz_oauth_start(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    return_to: ListenBrainzReturnTo = Query(...),
+) -> ListenBrainzOAuthStartResponse:
+    """Start connecting ListenBrainz through MetaBrainz OAuth (404 ``oauth_disabled`` when off)."""
+    if not settings.listenbrainz_oauth_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="oauth_disabled")
+    code_verifier, code_challenge = new_pkce_pair()
+    state = await music_service.create_oauth_state(
+        user.id, "listenbrainz", extra={"return_to": return_to, "code_verifier": code_verifier}
+    )
+    return ListenBrainzOAuthStartResponse(auth_url=music_service.metabrainz.authorize_url(state, code_challenge))
+
+
+def _listenbrainz_oauth_return(
+    settings: BackendSettings, return_to: str, reason: ListenBrainzOAuthReason | None = None
+) -> HTMLResponse | RedirectResponse:
+    """302 to the app scheme (with a tiny HTML fallback link) or to the web Music I Know page."""
+    headers = {"Cache-Control": "no-store"}
+    if return_to == "app":
+        query = "status=connected" if reason is None else f"status=error&reason={reason}"
+        url = f"{settings.mobile_app_scheme}://services/listenbrainz?{query}"
+        return HTMLResponse(
+            _APP_RETURN_PAGE.format(url=html.escape(url, quote=True)),
+            status_code=status.HTTP_302_FOUND,
+            headers={"Location": url, **headers},
+        )
+    query = "listenbrainz=connected" if reason is None else f"listenbrainz=error&reason={reason}"
+    url = f"{settings.frontend_url}{get_locale_prefix(DEFAULT_LOCALE)}/music-i-know?{query}"
+    return RedirectResponse(url=url, status_code=status.HTTP_302_FOUND, headers=headers)
+
+
+_ZIP_MAGIC = b"PK\x03\x04"
+
+
+LB_PENDING_IMPORT_MAX_AGE = timedelta(hours=6)
+
+
+def _pending_import_blocks(pending: object) -> bool:
+    """Whether a stored pending import is recent and not known to be finished."""
+    if not isinstance(pending, dict) or not pending.get("id") or pending.get("status") in LB_IMPORT_TERMINAL_STATUSES:
+        return False
+    try:
+        return datetime.now(UTC) - datetime.fromisoformat(pending["submitted_at"]) < LB_PENDING_IMPORT_MAX_AGE
+    except (KeyError, TypeError, ValueError):
+        return True
+
+
+class ListenBrainzUploadResponse(BaseModel):
+    import_id: str
+    status: str
+
+
+@router.post("/listenbrainz/upload-export", response_model=ListenBrainzUploadResponse)
+async def upload_listenbrainz_export(
+    user: VerifiedUser,
+    music_service: MusicServiceServiceDep,
+    file: Annotated[UploadFile, File()],
+) -> ListenBrainzUploadResponse:
+    """Hand the user's Spotify export zip (at most 30 MiB) to ListenBrainz's importer for them.
+
+    Needs a ListenBrainz connection made with OAuth. The listens are not ingested here (the app
+    already sent its aggregates); this only feeds ListenBrainz. Errors: 409 not_oauth_connected /
+    needs_reconnect / import_in_progress, 413 too_large, 400 not_a_zip, 429 rate_limited
+    (Retry-After), 503 listenbrainz_unavailable.
+    """
+    doc = await music_service.get_service_doc(user.id, "listenbrainz")
+    if doc is None or doc.get("auth") != "oauth":
+        raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
+    service = music_service.service_from_doc(doc)
+
+    data = await file.read(LISTENBRAINZ_UPLOAD_MAX_BYTES + 1)
+    if len(data) > LISTENBRAINZ_UPLOAD_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "too_large")
+    if not data.startswith(_ZIP_MAGIC):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "not_a_zip")
+
+    try:
+        token = await music_service.get_listenbrainz_token(service)
+    except ListenBrainzTokenUnavailableError as e:
+        logger.warning("ListenBrainz token unavailable for %s: %s", user.id, e)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "listenbrainz_unavailable", headers={"Retry-After": "30"}
+        )
+    except MusicServiceError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "needs_reconnect")
+
+    lb = music_service.listenbrainz
+    pending = doc.get("lb_pending_import")
+    try:
+        if _pending_import_blocks(pending):
+            try:
+                latest = (await lb.get_import_status(token, str(pending["id"]))).get("status")  # type: ignore[index]
+            except ExternalServiceError as e:
+                # Can't tell (404/401/429...): never block on it. LB's own "already in progress" 400 is the guard.
+                logger.warning("Could not check ListenBrainz import status for %s: %s", user.id, e)
+                latest = None
+            if latest and latest not in LB_IMPORT_TERMINAL_STATUSES:
+                raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
+        filename = file.filename if file.filename and file.filename.lower().endswith(".zip") else "spotify-export.zip"
+        import_id = await lb.submit_import(token, data, filename)
+    except ListenBrainzImportInProgressError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "import_in_progress")
+    except ListenBrainzRateLimitedError as e:
+        logger.warning("ListenBrainz rate limited the export upload for %s (retry in %ss)", user.id, e.retry_after)
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "rate_limited",
+            headers={"Retry-After": str(max(1, round(e.retry_after)))},
+        )
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz export upload failed for %s: %s", user.id, e)
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "listenbrainz_unavailable")
+
+    await music_service.set_pending_listenbrainz_import(user.id, import_id)
+    return ListenBrainzUploadResponse(import_id=import_id, status="waiting")
+
+
+@router.get("/listenbrainz/oauth/callback", response_model=None)
+async def listenbrainz_oauth_callback(
+    music_service: MusicServiceServiceDep,
+    settings: Settings,
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+) -> HTMLResponse | RedirectResponse:
+    """MetaBrainz redirects here (no auth; the state identifies the user and the return target).
+
+    Errors redirect with a fixed reason code, never exception text. An unknown state can't
+    say where the user came from, so it returns to the web page.
+    """
+    state_data = await music_service.verify_oauth_state(state) if _well_formed_state(state) else None
+    if state_data is not None and state_data.get("service_type") != "listenbrainz":
+        state_data = None
+    return_to = state_data.get("return_to", "web") if state_data else "web"
+
+    def fail(reason: ListenBrainzOAuthReason) -> HTMLResponse | RedirectResponse:
+        return _listenbrainz_oauth_return(settings, return_to, reason)
+
+    if error:
+        return fail("denied")
+    if not code or not state:
+        return fail("missing_params")
+    if state_data is None or not state_data.get("code_verifier"):
+        return fail("invalid_state")
+    if not settings.listenbrainz_oauth_active:  # switched off mid-flow: never store unencrypted tokens
+        return fail("exchange_failed")
+
+    try:
+        tokens = await music_service.metabrainz.exchange_code(code, state_data["code_verifier"])
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz OAuth code exchange failed: %s", e)
+        return fail("exchange_failed")
+
+    try:
+        # LB's /1/validate-token doesn't know MetaBrainz OAuth tokens, so the username comes
+        # from MetaBrainz userinfo; the listen-count lookup confirms a ListenBrainz account exists.
+        username = await music_service.metabrainz.userinfo(str(tokens["access_token"]))
+        await music_service.listenbrainz.get_user_listen_count(username)
+    except ExternalServiceError as e:
+        logger.warning("ListenBrainz OAuth account check failed: %s", e)
+        return fail("validate_failed")
+
+    try:
+        await music_service.create_listenbrainz_oauth_service(state_data["user_id"], tokens, username)
+    except Exception:
+        logger.exception("Storing the ListenBrainz OAuth connection failed")
+        return fail("exchange_failed")
+    return _listenbrainz_oauth_return(settings, return_to)
 
 
 # -----------------------------------------------------------------------------

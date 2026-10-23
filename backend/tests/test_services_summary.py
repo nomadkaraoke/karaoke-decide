@@ -125,6 +125,12 @@ def test_summary_merges_connections_and_imports(client: TestClient, db: FakeDb) 
     assert body["capabilities"]["listenbrainz_oauth"] is False
 
 
+def test_summary_reads_lb_pending_import(client: TestClient, db: FakeDb) -> None:
+    _conn(db, "listenbrainz", lb_pending_import={"id": "42", "status": "waiting", "submitted_at": "T"}, auth="oauth")
+    row = client.get("/api/services/summary").json()["sources"][0]
+    assert row["pending_listenbrainz_import"] == {"id": "42", "status": "waiting"}
+
+
 def test_summary_pending_listenbrainz_import(client: TestClient, db: FakeDb) -> None:
     _conn(db, "listenbrainz", pending_listenbrainz_import={"id": "imp-1", "status": "queued"}, auth="oauth")
     row = client.get("/api/services/summary").json()["sources"][0]

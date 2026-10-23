@@ -1,7 +1,7 @@
 """Internal routes for Cloud Tasks callbacks.
 
 These endpoints are called by Cloud Tasks, not by users directly.
-They are protected by OIDC authentication in production.
+Protected by OIDC token verification (backend.api.internal_auth) in production.
 """
 
 import logging
@@ -9,10 +9,11 @@ from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from backend.api.deps import FirestoreServiceDep, Settings, SyncServiceDep
+from backend.api.internal_auth import InternalCaller
 from backend.config import BackendSettings
 from backend.models.sync_job import SyncJob, SyncJobProgress, SyncJobResult, SyncJobStatus
 from backend.services.firestore_service import FirestoreService
@@ -37,39 +38,8 @@ class SyncProcessResponse(BaseModel):
     message: str
 
 
-async def verify_cloud_tasks_request(request: Request, settings: Settings) -> bool:
-    """Verify that request comes from Cloud Tasks.
-
-    In production, Cloud Tasks sends OIDC token.
-    In development, we allow all requests.
-
-    Args:
-        request: FastAPI request.
-        settings: App settings.
-
-    Returns:
-        True if request is authorized.
-    """
-    if not settings.is_production:
-        return True
-
-    # In production, Cloud Run validates OIDC automatically
-    # The request has already been authenticated by Cloud Run IAM
-    # Check for Cloud Tasks headers as additional verification
-    task_name = request.headers.get("X-CloudTasks-TaskName")
-    queue_name = request.headers.get("X-CloudTasks-QueueName")
-
-    if task_name and queue_name:
-        logger.info(f"Cloud Tasks request: task={task_name}, queue={queue_name}")
-        return True
-
-    logger.warning("Request missing Cloud Tasks headers")
-    return False
-
-
-@router.post("/sync/process", response_model=SyncProcessResponse)
+@router.post("/sync/process", response_model=SyncProcessResponse, dependencies=[InternalCaller])
 async def process_sync_task(
-    request: Request,
     body: SyncProcessRequest,
     settings: Settings,
     firestore: FirestoreServiceDep,
@@ -80,13 +50,6 @@ async def process_sync_task(
     This endpoint is called by Cloud Tasks to execute the actual sync.
     It updates the job status in Firestore as it progresses.
     """
-    # Verify request origin
-    if not await verify_cloud_tasks_request(request, settings):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized: not a valid Cloud Tasks request",
-        )
-
     job_id = body.job_id
     user_id = body.user_id
 

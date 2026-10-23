@@ -385,3 +385,84 @@ def test_job_shape(pulumi_job: dict[str, Any]) -> None:
     assert c["resources"]["limits"] == {"cpu": "2", "memory": "8Gi"}
     assert tmpl["timeout"] == "3600s"
     assert tmpl["max_retries"] == 0
+
+
+# --------------------------------------------------------------------------
+# Main service secrets are readable; Phase 3b env; the lb-poll job
+# --------------------------------------------------------------------------
+
+
+def test_every_main_secret_is_granted(ci_main_deploy: dict[str, Any]) -> None:
+    """Each secret CI mounts on the API has an accessor grant (REQUIRED_SECRETS or a dedicated one)."""
+    consts = _module_constants(_pulumi_tree())
+    granted = set(consts["REQUIRED_SECRETS"]) | {"decide-kjbox-secret"}  # decide_kjbox_secret_access
+    mounted = {ref.split(":", 1)[0] for ref in _kv(str(ci_main_deploy["--set-secrets"])).values()}
+    assert mounted <= granted, f"no accessor grant for {sorted(mounted - granted)}"
+
+
+def test_phase3b_secrets_mounted_unconditionally(ci_main_deploy: dict[str, Any]) -> None:
+    secrets = _kv(str(ci_main_deploy["--set-secrets"]))
+    assert secrets["GEMINI_API_KEY"] == "gemini-api-key:latest"
+    assert secrets["METABRAINZ_CLIENT_ID"] == "metabrainz-client-id:latest"
+    assert secrets["METABRAINZ_CLIENT_SECRET"] == "metabrainz-client-secret:latest"
+    assert secrets["DECIDE_TOKEN_KEY"] == "decide-token-key:latest"
+    assert "DECIDE_3B_SECRETS" not in CI.read_text() and "DECIDE_METABRAINZ" not in CI.read_text()
+
+
+def test_main_plain_env_vars_match(pulumi_main: dict[str, Any], ci_main_deploy: dict[str, Any]) -> None:
+    """CI's --set-env-vars replaces the API's plain env on every deploy: Pulumi must list the same
+    names, and the same value wherever Pulumi's is a literal (others come from stack config)."""
+    pulumi_envs = {e["name"]: e["value"] for e in _container(pulumi_main)["envs"] if "value" in e}
+    ci_envs = _kv(str(ci_main_deploy["--set-env-vars"]))
+    assert set(pulumi_envs) == set(ci_envs)
+    for name, value in pulumi_envs.items():
+        if isinstance(value, str):
+            assert ci_envs[name] == value, name
+    assert ci_envs["LISTENBRAINZ_OAUTH_ENABLED"] == "true"
+    assert ci_envs["PUBLIC_API_BASE_URL"] == "https://decide.nomadkaraoke.com"
+
+
+@pytest.fixture(scope="module")
+def pulumi_lb_poll() -> dict[str, Any]:
+    tree = _pulumi_tree()
+    call = _resource_call(tree, "Job", "lb-poll-job")
+    kw = _kwargs(call, _module_constants(tree))
+    kw["_ignore_changes"] = _ignore_changes(call)
+    return kw
+
+
+def test_lb_poll_job_image_step_exists() -> None:
+    for step in _ci_steps():
+        if "gcloud run jobs update lb-poll" in step.get("run", ""):
+            flags = _flags(_command_line(step["run"], "gcloud run jobs update lb-poll"))
+            assert str(flags["--image"]).endswith(":EXPR")  # ...:${{ github.sha }}
+            return
+    raise AssertionError("no `gcloud run jobs update lb-poll` step in deploy-backend")
+
+
+def test_lb_poll_job_shape(pulumi_lb_poll: dict[str, Any]) -> None:
+    tmpl = pulumi_lb_poll["template"]["template"]
+    (c,) = tmpl["containers"]
+    assert c["commands"] == ["python", "-m", "backend.jobs.lb_poll"]
+    assert "args" not in c
+    assert tmpl["timeout"] == "1800s"
+    assert tmpl["max_retries"] == 0
+    assert "template.template.containers[0].image" in pulumi_lb_poll["_ignore_changes"]
+    plain = {e["name"]: e["value"] for e in c["envs"] if isinstance(e, dict) and "value" in e}
+    assert plain["LISTENBRAINZ_OAUTH_ENABLED"] == "true"
+    assert {"ENVIRONMENT", "GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_PROJECT_NUMBER"} <= set(plain)
+    consts = _module_constants(_pulumi_tree())
+    assert consts["LB_POLL_SECRETS"] == {
+        "DECIDE_TOKEN_KEY": "decide-token-key",
+        "METABRAINZ_CLIENT_ID": "metabrainz-client-id",
+        "METABRAINZ_CLIENT_SECRET": "metabrainz-client-secret",
+    }
+
+
+def test_lb_poll_is_scheduled_daily() -> None:
+    tree = _pulumi_tree()
+    sched = _kwargs(_resource_call(tree, "Job", "lb-poll-scheduler"), _module_constants(tree))
+    assert sched["schedule"] == "30 6 * * *" and sched["time_zone"] == "UTC"
+    assert sched["http_target"]["http_method"] == "POST"
+    invoker = _kwargs(_resource_call(tree, "JobIamMember", "lb-poll-scheduler-invoker"), _module_constants(tree))
+    assert invoker["role"] == "roles/run.invoker"

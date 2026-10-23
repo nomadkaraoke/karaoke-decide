@@ -18,6 +18,7 @@ beforeEach(() => {
       url: req ? req.url : String(input),
       method: req ? req.method : (init?.method ?? "GET"),
       headers: req ? req.headers : new Headers(init?.headers),
+      redirect: req ? req.redirect : init?.redirect,
       cf: init?.cf,
     });
     return new Response("body", {
@@ -152,4 +153,29 @@ test("offline index upstream errors become a bare 404", async () => {
   const res = await get("/offline-index/r-1/offline.db.gz");
   assert.equal(res.status, 404);
   assert.equal(await res.text(), "Not found");
+});
+
+test("backend redirects are passed through, not followed (OAuth app-scheme returns)", async () => {
+  const location = "nomadkaraoke://services/listenbrainz?status=connected";
+  globalThis.fetch = async (input) => {
+    calls.push({ url: input.url, redirect: input.redirect });
+    return new Response("<a>Return to the app</a>", {
+      status: 302,
+      headers: { location, "cache-control": "no-store" },
+    });
+  };
+  const res = await get("/api/services/listenbrainz/oauth/callback?code=c&state=s");
+  assert.equal(calls[0].redirect, "manual");
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("location"), location);
+  assert.equal(res.headers.get("cache-control"), "no-store");
+});
+
+test("every main-API and search request asks for manual redirects", async () => {
+  await get("/api/health");
+  await get("/api/search?q=x");
+  assert.deepEqual(
+    calls.map((c) => c.redirect),
+    ["manual", "manual"],
+  );
 });

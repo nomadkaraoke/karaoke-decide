@@ -112,7 +112,9 @@ export default {
       method: request.method,
       headers: headers,
       body: request.body,
-      redirect: "follow",
+      // Pass backend 3xx through untouched: OAuth callbacks 302 to nomadkaraoke://…,
+      // which a followed redirect can't fetch (and a followed web redirect would hide the URL).
+      redirect: "manual",
     });
 
     try {

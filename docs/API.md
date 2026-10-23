@@ -148,6 +148,7 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
 | `GET /api/test/profile?email=` | Reads the profile back |
 | `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log. |
+| `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
 
 ## Song search ✅ Implemented
 
@@ -651,6 +652,22 @@ Connect Last.fm account by username.
   "tracks_synced": 0
 }
 ```
+
+### GET /api/services/listenbrainz/oauth/start
+
+Verified users. Start connecting ListenBrainz through MetaBrainz OAuth (authorization code + PKCE S256, scopes `profile listenbrainz:submit-listens`). Query `return_to=app|web` (required). Response `{"auth_url": "https://metabrainz.org/oauth2/authorize?..."}`; `404 {"detail":"oauth_disabled"}` when `capabilities.listenbrainz_oauth` is false.
+
+### POST /api/services/listenbrainz/upload-export
+
+Verified users, ListenBrainz connected with OAuth. Multipart `file` (a Spotify export `.zip`, at most 31,457,280 bytes). Hands the zip to ListenBrainz's importer (`POST /1/import-listens/`, `service=spotify`) with the user's token; nothing is ingested here. Response `{"import_id":"42","status":"waiting"}`, and `lb_pending_import={id,status,submitted_at}` is stored on the connection (shown as `pending_listenbrainz_import` in `/summary`). Errors (`detail`): `409 not_oauth_connected | needs_reconnect | import_in_progress`, `413 too_large`, `400 not_a_zip` (no `PK\x03\x04` magic), `429 rate_limited` (with `Retry-After`), `503 listenbrainz_unavailable` (ListenBrainz down, or the token refresh is busy or MetaBrainz failed transiently: `Retry-After: 30`; retry).
+
+### GET /api/services/listenbrainz/oauth/callback
+
+No auth (MetaBrainz redirects here; the one-time state identifies the user; a state outside `^[A-Za-z0-9_-]{16,128}$` is `invalid_state` without a lookup). Query `code`, `state`, `error`. Stores the connection (`auth: "oauth"`, tokens encrypted with `DECIDE_TOKEN_KEY`) and answers `302` with `Cache-Control: no-store`:
+- `return_to=app`: `nomadkaraoke://services/listenbrainz?status=connected` or `?status=error&reason=<code>` (tiny HTML body with a "Return to the app" link);
+- `return_to=web` (also used when the state is unknown): `{frontend_url}/en/music-i-know?listenbrainz=connected` or `?listenbrainz=error&reason=<code>`.
+
+Reason codes: `denied`, `missing_params`, `invalid_state`, `exchange_failed`, `validate_failed` (no ListenBrainz account for that MetaBrainz user). The Worker proxies with `redirect: "manual"` so the 302 reaches the browser.
 
 ### GET /api/services/capabilities
 

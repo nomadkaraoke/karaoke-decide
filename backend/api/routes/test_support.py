@@ -14,11 +14,21 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field
 
-from backend.api.deps import get_auth_service_dep, get_firestore
+from backend.api.deps import (
+    get_auth_service_dep,
+    get_firestore,
+    get_import_ingest_service_dep,
+    get_music_service_service_dep,
+    get_settings,
+)
+from backend.config import BackendSettings
 from backend.models.karaoke_log import KaraokeLogEntry
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
+from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLLECTION, log_doc_id
+from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
+from backend.services.music_service_service import MusicServiceService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 
 router = APIRouter()
@@ -172,3 +182,30 @@ async def read_karaoke_log(email: Annotated[str, Query()], fs: FirestoreDep, aut
             if d.get("times_sung")
         ],
     }
+
+
+async def get_listenbrainz_poller(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    fs: FirestoreDep,
+    music_service: Annotated[MusicServiceService, Depends(get_music_service_service_dep)],
+    ingest: Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)],
+) -> ListenBrainzPoller:
+    return ListenBrainzPoller(settings, fs, music_service, ingest, music_service.listenbrainz)
+
+
+class PollReportResponse(BaseModel):
+    users_polled: int
+    listens_added: int
+    imports_checked: int
+    rate_limited: int
+    remaining: int
+
+
+@router.post("/listenbrainz/poll", response_model=PollReportResponse)
+async def poll_listenbrainz(
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+    poller: Annotated[ListenBrainzPoller, Depends(get_listenbrainz_poller)],
+) -> PollReportResponse:
+    """Run the daily ``lb-poll`` job's poller once, in-process (local stack and Maestro)."""
+    report: PollReport = await poller.run(settings.lb_poll_budget_seconds)
+    return PollReportResponse(**vars(report))
