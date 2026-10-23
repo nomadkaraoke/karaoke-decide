@@ -372,7 +372,15 @@ jobs:
 
       - name: Update lb-poll job image
         # Same as mb-refresh: pin the daily ListenBrainz poll job to the deployed image.
+        # Pulumi creates the job; until it exists this step is skipped so later deploy steps still run.
         run: |
+          if ! out=$(gcloud run jobs describe lb-poll --region ${{ env.REGION }} 2>&1); then
+            if echo "$out" | grep -qE "Cannot find (service|job)"; then
+              echo "::warning::lb-poll does not exist yet (created by Pulumi); skipping"
+              exit 0
+            fi
+            echo "$out"; exit 1
+          fi
           gcloud run jobs update lb-poll \
             --image ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.REGION }}

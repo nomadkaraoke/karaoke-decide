@@ -647,8 +647,6 @@ async def upload_listenbrainz_export(
     if doc is None or doc.get("auth") != "oauth":
         raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
     service = music_service.service_from_doc(doc)
-    if not service.access_token:
-        raise HTTPException(status.HTTP_409_CONFLICT, "not_oauth_connected")
 
     data = await file.read(LISTENBRAINZ_UPLOAD_MAX_BYTES + 1)
     if len(data) > LISTENBRAINZ_UPLOAD_MAX_BYTES:

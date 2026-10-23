@@ -217,3 +217,18 @@ async def test_token_refresh_busy_is_retryable_503(client: TestClient, db: FakeD
     assert resp.status_code == 503 and resp.json()["detail"] == "listenbrainz_unavailable"
     assert resp.headers["retry-after"] == "30"
     lb.submit_import.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_upload_undecryptable_tokens_409_needs_reconnect(client: TestClient, db: FakeDb, lb: MagicMock) -> None:
+    from backend.main import app
+
+    await _connect(db)  # tokens encrypted with the default key
+    rotated = _settings(decide_token_key="Hn2zDl8b0n8YJ2dZ9mH1vC5xQe3WkTt7uR4aPs6LfGo=")
+    svc = MusicServiceService(rotated, db, listenbrainz_client=lb)  # type: ignore[arg-type]
+    app.dependency_overrides[get_music_service_service_dep] = lambda: svc
+    resp = client.post(URL, files=FILES)
+    assert resp.status_code == 409 and resp.json()["detail"] == "needs_reconnect"
+    stored = db.doc("music_services", LB_DOC)
+    assert stored is not None and stored["error_code"] == "needs_reconnect" and stored["sync_status"] == "error"
+    lb.submit_import.assert_not_awaited()
