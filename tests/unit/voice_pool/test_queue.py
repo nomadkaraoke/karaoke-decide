@@ -21,7 +21,7 @@ async def test_enqueue_writes_full_doc(fs):
     assert set(doc) == {
         "song_key", "artist", "title", "spotify_id", "duration_ms", "source", "priority", "batch_ids", "status",
         "attempts", "flacfetch_id", "audio_gcs", "vocals_gcs", "manifest_run", "error", "added_at", "updated_at",
-        "stratum",
+        "stratum", "versions_embeddable",
     }  # fmt: skip
     assert doc["spotify_id"] == "sp1" and doc["duration_ms"] == 200_000
     assert doc["priority"] == 1 and doc["status"] == "queued" and doc["attempts"] == 0

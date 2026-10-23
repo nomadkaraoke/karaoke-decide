@@ -14,7 +14,14 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
-from google.api_core.exceptions import Forbidden
+import requests
+from google.api_core.exceptions import (
+    DeadlineExceeded,
+    Forbidden,
+    InternalServerError,
+    ServiceUnavailable,
+    TooManyRequests,
+)
 
 from karaoke_decide.catalog.keys import song_key
 from karaoke_decide.etl import vocal_range_refresh as vr
@@ -246,7 +253,7 @@ async def test_every_song_erroring_is_one_error(frames, monkeypatch, caplog) -> 
     fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
     pids = await _seed(fs, gcs, SONGS[:3])
     out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
-    assert out["failed"] == 3
+    assert out["failed"] == 3 and out["all_failed"] is True
     assert {fs.cols[FETCH][p]["status"] for p in pids} == {"failed"}
     assert len([r for r in caplog.records if r.levelno >= logging.ERROR]) == 1
 
@@ -264,3 +271,76 @@ def test_voice_db_analysis_version_matches_markers() -> None:
     from karaoke_decide.voice_pool import voicedb
 
     assert voicedb.ANALYSIS_VERSION == ANALYSIS_VERSION
+
+
+def _refuse(monkeypatch: pytest.MonkeyPatch, method: str, name_part: str, exc: Exception, mode: str | None = None):
+    """Make FakeBlob.<method> raise ``exc`` for object names containing ``name_part``."""
+    from tests.unit.fake_gcs import FakeBlob
+
+    original = getattr(FakeBlob, method)
+
+    def patched(self, *args: Any, **kw: Any) -> Any:
+        if name_part in self.name and (mode is None or (args and args[0] == mode)):
+            raise exc
+        return original(self, *args, **kw)
+
+    monkeypatch.setattr(FakeBlob, method, patched)
+
+
+@pytest.mark.parametrize(
+    ("method", "name_part", "mode"),
+    [
+        ("open", "pool_measured/", "wb"),  # the CSV write: refused before any BigQuery append
+        ("exists", "pool_measured/", None),
+        ("exists", "voice-pool/stems/", None),
+        ("exists", "ultrastar/", None),
+    ],
+)
+async def test_gcs_forbidden_is_infra_pending(frames, monkeypatch, caplog, method, name_part, mode) -> None:
+    caplog.set_level(logging.INFO)
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    _ultrastar_zip(gcs)
+    pids = await _seed(fs, gcs, SONGS[:3])
+    before = {p: dict(fs.cols[FETCH][p]) for p in pids}
+    _refuse(monkeypatch, method, name_part, Forbidden("403 no access"), mode)
+
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+
+    assert out["blocked"] and "403" in out["blocked"] and out["analysed"] == 0
+    assert bq.loads == []
+    assert {p: fs.cols[FETCH][p] for p in pids} == before
+    assert not [n for n in gcs.bucket(DATA).objects if "pool_measured" in n]
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len([r for r in caplog.records if r.levelno == logging.WARNING]) == 1
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        ServiceUnavailable("503"),
+        DeadlineExceeded("slow"),
+        TooManyRequests("429"),
+        InternalServerError("500"),
+        ConnectionError("reset"),
+        requests.exceptions.ConnectionError("dns"),
+    ],  # fmt: skip
+)
+async def test_transient_vocals_error_leaves_song_separated(frames, monkeypatch, caplog, exc) -> None:
+    caplog.set_level(logging.INFO)
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    flaky, ok = await _seed(fs, gcs, SONGS[:2])
+    real = analyse.load_audio
+
+    def load_audio(blob: Any) -> Any:
+        if flaky in blob.name:
+            raise exc
+        return real(blob)
+
+    monkeypatch.setattr(analyse, "load_audio", load_audio)
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert (out["analysed"], out["failed"], out["deferred"], out["all_failed"]) == (1, 0, 1, False)
+    assert fs.cols[FETCH][flaky]["status"] == "separated" and fs.cols[FETCH][flaky]["error"] is None
+    assert fs.cols[FETCH][ok]["status"] == "analysed"
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1 and flaky in warnings[0]
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]

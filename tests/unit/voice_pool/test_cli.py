@@ -123,10 +123,11 @@ def test_publish_builds_voice_db(no_bq, fakes, catalog_db: Path, availability_db
 
 
 @pytest.mark.parametrize(
-    ("task", "blocked", "publishes"), [("0", None, True), ("1", None, False), ("0", "no bq", False)]
+    ("task", "blocked", "all_failed", "publishes"),
+    [("0", None, False, True), ("1", None, False, False), ("0", "no bq", False, False), ("0", None, True, False)],
 )
 def test_analyse_then_task0_publishes(
-    monkeypatch, fakes, catalog_db: Path, availability_db: Path, capsys, task, blocked, publishes
+    monkeypatch, fakes, catalog_db: Path, availability_db: Path, capsys, task, blocked, all_failed, publishes
 ):
     import asyncio
 
@@ -143,7 +144,8 @@ def test_analyse_then_task0_publishes(
     async def fake_run(fs, gcs, bq, *, run, limit, task_index, task_count):
         calls.append((bq, run, limit, task_index, task_count))
         return {"run": run, "task_index": task_index, "task_count": task_count, "listed": 1, "analysed": 1,
-                "too_little_voice": 0, "failed": 0, "blocked": blocked}  # fmt: skip
+                "too_little_voice": 0, "failed": 0, "deferred": 0, "all_failed": all_failed,
+                "blocked": blocked}  # fmt: skip
 
     monkeypatch.setattr(analyse, "run_analyse", fake_run)
     get_backend_settings.cache_clear()

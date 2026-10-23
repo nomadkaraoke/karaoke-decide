@@ -376,8 +376,9 @@ async def run_select(
                 "spotify_id": c.spotify_id,
                 "duration_ms": c.duration_ms,
                 "stratum": stratum,
+                "versions_embeddable": {v.video_id: v.embeddable for v in versions if v.embeddable is not None},
             }
-            for c, stratum, _ in picks
+            for c, stratum, versions in picks
         ]
         summary["enqueued"] = await queue.enqueue(fs, items)
         _append_pool_rows(bq, _pool_rows(picks, run, datetime.now(UTC)))

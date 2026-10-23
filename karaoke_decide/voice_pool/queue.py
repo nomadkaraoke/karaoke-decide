@@ -41,6 +41,8 @@ def _doc(item: dict[str, Any], now: datetime) -> dict[str, Any]:
         "added_at": now,
         "updated_at": now,
         "stratum": item.get("stratum"),
+        # The selection's oEmbed verdicts ({video_id: bool}; unknown ones omitted) for voice.db.
+        "versions_embeddable": dict(item.get("versions_embeddable") or {}),
     }
 
 
@@ -48,7 +50,7 @@ async def enqueue(fs: Any, items: Iterable[dict[str, Any]]) -> int:
     """Queue songs for fetch; a doc that already exists is left alone. Returns the number added.
 
     Each item: ``song_key``, ``artist``, ``title``, ``source`` and optionally ``spotify_id``,
-    ``duration_ms``, ``stratum``. Create-if-absent, so concurrent enqueues of one song add it once.
+    ``duration_ms``, ``stratum``, ``versions_embeddable``. Create-if-absent, so concurrent enqueues of one song add it once.
     """
     added = 0
     for item in items:

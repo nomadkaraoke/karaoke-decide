@@ -189,6 +189,9 @@ async def test_run_select_writes_queue_bq_and_coverage(reader, fake_bq, fs):
     doc = next(iter(col.values()))
     assert doc["source"] == "shared" and doc["priority"] == 1 and doc["spotify_id"].startswith("sp")
     assert doc["duration_ms"] == 200_000 and doc["stratum"].startswith("gender=")
+    # The oEmbed verdicts travel with the song so voice.db can skip non-embeddable versions.
+    probed = {vid: ok for d in col.values() for vid, ok in d["versions_embeddable"].items()}
+    assert probed and set(probed) <= set(seen) and all(ok is True for ok in probed.values())
 
     ((rows, table, config),) = bq.loads
     assert table == "nomadkaraoke.karaoke_decide.voice_pool_songs"

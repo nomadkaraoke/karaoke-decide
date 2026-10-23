@@ -14,7 +14,8 @@ WARNING and exits 0. ``status`` prints the fetch queue's counts per status and t
 ``voice-pool-analyse`` job, on 3c's ``karaoke-decide-vocal`` image) analyses this task's shard of
 ``separated`` songs (``voice_analysis.analyse.run_analyse``; ``CLOUD_RUN_TASK_INDEX`` / ``_COUNT``,
 run id = ``--run``, else the shared ``CLOUD_RUN_EXECUTION``), then task 0 publishes voice.db from
-everything committed so far (``voicedb.publish_from_queue``). With several tasks, rows another
+everything committed so far (``voicedb.publish_from_queue``; skipped when the run was blocked
+by missing infra or every song failed). With several tasks, rows another
 task commits after task 0's publish reach voice.db on the next analyse run or ``publish``.
 ``publish [--catalog PATH --availability PATH]`` rebuilds and publishes voice.db alone.
 
@@ -87,7 +88,8 @@ def format_status(out: dict[str, Any]) -> str:
 def format_analyse(out: dict[str, Any]) -> str:
     line = (
         f"voice pool analyse {out['run']} task {out['task_index']}/{out['task_count']}: {out['listed']} listed,"
-        f" {out['analysed']} analysed, {out['too_little_voice']} too little voice, {out['failed']} failed"
+        f" {out['analysed']} analysed, {out['too_little_voice']} too little voice, {out['failed']} failed,"
+        f" {out.get('deferred', 0)} deferred"
     )
     return line + (f"\n  blocked: {out['blocked']}" if out["blocked"] else "")
 
@@ -252,7 +254,8 @@ def _analyse(args: argparse.Namespace) -> int:
         out = await run_analyse(
             fs, gcs, bq, run=resolve_run_id(args.run), limit=args.limit, task_index=task_index, task_count=task_count
         )
-        if task_index != 0 or out["blocked"]:
+        # all_failed already logged this run's one ERROR; a publish failure would be a second.
+        if task_index != 0 or out["blocked"] or out.get("all_failed"):
             return out, None, False
         return out, await _publish_voice_db(args, settings, fs, gcs), True
 

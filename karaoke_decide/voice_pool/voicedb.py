@@ -1,8 +1,10 @@
 """voice.db: the small SQLite file the API's voice session plays from, behind ``voice/latest.json``.
 
 Built from the fetch queue (every song except ``failed``; analysed songs carry their markers as
-the queue doc's ``markers``), the catalog (artist key, popularity, lead gender, and the song's
-community versions from availability.db) and Firestore ``voice_version_stats`` (singer feedback).
+the queue doc's ``markers``, and the selection's oEmbed verdicts as ``versions_embeddable``), the
+catalog (artist key, popularity, lead gender, and the song's community versions from
+availability.db) and Firestore ``voice_version_stats`` (singer feedback; its ``embeddable``
+verdict beats the probe's).
 BigQuery ``song_voice_analysis`` stays the source of record; the queue holds the same rows.
 
 Published to ``gs://nomadkaraoke-musicbrainz-data/voice/<run>/voice.db.gz`` (gzip mtime 0), then
@@ -23,7 +25,7 @@ import re
 import shutil
 import sqlite3
 from collections.abc import Iterable, Sequence
-from dataclasses import fields
+from dataclasses import fields, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -266,6 +268,11 @@ def _catalog_rows(reader: CatalogReader, keys: Sequence[str]) -> tuple[dict[str,
     return songs, community_versions(version_rows)
 
 
+def _with_probes(versions: tuple[Version, ...], probed: dict[str, bool]) -> tuple[Version, ...]:
+    """The selection's oEmbed verdicts (queue doc ``versions_embeddable``) on the catalog versions."""
+    return tuple(replace(v, embeddable=probed[v.video_id]) if v.video_id in probed else v for v in versions)
+
+
 def _stats(doc: dict[str, Any]) -> VersionStats:
     names = {f.name for f in fields(VersionStats)}
     return VersionStats(**{k: v for k, v in doc.items() if k in names})
@@ -297,7 +304,7 @@ async def load_sources(
                 "duration_ms": d.get("duration_ms"),
                 "popularity": cat["popularity"] if cat else None,
                 "lead_gender": cat["lead_gender"] if cat else None,
-                "versions": versions.get(key, ()),
+                "versions": _with_probes(versions.get(key, ()), d.get("versions_embeddable") or {}),
             }
         )
         if d.get("status") == "analysed" and d.get("markers"):

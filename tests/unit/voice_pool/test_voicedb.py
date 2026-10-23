@@ -19,7 +19,7 @@ from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.vocal_range.notes import VOICE_TYPES
 from karaoke_decide.voice_pool import fixtures, queue, voicedb
 from karaoke_decide.voice_pool.models import Version, pool_id
-from karaoke_decide.voice_pool.versions import VersionStats
+from karaoke_decide.voice_pool.versions import VersionStats, youtube_id
 from tests.unit.fake_gcs import FakeBucket
 
 NOW = datetime(2026, 10, 23, 4, 5, 6, tzinfo=UTC)
@@ -139,8 +139,15 @@ async def test_publish_from_queue_joins_catalog_versions_and_stats(fs, reader: C
         "AND v.youtube_url LIKE '%youtu%') ORDER BY s.song_key LIMIT 1"
     ).fetchone()
     key = row["song_key"]
+    first = con.execute(
+        "SELECT youtube_url FROM av.versions WHERE song_key = ? AND kind = 'community' AND youtube_url IS NOT NULL"
+        " ORDER BY rank, rowid LIMIT 1",
+        (key,),
+    ).fetchone()[0]
+    probed_vid = youtube_id(first)
     await queue.enqueue(fs, [
-        {"song_key": key, "artist": row["artist"], "title": row["title"], "source": "shared", "stratum": "s1"},
+        {"song_key": key, "artist": row["artist"], "title": row["title"], "source": "shared", "stratum": "s1",
+         "versions_embeddable": {probed_vid: False}},
         {"song_key": "nowhere|unknown", "artist": "Nowhere", "title": "Unknown", "source": "personal"},
         {"song_key": "gone|failed", "artist": "Gone", "title": "Failed", "source": "shared"},
     ])  # fmt: skip
@@ -157,17 +164,27 @@ async def test_publish_from_queue_joins_catalog_versions_and_stats(fs, reader: C
     assert by_key["nowhere|unknown"]["artist_key"] == "nowhere" and by_key["nowhere|unknown"]["versions"] == ()
     assert [a["song_key"] for a in analysis] == [key]
     assert stats == {}
-
+    # The selection's oEmbed verdict reaches the Version (unprobed versions stay unknown).
     vid = by_key[key]["versions"][0].video_id
-    await fs.create_document(voicedb.VERSION_STATS_COLLECTION, vid, {"good": 2, "plays": 3, "embeddable": False})
+    assert vid == probed_vid and by_key[key]["versions"][0].embeddable is False
+    assert all(v.embeddable is None for v in by_key[key]["versions"][1:])
+
+    def embeddable() -> Any:
+        con2 = sqlite3.connect(tmp_path / "voice.db")
+        try:
+            return con2.execute("SELECT embeddable FROM versions WHERE video_id=?", (vid,)).fetchone()[0]
+        finally:
+            con2.close()
+
     bucket = FakeBucket()
     pointer = await voicedb.publish_from_queue(fs, bucket, reader, tmp_path, now=NOW)
     assert pointer is not None and pointer["run"] == "20261023-040506"
     assert (pointer["songs"], pointer["analysed"]) == (2, 1)
-    db = tmp_path / "voice.db"
-    con2 = sqlite3.connect(db)
-    assert con2.execute("SELECT embeddable FROM versions WHERE video_id=?", (vid,)).fetchone() == (0,)
-    con2.close()
+    assert embeddable() == 0  # the probe said no
+    # The app's verdict (C5 stats) takes precedence over the probe.
+    await fs.create_document(voicedb.VERSION_STATS_COLLECTION, vid, {"good": 2, "plays": 3, "embeddable": True})
+    await voicedb.publish_from_queue(fs, bucket, reader, tmp_path, now=NOW)
+    assert embeddable() == 1
 
 
 async def test_publish_from_empty_queue_publishes_nothing(fs, reader: CatalogReader, tmp_path: Path, caplog) -> None:

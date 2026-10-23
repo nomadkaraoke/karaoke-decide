@@ -241,6 +241,6 @@ def compute_markers(
         longest_phrase_s=max(last - first + FRAME_S for first, last in _runs(f.t, PHRASE_MAX_GAP_S)),
         intro_s=_intro_s(float(f.t[0]), sections),
         key=key,
-        mode=track.mode if key is not None else None,
+        mode=track.mode if track is not None and key is not None else None,
         key_changes=_key_changes(sections),
     )

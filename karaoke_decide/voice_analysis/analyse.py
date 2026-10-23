@@ -9,12 +9,13 @@ For the fetch-queue songs at ``separated`` in this task's shard (``sha1(pool_id)
 3. an UltraStar file matched by ``song_key(artist, title)`` from 3c's USDB zip (syllable density);
 4. ``compute_markers``.
 
-Every ``COMMIT_EVERY`` songs (and at the end) the results are committed in this order:
-BigQuery ``karaoke_decide.song_voice_analysis`` (WRITE_APPEND; readers take the latest row per
-``(song_key, analysis_version)``), this task's 3c measured CSV
+Every ``COMMIT_EVERY`` songs (and at the end) the results are committed in this order: this
+task's 3c measured CSV
 ``gs://nomadkaraoke-musicbrainz-data/vocal-range/pool_measured/<run>/part-<task>.csv`` (read by
-the weekly vocal-range refresh as ``pool_measured``), then the queue docs. A crash between the
-steps only re-analyses a song (a duplicate BigQuery row; the latest wins).
+the weekly vocal-range refresh as ``pool_measured``; one row per pool id, rewritten in full),
+BigQuery ``karaoke_decide.song_voice_analysis`` (WRITE_APPEND; readers take the latest row per
+``(song_key, analysis_version)``), then the queue docs. A failure between the steps only
+re-analyses a song: its CSV row is replaced, and a duplicate BigQuery row loses to the latest.
 
 Queue outcomes, all terminal so the hourly fetch never restarts this job for the same song:
 
@@ -22,10 +23,13 @@ Queue outcomes, all terminal so the hourly fetch never restarts this job for the
 * ``analysed`` with ``markers: None`` and ``analysis_note: "too_little_voice"`` when the stem has
   under 3c's ``MIN_VOICED_S`` (20 s) of voice (INFO; no BigQuery row or CSV line);
 * ``failed`` when the vocals object is missing (WARNING) or decoding/analysis raises (WARNING;
-  ONE ERROR, from task 0 only, when every song of the run failed that way).
+  ONE ERROR, from task 0 only, when every song of the run failed that way: ``all_failed``, and
+  the CLI then skips the publish).
 
-BigQuery missing or forbidden (infra not applied yet) is a WARNING: the run stops, nothing is
-marked, and the next hourly hand-off retries. voice.db is published by the CLI afterwards.
+A transient storage error while fetching a song's vocals (503, 500, 429, deadline, connection)
+is a WARNING and leaves that song ``separated`` for the next run: its audio cost Spotify budget.
+BigQuery or GCS answering 403 / 404 (infra not applied yet) is a WARNING: the run stops, nothing
+uncommitted is marked, and the next hourly hand-off retries. voice.db is published by the CLI.
 """
 
 from __future__ import annotations
@@ -36,12 +40,21 @@ import json
 import logging
 import zipfile
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
-from google.api_core.exceptions import Forbidden, NotFound
+import requests
+from google.api_core.exceptions import (
+    DeadlineExceeded,
+    Forbidden,
+    InternalServerError,
+    NotFound,
+    ServiceUnavailable,
+    TooManyRequests,
+)
+from google.auth.exceptions import TransportError
 from google.cloud import bigquery
 
 from karaoke_decide.catalog.bq_source import P
@@ -74,6 +87,7 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+_T = TypeVar("_T")
 
 ANALYSIS_TABLE = f"{P}.song_voice_analysis"
 SPOTIFY_BATCH = 200
@@ -84,6 +98,16 @@ MAX_BYTES_ANALYSIS = MAX_BYTES_BATCH
 TOO_LITTLE_VOICE = "too_little_voice"
 _EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 _INFRA_MISSING = (NotFound, Forbidden)
+_TRANSIENT = (
+    ServiceUnavailable,
+    DeadlineExceeded,
+    TooManyRequests,
+    InternalServerError,
+    ConnectionError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    TransportError,
+)
 
 SPOTIFY_ANALYSIS_SQL = f"""
 WITH sec AS (
@@ -150,7 +174,15 @@ ANALYSIS_SCHEMA_FIELDS = tuple(f.name for f in ANALYSIS_SCHEMA)
 
 
 class InfraUnavailableError(Exception):
-    """BigQuery table/dataset missing or forbidden: infra not applied yet."""
+    """A BigQuery table/dataset or GCS bucket missing or forbidden: infra not applied yet."""
+
+
+def _infra(what: str, fn: Callable[[], _T]) -> _T:
+    """``fn()``, with a 403 / 404 turned into ``InfraUnavailableError``."""
+    try:
+        return fn()
+    except _INFRA_MISSING as e:
+        raise InfraUnavailableError(f"{what}: {e}") from e
 
 
 @dataclass
@@ -209,11 +241,15 @@ def load_ultrastar(bucket: Any, wanted: set[str]) -> dict[str, UltraStarSong]:
     if not wanted:
         return {}
     blob = bucket.blob(ZIP_BLOB)
-    if not blob.exists():
+    if not _infra("check the UltraStar zip", blob.exists):
         logger.info("voice analysis: no UltraStar zip at gs://%s/%s; densities come from onsets", DATA_BUCKET, ZIP_BLOB)
         return {}
-    with blob.open("rb") as f:
-        data = f.read()
+
+    def read() -> bytes:
+        with blob.open("rb") as f:
+            return bytes(f.read())
+
+    data = _infra("read the UltraStar zip", read)
     out: dict[str, UltraStarSong] = {}
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         for info in sorted(z.infolist(), key=lambda i: i.filename):
@@ -267,7 +303,7 @@ def _vocals_blob(gcs: Any, uri: str | None) -> Any | None:
         return None
     bucket, name = uri[5:].split("/", 1)
     blob = gcs.bucket(bucket).blob(name)
-    return blob if blob.exists() else None
+    return blob if _infra(f"check {uri}", blob.exists) else None
 
 
 class _Shard:
@@ -276,19 +312,40 @@ class _Shard:
     def __init__(self, fs: Any, gcs: Any, bq: Any, run: str, task_index: int) -> None:
         self.fs, self.bq = fs, bq
         self.csv_blob = gcs.bucket(DATA_BUCKET).blob(f"{POOL_MEASURED_PREFIX}{run}/part-{task_index}.csv")
-        self.csv_rows: list[dict[str, str]] = []
-        if self.csv_blob.exists():  # a retried task keeps the rows it already wrote
-            with self.csv_blob.open("rb") as f:
-                self.csv_rows = list(csv.DictReader(io.StringIO(f.read().decode())))
+        self.csv_rows: dict[str, dict[str, str]] = {}  # by source_id (pool id)
         self.bq_rows: list[dict[str, Any]] = []
         self.new_csv = 0
         self.updates: list[tuple[str, str, dict[str, Any]]] = []  # (pool_id, outcome, update)
         self.done: Counter[str] = Counter()  # committed outcomes
+        self.deferred = 0  # left separated after a transient storage error
+
+    def load_csv(self) -> None:
+        """A retried task keeps the rows it already wrote."""
+        if not _infra(f"check {self.csv_blob.name}", self.csv_blob.exists):
+            return
+
+        def read() -> str:
+            with self.csv_blob.open("rb") as f:
+                return str(f.read().decode())
+
+        for r in csv.DictReader(io.StringIO(_infra(f"read {self.csv_blob.name}", read))):
+            self.csv_rows[r["source_id"]] = r
+
+    def add_csv_row(self, row: dict[str, str]) -> None:
+        self.csv_rows[row["source_id"]] = row  # a re-analysed song replaces its earlier row
+        self.new_csv += 1
 
     def pending(self) -> int:
         return len(self.updates)
 
+    def _write_csv(self) -> None:
+        with self.csv_blob.open("wb", content_type="text/csv") as f:
+            f.write(_csv_bytes(list(self.csv_rows.values())))
+
     async def commit(self) -> None:
+        # CSV first: a refused write must never leave BigQuery rows behind for songs still separated.
+        if self.new_csv:
+            _infra(f"write {self.csv_blob.name}", self._write_csv)
         if self.bq_rows:
             config = bigquery.LoadJobConfig(
                 schema=ANALYSIS_SCHEMA,
@@ -299,9 +356,6 @@ class _Shard:
                 self.bq.load_table_from_json(self.bq_rows, ANALYSIS_TABLE, job_config=config).result()
             except _INFRA_MISSING as e:
                 raise InfraUnavailableError(f"load into {ANALYSIS_TABLE}: {e}") from e
-        if self.new_csv:
-            with self.csv_blob.open("wb", content_type="text/csv") as f:
-                f.write(_csv_bytes(self.csv_rows))
         for pid, outcome, update in self.updates:
             await self.fs.update_document(FETCH_COLLECTION, pid, update)
             self.done[outcome] += 1
@@ -312,7 +366,8 @@ async def run_analyse(
     fs: Any, gcs: Any, bq: Any, *, run: str, limit: int | None, task_index: int, task_count: int
 ) -> dict[str, Any]:
     """Analyse this task's share of ``separated`` songs (see module doc). Returns
-    ``{run, task_index, task_count, listed, analysed, too_little_voice, failed, blocked}``."""
+    ``{run, task_index, task_count, listed, analysed, too_little_voice, failed, deferred, all_failed,
+    blocked}`` (``deferred``: left ``separated`` after a transient storage error)."""
     docs = await fs.query_documents(FETCH_COLLECTION, filters=[("status", "==", "separated")])
     mine = set(shard([d["id"] for d in docs], task_index, task_count))
     todo = sorted((d for d in docs if d["id"] in mine), key=lambda d: (d.get("updated_at") or _EPOCH, d["id"]))
@@ -321,11 +376,13 @@ async def run_analyse(
     out: dict[str, Any] = {"run": run, "task_index": task_index, "task_count": task_count, "listed": len(todo)}
     if not todo:
         logger.info("voice analysis %s task %d/%d: nothing separated in this shard", run, task_index, task_count)
-        return {**out, "analysed": 0, "too_little_voice": 0, "failed": 0, "blocked": None}
+        return {**out, "analysed": 0, "too_little_voice": 0, "failed": 0, "deferred": 0, "all_failed": False,
+                "blocked": None}  # fmt: skip
 
     data = gcs.bucket(DATA_BUCKET)
     work = _Shard(fs, gcs, bq, run, task_index)
     try:
+        work.load_csv()
         spotify = fetch_spotify(bq, (d.get("spotify_id") for d in todo))
         ultrastar = load_ultrastar(data, {d["song_key"] for d in todo})
         for doc in todo:
@@ -345,9 +402,11 @@ async def run_analyse(
         "analysed": done["analysed"],
         "too_little_voice": done[TOO_LITTLE_VOICE],
         "failed": done["missing"] + done["error"],
+        "deferred": work.deferred,
+        "all_failed": bool(done["error"]) and done["error"] == len(todo),
         "blocked": blocked,
     }
-    if done["error"] and done["error"] == len(todo):
+    if summary["all_failed"]:
         # A real failure (bad image, broken decoder): one ERROR per execution, from task 0.
         log = logger.error if task_index == 0 else logger.warning
         log("voice analysis %s: every song failed (%d); see the WARNINGs above", run, done["error"])
@@ -364,13 +423,16 @@ async def _analyse_one(
 ) -> None:
     pid = doc["id"]
     now = datetime.now(UTC)
-    blob = _vocals_blob(gcs, doc.get("vocals_gcs"))
-    if blob is None:
-        logger.warning("voice analysis: %s (%s) has no vocals at %s", pid, doc.get("song_key"), doc.get("vocals_gcs"))
-        work.updates.append((pid, "missing", {"status": "failed", "error": "vocals stem missing", "updated_at": now}))
-        return
+    uri = doc.get("vocals_gcs")
     try:
-        y, sr = load_audio(blob)
+        blob = _vocals_blob(gcs, uri)
+        if blob is None:
+            logger.warning("voice analysis: %s (%s) has no vocals at %s", pid, doc.get("song_key"), uri)
+            work.updates.append(
+                (pid, "missing", {"status": "failed", "error": "vocals stem missing", "updated_at": now})
+            )
+            return
+        y, sr = _infra(f"read {uri}", lambda: load_audio(blob))
         frames = vocal_frames(y, sr)
         voiced_s = len(frames.t) * FRAME_S
         markers = None
@@ -385,7 +447,16 @@ async def _analyse_one(
                 )
             except ValueError:  # no voiced frames (unreachable past the 20 s check, kept as a guard)
                 markers = None
-    except Exception as e:  # noqa: BLE001 - one bad stem must not stop the shard
+    except InfraUnavailableError:
+        raise
+    except _TRANSIENT as e:  # the audio cost Spotify budget: never drop it for a blip
+        logger.warning(
+            "voice analysis: %s (%s) vocals unavailable for now (%s: %s); stays separated for the next run",
+            pid, doc.get("song_key"), type(e).__name__, e,
+        )  # fmt: skip
+        work.deferred += 1
+        return
+    except Exception as e:  # noqa: BLE001 - one bad stem (decode / analysis) must not stop the shard
         logger.warning("voice analysis: %s (%s) failed: %s: %s", pid, doc.get("song_key"), type(e).__name__, e)
         work.updates.append(
             (pid, "error", {"status": "failed", "error": f"analysis: {type(e).__name__}: {e}", "updated_at": now})
@@ -402,6 +473,5 @@ async def _analyse_one(
         return
     row = analysis_row(doc, markers, spotify.get(doc.get("spotify_id") or ""), now)
     work.bq_rows.append(row)
-    work.csv_rows.append(_csv_row(doc, markers))
-    work.new_csv += 1
+    work.add_csv_row(_csv_row(doc, markers))
     work.updates.append((pid, "analysed", {**base, "markers": row, "analysis_note": None, "error": None}))
