@@ -218,3 +218,9 @@ async def test_invalid_stored_profile_is_unset(fs: RouteFirestore, caplog: pytes
 def test_get_route_survives_invalid_stored_profile(client: TestClient, fs: RouteFirestore) -> None:
     fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {"low_midi": 1}
     assert client.get("/api/my/voice").json() == {"profile": None}
+
+
+def test_put_404_when_user_has_no_doc(client: TestClient, fs: RouteFirestore) -> None:
+    fs.cols["decide_users"].clear()
+    r = client.put("/api/my/voice", json=PROFILE)
+    assert r.status_code == 404 and r.json() == {"detail": "not_found"}

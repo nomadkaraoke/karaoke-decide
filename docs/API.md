@@ -409,6 +409,21 @@ Get details for a specific song.
 }
 ```
 
+### GET / PUT / DELETE /api/my/voice
+
+The singer's voice profile, stored on their `decide_users` doc (auth required; verified, guest and gen-session users). Mic audio never reaches the server: the app sends only derived numbers, and unknown body keys are rejected (422).
+
+- `GET` -> `{"profile": null | {...}}` (an invalid stored profile is treated as unset).
+- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; 404 `not_found` if the user has no doc; 422 on an inconsistent body.
+- `DELETE` -> 204.
+
+```json
+{"low_midi": 40, "high_midi": 69, "comfort_low": 45, "comfort_high": 64, "voice_type": "baritone", "voice_type_between": "tenor",
+ "register": null, "confidence": "medium", "method": "mic", "measured_at": "2026-10-22T10:00:00Z"}
+```
+
+Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self, and `self` requires `confidence: low`.
+
 ### GET /api/catalog/songs/{song_key}/vocal-range
 
 Public. A song's vocal range from `catalog.db` (MIDI numbers; `tier: rough` = the artist's range standing in; `is_duet` null when unknown). `range` is `null` for an unknown song or one without data. `503 warming_up` (`Retry-After: 30`) until `catalog.db` has loaded. URL-encode the key (`muse%7Cuprising`).
