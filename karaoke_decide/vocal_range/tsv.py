@@ -1,10 +1,11 @@
 """Read the published vocal-range tables (mb-refresh's ``vocal_range`` step) for the index builders.
 
 The step writes ``song_vocal_range`` / ``artist_vocal_range`` to BigQuery and the same rows as
-``gs://nomadkaraoke-musicbrainz-data/vocal-range/latest/{song,artist}_vocal_range.tsv.gz``
-(header row; NULL = empty cell; bool = 1/0), then ``vocal-range/latest.json`` =
-``{run, sha256_song, sha256_artist}`` LAST. catalog.db reads the BigQuery tables, offline.db the
-TSVs; both go through ``song_range`` / ``artist_range`` and ``VocalRanges.lookup`` so the
+``gs://nomadkaraoke-musicbrainz-data/vocal-range/<run>/...tsv.gz`` (header row; NULL = empty cell;
+bool = 1/0; a ``latest/`` copy is also kept), then ``vocal-range/latest.json`` =
+``{run, sha256_song, sha256_artist, song_path, artist_path}`` LAST. Readers (song-index-build) fetch
+the pointer, then read the per-run ``song_path`` / ``artist_path`` and check the sha256, so a
+half-published run is never seen. catalog.db reads the BigQuery tables, offline.db the TSVs; both go through ``song_range`` / ``artist_range`` and ``VocalRanges.lookup`` so the
 song -> artist ("rough") -> NULL fallback is the same everywhere.
 
 ``octave_confidence`` is the octave-repair confidence (UltraStar notes). The separate

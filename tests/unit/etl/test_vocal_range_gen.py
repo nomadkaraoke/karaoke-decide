@@ -183,3 +183,19 @@ def test_error_only_when_every_attempted_job_failed(
     with caplog.at_level(logging.INFO):
         vrg.run(gen, FakeBucket(), jobs.get, run_id="r", task_index=0, task_count=1)
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+def test_non_zero_task_logs_warning_not_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def boom(blob: Any) -> Any:
+        raise RuntimeError("decode failed")
+
+    monkeypatch.setattr(vrg, "load_audio", boom)
+    monkeypatch.setattr(vrg, "shard", lambda names, idx, count: names)  # give task 1 the job
+    gen = _gen({"a": _corr(_words((1.0, 2.0)))}, with_stem={"a"})
+    with caplog.at_level(logging.INFO):
+        vrg.run(gen, FakeBucket(), {"a": {"artist": "A", "title": "T"}}.get, run_id="r", task_index=1, task_count=2)
+    levels = [r.levelno for r in caplog.records]
+    assert logging.ERROR not in levels
+    assert any("every job failed" in r.getMessage() and r.levelno == logging.WARNING for r in caplog.records)

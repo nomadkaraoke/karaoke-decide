@@ -538,6 +538,11 @@ def test_song_index_build_reads_vocal_range_by_name() -> None:
         expr = ast.literal_eval(expr) if isinstance(expr, ast.Constant) else ast.unparse(expr)
     # built from the bucket resource's name, not a hardcoded bucket string
     assert "musicbrainz_bucket.name" in expr and "/objects/vocal-range/" in expr
+    # narrowed: pointer + latest/ and per-run dirs only (run id = %Y%m%d-%H%M%S)
+    assert '/objects/vocal-range/latest")' in expr
+    assert "[0-9]{8}-[0-9]{6}/.*$" in expr
+    assert "ultrastar" not in expr and "gen_measured" not in expr
+    assert "startsWith(\"projects/_/buckets/', musicbrainz_bucket.name, '/objects/vocal-range/\")" not in expr
     assert "nomadkaraoke-musicbrainz-data" not in expr
     assert "objectListPrefix" not in expr  # by-name reads only
 

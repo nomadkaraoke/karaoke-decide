@@ -58,13 +58,16 @@ Every optional input missing (UltraStar zip, a measured CSV, Gemini files, Wikid
 line and the merge continues with the rest. A failure in the step logs one ERROR and never fails
 the MB refresh; BigQuery loads go to `musicbrainz_staging` first so prod tables are untouched on
 failure, and `latest.json` is written last so readers keep last week's data. `song-index-build`
-and the catalog build fall back to NULL `vr_*` columns with a WARNING when the pointer, a file or
-the sha256 is missing.
+falls back to NULL `vr_*` columns with a WARNING when the pointer, a file or the sha256 is
+missing. Only `song-index-build` uses the pointer, the per-run files and the sha256; the catalog
+build reads the BigQuery tables.
 
 ## Andrew's to-dos after merge
 
-1. `pulumi up` in `infrastructure/` (SA, IAM including the song-index bucket-list clause, the
-   `vocal-range-gen` job). Order matters: the first CI run on main must push
+1. `pulumi up` in `infrastructure/` (SA, IAM, the `vocal-range-gen` job). The bucket-list clause
+   belongs to `vocal-range-gen`; the `song-index-build` grant is read-by-name (no list) and
+   narrowed to `vocal-range/latest*` and the per-run `vocal-range/<YYYYMMDD-HHMMSS>/` dirs, so it
+   cannot read `ultrastar/` or `gen_measured/`. Order matters: the first CI run on main must push
    `karaoke-decide-vocal:latest` before the job can be created.
 2. `gcloud run jobs execute vocal-range-gen --region us-central1` (about 452 stems exist).
 3. `gcloud run jobs execute mb-refresh --region us-central1 --args=vocal-range`, or wait for Sunday.

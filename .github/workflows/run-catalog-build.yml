@@ -6,6 +6,11 @@ name: Run catalog build
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_vocal_range:
+        description: "Pass --skip-vocal-range (catalog runs the vocal-range step first; skip it if the 60 min timeout is tight)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -30,5 +35,5 @@ jobs:
         run: |
           gcloud run jobs execute mb-refresh \
             --region us-central1 \
-            --args=catalog \
+            --args=${{ inputs.skip_vocal_range && 'catalog,--skip-vocal-range' || 'catalog' }} \
             --wait

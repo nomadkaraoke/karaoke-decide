@@ -47,6 +47,7 @@ import hashlib
 import io
 import json
 import logging
+import math
 import re
 import statistics
 import time
@@ -301,9 +302,10 @@ def _float(value: str | None) -> float | None:
     if value is None or value == "":
         return None
     try:
-        return float(value)
+        f = float(value)
     except ValueError:
         return None
+    return f if math.isfinite(f) else None
 
 
 def measured_rows(lines: Iterable[str], source: str) -> Iterator[SourceRow]:

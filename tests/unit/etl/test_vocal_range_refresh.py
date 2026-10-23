@@ -500,3 +500,11 @@ def test_prune_failure_is_a_warning(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO)
     vr.prune_runs(Broken(), keep="20261025-030000")
     assert [r.levelno for r in caplog.records if r.levelno >= logging.WARNING] == [logging.WARNING]
+
+
+def test_float_rejects_non_finite() -> None:
+    assert vr._float("nan") is None
+    assert vr._float("inf") is None
+    assert vr._float("-Infinity") is None
+    assert vr._float("") is None and vr._float(None) is None
+    assert vr._float("60.5") == 60.5

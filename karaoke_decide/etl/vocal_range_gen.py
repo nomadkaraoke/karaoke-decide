@@ -225,7 +225,9 @@ def run(
         + f" rows={len(rows_out)}"
     )
     if counts["attempted"] and counts["failed"] == counts["attempted"]:
-        logger.error("vocal-range-gen: every job failed. %s", line)
+        # one ERROR per execution (task 0 only); other tasks warn so the alert fires once
+        log = logger.error if task_index == 0 else logger.warning
+        log("vocal-range-gen: every job failed. %s", line)
     else:
         logger.info("vocal-range-gen done. %s", line)
     return summary

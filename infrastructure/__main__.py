@@ -1030,10 +1030,12 @@ gcp.storage.BucketIAMMember(
         "expression": (f'resource.name.startsWith("projects/_/buckets/{KN_DATA_BUCKET}/objects/song-index/")'),
     },
 )
-# Read mb-refresh's vocal ranges for offline.db's vr_* columns: vocal-range/latest.json and
-# vocal-range/latest/*.tsv.gz, read BY NAME (the job never lists this bucket, so the
-# condition needs no objectListPrefix clause). Until applied, the job logs one WARNING per
-# build and publishes offline.db with NULL vr_*.
+# Read mb-refresh's vocal ranges for offline.db's vr_* columns, BY NAME (the job never lists
+# this bucket, so the condition needs no objectListPrefix clause). Narrowed to what the job
+# reads: the pointer vocal-range/latest.json (and latest/*), plus the per-run dirs
+# vocal-range/<YYYYMMDD-HHMMSS>/ that the pointer's song_path/artist_path name. NOT
+# vocal-range/ultrastar/ (full UltraStar files with lyrics) or vocal-range/gen_measured/.
+# Until applied, the job logs one WARNING per build and publishes offline.db with NULL vr_*.
 gcp.storage.BucketIAMMember(
     "song-index-build-vocal-range-reader",
     bucket=musicbrainz_bucket.name,
@@ -1041,9 +1043,13 @@ gcp.storage.BucketIAMMember(
     member=song_index_build_member,
     condition={
         "title": "vocal-range prefix only",
-        "description": "song-index-build may only read vocal-range/ objects by name",
+        "description": "song-index-build may only read the vocal-range pointer and per-run outputs by name",
         "expression": pulumi.Output.concat(
-            'resource.name.startsWith("projects/_/buckets/', musicbrainz_bucket.name, '/objects/vocal-range/")'
+            'resource.name.startsWith("projects/_/buckets/',
+            musicbrainz_bucket.name,
+            '/objects/vocal-range/latest") || resource.name.matches("^projects/_/buckets/',
+            musicbrainz_bucket.name,
+            '/objects/vocal-range/[0-9]{8}-[0-9]{6}/.*$")',
         ),
     },
 )
