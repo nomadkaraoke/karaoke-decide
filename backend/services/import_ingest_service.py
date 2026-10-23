@@ -218,7 +218,7 @@ class ImportIngestService:
         )
         added, updated = await self._write_songs(user_id, source, tracks, matched, play_mode)
         if artists is None:
-            artists = _derive_artists(tracks)
+            artists = await asyncio.to_thread(_derive_artists, tracks)
         artists_added = await self._write_artists(user_id, source, artists, play_mode)
         return IngestResult(
             artists_added=artists_added,
@@ -258,7 +258,28 @@ class ImportIngestService:
         keys, kn_ids = await asyncio.to_thread(self._resolve, tracks, matched)  # SQLite: off the loop
         kn_rows = [f"{user_id}:{kn}" for kn in dict.fromkeys(kn_ids.values())]
         existing = await self.db.get_many(USER_SONGS_COLLECTION, kn_rows)
+        # Grouping / doc building is O(tracks) CPU work (20,000+ per export chunk): off the loop too.
+        rows = await asyncio.to_thread(self._group_rows, user_id, source, tracks, matched, keys, kn_ids, existing)
 
+        missing = [r for r in rows if r not in existing]
+        existing.update(await self.db.get_many(USER_SONGS_COLLECTION, missing))
+
+        docs = await asyncio.to_thread(self._build_docs, user_id, source, rows, existing, mode)
+        await self.db.batch_set(USER_SONGS_COLLECTION, docs, merge=True)
+        updated = sum(1 for r in rows if r in existing)
+        return len(rows) - updated, updated
+
+    @staticmethod
+    def _group_rows(
+        user_id: str,
+        source: str,
+        tracks: list[IngestTrack],
+        matched: list[MatchedTrack],
+        keys: list[str | None],
+        kn_ids: dict[str, int],
+        existing: dict[str, dict[str, Any]],
+    ) -> dict[str, _Row]:
+        """One ``_Row`` per ``user_songs`` row the tracks land on, plays summed."""
         rows: dict[str, _Row] = {}
         for track, match, key in zip(tracks, matched, keys, strict=True):
             song = match.catalog_song
@@ -285,22 +306,28 @@ class ImportIngestService:
             row.ms_played = _add(row.ms_played, track.ms_played)
             if track.last_ts is not None:
                 row.last_ts = max(row.last_ts or 0, track.last_ts)
+        return rows
 
-        missing = [r for r in rows if r not in existing]
-        existing.update(await self.db.get_many(USER_SONGS_COLLECTION, missing))
-
+    @classmethod
+    def _build_docs(
+        cls,
+        user_id: str,
+        source: str,
+        rows: dict[str, _Row],
+        existing: dict[str, dict[str, Any]],
+        mode: PlayMode,
+    ) -> dict[str, dict[str, Any]]:
+        """The ``user_songs`` writes: a merge patch for an existing row, a full doc for a new one."""
         now = _now()
         docs: dict[str, dict[str, Any]] = {}
         for row_id, row in rows.items():
             cur = existing.get(row_id)
             docs[row_id] = (
-                self._update_doc(cur, row, source, mode, now)
+                cls._update_doc(cur, row, source, mode, now)
                 if cur is not None
-                else self._new_doc(user_id, row_id, row, source, now)
+                else cls._new_doc(user_id, row_id, row, source, now)
             )
-        await self.db.batch_set(USER_SONGS_COLLECTION, docs, merge=True)
-        updated = sum(1 for r in rows if r in existing)
-        return len(rows) - updated, updated
+        return docs
 
     @staticmethod
     def _new_doc(user_id: str, row_id: str, row: _Row, source: str, now: str) -> dict[str, Any]:

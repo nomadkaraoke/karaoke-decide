@@ -9,6 +9,7 @@ chunk is a no-op that returns the stored totals.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, date, datetime
 from typing import Any, Literal
@@ -179,10 +180,10 @@ async def _ingest_chunk(
 
     # Ingest first, record after: a failed ingest leaves the chunk unrecorded so the phone's retry
     # re-sends it. Two racing posts of one chunk both ingest, which "max" mode makes harmless.
-    tracks = _ingest_tracks(body)
-    artists = await _cumulative_artists(
-        ingest, user_id, source, export_key, body.chunk_index, _chunk_artist_plays(tracks)
-    )
+    # Up to 20,000 tracks plus liked / playlist refs to normalise and sum: CPU work, off the loop.
+    tracks = await asyncio.to_thread(_ingest_tracks, body)
+    chunk_artists = await asyncio.to_thread(_chunk_artist_plays, tracks)
+    artists = await _cumulative_artists(ingest, user_id, source, export_key, body.chunk_index, chunk_artists)
     result = await ingest.ingest(user_id, source, tracks, artists=artists, play_mode="max")
     outcome: dict[str, Any] = {}
 

@@ -4,6 +4,7 @@ Fetches tracks from Spotify and Last.fm, matches them against the
 karaoke catalog, and creates UserSong records.
 """
 
+import asyncio
 import logging
 import re
 import uuid
@@ -788,7 +789,8 @@ class SyncService:
 
             # Batch lookup Spotify metadata for all artists
             artist_names = [a.get("name", "") for a in artists if a.get("name")]
-            spotify_metadata = self._get_spotify_metadata_for_artists(artist_names)
+            # A blocking BigQuery query (~11 s for 1,000 artists): off the event loop.
+            spotify_metadata = await asyncio.to_thread(self._get_spotify_metadata_for_artists, artist_names)
             logger.info(f"Last.fm artists: found Spotify metadata for {len(spotify_metadata)} artists")
 
             for artist in artists:

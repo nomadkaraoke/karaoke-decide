@@ -170,9 +170,10 @@ async def search_catalog(
 
     service = get_catalog_service()
     if artist:
-        results = service.get_songs_by_artist(artist, limit=per_page)
+        results = await asyncio.to_thread(service.get_songs_by_artist, artist, limit=per_page)
     elif q:
-        results = service.search_songs(
+        results = await asyncio.to_thread(
+            service.search_songs,
             query=q,
             limit=per_page + 1,  # Get one extra to check has_more
             offset=offset,
@@ -180,7 +181,8 @@ async def search_catalog(
         )
     else:
         # Default: popular songs
-        results = service.get_popular_songs(
+        results = await asyncio.to_thread(
+            service.get_popular_songs,
             limit=per_page + 1,
             min_brands=max(min_brands, 3),  # At least 3 brands for popular
         )
@@ -213,7 +215,7 @@ async def get_popular_songs(
     min_brands: int = Query(5, ge=1, description="Minimum brand count"),
 ) -> list[SongResponse]:
     """Get the most popular karaoke songs by brand coverage."""
-    results = get_catalog_service().get_popular_songs(limit=limit, min_brands=min_brands)
+    results = await asyncio.to_thread(get_catalog_service().get_popular_songs, limit=limit, min_brands=min_brands)
     return [
         SongResponse(
             id=s.id,
@@ -230,7 +232,7 @@ async def get_popular_songs(
 @router.get("/songs/{song_id}", response_model=SongResponse)
 async def get_song(song_id: int, request: Request) -> SongResponse:
     """Get details for a specific song."""
-    result = get_catalog_service().get_song_by_id(song_id)
+    result = await asyncio.to_thread(get_catalog_service().get_song_by_id, song_id)
     if not result:
         locale = get_locale_from_request(request)
         raise HTTPException(status_code=404, detail=t(locale, "catalog.songNotFound"))
@@ -254,7 +256,7 @@ async def get_song_links(song_id: int, request: Request) -> SongLinksResponse:
     - Nomad Karaoke Generator for creating custom videos
     """
     # First get the song to verify it exists and get artist/title
-    song = get_catalog_service().get_song_by_id(song_id)
+    song = await asyncio.to_thread(get_catalog_service().get_song_by_id, song_id)
     if not song:
         locale = get_locale_from_request(request)
         raise HTTPException(status_code=404, detail=t(locale, "catalog.songNotFound"))
@@ -282,7 +284,7 @@ async def get_song_links(song_id: int, request: Request) -> SongLinksResponse:
 @router.get("/stats", response_model=CatalogStatsResponse)
 async def get_catalog_stats() -> CatalogStatsResponse:
     """Get catalog statistics."""
-    stats = get_catalog_service().get_stats()
+    stats = await asyncio.to_thread(get_catalog_service().get_stats)
     return CatalogStatsResponse(**stats)
 
 
@@ -334,7 +336,7 @@ async def get_artist_index() -> ArtistIndexResponse:
         return _artist_index_cache
 
     # Try MBID-first index
-    mbid_results = get_catalog_service().get_artist_index_mbid(min_popularity=50)
+    mbid_results = await asyncio.to_thread(get_catalog_service().get_artist_index_mbid, min_popularity=50)
 
     if mbid_results:
         _artist_index_cache = ArtistIndexResponse(
@@ -352,7 +354,7 @@ async def get_artist_index() -> ArtistIndexResponse:
         return _artist_index_cache
 
     # Fallback to Spotify-only index if MBID tables not available
-    spotify_results = get_catalog_service().get_artist_index(min_popularity=50)
+    spotify_results = await asyncio.to_thread(get_catalog_service().get_artist_index, min_popularity=50)
     _artist_index_cache = ArtistIndexResponse(
         artists=[
             ArtistIndexEntry(
@@ -476,7 +478,7 @@ async def search_tracks(
 
     This endpoint is public (no auth required) for quick autocomplete.
     """
-    results = get_catalog_service().search_tracks_combined(q, artist=artist, limit=limit)
+    results = await asyncio.to_thread(get_catalog_service().search_tracks_combined, q, artist=artist, limit=limit)
     return TrackSearchResponse(
         tracks=[
             TrackSearchResult(

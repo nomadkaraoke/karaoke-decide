@@ -190,7 +190,7 @@ class TrackMatcher:
         # Search the catalog using the normalized values
         # Using a combined query to find exact matches
         query = f"{normalized_artist} {normalized_title}"
-        results = self.catalog_service.search_songs(query, limit=10)
+        results = await asyncio.to_thread(self.catalog_service.search_songs, query, limit=10)  # BigQuery
 
         catalog_song = None
         confidence = 0.0
@@ -241,7 +241,12 @@ class TrackMatcher:
         """
         if not tracks:
             return []
+        # Normalising thousands of tracks is CPU work and the BigQuery fallback blocks: this runs on
+        # the API service (sync tasks, imports), so all of it stays off the event loop.
+        return await asyncio.to_thread(self._batch_match_blocking, tracks)
 
+    def _batch_match_blocking(self, tracks: list[dict[str, Any]]) -> list[MatchedTrack]:
+        """``batch_match_tracks``'s work: normalise, look up (catalog.db or BigQuery), build results."""
         logger.info(f"Track matcher: received {len(tracks)} tracks to match")
 
         # First, normalize all tracks and build lookup structures
@@ -283,8 +288,7 @@ class TrackMatcher:
         # Use catalog.db (indexed SQLite, instant) once it's loaded, otherwise fall back to BigQuery
         if self.catalog_lookup and self.catalog_lookup.store.status == "ready":
             logger.info("Track matcher: using catalog.db lookup (instant)")
-            # One indexed SQLite lookup per track: off the event loop.
-            matched_songs = await asyncio.to_thread(self._match_with_catalog, unique_normalized)
+            matched_songs = self._match_with_catalog(unique_normalized)
             logger.info(f"Track matcher: catalog.db lookup found {len(matched_songs)} matches")
         else:
             # Fallback to BigQuery (slower; catalog.db not loaded yet)
