@@ -190,7 +190,7 @@ make stack-up                       # or scripts/local-stack.sh up   (idempotent
 scripts/local-stack.sh status | down | logs [api|search] | env
 ```
 
-- `up` builds the fixture index (`.local-stack/song-index/`) and fixture catalog (`.local-stack/catalog/catalog.db`, `python -m karaoke_decide.catalog.fixtures build`), starts search, then `uvicorn backend.main:app` on :8030 with `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, `GOOGLE_CLOUD_PROJECT=test-project`, `ENVIRONMENT=development`, `JWT_SECRET=local-stack-jwt`, `DECIDE_TEST_API=1`, `BIGQUERY_DISABLED=1`, `CATALOG_LOCAL_DIR`, `SONG_INDEX_LOCAL_DIR`. It waits for `/api/ready` to report `catalog:true` (60 tries). If nothing listens on :8080 it runs `scripts/start-emulators.sh` itself. State: `.local-stack/{api,search}.{pid,log}`. `down` stops only decide's two servers; the docker emulators (gen's stack) keep running. The stack refuses a non-loopback `GEN_API_URL` and always uses the partner secret `local-stack-secret` (the caller's `DECIDE_GEN_PARTNER_SECRET` is ignored; override with `LOCAL_STACK_PARTNER_SECRET`).
+- `up` builds the fixture index (`.local-stack/song-index/`) and fixture catalog (`.local-stack/catalog/catalog.db`, `python -m karaoke_decide.catalog.fixtures build`), starts search, then `uvicorn backend.main:app` on :8030 with `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`, `GOOGLE_CLOUD_PROJECT=test-project`, `ENVIRONMENT=development`, `JWT_SECRET=local-stack-jwt`, `DECIDE_TEST_API=1`, `BIGQUERY_DISABLED=1`, `CATALOG_LOCAL_DIR`, `SONG_INDEX_LOCAL_DIR`, and the voice session env (`VOICE_LOCAL_DIR`, `VOICE_RECORDINGS_LOCAL_DIR`, `VOICE_SESSION_OPEN=1`; see § Voice session). It waits for `/api/ready` to report `catalog:true` (60 tries). If nothing listens on :8080 it runs `scripts/start-emulators.sh` itself. State: `.local-stack/{api,search}.{pid,log}`. `down` stops only decide's two servers; the docker emulators (gen's stack) keep running. The stack refuses a non-loopback `GEN_API_URL` and always uses the partner secret `local-stack-secret` (the caller's `DECIDE_GEN_PARTNER_SECRET` is ignored; override with `LOCAL_STACK_PARTNER_SECRET`).
 - `env` prints `EXPO_PUBLIC_DECIDE_API_URL` and `EXPO_PUBLIC_DECIDE_SEARCH_URL` for the mobile app (`DECIDE_LOCAL_PUBLIC_URL` / `SEARCH_LOCAL_PUBLIC_URL=http://10.0.2.2:...` for an Android emulator). Ports: `DECIDE_LOCAL_PORT`, `SEARCH_LOCAL_PORT`.
 - Smoke test:
 
@@ -227,6 +227,27 @@ Drive the web app in a real browser against gen's local stack (:8010) and decide
 - Use locale-prefixed paths (`http://localhost:3000/en/recommendations`); bare paths redirect and lose the dev context.
 - Sign in with gen's local email code (gen's stack returns/logs the code) or mint a session via gen's `/api/users/auth/google` fake id token (see smoke test above) and put it in `localStorage`.
 - **Don't run `npm run build` while `next dev` is running**: both write `.next/` and the dev server breaks (500s, missing chunks). Stop dev first, or restart it after the build.
+
+## Voice session
+
+The voice session (`/api/voice/*`, Phase 3d) runs on a **fixture `voice.db`**: `python -m karaoke_decide.voice_pool.fixtures build <dir>` writes `<dir>/voice.db` (invented songs with synthetic ranges and versions whose video ids start `FIXTURE`, so no YouTube or Spotify is ever touched). Backend tests build it through `karaoke_decide.voice_pool.fixtures.build` and load it with `VoiceDataStore.load(BackendSettings(voice_local_dir=...))`; routes tests (`backend/tests/test_voice_session_routes.py`) pair it with the fixture catalog and an in-memory Firestore.
+
+- **Local env** (what `scripts/local-stack.sh up` exports for the main API): `VOICE_LOCAL_DIR=.local-stack/voice` (the fixture `voice.db`, built once; delete the directory to rebuild), `VOICE_RECORDINGS_LOCAL_DIR=.local-stack/recordings` (recordings go to that directory instead of GCS, `LocalBucket`), `VOICE_SESSION_OPEN=1` (the session is open to every signed-in user, not just admins). `.local-stack/` is gitignored.
+- **Flags:** `GET /api/voice/flags` -> `session_enabled` (`VOICE_SESSION_OPEN` or an admin), `is_admin`, `voice_data` (voice.db loaded). Production runs with `VOICE_SESSION_OPEN` off: only admins get a session.
+- **Test API** (`DECIDE_TEST_API=1`, never mounted in production; no auth; `email` = the gen user):
+  - `GET /api/test/voice/sessions?email=` -> `[{session_id, state, attempts, done_reason}]`
+  - `GET /api/test/voice/recordings?email=` -> `{count}`
+  - `POST /api/test/voice/reset {email}` (204) deletes the user's sessions, attempts, imported labels (`voice_labels`), recordings (documents and stored objects) and `voice_recording_purges` marker. In `user_songs`, a row whose `sources` are exactly `["voice_session"]` is deleted; on any other row the `session_*` fields and `voice_session` in `sources` are removed (`source` falls to the next source). Unknown emails are a no-op.
+- **Smoke** (gen's stack on :8010 and decide's on :8030, token as in the local-stack smoke test above):
+
+  ```bash
+  S=$(curl -s -XPOST 127.0.0.1:8030/api/voice/sessions -H "Authorization: Bearer $T" -H 'content-type: application/json' \
+      -d '{"posture":"standing","warmth":"warm","record":false,"headphones":true}' | jq -r .session_id)
+  curl -s -H "Authorization: Bearer $T" 127.0.0.1:8030/api/voice/sessions/$S/next | jq .version.video_id   # "FIXTURE<n>"
+  # POST .../attempts three times (body in docs/API.md), then:
+  curl -s -H "Authorization: Bearer $T" 127.0.0.1:8030/api/voice/sessions/$S/result | jq .voice_type
+  curl -XPOST 127.0.0.1:8030/api/test/voice/reset -H 'content-type: application/json' -d '{"email":"me@example.com"}'
+  ```
 
 ## Search local stack
 

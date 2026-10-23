@@ -2225,6 +2225,91 @@ At least one of `user_id` or `email` must be provided.
 
 ---
 
+## Voice session ✅ Implemented
+
+Phase 3d. A guided singing session that finds the singer's voice type and key-fit from a few songs. All `/api/voice/*` endpoints need a signed-in user.
+
+**Gate:** session endpoints (`/api/voice/sessions*`, `POST /api/voice/recordings`) return `403 voice_session_disabled` unless `VOICE_SESSION_OPEN` is on or the user is an admin. `503 warming_up` (voice.db or the catalog not loaded yet) can come from any of them. Request bodies reject unknown keys (`422`); there is no audio or raw pitch frame in any session body.
+
+### GET /api/voice/flags
+
+`{"session_enabled": true, "is_admin": false, "voice_data": true}`. Never gated.
+
+### POST /api/voice/sessions
+
+Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel"}` (`device` optional, max 80). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
+
+### PATCH /api/voice/sessions/{session_id}
+
+Any subset of the setup body above (the mid-session context chip). `204`. Errors: `404 session_not_found` (also for another user's session), `409 session_not_active`.
+
+### GET /api/voice/sessions/{session_id}/next
+
+The next song, or the end of the session. Errors: `404 session_not_found`, `409 session_not_active`.
+
+```json
+{"kind": "song", "song_key": "artist|title", "artist": "Artist", "title": "Title", "duration_s": 215,
+ "reason_type": "explore", "version": {"video_id": "FIXTURE11", "brand_code": "SING", "brand_name": "Sing King", "embeddable": true},
+ "alternatives": [], "song_range": {"low": 48, "high": 70, "p10": 52, "p50": 59, "p90": 66}}
+```
+
+or `{"kind": "done", "reason": "..."}`. `version.embeddable` is `false` only for the link-out offer (no embeddable version is left): the app opens YouTube instead of embedding. `alternatives` holds at most 2 versions; `song_range` is `null` without data.
+
+### POST /api/voice/sessions/{session_id}/skips
+
+Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "video_id": null}`. `not_embeddable` (with `video_id`) marks that version unplayable for everyone. `204`. Errors: `404 session_not_found`, `409 session_not_active`, `422` for an unknown song or version (`unknown_song`, `unknown_version`).
+
+### POST /api/voice/sessions/{session_id}/attempts
+
+One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `started_at`), `stopped_early`, `quiz` and an optional `pitch` summary.
+
+```json
+{"song_key": "artist|title", "video_id": "FIXTURE11", "started_at": "2026-10-22T19:00:00Z", "ended_at": "2026-10-22T19:03:00Z",
+ "stopped_early": false, "pitch": null,
+ "quiz": {"feel": "loved|fine|not_for_me", "position": "too_low|comfortable|too_high|both_ends",
+          "difficulty": "easy|stretch|couldnt", "knew": "well|partly|barely", "would_sing": "yes|yes_other_key|no",
+          "would_work_if": ["warmer", "other_key", "other_octave", "practice", "fine"], "voice_now": "fresh|warm|tired",
+          "version_quality": "good|not_great", "version_issues": ["no_intro", "wrong_lyrics", "bad_sync", "low_quality"],
+          "tags": ["fast_lyrics", "long_gaps", "needed_warmup", "crowd_song", "mood_only"]}}
+```
+
+`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`.
+
+### GET /api/voice/sessions/{session_id}/result
+
+Works in any session state (no attempts yet: the prior, `partial: true`); marks the session done and saves the voice profile (`method: session`) once the result is confident enough. Errors: `404 session_not_found`.
+
+```json
+{"voice_type": "tenor", "between": null, "confidence_label": "low", "top_p": 0.5, "low": 45, "high": 69,
+ "comfort_low": 50, "comfort_high": 65, "attempts": 3, "partial": false, "improve_hint": null, "profile_saved": false,
+ "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
+```
+
+`suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session.
+
+### POST /api/voice/recordings
+
+Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.
+
+### DELETE /api/voice/recordings
+
+Erases every recording of the signed-in user (objects, documents, attempt links); idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
+
+### GET /api/voice/recordings/count
+
+`{"count": 2}`. Open to every signed-in user.
+
+### Admin voice (`/api/admin/voice/*`)
+
+Admin session or `X-Admin-Token` (otherwise `403`).
+
+- `POST /api/admin/voice/labels/import` body `{"email", "rows": [{"artist", "title", "duet", "good", "sung", "notes"}], "enqueue": true}` (max 500 rows). Stores the sheet rows as per-user `voice_labels` (idempotent per user + song) and queues matched songs for analysis. Returns `{"imported", "matched", "unmatched": [{"artist","title"}], "enqueued"}`. `503 warming_up` without the catalog.
+- `GET /api/admin/voice/coverage` -> `{"run", "songs", "analysed", "per_stratum_dimension": {dim: {value: {songs, analysed}}}, "queue": {status: n}, "budget": {...} | null}` (`budget` is flacfetch's Spotify budget, `null` when unavailable).
+- `GET /api/admin/voice/users/{email}/songs` -> every song the user labelled or attempted: `[{"song_key", "artist", "title", "markers", "label": {"good","tags","notes"} | null, "attempts": [{"session_id","at","quiz","context","pitch","recording_id"}], "prediction": {"good","p"} | null}]`. `404 user_not_found`.
+- `GET /api/admin/voice/recordings/{recording_id}/audio` streams the private recording with its stored content type. `404 recording_not_found`.
+
+---
+
 ## Error Responses
 
 All errors follow this format:
