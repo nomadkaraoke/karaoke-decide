@@ -17,7 +17,6 @@ KaraokeNerds data comes only from our own copies (catalog.db / availability.db /
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import json
 import logging
@@ -50,6 +49,7 @@ MIN_POP_STEP = 5
 CANDIDATE_FACTOR = 3
 MIN_DURATION_MS = 120_000
 MAX_DURATION_MS = 420_000
+UNKNOWN_PROBE_WARN_FRACTION = 0.5  # more unknown oEmbed answers than this: YouTube is likely throttling us
 
 BUCKET = "nomadkaraoke-musicbrainz-data"
 POOL_TABLE = f"{P}.voice_pool_songs"
@@ -331,7 +331,7 @@ def _write_coverage(gcs: Any, run: str, summary: dict[str, Any]) -> str:
     return f"gs://{BUCKET}/{name}"
 
 
-def run_select(
+async def run_select(
     reader: CatalogReader,
     bq: Any,
     fs: Any,
@@ -347,7 +347,8 @@ def run_select(
     """Select the pool, probe embeddability, and (unless ``dry_run``) queue + record it.
 
     Returns the ``CoverageReport`` as a dict plus ``candidates``, ``probed`` (oEmbed requests),
-    ``non_embeddable`` (songs dropped because no version can be embedded), ``enqueued``,
+    ``probe_unknown`` (requests that answered neither yes nor no), ``non_embeddable`` (songs
+    dropped because no version can be embedded), ``enqueued``,
     ``songs`` (picked song keys, pick order), ``run`` and ``dry_run``. ``probe=False`` skips oEmbed.
     """
     cands = _dedupe(load_candidates(reader, bq, n=n))
@@ -358,12 +359,20 @@ def run_select(
         **dataclasses.asdict(report),
         "candidates": len(cands),
         "probed": len(prober.results),
+        "probe_unknown": sum(v is None for v in prober.results.values()),
         "non_embeddable": len(dropped),
         "enqueued": 0,
         "songs": [c.song_key for c, _, _ in picks],
         "run": run,
         "dry_run": dry_run,
     }
+    if summary["probed"] and summary["probe_unknown"] > UNKNOWN_PROBE_WARN_FRACTION * summary["probed"]:
+        logger.warning(
+            "voice pool %s: %d of %d oEmbed probes were unknown; YouTube may be rate-limiting or blocking us",
+            run,
+            summary["probe_unknown"],
+            summary["probed"],
+        )
     if report.below_minimum:
         logger.warning("voice pool %s: only %d songs picked (minimum %d)", run, report.picked, MIN_POOL)
     if not dry_run:
@@ -379,16 +388,18 @@ def run_select(
             }
             for c, stratum, _ in picks
         ]
-        summary["enqueued"] = asyncio.run(queue.enqueue(fs, items))
+        summary["enqueued"] = await queue.enqueue(fs, items)
         _append_pool_rows(bq, _pool_rows(picks, run, datetime.now(UTC)))
         summary["coverage_uri"] = _write_coverage(gcs, run, summary)
     logger.info(
-        "voice pool %s: picked %d/%d from %d candidates; probed %d, dropped %d non-embeddable, enqueued %d%s",
+        "voice pool %s: picked %d/%d from %d candidates; probed %d (%d unknown), dropped %d non-embeddable,"
+        " enqueued %d%s",
         run,
         report.picked,
         n,
         len(cands),
         summary["probed"],
+        summary["probe_unknown"],
         len(dropped),
         summary["enqueued"],
         " (dry run)" if dry_run else "",

@@ -18,6 +18,7 @@ from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.availability import build_availability_db
 from karaoke_decide.song_search.build_song_id import build as build_song_id
 from karaoke_decide.voice_pool import select
+from tests.unit.fake_gcs import FakeBucket
 
 SONG_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "song_search"
 
@@ -114,6 +115,15 @@ class MemoryFs:
         col[doc_id] = copy.deepcopy(data)
         return True
 
+    async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        col = self.cols.get(collection, {})
+        if doc_id not in col:  # Firestore's update() raises NotFound too
+            raise KeyError(doc_id)
+        col[doc_id].update(copy.deepcopy(data))
+
+    async def count_documents(self, collection: str, filters: Any = None) -> int:
+        return len(await self.query_documents(collection, filters))
+
     async def query_documents(self, collection: str, filters: Any = None, **kw: Any) -> list[dict[str, Any]]:
         self.queries.append((collection, filters, kw))
         out = []
@@ -126,3 +136,63 @@ class MemoryFs:
 @pytest.fixture
 def fs() -> MemoryFs:
     return MemoryFs()
+
+
+class FakeGcs:
+    """``storage.Client`` stand-in: one in-memory ``FakeBucket`` per name."""
+
+    def __init__(self) -> None:
+        self.buckets: dict[str, FakeBucket] = {}
+
+    def bucket(self, name: str) -> FakeBucket:
+        return self.buckets.setdefault(name, FakeBucket())
+
+
+@pytest.fixture
+def gcs() -> FakeGcs:
+    return FakeGcs()
+
+
+class FakeRunner:
+    """``JobRunner`` that records runs; ``running`` holds the job names reported as running."""
+
+    def __init__(self, running: set[str] | None = None, fail: dict[str, Exception] | None = None) -> None:
+        self.running = running or set()
+        self.fail = fail or {}
+        self.calls: list[dict[str, Any]] = []
+
+    def run(self, job: str, region: str, args: list[str] | None = None, task_count: int | None = None) -> str:
+        if job in self.fail:
+            raise self.fail[job]
+        self.calls.append({"job": job, "region": region, "args": args, "task_count": task_count})
+        return f"projects/p/locations/{region}/jobs/{job}/executions/{job}-{len(self.calls)}"
+
+    def is_running(self, job: str, region: str) -> bool:
+        if job in self.fail:
+            raise self.fail[job]
+        return job in self.running
+
+
+@pytest.fixture
+def runner() -> FakeRunner:
+    return FakeRunner()
+
+
+class Clock:
+    """Fake ``time.time`` + async sleep: sleeping advances the clock and is recorded."""
+
+    def __init__(self, t: float = 1_800_000_000.0) -> None:
+        self.t = t
+        self.sleeps: list[float] = []
+
+    def now(self) -> float:
+        return self.t
+
+    async def sleep(self, seconds: float) -> None:
+        self.sleeps.append(seconds)
+        self.t += seconds
+
+
+@pytest.fixture
+def clock() -> Clock:
+    return Clock()

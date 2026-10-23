@@ -38,6 +38,10 @@ class BackendSettings(Settings):
     screenshot_llm_model: str = "gemini-3.8-flash"
     lb_poll_budget_seconds: int = 1500
 
+    # Voice-pool fetch job (Secret Manager flacfetch-api-url / flacfetch-api-key). Empty: the job skips.
+    flacfetch_api_url: str = ""  # FLACFETCH_API_URL
+    flacfetch_api_key: str = ""  # FLACFETCH_API_KEY
+
     @property
     def screenshot_import_enabled(self) -> bool:
         """AI Studio key present in the env (never the gcloud fallback), or fakes on."""

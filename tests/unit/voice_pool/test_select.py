@@ -114,10 +114,10 @@ def _client(blocked: set[str], seen: list[str]) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_select_replaces_all_non_embeddable(reader, fake_bq):
+async def test_select_replaces_all_non_embeddable(reader, fake_bq):
     seen: list[str] = []
     with _client(set(), seen) as http:
-        first = select.run_select(reader, fake_bq(), None, http, n=5, run="r1", dry_run=True, limiter=NO_WAIT)
+        first = await select.run_select(reader, fake_bq(), None, http, n=5, run="r1", dry_run=True, limiter=NO_WAIT)
     assert first["picked"] == 5 and first["non_embeddable"] == 0 and first["probed"] == 5
     picks = first["songs"]
     victim = picks[0]
@@ -127,7 +127,7 @@ def test_select_replaces_all_non_embeddable(reader, fake_bq):
 
     seen = []
     with _client(set(victim_versions), seen) as http:
-        out = select.run_select(reader, fake_bq(), None, http, n=5, run="r2", dry_run=True, limiter=NO_WAIT)
+        out = await select.run_select(reader, fake_bq(), None, http, n=5, run="r2", dry_run=True, limiter=NO_WAIT)
     assert out["picked"] == 5 and victim not in out["songs"]
     assert out["non_embeddable"] == 1
     assert set(victim_versions) <= set(seen)  # every version of the dropped song was tried
@@ -136,13 +136,36 @@ def test_select_replaces_all_non_embeddable(reader, fake_bq):
     assert out["target"] == 5 and set(out["per_dimension"]) >= {"gender", "decade"}
 
 
-def test_select_unknown_probe_keeps_song(reader, fake_bq):
+async def test_select_unknown_probe_keeps_song(reader, fake_bq):
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503)
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as http:
-        out = select.run_select(reader, fake_bq(), None, http, n=3, run="r", dry_run=True, limiter=NO_WAIT)
+        out = await select.run_select(reader, fake_bq(), None, http, n=3, run="r", dry_run=True, limiter=NO_WAIT)
     assert out["picked"] == 3 and out["non_embeddable"] == 0 and out["probed"] == 3
+    assert out["probe_unknown"] == 3
+
+
+async def test_mostly_unknown_probes_warn_once(reader, fake_bq, caplog):
+    blocked = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        blocked["n"] += 1
+        return httpx.Response(429 if blocked["n"] % 4 else 200, json={})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        out = await select.run_select(reader, fake_bq(), None, http, n=8, run="r", dry_run=True, limiter=NO_WAIT)
+    assert out["probe_unknown"] > out["probed"] / 2
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and "unknown" in r.getMessage()]
+    assert len(warnings) == 1 and "rate-limit" in warnings[0].getMessage()
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+async def test_known_probes_do_not_warn(reader, fake_bq, caplog):
+    with _client(set(), []) as http:
+        out = await select.run_select(reader, fake_bq(), None, http, n=5, run="r", dry_run=True, limiter=NO_WAIT)
+    assert out["probe_unknown"] == 0
+    assert not any("unknown" in r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING)
 
 
 class FakeGcs:
@@ -153,10 +176,10 @@ class FakeGcs:
         return self.buckets.setdefault(name, FakeBucket())
 
 
-def test_run_select_writes_queue_bq_and_coverage(reader, fake_bq, fs):
+async def test_run_select_writes_queue_bq_and_coverage(reader, fake_bq, fs):
     bq, gcs, seen = fake_bq(), FakeGcs(), []
     with _client(set(), seen) as http:
-        out = select.run_select(
+        out = await select.run_select(
             reader, bq, fs, http, n=4, run="20261022-120000", dry_run=False, gcs=gcs, limiter=NO_WAIT
         )
     assert out["enqueued"] == 4 and out["picked"] == 4
@@ -185,21 +208,21 @@ def test_run_select_writes_queue_bq_and_coverage(reader, fake_bq, fs):
 
     # Re-running enqueues nothing new (same songs already queued).
     with _client(set(), []) as http:
-        again = select.run_select(reader, bq, fs, http, n=4, run="r2", dry_run=False, gcs=gcs, limiter=NO_WAIT)
+        again = await select.run_select(reader, bq, fs, http, n=4, run="r2", dry_run=False, gcs=gcs, limiter=NO_WAIT)
     assert again["enqueued"] == 0
 
 
-def test_dry_run_writes_nothing(reader, fake_bq, fs):
+async def test_dry_run_writes_nothing(reader, fake_bq, fs):
     bq, gcs = fake_bq(), FakeGcs()
-    out = select.run_select(reader, bq, fs, None, n=4, run="r", dry_run=True, gcs=gcs, probe=False)
+    out = await select.run_select(reader, bq, fs, None, n=4, run="r", dry_run=True, gcs=gcs, probe=False)
     assert out["picked"] == 4 and out["probed"] == 0 and out["enqueued"] == 0
     assert not fs.cols and not bq.loads and not gcs.buckets
 
 
-def test_dedupes_candidates_by_song_key(reader, fake_bq, monkeypatch):
+async def test_dedupes_candidates_by_song_key(reader, fake_bq, monkeypatch):
     cands = select.load_candidates(reader, fake_bq(), n=1000)
     monkeypatch.setattr(select, "load_candidates", lambda *a, **k: cands + cands[:10])
-    out = select.run_select(reader, fake_bq(), None, None, n=50, run="r", dry_run=True, probe=False)
+    out = await select.run_select(reader, fake_bq(), None, None, n=50, run="r", dry_run=True, probe=False)
     assert out["candidates"] == len(cands)
     assert len(out["songs"]) == len(set(out["songs"]))
 

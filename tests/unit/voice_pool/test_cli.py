@@ -23,8 +23,13 @@ def no_bq(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 def test_pending_commands_exit_2(capsys):
-    assert cli.main(["fetch"]) == 2
-    assert "Task A4" in capsys.readouterr().err
+    assert cli.main(["analyse"]) == 2
+    assert "Task A7" in capsys.readouterr().err
+
+
+def test_no_probe_needs_dry_run(no_bq, capsys):
+    assert cli.main(["select", "--n", "5", "--no-probe"]) == 2
+    assert "--no-probe" in capsys.readouterr().err
 
 
 def test_select_dry_run_prints_report(no_bq, catalog_db: Path, availability_db: Path, capsys):
@@ -62,3 +67,25 @@ def test_format_report_marks_below_minimum():
     text = cli.format_report(summary)
     assert "BELOW MINIMUM" in text and "solo 2/900" in text and "empty: duet=duet" in text
     assert "gs://b/voice/selection/r/coverage.json" in text
+
+
+def test_fetch_without_flacfetch_config_is_a_warning(no_bq, monkeypatch, caplog):
+    monkeypatch.setenv("FLACFETCH_API_URL", "")
+    monkeypatch.setenv("FLACFETCH_API_KEY", "")
+    assert cli.main(["fetch"]) == 0
+    assert any(r.levelno == logging.WARNING and "FLACFETCH_API_URL" in r.getMessage() for r in caplog.records)
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+def test_format_fetch_and_status():
+    text = cli.format_fetch({
+        "run": "r", "polled": 2, "fetched": 1, "submitted": 3, "refused_code": "spotify_budget", "separating": 0,
+        "separated": 4, "requeued": 0, "analyse_started": True,
+    })  # fmt: skip
+    assert "submitted 3" in text and "spotify_budget" in text and "analyse started" in text
+    text = cli.format_status({"counts": {"queued": 5, "fetched": 1}, "budget": None})
+    assert "queued 5" in text and "budget unavailable" in text
+    text = cli.format_status({"counts": {"queued": 0}, "budget": {"batch_s": 3600.0, "batch_budget_s": 43200,
+                              "total_s": 4000.0, "hard_cap_s": 86400, "batch_in_flight": 1,
+                              "batch_allowed_now": False, "retry_after_s": 30}})  # fmt: skip
+    assert "batch 3600/43200 s" in text and "retry in 30 s" in text
