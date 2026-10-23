@@ -13,6 +13,15 @@ STALE_JOB_THRESHOLD_SECONDS = 300
 MAX_SYNC_RESUMES = 5
 
 
+class RunSupersededError(Exception):
+    """Another delivery claimed this sync job; the current run must stop writing.
+
+    Raised by the progress callback. Per-service sync wrappers must re-raise it ahead of
+    their broad ``except Exception`` handlers so a superseded run stops at once and leaves
+    per-service status to the run that now owns the job.
+    """
+
+
 class SyncJobStatus(str, Enum):
     """Sync job status values."""
 

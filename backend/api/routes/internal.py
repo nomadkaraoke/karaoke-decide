@@ -17,7 +17,14 @@ from pydantic import BaseModel
 from backend.api.deps import FirestoreServiceDep, Settings, SyncServiceDep
 from backend.api.internal_auth import InternalCaller
 from backend.config import BackendSettings
-from backend.models.sync_job import MAX_SYNC_RESUMES, SyncJob, SyncJobProgress, SyncJobResult, SyncJobStatus
+from backend.models.sync_job import (
+    MAX_SYNC_RESUMES,
+    RunSupersededError,
+    SyncJob,
+    SyncJobProgress,
+    SyncJobResult,
+    SyncJobStatus,
+)
 from backend.services.firestore_service import FirestoreService, TransactionView
 
 logger = logging.getLogger(__name__)
@@ -125,11 +132,11 @@ async def process_sync_task(
 
     except HTTPException:
         raise
+    except RunSupersededError:
+        logger.warning(f"Sync run for {job_id} was superseded")
+        raise superseded
     except Exception as e:
         await _stop(heartbeat)
-        if isinstance(e, RunSupersededError):
-            logger.warning(f"Sync run for {job_id} was superseded")
-            raise superseded
         logger.exception(f"Sync job failed: {job_id}")
         requeue = await _record_failure(firestore, job_id, run_id, e)
         if requeue is None:
@@ -143,10 +150,6 @@ async def process_sync_task(
         return SyncProcessResponse(job_id=job_id, status="failed", message=f"Sync failed: {e}")
     finally:
         await _stop(heartbeat)
-
-
-class RunSupersededError(Exception):
-    """Another delivery claimed this job; this run must stop writing."""
 
 
 async def _stop(task: "asyncio.Task[None]") -> None:

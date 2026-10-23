@@ -1119,3 +1119,48 @@ class TestSpotifyPlaylistImport:
         with pytest.raises(InvalidSpotifyPlaylistUrlError):
             await sync_service.import_spotify_playlist("u1", "https://example.com/x", client=self._client())
         assert "u1" not in store
+
+
+class TestSupersededRun:
+    """A superseded run (progress callback raises RunSupersededError) stops at once."""
+
+    @staticmethod
+    def _service(service_type: str) -> MusicService:
+        now = datetime.now(UTC)
+        return MusicService(
+            id=f"user_123_{service_type}",
+            user_id="user_123",
+            service_type=service_type,  # type: ignore[arg-type]
+            service_user_id="fixture-user",
+            service_username="fixture-user",
+            access_token="token",
+            refresh_token="refresh",
+            token_expires_at=now + timedelta(hours=1),
+            created_at=now,
+            updated_at=now,
+        )
+
+    @pytest.mark.parametrize("service_type", ["spotify", "lastfm", "listenbrainz", "apple_music"])
+    async def test_superseded_progress_stops_run_without_status_writes(
+        self,
+        sync_service: SyncService,
+        mock_music_service_service: MagicMock,
+        service_type: str,
+    ) -> None:
+        from unittest.mock import call
+
+        from backend.models.sync_job import RunSupersededError
+
+        mock_music_service_service.get_user_services = AsyncMock(
+            return_value=[self._service(service_type), self._service("spotify")]
+        )
+        progress = AsyncMock(side_effect=RunSupersededError("job-1"))
+
+        with pytest.raises(RunSupersededError):
+            await sync_service.sync_all_services_with_progress("user_123", progress)
+
+        # Only the opening "syncing" write: no per-service "error", and the next service never starts.
+        assert mock_music_service_service.update_sync_status.call_args_list == [
+            call("user_123", service_type, "syncing")
+        ]
+        progress.assert_awaited_once()

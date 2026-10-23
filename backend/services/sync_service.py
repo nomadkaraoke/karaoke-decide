@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from backend.config import BackendSettings
+from backend.models.sync_job import RunSupersededError
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportIngestService, IngestTrack
 from backend.services.music_service_service import MusicServiceError, MusicServiceService
@@ -308,6 +309,8 @@ class SyncService:
                 user_songs_updated=0,
                 error=error_msg,
             )
+        except RunSupersededError:
+            raise  # another run owns the job now: stop without touching per-service status
         except Exception as e:
             error_msg = f"Unexpected error: {e}"
             await self.music_service_service.update_sync_status(user_id, "spotify", "error", error=error_msg)
@@ -495,6 +498,8 @@ class SyncService:
                 user_songs_updated=0,
                 error=error_msg,
             )
+        except RunSupersededError:
+            raise  # another run owns the job now: stop without touching per-service status
         except Exception as e:
             error_msg = f"Unexpected error: {e}"
             await self.music_service_service.update_sync_status(user_id, "lastfm", "error", error=error_msg)
@@ -1541,6 +1546,8 @@ class SyncService:
                 error=str(e),
             )
 
+        except RunSupersededError:
+            raise  # another run owns the job now: stop without touching per-service status
         except Exception as e:
             logger.exception(f"Unexpected error during ListenBrainz sync: {e}")
             await self.music_service_service.update_sync_status(user_id, "listenbrainz", "error", error=str(e))
@@ -1686,6 +1693,8 @@ class SyncService:
             failure.error = message
             return failure
 
+        except RunSupersededError:
+            raise  # another run owns the job now: stop without touching per-service status
         except Exception as e:
             logger.exception(f"Unexpected error during Apple Music sync: {e}")
             await self.music_service_service.update_sync_status(user_id, "apple_music", "error", error=str(e))
