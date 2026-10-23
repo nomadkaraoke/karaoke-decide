@@ -4,7 +4,7 @@ for the next run; it never fails a song or becomes the run's ERROR."""
 
 from __future__ import annotations
 
-import requests
+import requests  # type: ignore[import-untyped, unused-ignore]  # no types-requests in dev deps; CI mypy has no stubs
 from google.api_core.exceptions import DeadlineExceeded, InternalServerError, ServiceUnavailable, TooManyRequests
 from google.auth.exceptions import TransportError
 
