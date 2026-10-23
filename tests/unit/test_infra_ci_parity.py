@@ -466,6 +466,8 @@ def test_lb_poll_is_scheduled_daily() -> None:
     assert sched["http_target"]["http_method"] == "POST"
     invoker = _kwargs(_resource_call(tree, "JobIamMember", "lb-poll-scheduler-invoker"), _module_constants(tree))
     assert invoker["role"] == "roles/run.invoker"
+
+
 # The vocal-range-gen job (on demand, no scheduler)
 # --------------------------------------------------------------------------
 
