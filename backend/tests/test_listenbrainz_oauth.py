@@ -718,7 +718,7 @@ async def test_reconnect_resets_poll_cursor_only_when_account_changes(
             USER, {"access_token": "meba_n", "refresh_token": "meba_r2", "expires_in": 3600}, new_name
         )
     else:
-        svc.listenbrainz.get_user_info = AsyncMock(  # type: ignore[attr-defined]
+        svc.listenbrainz.get_user_info = AsyncMock(  # type: ignore[method-assign]
             return_value=MagicMock(username=new_name, listen_count=1)
         )
         await svc.create_listenbrainz_service(USER, new_name)
