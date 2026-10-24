@@ -2,7 +2,7 @@
 
 import pytest
 
-from karaoke_decide.voice_session.labels import parse_good, parse_note, rows_from_csv
+from karaoke_decide.voice_session.labels import parse_good, parse_note, row_tags, rows_from_csv
 
 
 @pytest.mark.parametrize(
@@ -69,3 +69,35 @@ def test_rows_from_csv_header_case() -> None:
         "The Lanterns", "Paper Harbour", True, "Y", False, "good if warm",
     )  # fmt: skip
     assert rows[1].duet is None and rows[1].good is None and rows[1].notes == ""
+
+
+_SHEET_GOOD = [
+    ("yes", "yes"), ("yes!", "yes"), ("no", "no"), ("no!", "no"), ("meh", "maybe"), ("?", "maybe"),
+    ("yes if warm", "yes"), ("maybe", "maybe"), ("no! avoid!", "no"), ("no! hard!", "no"),
+    ("??", "maybe"), ("???", "maybe"), ("eh", "maybe"), ("ish", "maybe"), ("kinda", "maybe"),
+    ("probably!", "yes"), ("maybe!", "maybe"), ("yes, if warm", "yes"), ("yes! if warmed up", "yes"),
+    ("yes (but quiet)", "yes"), ("yes (if warmed up!)", "yes"), ("yes, ish", "maybe"), ("yes\nif warm", "yes"),
+    ("yes (ish)", "maybe"), ("yes (but stay in the lower octave…)", "yes"),
+    ("yes (hard and super high, need warmup)", "yes"), ("", None),
+]  # fmt: skip
+
+
+@pytest.mark.parametrize(("value", "expected"), _SHEET_GOOD)
+def test_parse_good_sheet_values(value: str, expected: str | None) -> None:
+    assert parse_good(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("good", "notes", "tags"),
+    [
+        ("yes if warm", "", {"good_if_warm"}),
+        ("yes! if warmed up", "", {"needs_warmup", "good_if_warm"}),
+        ("yes (but stay in the lower octave…)", "needs practice", {"key_change", "needs_practice"}),
+        ("yes", "no intro", {"no_intro"}),
+        ("yes", "", set()),
+        ("yes\nif warm", "", {"good_if_warm"}),
+        (None, None, set()),
+    ],
+)
+def test_row_tags_unions_good_qualifier(good: str | None, notes: str, tags: set[str]) -> None:
+    assert row_tags(good, notes) == tags
