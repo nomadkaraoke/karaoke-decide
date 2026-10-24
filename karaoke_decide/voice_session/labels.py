@@ -46,8 +46,8 @@ def _split_good(value: str | None) -> tuple[str, str]:
     v = (value or "").strip().lower()
     if not v:
         return "", ""
-    first, _, rest = v.partition(" ")
-    return first.strip(_PUNCT), rest
+    parts = v.split(None, 1)
+    return parts[0].strip(_PUNCT), (parts[1] if len(parts) > 1 else "")
 
 
 def parse_good(value: str | None) -> Literal["yes", "no", "maybe"] | None:

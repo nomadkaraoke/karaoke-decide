@@ -76,7 +76,7 @@ _SHEET_GOOD = [
     ("yes if warm", "yes"), ("maybe", "maybe"), ("no! avoid!", "no"), ("no! hard!", "no"),
     ("??", "maybe"), ("???", "maybe"), ("eh", "maybe"), ("ish", "maybe"), ("kinda", "maybe"),
     ("probably!", "yes"), ("maybe!", "maybe"), ("yes, if warm", "yes"), ("yes! if warmed up", "yes"),
-    ("yes (but quiet)", "yes"), ("yes (if warmed up!)", "yes"), ("yes, ish", "maybe"),
+    ("yes (but quiet)", "yes"), ("yes (if warmed up!)", "yes"), ("yes, ish", "maybe"), ("yes\nif warm", "yes"),
     ("yes (ish)", "maybe"), ("yes (but stay in the lower octave…)", "yes"),
     ("yes (hard and super high, need warmup)", "yes"), ("", None),
 ]  # fmt: skip
@@ -95,6 +95,7 @@ def test_parse_good_sheet_values(value: str, expected: str | None) -> None:
         ("yes (but stay in the lower octave…)", "needs practice", {"key_change", "needs_practice"}),
         ("yes", "no intro", {"no_intro"}),
         ("yes", "", set()),
+        ("yes\nif warm", "", {"good_if_warm"}),
         (None, None, set()),
     ],
 )
