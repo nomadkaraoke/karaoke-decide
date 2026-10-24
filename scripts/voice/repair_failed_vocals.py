@@ -3,7 +3,8 @@
 bare object name (``voice-pool/stems/<id>/vocals.flac``) instead of a ``gs://`` URI (v0.28.1 fix).
 
 A ``voice_pool_fetch`` doc is repaired when it is ``failed`` and either its ``vocals_gcs`` is a bare
-``voice-pool/stems/...`` name or its ``error`` mentions "no vocals at voice-pool/stems". It goes back
+``voice-pool/stems/...`` name with analyse's "vocals stem missing" error, or its ``error`` mentions
+"no vocals at voice-pool/stems". It goes back
 to ``separated`` with ``vocals_gcs`` = ``gs://karaoke-gen-storage-nomadkaraoke/<name>`` and
 ``error`` None (``attempts`` untouched), but only when that stem object exists.
 
@@ -31,6 +32,7 @@ from karaoke_decide.voice_pool.separate import GEN_BUCKET, gen_uri  # noqa: E402
 
 STEMS_PREFIX = "voice-pool/stems/"
 ERROR_HINT = "no vocals at voice-pool/stems"
+MISSING_ERRORS = {"vocals stem missing", ""}  # analyse's missing-stem error (pre-v0.28.1)
 _STEM_IN_TEXT = re.compile(r"(voice-pool/stems/\S+?\.flac)")
 
 
@@ -47,9 +49,10 @@ def stem_name(doc_id: str, d: dict[str, Any]) -> str | None:
     if d.get("status") != "failed":
         return None
     vocals = d.get("vocals_gcs")
-    if isinstance(vocals, str) and vocals.strip().lstrip("/").startswith(STEMS_PREFIX):
-        return vocals.strip().lstrip("/")
     error = str(d.get("error") or "")
+    if isinstance(vocals, str) and vocals.strip().lstrip("/").startswith(STEMS_PREFIX):
+        # Only the missing-stem failure: a real analysis error on a stem keeps its failure.
+        return vocals.strip().lstrip("/") if error in MISSING_ERRORS or ERROR_HINT in error else None
     if ERROR_HINT not in error:
         return None
     if isinstance(vocals, str) and vocals.startswith(f"gs://{GEN_BUCKET}/{STEMS_PREFIX}"):

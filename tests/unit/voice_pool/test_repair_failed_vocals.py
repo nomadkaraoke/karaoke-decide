@@ -134,8 +134,12 @@ def test_a_mode_flag_is_required(world) -> None:
 
 
 def test_stem_name_rules() -> None:
-    assert repair.stem_name("p", {"status": "failed", "vocals_gcs": _stem("p")}) == _stem("p")
+    assert repair.stem_name(
+        "p", {"status": "failed", "vocals_gcs": _stem("p"), "error": "vocals stem missing"}
+    ) == _stem("p")
     assert repair.stem_name("p", {"status": "analysed", "vocals_gcs": _stem("p")}) is None
+    bare_decode_error = {"status": "failed", "vocals_gcs": _stem("p"), "error": "analysis: RuntimeError: corrupt"}
+    assert repair.stem_name("p", bare_decode_error) is None  # a real analysis failure keeps its error
     assert repair.stem_name("p", {"status": "failed", "vocals_gcs": "gs://x/y", "error": "other"}) is None
     hinted = {"status": "failed", "vocals_gcs": f"gs://{GEN}/{_stem('p')}", "error": f"no vocals at {_stem('p')}"}
     assert repair.stem_name("p", hinted) == _stem("p")
