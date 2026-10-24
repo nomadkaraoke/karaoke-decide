@@ -36,7 +36,7 @@ from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
 from karaoke_decide.vocal_range.fit import UserVoiceRange
 from karaoke_decide.voice_pool.queue import FETCH_COLLECTION, enqueue
-from karaoke_decide.voice_session.labels import parse_good, parse_note
+from karaoke_decide.voice_session.labels import parse_good, row_tags
 from karaoke_decide.voice_session.predict import PREDICT_WEIGHTS, features, held_out, predict_good, replay
 
 logger = logging.getLogger(__name__)
@@ -137,7 +137,7 @@ async def import_labels(
                 "good": parse_good(row.good),
                 "sung": row.sung,
                 "notes": row.notes,
-                "tags": sorted(parse_note(row.notes)),
+                "tags": sorted(row_tags(row.good, row.notes)),
                 "matched": is_match,
                 "source": "sheet",
                 "imported_at": now,

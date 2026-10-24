@@ -20,8 +20,8 @@ LabelTag = Literal[
     "version_good",
 ]
 
-_YES = {"y", "yes", "good", "✓", "✔", "1"}
-_NO = {"n", "no", "x", "✗", "0"}
+_YES = {"y", "yes", "good", "probably", "✓", "✔", "1"}
+_NO = {"n", "no", "never", "x", "✗", "0"}
 
 _NOTE_RULES: tuple[tuple[LabelTag, str], ...] = (
     ("needs_warmup", r"warm-?up|warmed up"),
@@ -37,13 +37,28 @@ _NOTE_RULES: tuple[tuple[LabelTag, str], ...] = (
 _NOTE_PATTERNS = tuple((tag, re.compile(rx, re.IGNORECASE)) for tag, rx in _NOTE_RULES)
 
 
+_PUNCT = "!.,;:()?…\"'"
+_ISH = re.compile(r"\bish\b", re.IGNORECASE)
+
+
+def _split_good(value: str | None) -> tuple[str, str]:
+    """Return (first word, lower-cased, punctuation-stripped; remainder text)."""
+    v = (value or "").strip().lower()
+    if not v:
+        return "", ""
+    first, _, rest = v.partition(" ")
+    return first.strip(_PUNCT), rest
+
+
 def parse_good(value: str | None) -> Literal["yes", "no", "maybe"] | None:
     v = (value or "").strip().lower()
     if not v:
         return None
-    if v in _YES:
-        return "yes"
-    if v in _NO:
+    word, rest = _split_good(v)
+    if word in _YES:
+        # "yes, ish" / "yes (ish)": Andrew hedged, so treat as maybe.
+        return "maybe" if _ISH.search(rest) else "yes"
+    if word in _NO:
         return "no"
     return "maybe"
 
@@ -51,6 +66,11 @@ def parse_good(value: str | None) -> Literal["yes", "no", "maybe"] | None:
 def parse_note(note: str | None) -> set[LabelTag]:
     text = note or ""
     return {tag for tag, rx in _NOTE_PATTERNS if rx.search(text)}
+
+
+def row_tags(good: str | None, notes: str | None) -> set[LabelTag]:
+    """Tags from the Notes column plus any qualifier text after the first word of good?."""
+    return parse_note(notes) | parse_note(_split_good(good)[1])
 
 
 @dataclass
