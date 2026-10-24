@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -411,3 +412,82 @@ async def test_mixed_failures_in_the_first_batch_are_per_song(frames, monkeypatc
     assert out["systematic"] is None and out["failed"] == 3
     assert {fs.cols[FETCH][p]["status"] for p in pids} == {"failed"}
     assert all(fs.cols[FETCH][p]["error"].startswith("analysis: ") for p in pids)
+
+
+@pytest.mark.parametrize(
+    ("uri", "found"),
+    [
+        ("voice-pool/stems/p/vocals.flac", True),  # gen's bare object name: the gen bucket
+        (f"gs://{GEN}/voice-pool/stems/p/vocals.flac", True),
+        ("gs://", False),
+        (f"gs://{GEN}", False),
+        (f"gs://{GEN}/", False),
+        ("", False),
+        ("   ", False),
+        (None, False),
+        (123, False),
+        ("voice-pool/stems/other/vocals.flac", False),  # no such object
+    ],
+)
+def test_vocals_blob_accepts_bare_names_and_rejects_malformed(uri, found) -> None:
+    gcs = FakeGcs()
+    gcs.bucket(GEN).objects["voice-pool/stems/p/vocals.flac"] = b"fake flac"
+    blob = analyse._vocals_blob(gcs, uri)
+    assert (blob is not None) == found
+    if found:
+        assert blob.name == "voice-pool/stems/p/vocals.flac"
+
+
+async def test_gen_result_line_through_collect_and_analyse_ends_analysed(frames) -> None:
+    """Cross-contract regression (2026-10-23 incident): gen's worker writes ``vocals`` as a bare
+    object name; collect_results + analyse must still find the stem and mark the song analysed."""
+    from karaoke_decide.voice_pool import separate
+
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    (pid,) = await _seed(fs, gcs, SONGS[:1])
+    stem = f"voice-pool/stems/{pid}/vocals.flac"
+    await fs.update_document(FETCH, pid, {"status": "separating", "manifest_run": "r1", "vocals_gcs": None,
+                                          "separating_at": datetime.now(UTC)})  # fmt: skip
+    line = {"id": pid, "ok": True, "vocals": stem, "seconds": 38.2, "error": None}  # gen's exact shape
+    gcs.bucket(GEN).objects["voice-pool/manifests/r1.results/part-0.jsonl"] = (json.dumps(line) + "\n").encode()
+
+    assert await separate.collect_results(fs, gcs, "r1") == (1, 0)
+    out = await analyse.run_analyse(fs, gcs, bq, run="a1", limit=None, task_index=0, task_count=1)
+
+    assert (out["analysed"], out["failed"]) == (1, 0)
+    assert fs.cols[FETCH][pid]["status"] == "analysed" and fs.cols[FETCH][pid]["markers"] is not None
+
+
+async def test_bare_vocals_name_already_in_queue_is_analysed(frames) -> None:
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    (pid,) = await _seed(fs, gcs, SONGS[:1])
+    await fs.update_document(FETCH, pid, {"vocals_gcs": f"voice-pool/stems/{pid}/vocals.flac"})
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert out["analysed"] == 1 and fs.cols[FETCH][pid]["status"] == "analysed"
+
+
+async def test_run_with_every_song_missing_vocals_is_one_error(frames, caplog) -> None:
+    """The incident run: 20 listed, 0 analysed, 20 failed as missing, yet all_failed was False."""
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    pids = await _seed(fs, gcs, SONGS[: analyse.ALL_FAILED_MIN], with_stem=False)
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert (out["listed"], out["analysed"], out["failed"], out["all_failed"]) == (len(pids), 0, len(pids), True)
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert (
+        len(errors) == 1
+        and errors[0].getMessage() == "voice analysis: every song of the run failed; see the WARNINGs above"
+    )
+
+
+async def test_few_missing_or_some_analysed_is_not_all_failed(frames, caplog) -> None:
+    fs, gcs, bq = MemoryFs(), FakeGcs(), FakeBq()
+    await _seed(fs, gcs, SONGS[: analyse.ALL_FAILED_MIN - 1], with_stem=False)
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert out["all_failed"] is False  # a handful of missing stems is per-song WARNINGs only
+
+    fs, gcs = MemoryFs(), FakeGcs()
+    missing = await _seed(fs, gcs, SONGS[:6], with_stem=False)
+    await _seed(fs, gcs, [LALAS])
+    out = await analyse.run_analyse(fs, gcs, bq, run="r", limit=None, task_index=0, task_count=1)
+    assert (out["analysed"], out["failed"], out["all_failed"]) == (1, len(missing), False)
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]

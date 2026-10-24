@@ -23,8 +23,12 @@ Queue outcomes, all terminal so the hourly fetch never restarts this job for the
 * ``analysed`` with ``markers: None`` and ``analysis_note: "too_little_voice"`` when the stem has
   under 3c's ``MIN_VOICED_S`` (20 s) of voice (INFO; no BigQuery row or CSV line);
 * ``failed`` when the vocals object is missing (WARNING) or decoding/analysis raises (WARNING;
-  ONE ERROR, from task 0 only, when every song of the run failed that way: ``all_failed``, and
-  the CLI then skips the publish).
+  ONE ERROR, from task 0 only, when every song of the run failed that way, or when a run of
+  ``ALL_FAILED_MIN``+ songs analysed none and all failed, missing vocals included:
+  ``all_failed``, and the CLI then skips the publish).
+
+``vocals_gcs`` is a ``gs://bucket/name`` URI or a bare object name in the gen bucket (gen's
+separation worker writes the latter; ``collect_results`` normalises it).
 
 A transient storage error while fetching a song's vocals (503, 500, 429, deadline, connection)
 is a WARNING and leaves that song ``separated`` for the next run: its audio cost Spotify budget.
@@ -286,9 +290,17 @@ def _csv_row(doc: dict[str, Any], m: SongMarkers) -> dict[str, str]:
 
 
 def _vocals_blob(gcs: Any, uri: str | None) -> Any | None:
-    if not uri or not uri.startswith("gs://") or "/" not in uri[5:]:
+    """The vocals blob when it exists. ``uri`` is ``gs://bucket/name`` or a bare object name in the
+    gen bucket (what gen's separation worker writes); None / empty / no object -> None (missing)."""
+    if not isinstance(uri, str) or not uri.strip():
         return None
-    bucket, name = uri[5:].split("/", 1)
+    uri = uri.strip()
+    if uri.startswith("gs://"):
+        bucket, _, name = uri[5:].partition("/")
+    else:
+        bucket, name = GEN_BUCKET, uri.lstrip("/")
+    if not bucket or not name:
+        return None
     blob = gcs.bucket(bucket).blob(name)
     return blob if _infra(f"check {uri}", blob.exists) else None
 
@@ -419,16 +431,34 @@ async def run_analyse(
         "too_little_voice": done[TOO_LITTLE_VOICE],
         "failed": done["missing"] + done["error"],
         "deferred": work.deferred,
-        "all_failed": bool(done["error"]) and done["error"] == len(todo),
+        "all_failed": _all_failed(done, len(todo)),
         "blocked": blocked,
         "systematic": systematic,
     }
     if summary["all_failed"] and not systematic:
-        # A real failure (bad image, broken decoder): one ERROR per execution, from task 0.
+        # A real failure (bad image, broken decoder, stems not where we look): one ERROR per
+        # execution, from task 0.
         log = logger.error if task_index == 0 else logger.warning
-        log("voice analysis %s: every song failed (%d); see the WARNINGs above", run, done["error"])
+        log(
+            "voice analysis: every song of the run failed; see the WARNINGs above",
+            extra={
+                "json_fields": {"run": run, "listed": len(todo), "missing": done["missing"], "error": done["error"]}
+            },
+        )
     logger.info("voice analysis done: %s", summary)
     return summary
+
+
+ALL_FAILED_MIN = 5  # a run of at least this many songs with none analysed is never "a few bad stems"
+
+
+def _all_failed(done: Counter[str], listed: int) -> bool:
+    """Every song raised, or (``ALL_FAILED_MIN``+ songs) none was analysed and all failed, missing
+    vocals included: then the CLI skips the publish and ONE ERROR reaches #alerts."""
+    failed = done["missing"] + done["error"]
+    if done["error"] and done["error"] == listed:
+        return True
+    return listed >= ALL_FAILED_MIN and failed == listed
 
 
 async def _analyse_one(

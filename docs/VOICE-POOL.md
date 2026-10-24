@@ -199,6 +199,22 @@ for doc in db.collection("voice_pool_fetch").where("status", "==", "failed").str
 
 Download and separation failures have other `error` texts and are not touched by this.
 
+### Songs failed as "vocals stem missing" by a bare `vocals_gcs` (2026-10-23, fixed in v0.28.1)
+
+gen's separation worker writes `vocals` as a bare object name (`voice-pool/stems/<id>/vocals.flac`).
+Before v0.28.1 decide stored it verbatim and analyse only accepted `gs://` URIs, so every
+separated song was marked `failed` ("vocals stem missing"). `collect_results` now stores the
+`gs://` URI and analyse accepts either form. To put the affected songs back (Firestore write,
+`/gcp-admin`; it checks each stem exists and leaves `attempts` alone):
+
+```bash
+python scripts/voice/repair_failed_vocals.py --project nomadkaraoke --dry-run
+python scripts/voice/repair_failed_vocals.py --project nomadkaraoke --apply
+```
+
+A run of 5 or more songs in which none was analysed (all failed, missing vocals included) now sets
+`all_failed`: one ERROR, "voice analysis: every song of the run failed", and no publish.
+
 ## Cost
 
 These are estimates. Replace them with measured numbers after the first day (see

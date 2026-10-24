@@ -98,6 +98,15 @@ class CloudRunJobRunner:
         return False
 
 
+def gen_uri(name: str | None) -> str | None:
+    """gen's result ``vocals`` as a ``gs://`` URI: gen writes a bare object name in its own bucket
+    (``voice-pool/stems/<id>/vocals.flac``); a ``gs://`` URI is kept as is, empty -> None."""
+    if not isinstance(name, str) or not name.strip():
+        return None
+    name = name.strip()
+    return name if name.startswith("gs://") else f"gs://{GEN_BUCKET}/{name.lstrip('/')}"
+
+
 def canonical_audio(pid: str) -> str:
     return f"gs://{GEN_BUCKET}/voice-pool/audio/{pid}/original.flac"
 
@@ -207,7 +216,7 @@ async def collect_results(
 ) -> tuple[int, int]:
     """Apply run ``run``'s separation results; returns ``(separated, sent_back)``.
 
-    ``ok`` -> ``separated`` with ``vocals_gcs``; not ok -> ``fetched`` with ``attempts += 1``
+    ``ok`` -> ``separated`` with ``vocals_gcs`` (gen's bare object name made a gen-bucket URI); not ok -> ``fetched`` with ``attempts += 1``
     (``failed`` at ``MAX_ATTEMPTS``). Songs with no result after ``STALE_AFTER_S`` go back to
     ``fetched`` with ``attempts += 1`` too (``requeue_stale=False`` while a separation execution
     is still running).
@@ -224,7 +233,11 @@ async def collect_results(
         res = results.get(doc["id"])
         update: dict[str, Any]
         if res is not None and res.get("ok"):
-            update = {"status": "separated", "vocals_gcs": res.get("vocals"), "separation_s": res.get("seconds")}
+            update = {
+                "status": "separated",
+                "vocals_gcs": gen_uri(res.get("vocals")),
+                "separation_s": res.get("seconds"),
+            }
             update["error"] = None
             separated += 1
         elif res is not None:

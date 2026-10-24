@@ -236,3 +236,25 @@ async def test_failed_manifest_write_reverts_claims(fs, runner):
         doc = fs.cols[FETCH][i["id"]]
         assert (doc["status"], doc["manifest_run"], doc["separating_at"]) == ("fetched", None, None)
     assert runner.calls == []
+
+
+@pytest.mark.parametrize(
+    ("vocals", "expected"),
+    [
+        ("voice-pool/stems/x/vocals.flac", f"gs://{GEN}/voice-pool/stems/x/vocals.flac"),  # what gen writes
+        ("/voice-pool/stems/x/vocals.flac", f"gs://{GEN}/voice-pool/stems/x/vocals.flac"),
+        ("gs://other-bucket/a/b.flac", "gs://other-bucket/a/b.flac"),
+        ("", None),
+        (None, None),
+        (42, None),
+    ],
+)
+def test_gen_uri_normalises_gens_bare_object_names(vocals, expected):
+    assert separate.gen_uri(vocals) == expected
+
+
+async def test_results_with_gens_bare_vocals_name_store_a_gs_uri(fs, gcs):
+    (a,) = (i["id"] for i in await fetched(fs, 1, status="separating", manifest_run="r1", separating_at=at(1)))
+    _results(gcs, "r1", 0, [{"id": a, "ok": True, "vocals": f"voice-pool/stems/{a}/vocals.flac", "seconds": 9.0}])
+    assert await separate.collect_results(fs, gcs, "r1", now=lambda: NOW) == (1, 0)
+    assert fs.cols[FETCH][a]["vocals_gcs"] == f"gs://{GEN}/voice-pool/stems/{a}/vocals.flac"
