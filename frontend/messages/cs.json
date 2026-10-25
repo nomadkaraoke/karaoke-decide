@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Snímek obrazovky",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Zpíváno na karaoke",
+      "manual": "Přidáno tebou"
     }
   },
   "common": {

@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Skjermbilde",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Sunget på karaoke",
+      "manual": "Lagt til av deg"
     }
   },
   "common": {

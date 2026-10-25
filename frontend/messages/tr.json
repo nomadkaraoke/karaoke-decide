@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Ekran Görüntüsü",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Karaokede söylendi",
+      "manual": "Senin eklediğin"
     }
   },
   "common": {

@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Snímka obrazovky",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Zaspievané na karaoke",
+      "manual": "Pridal/a si ty"
     }
   },
   "common": {

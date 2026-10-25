@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "स्क्रीनशॉट",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "कराओके में गाया गया",
+      "manual": "तुम्हारे द्वारा जोड़ा गया"
     }
   },
   "common": {

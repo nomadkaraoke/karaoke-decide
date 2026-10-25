@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "ภาพหน้าจอ",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "ร้องที่คาราโอเกะแล้ว",
+      "manual": "คุณเพิ่มเอง"
     }
   },
   "common": {

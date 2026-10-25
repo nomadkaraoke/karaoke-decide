@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "스크린샷",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "노래방에서 부름",
+      "manual": "직접 추가함"
     }
   },
   "common": {

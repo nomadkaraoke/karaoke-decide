@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Capture d'écran",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Chanté au karaoké",
+      "manual": "Ajouté par toi"
     }
   },
   "common": {

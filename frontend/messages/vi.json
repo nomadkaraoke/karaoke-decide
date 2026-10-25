@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Ảnh chụp màn hình",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Đã hát karaoke",
+      "manual": "Do bạn thêm"
     }
   },
   "common": {

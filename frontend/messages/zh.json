@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "截图",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "在KTV唱过",
+      "manual": "由你添加"
     }
   },
   "common": {

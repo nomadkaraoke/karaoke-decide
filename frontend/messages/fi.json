@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Kuvankaappaus",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Laulettu karaokessa",
+      "manual": "Sinun lisäämäsi"
     }
   },
   "common": {

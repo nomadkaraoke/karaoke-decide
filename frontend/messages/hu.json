@@ -811,8 +811,8 @@
     },
     "sourceBadge": {
       "screenshot": "Képernyőkép",
-      "karaokeLog": "Sung at karaoke",
-      "manual": "Added by you"
+      "karaokeLog": "Karaokén énekelve",
+      "manual": "Te adtad hozzá"
     }
   },
   "common": {
