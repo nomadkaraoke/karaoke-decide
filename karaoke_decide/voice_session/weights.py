@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from karaoke_decide.voice_session.model import Evidence
 
 W_QUIZ = 1.0
-W_PITCH_HEADPHONES = 2.0
+W_PITCH_HEADPHONES = 1.5
 W_PITCH_OPEN = 1.0
 # Tessitura (model.likelihood_tessitura): where a song rated comfortable was actually sung, against each
 # hypothesis's comfortable band. TESS_TEMP softens the band edges; TESS_SD is how far (semitones) the sung
@@ -45,7 +45,7 @@ OCTAVE_PRIOR: dict[int, float] = {0: 0.6, -12: 0.2, 12: 0.2}
 
 # Next-song choice (select.choose_next): score = like·know·((1 − SEP_WEIGHT)·EIG + SEP_WEIGHT·separation);
 # like = LIKE_BASE + (1 − LIKE_BASE)·max(pref, 1 if loved), so an unliked song keeps LIKE_BASE of its score.
-SEP_WEIGHT = 0.5
+SEP_WEIGHT = 0.3
 LIKE_BASE = 0.6
 
 CONDITIONAL_REASONS = frozenset({"warmer", "practice"})

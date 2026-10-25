@@ -185,3 +185,38 @@ def test_confidently_wrong_within_k() -> None:
         assert stats.confidently_wrong_within[k] == pytest.approx(sum(wrong) / 30)
         assert stats.confidently_wrong_within[k] <= stats.confident_within[k]
     assert "wrong≤5" in stats.describe()
+
+
+# ---------------------------------------------------------------- 3-5 song gates (E5)
+
+GATE_SEED = 20261025
+GATE_N = 300
+
+
+def test_converges_within_5_songs_mic_prior_with_pitch() -> None:
+    """Realistic singers (comfortable inside their full range), the 3c mic test as prior, on-device pitch."""
+    hp = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="mic", pitch="headphones", budget=10, answer_style="realistic"
+    )
+    print(f"\nmic + headphones, realistic answers: {hp.describe()}")
+    assert hp.exact_at[5] >= 0.70, hp
+    assert hp.adjacent_at[5] >= 0.92, hp
+    assert hp.confident_within[5] >= 0.50, hp
+    assert hp.confidently_wrong_within[5] <= 0.10, hp
+    open_mic = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="mic", pitch="open", budget=10, answer_style="realistic"
+    )
+    print(f"mic + open mic, realistic answers: {open_mic.describe()}")
+    assert open_mic.exact_at[5] >= 0.60, open_mic
+
+
+def test_quiz_only_budget_report() -> None:
+    """Not gated: quiz answers alone from a flat start, realistic singers, after 3-5 songs."""
+    stats = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="uniform", pitch="none", budget=10, answer_style="realistic"
+    )
+    print(
+        "\nquiz-only uniform prior, realistic answers: "
+        + " ".join(f"exact@{k}={stats.exact_at[k]:.0%}" for k in (3, 4, 5))
+    )
+    assert all(0.0 <= stats.exact_at[k] <= 1.0 for k in (3, 4, 5))

@@ -113,3 +113,39 @@ def test_fixture_round_trips_through_json(tmp_path: Path) -> None:
     out = tmp_path / "fx.json"
     out.write_text(json.dumps(_fixture()))
     assert replay.replay_fixture(replay.load_fixture(out)) == replay.replay_fixture(_fixture())
+
+
+def _relabelled(fx: dict[str, Any], falsetto_from: float = 69.0) -> dict[str, Any]:
+    """Notes at or above ``falsetto_from`` labelled falsetto: held_high capped below it, percentiles kept."""
+    out = copy.deepcopy(fx)
+    for a in out["attempts"]:
+        p = a["pitch"]
+        if p and p["held_high"] >= falsetto_from:
+            p["held_high"] = falsetto_from - 1
+    return out
+
+
+def _trace_lines(trace: list[Any]) -> str:
+    return "\n".join(
+        f"  {i}: {s.voice_type} top {s.top_p:.2f} pair {s.pair_p:.2f} {s.confidence_label} "
+        f"comfort {s.comfort} ({s.comfort_source}) full {s.full}"
+        for i, s in enumerate(trace, 1)
+    )
+
+
+def test_andrew_replay() -> None:
+    """The binding real-world gate: Andrew's 4 songs, A4 (69) relabelled falsetto, are baritone at medium or high
+    confidence with comfort within ±2 of (49, 59). Andrew's true type is assumed baritone (A#2-A#4 vs 45-69)."""
+    trace = replay.replay_fixture(_relabelled(_fixture()))
+    print("\nAndrew, 69+ relabelled falsetto:\n" + _trace_lines(trace))
+    last = trace[3]
+    assert last.voice_type == "baritone"
+    assert last.confidence_label in ("medium", "high")
+    assert abs(last.comfort[0] - 49) <= 2 and abs(last.comfort[1] - 59) <= 2, last.comfort
+
+
+def test_andrew_replay_unlabelled_report() -> None:
+    """Not gated: the same replay with the falsetto notes left in (what today's app sends)."""
+    trace = replay.replay_fixture(_fixture())
+    print("\nAndrew, as recorded:\n" + _trace_lines(trace))
+    assert len(trace) == 4

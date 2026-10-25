@@ -58,7 +58,7 @@ def test_stopped_early_miss_discounted() -> None:
 def test_pitch_weight_headphones_vs_open() -> None:
     assert evidence_weight(evidence(S, c=ctx(headphones=True)), "pitch") == pytest.approx(W_PITCH_HEADPHONES)
     assert evidence_weight(evidence(S, c=ctx(headphones=False)), "pitch") == pytest.approx(W_PITCH_OPEN)
-    assert (W_PITCH_HEADPHONES, W_PITCH_OPEN) == (2.0, 1.0)
+    assert (W_PITCH_HEADPHONES, W_PITCH_OPEN) == (1.5, 1.0)
 
 
 def test_unknown_knew_uses_default() -> None:

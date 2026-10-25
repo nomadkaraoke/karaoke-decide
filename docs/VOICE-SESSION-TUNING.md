@@ -8,15 +8,16 @@ measured two ways:
    `scripts/voice/export_session_fixture.py`.
 
 Plan: nomadkaraoke workspace `docs/archive/2026-10-25-mobile-phase3d-tuning-batch-1-plan.md` (Part E).
-This page records the **baseline before any tuning (Task E1, v0.31.x weights)**. E2–E5 add their
-before/after numbers below it.
+This page records the **baseline before any tuning (Task E1, v0.31.x weights)**, then the
+[tuning batch 1 results (E2–E5, D1, v0.32.0)](#tuning-batch-1-e2e5-d1-v0320) below it.
 
 ## How to run
 
 ```bash
-poetry run python scripts/voice/sim_report.py              # seed 20261025, n 300 per row, ~35 s
-poetry run python scripts/voice/sim_report.py --n 60 --priors mic --pitches headphones
-poetry run pytest tests/unit/voice_session/test_replay.py -q
+poetry run python scripts/voice/sim_report.py              # both answer styles, seed 20261025, n 300 per row, ~3 min
+poetry run python scripts/voice/sim_report.py --n 60 --priors mic --pitches headphones --styles realistic
+poetry run python scripts/voice/sim_grid.py                # coordinate-wise weight search against every gate, ~3 min on 8 cores
+poetry run pytest tests/unit/voice_session/test_replay.py -q -s   # prints Andrew's replay traces
 # export a real session (prod Firestore, read-only; needs Andrew's credentials):
 python scripts/voice/export_session_fixture.py --email <e> --session <id> --out tests/unit/voice_session/fixtures/<name>.json
 ```
@@ -173,3 +174,201 @@ named baritone instead of bass, the result after 4 songs is the same: baritone .
 3. **The stability gate dominates the label for late flips.** E3's centred, floored mic prior should make
    early songs move the estimate less abruptly. If the replay still ends "low" only because of the window,
    consider letting the stability window count from the first attempt with usable pitch.
+
+## Tuning batch 1 (E2–E5, D1, v0.32.0)
+
+### What changed
+
+| task | change | where |
+|---|---|---|
+| E2 | **Tessitura**: a song rated comfortable counts its sung p10/p50/p90 against each hypothesis's comfortable band: `σ((c_hi − p90 + 1)/TESS_TEMP)·σ((p10 − c_lo + 1)/TESS_TEMP)·exp(−(p50 − centre)²/(2·TESS_SD²))`, weighted `W_TESSITURA · K_KNEW`. | `model.likelihood_tessitura` |
+| E3 | **Range-shaped prior**: a mic or session profile with a comfort band gives `PRIOR_FLOOR + (1 − PRIOR_FLOOR)·exp(−(centre(h) − (band centre + MIC_BIAS))²/(2·PRIOR_SD²))` over all 30 hypotheses. The named type is no longer used. Self reports are unchanged. | `model.Posterior.from_profile` |
+| E4 | **Selection**: `like · know · ((1 − SEP_WEIGHT)·EIG + SEP_WEIGHT·separation) − stratum penalty`. `separation` is the TV distance between the top two types' answer distributions × their mass; `like = LIKE_BASE + (1 − LIKE_BASE)·max(pref, loved)`. The first song's familiar pool is taste-weighted. | `select.choose_next` |
+| D1 | **Measured comfort**: once ≥ 2 songs (≥ 60 s voiced) were rated comfortable and easy, known better than "barely", with usable pitch, comfort is the voiced-seconds-weighted mean of their p10/p90, each kept inside that song's held notes, clamped inside the full estimate. `comfort_source` says which. | `comfort.measured_comfort`, `stopping.summary` |
+| E5 | **Realistic simulated singers** and a **confidently-wrong** metric (below), four rulings, then a weight grid. | `simulate.py`, `stopping.py`, `model.py`, `weights.py` |
+
+### Realistic simulated singers (`answer_style="realistic"`)
+
+The E1 sim answered from the model's own likelihoods. Because selection probes the type boundaries, it said
+too_high / too_low far more readily than real singers do. Andrew said "comfortable" 4/4, including to a song he
+could only finish in falsetto.
+
+- A song whose sung body (p10..p90 at the sung octave) stays inside the singer's **full** chest range is answered
+  "comfortable" with probability `REALISTIC_COMFORT_P = 0.8`; otherwise it gets the model-likelihood answer.
+- Songs that leave the full range always get the model-likelihood answer, so too_high / too_low come only from them.
+- Difficulty is always the model-likelihood answer, so a song past the comfortable band is often "comfortable,
+  but a stretch", as Andrew's song 3 was.
+- The position likelihood was not tuned, so the singer's fallback answers are the v0.31 response model, not a
+  moving target.
+- `answer_style="model"` (the default for `simulate`/`run_population`) keeps the old behaviour, so the existing
+  gates (`test_simulated_users_converge`) keep their meaning.
+
+**`confidently_wrong_within[k]`** is the share of singers whose session stopped "confident" (medium or high)
+within k songs with the wrong exact type.
+
+### Rulings (beyond the plan's grid)
+
+1. **Tessitura and measured comfort only from songs rated comfortable *and easy*.** "Comfortable, but a stretch"
+   means the song reached past the comfortable band. Andrew's song 3 was exactly that: chest to 68, falsetto to
+   69, p90 69.1 still in the percentiles after relabelling. Counting it pulled him toward tenor and would have
+   set comfort to 53–62. Same rule in `model.tessitura_applies` and `comfort.counts_for_comfort`.
+2. **No octave shift of the pitch.** The plan said to "shift back by the sung octave". The percentiles are already
+   the singer's own notes in the octave they sang, so shifting them by `sung_octave` would move a baritone's
+   octave-down female song into mezzo range. They are compared as sung (`test_tessitura_uses_the_pitch_as_sung_in_any_octave`).
+3. **Stability: a measured comfort settles the range.** E1 found that "low" after 4 songs came from the 2-song
+   stability window on the *model's* comfort estimate, which jumps when the MAP type flips. Now
+   `_enough_evidence` also passes when `measured_comfort` exists, since that is what the result shows and it
+   doesn't move with the type. `MIN_RANGE_ATTEMPTS = 3` still applies.
+4. **Early "between" stops need a clear lean**: within `MEDIUM_LEAN_UNTIL = 5` songs, "medium" also needs the top
+   type ≥ `MEDIUM_MIN_TOP = 0.7`. After 5 songs a settled adjacent pair stops as before.
+   - Adjacent types share ranges at the ends of their shifts: baritone+1/+2 ≡ tenor−2/−1, alto+2 ≡ mezzo−2,
+     mezzo+1/+2 ≡ soprano−2/−1. A third of the 30 hypotheses are a coin flip on the exact type, so a ~50/50
+     pair is most often the confidently-wrong case.
+   - Without this rule, confidently-wrong@5 was 23–27% under every weight tried.
+   - Applying the floor at every length would have regressed the existing gate (self-register, quiz-only:
+     confident≤10 98% → 68%, gate ≥ 80%). Hence the 5-song limit.
+5. **The held top is robust to one missed falsetto note.** The upper bound of `likelihood_pitch` never drops
+   below `HELD_HIGH_FALSETTO_P = 0.3`. A single falsetto note in `held_high` (the sim leaks one into 30% of songs;
+   Andrew's song 3) was ruling the true type out at `W_PITCH`². It drove most remaining confident-wrong answers,
+   all of them "one type too high". The lower bound is unchanged, since falsetto only goes up.
+
+### Gates (seed 20261025, n = 300, realistic answers, mic prior)
+
+| gate | E1 baseline (v0.31) | v0.32.0 | |
+|---|---|---|---|
+| headphones exact@5 ≥ 70% | 70% | **81%** | pass |
+| headphones adjacent@5 ≥ 92% | 100% | **100%** | pass |
+| headphones confident≤5 ≥ 50% | 99% | **58%** | pass |
+| headphones confidently-wrong≤5 ≤ 10% | 30% | **5%** | pass |
+| open-mic exact@5 ≥ 60% | 74% | **77%** | pass |
+| Andrew replay (69+ falsetto) after 4: baritone, medium/high, comfort (49, 59) ± 2 | baritone .74, low, 51–65 | **baritone .82, high, 50–58** | pass |
+| existing: model answers, self-register, no pitch (seed 20261022, n 200): confident≤10 ≥ 80%, adjacent ≥ 90%, exact ≥ 70% | pass | **98% / 100% / 82%** | pass |
+
+The E1 sim's 99% confident within 5 songs came with 30% of singers confidently wrong. v0.32 stops later (58%)
+and is wrong a sixth as often.
+
+### Before / after: simulation (seed 20261025, n = 300 per row, sessions capped at 10)
+
+Columns are exact / exact-or-adjacent / stopped confident / stopped confident and wrong, after k = 3 · 4 · 5 · 10 songs.
+The "before" rows are the E1 code (v0.31 weights) run with the same realistic-answer logic.
+
+**Realistic answers, before (v0.31):**
+
+| prior | pitch | exact | adjacent | confident | confidently wrong |
+|---|---|---|---|---|---|
+| self_register | none | 67 · 69 · 71 · 72 % | 93 · 95 · 98 · 99 % | 0 · 42 · 66 · 97 % | 0 · 14 · 20 · 26 % |
+| self_register | headphones | 71 · 69 · 70 · 70 % | 99 · 100 · 100 · 100 % | 68 · 92 · 99 · 100 % | 22 · 29 · 30 · 30 % |
+| self_register | open | 72 · 75 · 75 · 75 % | 100 · 100 · 100 · 100 % | 66 · 88 · 97 · 100 % | 20 · 23 · 24 · 25 % |
+| uniform | none | 57 · 62 · 65 · 69 % | 89 · 92 · 95 · 98 % | 0 · 32 · 56 · 97 % | 0 · 14 · 21 · 30 % |
+| uniform | headphones | 66 · 68 · 69 · 69 % | 99 · 99 · 99 · 99 % | 56 · 85 · 97 · 100 % | 18 · 26 · 30 · 31 % |
+| uniform | open | 65 · 67 · 68 · 68 % | 99 · 99 · 99 · 99 % | 64 · 87 · 98 · 100 % | 22 · 29 · 32 · 32 % |
+| mic | none | 67 · 70 · 72 · 73 % | 97 · 97 · 99 · 99 % | 10 · 57 · 77 · 98 % | 2 · 17 · 20 · 26 % |
+| mic | headphones | 70 · 71 · 70 · 70 % | 100 · 100 · 100 · 100 % | 68 · 88 · 99 · 100 % | 23 · 27 · 30 · 30 % |
+| mic | open | 72 · 74 · 74 · 74 % | 98 · 99 · 99 · 99 % | 76 · 92 · 99 · 100 % | 21 · 24 · 25 · 26 % |
+
+**Realistic answers, after (v0.32.0):**
+
+| prior | pitch | exact | adjacent | confident | confidently wrong |
+|---|---|---|---|---|---|
+| self_register | none | 65 · 68 · 70 · 75 % | 95 · 97 · 98 · 99 % | 1 · 9 · 23 · 95 % | 0 · 1 · 2 · 23 % |
+| self_register | headphones | 73 · 78 · 82 · 81 % | 99 · 100 · 100 · 100 % | 26 · 49 · 60 · 100 % | 2 · 5 · 7 · 19 % |
+| self_register | open | 73 · 76 · 78 · 78 % | 99 · 100 · 100 · 100 % | 26 · 46 · 59 · 100 % | 2 · 4 · 5 · 22 % |
+| uniform | none | 58 · 61 · 68 · 71 % | 88 · 93 · 96 · 99 % | 0 · 4 · 14 · 93 % | 0 · 0 · 1 · 26 % |
+| uniform | headphones | 71 · 75 · 78 · 78 % | 98 · 100 · 100 · 100 % | 23 · 43 · 56 · 100 % | 2 · 5 · 6 · 22 % |
+| uniform | open | 66 · 74 · 78 · 78 % | 98 · 99 · 99 · 100 % | 27 · 44 · 54 · 100 % | 3 · 4 · 6 · 22 % |
+| mic | none | 68 · 72 · 74 · 77 % | 95 · 97 · 98 · 99 % | 4 · 19 · 33 · 97 % | 1 · 3 · 5 · 22 % |
+| mic | headphones | 75 · 82 · 81 · 80 % | 100 · 100 · 100 · 100 % | 29 · 46 · 58 · 100 % | 2 · 4 · 5 · 20 % |
+| mic | open | 74 · 77 · 77 · 79 % | 100 · 100 · 100 · 100 % | 33 · 48 · 61 · 100 % | 5 · 6 · 6 · 21 % |
+
+**Model answers (old style), before (v0.31):**
+
+| prior | pitch | exact | adjacent | confident | confidently wrong |
+|---|---|---|---|---|---|
+| self_register | none | 66 · 73 · 75 · 77 % | 94 · 96 · 98 · 99 % | 1 · 39 · 69 · 99 % | 0 · 9 · 15 · 23 % |
+| self_register | headphones | 69 · 70 · 70 · 71 % | 99 · 99 · 99 · 99 % | 65 · 91 · 98 · 100 % | 23 · 27 · 29 · 29 % |
+| self_register | open | 77 · 77 · 79 · 79 % | 100 · 100 · 100 · 100 % | 70 · 91 · 99 · 100 % | 18 · 20 · 21 · 21 % |
+| uniform | none | 60 · 67 · 70 · 73 % | 91 · 95 · 96 · 98 % | 0 · 32 · 58 · 98 % | 0 · 10 · 19 · 26 % |
+| uniform | headphones | 68 · 68 · 69 · 70 % | 100 · 100 · 100 · 100 % | 54 · 84 · 97 · 100 % | 18 · 27 · 30 · 30 % |
+| uniform | open | 69 · 72 · 73 · 73 % | 99 · 100 · 100 · 100 % | 58 · 87 · 98 · 100 % | 17 · 24 · 27 · 27 % |
+| mic | none | 66 · 70 · 70 · 71 % | 94 · 95 · 97 · 99 % | 10 · 51 · 77 · 98 % | 3 · 16 · 21 · 28 % |
+| mic | headphones | 75 · 76 · 76 · 76 % | 100 · 100 · 100 · 100 % | 67 · 90 · 100 · 100 % | 17 · 23 · 24 · 24 % |
+| mic | open | 70 · 71 · 71 · 71 % | 100 · 100 · 100 · 100 % | 73 · 95 · 99 · 100 % | 21 · 28 · 29 · 29 % |
+
+**Model answers (old style), after (v0.32.0):**
+
+| prior | pitch | exact | adjacent | confident | confidently wrong |
+|---|---|---|---|---|---|
+| self_register | none | 71 · 73 · 76 · 79 % | 95 · 98 · 97 · 100 % | 1 · 10 · 30 · 99 % | 0 · 0 · 0 · 21 % |
+| self_register | headphones | 76 · 79 · 80 · 83 % | 99 · 100 · 100 · 100 % | 30 · 52 · 61 · 100 % | 2 · 4 · 5 · 17 % |
+| self_register | open | 77 · 79 · 81 · 81 % | 99 · 100 · 100 · 100 % | 26 · 46 · 58 · 100 % | 1 · 3 · 5 · 19 % |
+| uniform | none | 62 · 65 · 66 · 75 % | 89 · 92 · 94 · 98 % | 0 · 8 · 20 · 96 % | 0 · 1 · 2 · 24 % |
+| uniform | headphones | 73 · 77 · 82 · 81 % | 99 · 99 · 100 · 100 % | 18 · 40 · 54 · 100 % | 1 · 3 · 4 · 19 % |
+| uniform | open | 73 · 76 · 79 · 80 % | 99 · 99 · 100 · 100 % | 19 · 37 · 51 · 100 % | 2 · 3 · 3 · 20 % |
+| mic | none | 68 · 73 · 75 · 77 % | 96 · 97 · 99 · 99 % | 3 · 20 · 38 · 97 % | 0 · 2 · 4 · 23 % |
+| mic | headphones | 76 · 79 · 84 · 84 % | 100 · 100 · 100 · 100 % | 30 · 49 · 59 · 100 % | 2 · 4 · 4 · 16 % |
+| mic | open | 73 · 77 · 76 · 77 % | 100 · 100 · 100 · 100 % | 27 · 45 · 57 · 100 % | 5 · 6 · 7 · 23 % |
+
+Quiz-only from a flat start (realistic answers, not gated): exact@3·4·5 = 58 · 61 · 68% (v0.31: 57 · 62 · 65%).
+
+### Weight grid (`scripts/voice/sim_grid.py`)
+
+Coordinate-wise over the plan's grid, objective exact@5 (realistic, mic, headphones), keeping only settings that
+pass every gate above. The four rulings were in place first. Every setting tried passed all gates (38 of 38).
+
+| knob | grid | v0.31 | E2–E4 start | v0.32.0 |
+|---|---|---|---|---|
+| `W_PITCH_HEADPHONES` | 1.5 · 2 · 3 | 1.5 | 2.0 | **1.5** |
+| `W_PITCH_OPEN` | (not gridded) | 0.6 | 1.0 | **1.0** |
+| `W_TESSITURA` | 1 · 2 · 3 | – | 1.0 | **1.0** |
+| `TESS_SD` | 2.5 · 3 · 4 | – | 3.0 | **3.0** |
+| `PRIOR_SD` | 2.5 · 3 · 4 | – | 3.0 | **3.0** |
+| `SEP_WEIGHT` | 0.3 · 0.5 · 0.7 | – | 0.5 | **0.3** |
+| `LIKE_BASE` | 0.5 · 0.6 · 0.8 | – (`PREF_WEIGHT` 0.03) | 0.6 | **0.6** |
+| `PRIOR_FLOOR`, `MIC_BIAS`, `TESS_TEMP`, `HELD_HIGH_FALSETTO_P`, `MEDIUM_MIN_TOP`, `MEDIUM_LEAN_UNTIL` | (not gridded) | – | – | 0.25, +1 mic / 0 session, 1.0, 0.3, 0.7, 5 |
+
+Over the whole grid exact@5 ranged 74–81%. Changes of 1–2 points (3–6 singers in 300) are seed noise.
+`W_TESSITURA` 2–3 makes Andrew more certain (baritone .92–.96) but raises sim confidently-wrong to 8–10%.
+`SEP_WEIGHT` 0.7 costs the existing gate 4 points of confident≤10.
+
+### Andrew's replay after tuning (v0.32.0)
+
+69+ relabelled falsetto (`held_high` capped at 68, percentiles kept). This is the gate (`test_andrew_replay`):
+
+| after song | type | top_p | pair_p | label | comfort | source | full |
+|---|---|---|---|---|---|---|---|
+| 1 | baritone | .62 | .91 | low | 49–63 | model | 44–68 |
+| 2 | baritone | .62 | .92 | low | 48–62 | model | 43–67 |
+| 3 | baritone | .69 | .98 | low | 50–64 | model | 45–69 |
+| 4 | baritone | .82 | .98 | **high** | **50–58** | measured | 45–69 |
+
+As recorded, falsetto left in (what today's app sends; not gated):
+
+| after song | type | top_p | pair_p | label | comfort | source | full |
+|---|---|---|---|---|---|---|---|
+| 1 | baritone | .62 | .91 | low | 49–63 | model | 44–68 |
+| 2 | baritone | .62 | .92 | low | 48–62 | model | 43–67 |
+| 3 | baritone | .67 | .99 | low | 51–65 | model | 46–70 |
+| 4 | baritone | .80 | .98 | **high** | **50–58** | measured | 45–69 |
+
+- **Baritone from song 1.** The range-shaped prior reads the mic band (42–67, centre 54.5 + 1) instead of
+  "bass ×4".
+- **Song 3 still dips** because it is rated comfortable on a song whose demand reaches 69. Its tessitura no
+  longer counts (a stretch), and the held 68/69 no longer rules out baritone.
+- **Song 4 settles it.** Measured comfort from songs 1 and 4 (50.3–57.9) is available, the stability gate is met,
+  and top_p .82 ≥ .75 gives "high".
+- **Song 2** (known "barely") never counts toward the measured comfort.
+
+### Open issues and next levers
+
+1. **The exact type is ambiguous for a third of the hypothesis space.** Adjacent types share ranges at the ends of
+   their shifts. The ceiling on exact accuracy is about 83%, and most remaining errors are those pairs. A
+   type-free result (range + "between") would be the honest fix.
+2. **Confidently-wrong rises after 5 songs** (≈ 20% at 10). By design, a settled pair stops "between X and Y" after
+   5 songs, and the metric counts the 50% of those where the top type is the other one.
+3. **The realistic sim is still a model.** It doesn't simulate falsetto-rated songs, octave errors in the demand
+   analysis (Andrew's song 4 was sung 10 semitones below its demand), or wrong "knew" answers. Andrew's second
+   session (manual gate 3) is the real check.
+4. **C1 (chest-only pitch) is still needed.** The replay gate keeps the falsetto percentiles. The comfort comes
+   out right only because the falsetto song was also rated a stretch.
+5. **Excluded attempts (PR 1, A4) never enter `state.evidence`** once `rebuild_state` skips them. When PR 1 and
+   PR 2 meet, check that the exclude path also skips `state.evidence.append`.
