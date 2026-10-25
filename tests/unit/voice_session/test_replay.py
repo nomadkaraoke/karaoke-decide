@@ -13,6 +13,7 @@ import pytest
 
 from backend.services.voice_session_service import rebuild_state
 from karaoke_decide.voice_session import replay
+from karaoke_decide.voice_session.model import HYPOTHESES, likelihood_pitch
 from karaoke_decide.voice_session.stopping import summary
 
 FIXTURE = Path(__file__).parent / "fixtures" / "andrew_2026_10_25.json"
@@ -232,15 +233,28 @@ def test_pitch_all_means_pitch_is_already_chest_only() -> None:
     assert _shown(trusted) == _shown(replay.replay_fixture(_fixture()))
 
 
-def test_chest_pitch_cap_keeps_the_summary_ordered() -> None:
-    p = replay.PitchSummary(voiced_s=60, held_count=5, held_low=66, held_high=70, p10=60, p50=64, p90=69)
+def test_chest_pitch_caps_held_high_below_the_lowest_falsetto_note() -> None:
+    p = replay.PitchSummary(voiced_s=60, held_count=5, held_low=60, held_high=70, p10=61, p50=64, p90=69)
     labels = [{"t_start": 1, "t_end": 2, "midi": 66.4, "label": "falsetto", "source": "quiz"},
               {"t_start": 3, "t_end": 4, "midi": 60.0, "label": "unsure", "source": "quiz"}]  # fmt: skip
     out = replay.chest_pitch(p, labels, None)
-    assert out is not None and out.held_high == pytest.approx(65.4) and out.held_low == pytest.approx(65.4)
+    assert out == replay.PitchSummary(voiced_s=60, held_count=5, held_low=60, held_high=pytest.approx(65.4),
+                                      p10=61, p50=64, p90=69)  # fmt: skip
     assert replay.chest_pitch(p, labels[1:], None) == p  # unsure alone never caps
     assert replay.chest_pitch(p, labels, {"voiced_s": 1}) == p
     assert replay.chest_pitch(None, labels, None) is None
+
+
+def test_chest_pitch_with_every_held_note_falsetto_invents_no_chest_note() -> None:
+    """Review fix: when the cap falls below ``held_low``, every held note was falsetto. The summary keeps no held
+    chest evidence (``held_count`` 0, so ``likelihood_pitch`` is 1.0 for every type) instead of a made-up chest
+    note at the cap; the held bounds are left as sent."""
+    p = replay.PitchSummary(voiced_s=60, held_count=5, held_low=66, held_high=70, p10=60, p50=64, p90=69)
+    labels = [{"t_start": 1, "t_end": 2, "midi": 66.4, "label": "falsetto", "source": "quiz"}]
+    out = replay.chest_pitch(p, labels, None)
+    assert out is not None and out.held_count == 0
+    assert (out.held_low, out.held_high, out.p50) == (66, 70, 64)
+    assert {likelihood_pitch(h, out) for h in HYPOTHESES} == {1.0}
 
 
 def test_falsetto_high_from_labels_of_counting_attempts() -> None:

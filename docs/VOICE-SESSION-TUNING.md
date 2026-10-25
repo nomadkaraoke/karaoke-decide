@@ -414,9 +414,13 @@ No weights changed. What the model reads from an attempt:
 - **`pitch` is chest-only.** The app removes the spans the singer labelled falsetto before summarising and sends the
   unfiltered summary as `pitch_all` (stored, never read by the model) with the labels as `note_labels`.
 - **Ruling: labels without `pitch_all`** (`replay.chest_pitch`). Then `pitch` may still hold the falsetto notes,
-  so `held_high` is capped 1 semitone below the lowest falsetto-labelled note (and `held_low` with it if needed).
-  - Percentiles are kept. The measured comfort keeps them inside the held notes, and the gate's manual
-    relabelling (`_relabelled`) does the same.
+  so `held_high` is capped 1 semitone below the lowest falsetto-labelled note.
+  - If the cap falls below `held_low`, every held note was falsetto. No chest note is invented: the summary keeps
+    no held evidence (`held_count` 0). Then `likelihood_pitch` is 1.0, and tessitura, the measured comfort and range
+    evidence don't use this pitch.
+  - Percentiles are kept, as the gate's manual relabelling (`_relabelled`) does. The measured comfort clamps them
+    to the held notes, but `likelihood_tessitura` reads p10/p50/p90 unclamped. An old app's falsetto can still
+    lift the tessitura of a song rated comfortable and easy.
   - For Andrew's song 3 (8 held A4s, all confirmed falsetto) this is exactly the gate's relabelling
     (`test_falsetto_labels_without_pitch_all_cap_held_high`).
   - With `pitch_all` present, `pitch` is used as sent.

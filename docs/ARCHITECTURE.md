@@ -342,7 +342,8 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   singer's per-note falsetto / full / unsure answers: times on the take's clock, the MIDI note, live or quiz;
   numbers and labels only) and `voice_attempts.pitch_all` (the unfiltered pitch summary next to the chest-only
   `pitch`) go with their attempt docs in `erase_voice_data`. `voice_sessions.setup.experience` / `uses_falsetto`
-  (the optional singing background) and `result_summary.falsetto_high` go with the session docs. On the voice
+  (the optional singing background, also copied into each attempt's `voice_attempts.context`) and
+  `result_summary.falsetto_high` go with the session and attempt docs. On the voice
   profile (`decide_users.voice_profile`, `voice_profile_mic`), `falsetto_high`, `falsetto_low`, `experience` and
   `uses_falsetto` are cleared with the profile by `DELETE /api/my/voice` and go with the `decide_users` doc on
   account deletion. Asserted in `backend/tests/test_user_deletion.py`.

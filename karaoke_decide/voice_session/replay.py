@@ -67,9 +67,14 @@ def chest_pitch(
 
     The app sends a chest-only ``pitch`` together with the unfiltered ``pitch_all``; then ``pitch`` is used as
     sent. Labels with falsetto spans but no ``pitch_all`` mean ``pitch`` may still contain the falsetto notes, so
-    ``held_high`` (and ``held_low`` if needed, to stay ordered) is capped 1 semitone below the lowest
-    falsetto-labelled note. Percentiles are kept: the measured comfort keeps them inside the held notes
-    (``comfort._counted``), and the gate's manual relabelling did the same. "unsure" and "full" never cap.
+    ``held_high`` is capped 1 semitone below the lowest falsetto-labelled note. If that cap is below ``held_low``,
+    every held note was falsetto: rather than invent a chest note at the cap, the summary keeps no held evidence
+    (``held_count`` 0, so ``usable_pitch`` is false and ``likelihood_pitch`` is 1.0; tessitura, the measured
+    comfort and range evidence then don't use this pitch either). "unsure" and "full" never cap.
+
+    Percentiles are kept, as the gate's manual relabelling does. The measured comfort clamps them to the held
+    notes (``comfort._counted``), but ``model.likelihood_tessitura`` reads p10/p50/p90 unclamped, so an old app's
+    falsetto can still lift the tessitura of a song rated comfortable and easy.
     """
     if pitch is None or pitch_all:
         return pitch
@@ -79,7 +84,9 @@ def chest_pitch(
     cap = min(falsetto) - 1
     if pitch.held_high <= cap:
         return pitch
-    return dataclasses.replace(pitch, held_high=cap, held_low=min(pitch.held_low, cap))
+    if cap < pitch.held_low:
+        return dataclasses.replace(pitch, held_count=0)
+    return dataclasses.replace(pitch, held_high=cap)
 
 
 def falsetto_midis(note_labels: Sequence[Mapping[str, Any]] | None) -> list[float]:

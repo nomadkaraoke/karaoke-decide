@@ -344,8 +344,8 @@ async def test_erase_voice_data_removes_labels(fs: FakeFirestore, bucket: LocalB
 
 
 async def test_account_deletion_erases_falsetto_and_background(fs: FakeFirestore, bucket: LocalBucket) -> None:
-    """The falsetto range and singing background live on the profile (decide_users) and the session setup and
-    result summary (voice_sessions): all go."""
+    """The falsetto range and singing background live on the profile (decide_users, incl. the kept mic copy), the
+    session setup and result summary (voice_sessions) and the attempt context (voice_attempts): all go."""
     _seed_user(fs, USER_A, EMAIL_A)
     _seed_voice(fs, bucket, USER_A)
     profile = {"voice_type": "baritone", "method": "session", "falsetto_high": 69, "falsetto_low": 64,
@@ -354,9 +354,11 @@ async def test_account_deletion_erases_falsetto_and_background(fs: FakeFirestore
     fs.cols["voice_sessions"]["s1"]["setup"].update({"experience": "some", "uses_falsetto": "yes"})
     fs.cols["voice_sessions"]["s1"]["result_summary"] = {"session_id": "s1", "falsetto_high": 69}
 
+    fs.cols["voice_attempts"]["s1:1"]["context"] = {"experience": "some", "uses_falsetto": "yes"}
+
     await delete_all_user_data(_db(fs), bucket, EMAIL_A)
 
-    for col in ("decide_users", "voice_sessions"):
-        for d in fs.cols[col].values():
-            assert not {"falsetto_high", "experience", "uses_falsetto"} & set(d.get("voice_profile") or {}), col
-            assert "experience" not in (d.get("setup") or {}) and "result_summary" not in d, col
+    assert _hash(EMAIL_A) not in fs.cols["decide_users"]
+    assert not [d for d in fs.cols["decide_users"].values() if "voice_profile_mic" in d]
+    assert "s1" not in fs.cols["voice_sessions"] and "s1:1" not in fs.cols["voice_attempts"]
+    assert list(fs.cols["voice_sessions"]) == ["sx"] and list(fs.cols["voice_attempts"]) == ["sx:1"]
