@@ -630,3 +630,100 @@ async def test_love_then_sing_uses_the_same_kn_row(
     assert list(fs.user_songs()) == [kn_row_id]
     row = fs.user_songs()[kn_row_id]
     assert (row["times_sung"], row["loved"], row["source"]) == (1, True, "spotify")
+
+
+# ---------------------------------------------------------------- survey chips + backfill records
+
+
+@pytest.mark.asyncio
+async def test_survey_vibes_and_reasons_roundtrip(svc: KaraokeLogService) -> None:
+    entry = await svc.upsert_user(
+        USER,
+        APP_ID,
+        _app_entry(
+            artist="Adele",
+            title="Hello",
+            survey={"feel": "ok", "vibes": ["ballad", "ballad", "emotional"], "reasons": ["too_long"]},
+        ),
+    )
+    assert entry.survey is not None
+    assert entry.survey.vibes == ["ballad", "emotional"]
+    assert entry.survey.reasons == ["too_long"]
+
+
+@pytest.mark.asyncio
+async def test_unknown_vibe_rejected(svc: KaraokeLogService) -> None:
+    with pytest.raises(KaraokeLogInvalidError):
+        await svc.upsert_user(USER, APP_ID, _app_entry(survey={"vibes": ["moshpit"]}))
+    with pytest.raises(KaraokeLogInvalidError):
+        await svc.upsert_user(USER, APP_ID, _app_entry(survey={"reasons": ["boring"]}))
+
+
+def _backfill(**over: Any) -> dict[str, Any]:
+    return _app_entry(
+        sung_at=None,
+        origin="backfill",
+        times=5,
+        night={"kind": "other", "date": "2024", "date_precision": "year"},
+        **over,
+    )
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_counts(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    entry = await svc.upsert_user(USER, APP_ID, _backfill())
+    assert entry.origin == "backfill" and entry.times == 5
+    assert entry.night is not None and entry.night.date_precision == "year"
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["times_sung"] == 5
+    assert fs.log(APP_ID)["counted"]["times"] == 5
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_edit_moves_by_delta(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, APP_ID, _backfill())
+    await svc.upsert_user(USER, APP_ID, {"times": 2})
+    assert fs.user_songs()[row_id]["times_sung"] == 2
+    await svc.upsert_user(USER, APP_ID, {"times": 2})  # same again: no change
+    assert fs.user_songs()[row_id]["times_sung"] == 2
+    await svc.delete(USER, APP_ID)
+    assert row_id not in fs.user_songs()  # 0 and log-created: removed
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_edit_keeps_existing_row_at_zero(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    kn_row_id = f"{USER}:{KN_ID}"
+    fs.cols["user_songs"] = {
+        kn_row_id: {"user_id": USER, "song_id": str(KN_ID), "source": "quiz", "times_sung": 0, "last_sung_at": None}
+    }
+    await svc.upsert_user(USER, APP_ID, _backfill())
+    assert fs.user_songs()[kn_row_id]["times_sung"] == 5
+    await svc.delete(USER, APP_ID)
+    assert fs.user_songs()[kn_row_id]["times_sung"] == 0
+
+
+@pytest.mark.asyncio
+async def test_old_counted_without_times_means_one(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, APP_ID, _app_entry())
+    fs.log(APP_ID)["counted"].pop("times", None)  # a doc written before backfill existed
+    await svc.upsert_user(USER, APP_ID, {"times": 3})
+    assert fs.user_songs()[row_id]["times_sung"] == 3
+
+
+@pytest.mark.asyncio
+async def test_times_bounds(svc: KaraokeLogService) -> None:
+    for bad in (0, 51, -1, "3", True, 2.5):
+        with pytest.raises(KaraokeLogInvalidError):
+            await svc.upsert_user(USER, APP_ID, _app_entry(times=bad))
+    entry = await svc.upsert_user(USER, APP_ID, _app_entry(times=50))
+    assert entry.times == 50
+
+
+@pytest.mark.asyncio
+async def test_kj_record_cannot_set_times(svc: KaraokeLogService) -> None:
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    with pytest.raises(NotOwnerError):
+        await svc.upsert_user(USER, KJ_ID, {"times": 3})
+    with pytest.raises(NotOwnerError):
+        await svc.upsert_user(USER, KJ_ID, {"origin": "backfill"})
