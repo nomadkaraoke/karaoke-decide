@@ -407,8 +407,6 @@
     "addFromRecs": "Hozzáadás az Ajánlásokból",
     "sing": "Éneklés",
     "removeFromPlaylist": "Eltávolítás a lejátszási listáról",
-    "songIdLabel": "Dal ID: {id}",
-    "songDetailsWillLoad": "A dal részletei a katalógusból lesznek betöltve",
     "createNewPlaylist": "Új lejátszási lista létrehozása",
     "nameLabel": "Név",
     "namePlaceholder": "Az én szuper lejátszási listám",

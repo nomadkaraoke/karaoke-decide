@@ -407,8 +407,6 @@
     "addFromRecs": "Dodaj z rekomendacji",
     "sing": "Śpiewaj",
     "removeFromPlaylist": "Usuń z playlisty",
-    "songIdLabel": "ID piosenki: {id}",
-    "songDetailsWillLoad": "Szczegóły piosenki zostaną załadowane z katalogu",
     "createNewPlaylist": "Utwórz nową playlistę",
     "nameLabel": "Nazwa",
     "namePlaceholder": "Moja niesamowita playlista",

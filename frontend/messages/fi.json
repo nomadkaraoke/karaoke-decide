@@ -407,8 +407,6 @@
     "addFromRecs": "Lisää suosituksista",
     "sing": "Laula",
     "removeFromPlaylist": "Poista soittolistalta",
-    "songIdLabel": "Kappaleen tunnus: {id}",
-    "songDetailsWillLoad": "Kappaleen tiedot ladataan valikoimasta",
     "createNewPlaylist": "Luo uusi soittolista",
     "nameLabel": "Nimi",
     "namePlaceholder": "Mahtava soittolistani",

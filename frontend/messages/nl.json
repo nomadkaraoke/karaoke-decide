@@ -407,8 +407,6 @@
     "addFromRecs": "Toevoegen uit Aanbevelingen",
     "sing": "Zingen",
     "removeFromPlaylist": "Verwijderen uit afspeellijst",
-    "songIdLabel": "Nummer ID: {id}",
-    "songDetailsWillLoad": "Nummerdetails worden geladen uit de catalogus",
     "createNewPlaylist": "Nieuwe afspeellijst maken",
     "nameLabel": "Naam",
     "namePlaceholder": "Mijn geweldige afspeellijst",

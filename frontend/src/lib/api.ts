@@ -4,7 +4,7 @@
 
 import { API_BASE_URL, AUTH_TOKEN_KEY } from "./constants";
 import { routing } from "@/i18n/routing";
-import type { RecV2Params, RecommendationsV2 } from "@/types";
+import type { RecV2Params, RecommendationsV2, Playlist, PlaylistsResponse } from "@/types";
 
 export function getCurrentLocale(): string {
   if (typeof window === 'undefined') return 'en';
@@ -906,51 +906,16 @@ export const api = {
 
   playlists: {
     list: (limit: number = 50, offset: number = 0) =>
-      api.get<{
-        playlists: Array<{
-          id: string;
-          name: string;
-          description: string | null;
-          song_ids: string[];
-          song_count: number;
-          created_at: string;
-          updated_at: string;
-        }>;
-        total: number;
-      }>(`/api/playlists?limit=${limit}&offset=${offset}`),
+      api.get<PlaylistsResponse>(`/api/playlists?limit=${limit}&offset=${offset}`),
 
     create: (name: string, description?: string | null) =>
-      api.post<{
-        id: string;
-        name: string;
-        description: string | null;
-        song_ids: string[];
-        song_count: number;
-        created_at: string;
-        updated_at: string;
-      }>("/api/playlists", { name, description }),
+      api.post<Playlist>("/api/playlists", { name, description }),
 
     get: (playlistId: string) =>
-      api.get<{
-        id: string;
-        name: string;
-        description: string | null;
-        song_ids: string[];
-        song_count: number;
-        created_at: string;
-        updated_at: string;
-      }>(`/api/playlists/${playlistId}`),
+      api.get<Playlist>(`/api/playlists/${playlistId}`),
 
     update: (playlistId: string, data: { name?: string; description?: string | null }) =>
-      apiRequest<{
-        id: string;
-        name: string;
-        description: string | null;
-        song_ids: string[];
-        song_count: number;
-        created_at: string;
-        updated_at: string;
-      }>(`/api/playlists/${playlistId}`, {
+      apiRequest<Playlist>(`/api/playlists/${playlistId}`, {
         method: "PUT",
         body: JSON.stringify(data),
       }),
@@ -959,18 +924,20 @@ export const api = {
       api.delete<Record<string, never>>(`/api/playlists/${playlistId}`),
 
     addSong: (playlistId: string, songId: string) =>
-      api.post<{
-        id: string;
-        name: string;
-        description: string | null;
-        song_ids: string[];
-        song_count: number;
-        created_at: string;
-        updated_at: string;
-      }>(`/api/playlists/${playlistId}/songs`, { song_id: songId }),
+      api.post<Playlist>(`/api/playlists/${playlistId}/songs`, { song_id: songId }),
 
     removeSong: (playlistId: string, songId: string) =>
-      api.delete<Record<string, never>>(`/api/playlists/${playlistId}/songs/${songId}`),
+      api.delete<Record<string, never>>(`/api/playlists/${playlistId}/songs/${encodeURIComponent(songId)}`),
+
+    putItems: (
+      playlistId: string,
+      items: Array<{ item_id: string; song_key: string | null; artist: string; title: string }>,
+      baseRev: number
+    ) =>
+      apiRequest<Playlist>(`/api/playlists/${playlistId}/items`, {
+        method: "PUT",
+        body: JSON.stringify({ items, base_rev: baseRev }),
+      }),
   },
 
   // ============================================================================

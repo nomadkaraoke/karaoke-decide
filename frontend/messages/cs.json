@@ -407,8 +407,6 @@
     "addFromRecs": "Přidat z doporučení",
     "sing": "Zpívat",
     "removeFromPlaylist": "Odstranit z playlistu",
-    "songIdLabel": "ID písně: {id}",
-    "songDetailsWillLoad": "Detaily písně se načtou z katalogu",
     "createNewPlaylist": "Vytvořit nový playlist",
     "nameLabel": "Název",
     "namePlaceholder": "Můj úžasný playlist",

@@ -407,8 +407,6 @@
     "addFromRecs": "Ajouter depuis les Recommandations",
     "sing": "Chanter",
     "removeFromPlaylist": "Retirer de la playlist",
-    "songIdLabel": "ID de la chanson : {id}",
-    "songDetailsWillLoad": "Les détails de la chanson seront chargés depuis le catalogue",
     "createNewPlaylist": "Créer une nouvelle Playlist",
     "nameLabel": "Nom",
     "namePlaceholder": "Ma super playlist",

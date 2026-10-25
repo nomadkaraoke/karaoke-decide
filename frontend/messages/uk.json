@@ -407,8 +407,6 @@
     "addFromRecs": "Додати з рекомендацій",
     "sing": "Співати",
     "removeFromPlaylist": "Видалити з плейлиста",
-    "songIdLabel": "ID пісні: {id}",
-    "songDetailsWillLoad": "Деталі пісні будуть завантажені з каталогу",
     "createNewPlaylist": "Створити новий плейлист",
     "nameLabel": "Назва",
     "namePlaceholder": "Мій крутий плейлист",

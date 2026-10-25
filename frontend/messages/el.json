@@ -407,8 +407,6 @@
     "addFromRecs": "Προσθήκη από τις Προτάσεις",
     "sing": "Τραγούδα",
     "removeFromPlaylist": "Αφαίρεση από την playlist",
-    "songIdLabel": "ID Τραγουδιού: {id}",
-    "songDetailsWillLoad": "Οι λεπτομέρειες του τραγουδιού θα φορτωθούν από τον κατάλογο",
     "createNewPlaylist": "Δημιουργία Νέας Playlist",
     "nameLabel": "Όνομα",
     "namePlaceholder": "Η Τέλεια Playlist μου",

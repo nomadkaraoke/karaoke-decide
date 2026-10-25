@@ -407,8 +407,6 @@
     "addFromRecs": "Önerilerden Ekle",
     "sing": "Söyle",
     "removeFromPlaylist": "Çalma listesinden çıkar",
-    "songIdLabel": "Şarkı Kimliği: {id}",
-    "songDetailsWillLoad": "Şarkı detayları katalogdan yüklenecek",
     "createNewPlaylist": "Yeni Çalma Listesi Oluştur",
     "nameLabel": "İsim",
     "namePlaceholder": "Harika Çalma Listem",

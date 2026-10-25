@@ -407,8 +407,6 @@
     "addFromRecs": "Dodaj iz preporuka",
     "sing": "Pjevaj",
     "removeFromPlaylist": "Ukloni s playliste",
-    "songIdLabel": "ID pjesme: {id}",
-    "songDetailsWillLoad": "Detalji pjesme bit će učitani iz kataloga",
     "createNewPlaylist": "Izradi novu playlistu",
     "nameLabel": "Ime",
     "namePlaceholder": "Moja super playlista",

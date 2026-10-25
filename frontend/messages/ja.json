@@ -407,8 +407,6 @@
     "addFromRecs": "おすすめから追加",
     "sing": "歌う",
     "removeFromPlaylist": "プレイリストから削除",
-    "songIdLabel": "曲ID: {id}",
-    "songDetailsWillLoad": "曲の詳細はカタログから読み込まれます",
     "createNewPlaylist": "新しいプレイリストを作成",
     "nameLabel": "名前",
     "namePlaceholder": "最高のプレイリスト",

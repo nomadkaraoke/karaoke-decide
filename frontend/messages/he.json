@@ -407,8 +407,6 @@
     "addFromRecs": "הוסף מההמלצות",
     "sing": "שיר",
     "removeFromPlaylist": "הסר מהפלייליסט",
-    "songIdLabel": "מזהה שיר: {id}",
-    "songDetailsWillLoad": "פרטי השיר ייטענו מהקטלוג",
     "createNewPlaylist": "צור פלייליסט חדש",
     "nameLabel": "שם",
     "namePlaceholder": "הפלייליסט המדהים שלי",

@@ -407,8 +407,6 @@
     "addFromRecs": "Aus Empfehlungen hinzufügen",
     "sing": "Singen",
     "removeFromPlaylist": "Aus Playlist entfernen",
-    "songIdLabel": "Song-ID: {id}",
-    "songDetailsWillLoad": "Songdetails werden aus dem Katalog geladen",
     "createNewPlaylist": "Neue Playlist erstellen",
     "nameLabel": "Name",
     "namePlaceholder": "Meine tolle Playlist",

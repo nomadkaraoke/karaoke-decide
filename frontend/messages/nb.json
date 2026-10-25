@@ -407,8 +407,6 @@
     "addFromRecs": "Legg til fra anbefalinger",
     "sing": "Syng",
     "removeFromPlaylist": "Fjern fra spilleliste",
-    "songIdLabel": "Sang-ID: {id}",
-    "songDetailsWillLoad": "Sangdetaljer vil bli lastet fra katalogen",
     "createNewPlaylist": "Opprett ny spilleliste",
     "nameLabel": "Navn",
     "namePlaceholder": "Min fantastiske spilleliste",

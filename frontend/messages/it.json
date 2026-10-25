@@ -407,8 +407,6 @@
     "addFromRecs": "Aggiungi dai suggerimenti",
     "sing": "Canta",
     "removeFromPlaylist": "Rimuovi dalla playlist",
-    "songIdLabel": "ID canzone: {id}",
-    "songDetailsWillLoad": "I dettagli della canzone verranno caricati dal catalogo",
     "createNewPlaylist": "Crea nuova playlist",
     "nameLabel": "Nome",
     "namePlaceholder": "La mia fantastica playlist",

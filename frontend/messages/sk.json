@@ -407,8 +407,6 @@
     "addFromRecs": "Pridať z odporúčaní",
     "sing": "Spievať",
     "removeFromPlaylist": "Odstrániť z playlistu",
-    "songIdLabel": "ID piesne: {id}",
-    "songDetailsWillLoad": "Detaily piesne sa načítajú z katalógu",
     "createNewPlaylist": "Vytvoriť nový playlist",
     "nameLabel": "Názov",
     "namePlaceholder": "Môj super playlist",

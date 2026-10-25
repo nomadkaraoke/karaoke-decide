@@ -407,8 +407,6 @@
     "addFromRecs": "추천에서 추가",
     "sing": "부르기",
     "removeFromPlaylist": "플레이리스트에서 삭제",
-    "songIdLabel": "노래 ID: {id}",
-    "songDetailsWillLoad": "노래 세부 정보는 카탈로그에서 로드됩니다",
     "createNewPlaylist": "새 플레이리스트 만들기",
     "nameLabel": "이름",
     "namePlaceholder": "나의 멋진 플레이리스트",

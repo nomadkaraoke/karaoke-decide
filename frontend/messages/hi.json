@@ -407,8 +407,6 @@
     "addFromRecs": "सुझावों से जोड़ो",
     "sing": "गाओ",
     "removeFromPlaylist": "प्लेलिस्ट से हटाओ",
-    "songIdLabel": "सॉन्ग ID: {id}",
-    "songDetailsWillLoad": "गाने की डिटेल्स कैटलॉग से लोड की जाएंगी",
     "createNewPlaylist": "नई प्लेलिस्ट बनाओ",
     "nameLabel": "नाम",
     "namePlaceholder": "मेरी शानदार प्लेलिस्ट",
