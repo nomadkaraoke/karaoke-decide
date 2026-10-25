@@ -7,7 +7,8 @@ unless both paths are given. ``BIGQUERY_DISABLED=1`` (local stack) is allowed fo
 only: no Spotify ids then, so nothing could be fetched. ``--no-probe`` needs ``--dry-run``.
 
 ``fetch [--run RUN] [--deadline-s S]`` (hourly) drives flacfetch and the separation / analyse
-hand-offs (``fetch.run_fetch``); without ``FLACFETCH_API_URL`` / ``FLACFETCH_API_KEY`` it logs a
+hand-offs (``fetch.run_fetch``); queued songs without a Spotify track are resolved first
+(``SpotifyResolver``: catalog.db alone + BigQuery, opened only when needed); without ``FLACFETCH_API_URL`` / ``FLACFETCH_API_KEY`` it logs a
 WARNING and exits 0. ``status`` prints the fetch queue's counts per status and the Spotify budget.
 
 ``analyse [--run RUN] [--limit N] [--catalog PATH --availability PATH]`` (the
@@ -64,6 +65,7 @@ def format_fetch(out: dict[str, Any]) -> str:
         [
             f"voice pool fetch {out['run']}",
             f"  polled {out['polled']}, fetched {out['fetched']}",
+            f"  spotify ids resolved {out.get('resolved', 0)}, unresolved (failed) {out.get('unresolved', 0)}",
             f"  submitted {out['submitted']}" + (f" (stopped: {out['refused_code']})" if out["refused_code"] else ""),
             f"  separated {out['separated']}, sent back {out['requeued']}, to separation {out['separating']}",
             f"  analyse {'started' if out['analyse_started'] else 'not started'}",
@@ -185,6 +187,39 @@ def _flacfetch(settings: Any, http: Any) -> Any:
     return FlacfetchClient(settings.flacfetch_api_url, settings.flacfetch_api_key, http)
 
 
+class SpotifyResolver:
+    """The fetch job's ``resolve``: catalog.db (alone) and a BigQuery client are opened on the first
+    call only, i.e. only in runs that have queued songs without a Spotify track."""
+
+    def __init__(self, settings: Any, *, open_catalog: Any = None, bq_client: Any = None) -> None:
+        self.settings = settings
+        self._open_catalog = open_catalog
+        self.reader: Any = None
+        self.bq = bq_client
+
+    def __call__(self, song_keys: list[str]) -> dict[str, tuple[str | None, int | None]]:
+        from karaoke_decide.voice_pool.fetch import SpotifyResolveUnavailableError
+        from karaoke_decide.voice_pool.spotify import resolve_song_keys
+
+        if self.reader is None:
+            from backend.services.catalog_store import CatalogLoadError, load_catalog_only
+
+            try:
+                self.reader = (self._open_catalog or load_catalog_only)(self.settings)
+            except CatalogLoadError as e:
+                raise SpotifyResolveUnavailableError(f"catalog.db not loaded: {e}") from e
+        if self.bq is None:
+            from google.cloud import bigquery
+
+            self.bq = bigquery.Client(project=self.settings.google_cloud_project or None)
+        return resolve_song_keys(self.reader, self.bq, song_keys)
+
+    def close(self) -> None:
+        if self.reader is not None:
+            self.reader.close()
+            self.reader = None
+
+
 def _fetch(args: argparse.Namespace) -> int:
     import httpx
 
@@ -205,9 +240,24 @@ def _fetch(args: argparse.Namespace) -> int:
         fs = FirestoreService(settings)
         gcs = storage.Client(project=settings.google_cloud_project or None)
         runner = CloudRunJobRunner(settings.google_cloud_project or "nomadkaraoke")
-        out = asyncio.run(
-            run_fetch(fs, ff, runner, gcs, run=args.run, rng=random.Random(args.run), deadline_s=args.deadline_s)
-        )
+        # BIGQUERY_DISABLED (local stack): no lookup, songs without a Spotify id fail as before.
+        resolver = None if settings.bigquery_disabled else SpotifyResolver(settings)
+        try:
+            out = asyncio.run(
+                run_fetch(
+                    fs,
+                    ff,
+                    runner,
+                    gcs,
+                    run=args.run,
+                    rng=random.Random(args.run),
+                    deadline_s=args.deadline_s,
+                    resolve=resolver,
+                )
+            )
+        finally:
+            if resolver is not None:
+                resolver.close()
     print(format_fetch(out))
     return 0
 

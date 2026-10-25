@@ -17,7 +17,7 @@ from karaoke_decide.catalog import fixtures
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.availability import build_availability_db
 from karaoke_decide.song_search.build_song_id import build as build_song_id
-from karaoke_decide.voice_pool import select
+from karaoke_decide.voice_pool import select, spotify
 from tests.unit.fake_gcs import FakeBucket
 
 SONG_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "song_search"
@@ -72,7 +72,7 @@ class FakeBq:
     def query(self, sql: str, job_config: Any = None) -> Any:
         self.sqls.append(sql)
         self.configs.append(job_config)
-        if sql == select.SPOTIFY_FOR_KN_SQL:
+        if sql == spotify.SPOTIFY_FOR_KN_SQL:
             rows = [
                 {
                     "karaoke_id": kn,

@@ -82,10 +82,11 @@ def test_fetch_without_flacfetch_config_is_a_warning(no_bq, monkeypatch, caplog)
 
 def test_format_fetch_and_status():
     text = cli.format_fetch({
-        "run": "r", "polled": 2, "fetched": 1, "submitted": 3, "refused_code": "spotify_budget", "separating": 0,
+        "run": "r", "polled": 2, "fetched": 1, "resolved": 4, "unresolved": 1, "submitted": 3, "refused_code": "spotify_budget", "separating": 0,
         "separated": 4, "requeued": 0, "analyse_started": True,
     })  # fmt: skip
     assert "submitted 3" in text and "spotify_budget" in text and "analyse started" in text
+    assert "resolved 4, unresolved (failed) 1" in text
     text = cli.format_status({"counts": {"queued": 5, "fetched": 1}, "budget": None})
     assert "queued 5" in text and "budget unavailable" in text
     text = cli.format_status({"counts": {"queued": 0}, "budget": {"batch_s": 3600.0, "batch_budget_s": 43200,
@@ -247,3 +248,60 @@ def test_select_old_catalog_works_and_require_flag_exits_2(
     assert "picked" not in capsys.readouterr().out
     assert sum("predates vocal-range" in r.getMessage() for r in caplog.records) == 1
     assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+def test_spotify_resolver_opens_catalog_lazily_and_resolves(reader, fake_bq):
+    opened: list[object] = []
+
+    def open_catalog(settings):
+        opened.append(settings)
+        return reader
+
+    bq = fake_bq()
+    resolver = cli.SpotifyResolver(object(), open_catalog=open_catalog, bq_client=bq)
+    assert opened == []  # nothing loaded until a run needs it
+    out = resolver(["adele|hello", "nobody|nothing"])
+    assert set(out) == {"adele|hello"} and out["adele|hello"][0].startswith("sp")
+    resolver(["adele|hello"])
+    assert len(opened) == 1  # opened once per run
+
+
+def test_spotify_resolver_catalog_failure_is_unavailable(fake_bq):
+    from backend.services.catalog_store import CatalogLoadError
+    from karaoke_decide.voice_pool.fetch import SpotifyResolveUnavailableError
+
+    def broken(settings):
+        raise CatalogLoadError("no published catalog.db")
+
+    resolver = cli.SpotifyResolver(object(), open_catalog=broken, bq_client=fake_bq())
+    with pytest.raises(SpotifyResolveUnavailableError, match="catalog.db"):
+        resolver(["adele|hello"])
+    resolver.close()  # nothing opened: a no-op
+
+
+def test_load_catalog_only_reads_local_catalog(no_bq, catalog_db: Path, monkeypatch):
+    from backend.services.catalog_store import CatalogLoadError, load_catalog_only
+
+    monkeypatch.setenv("CATALOG_LOCAL_DIR", str(catalog_db.parent))
+    get_backend_settings.cache_clear()
+    reader = load_catalog_only(get_backend_settings())
+    try:
+        assert not reader.has_availability and reader.all_kn_ids_for_song_keys(["adele|hello"])
+    finally:
+        reader.close()
+    monkeypatch.setenv("CATALOG_LOCAL_DIR", str(catalog_db.parent / "missing"))
+    get_backend_settings.cache_clear()
+    with pytest.raises(CatalogLoadError):
+        load_catalog_only(get_backend_settings())
+
+
+def test_load_catalog_only_wraps_an_unreadable_catalog(no_bq, tmp_path: Path, monkeypatch):
+    """A corrupt catalog.db is CatalogLoadError, so the fetch run keeps those songs queued instead of crashing."""
+    from backend.services import catalog_store
+    from backend.services.catalog_store import CatalogLoadError, load_catalog_only
+
+    bad = tmp_path / "catalog.db"
+    bad.write_bytes(b"not a sqlite database")
+    monkeypatch.setattr(catalog_store.CatalogStore, "_fetch_catalog", staticmethod(lambda *a: (bad, None)))
+    with pytest.raises(CatalogLoadError, match="could not be opened"):
+        load_catalog_only(get_backend_settings(), client=object())

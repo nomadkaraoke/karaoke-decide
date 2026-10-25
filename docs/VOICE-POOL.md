@@ -14,7 +14,7 @@ section of `infrastructure/__main__.py`. Pipeline diagram:
 | Piece | What | Where |
 |-------|------|-------|
 | `voice-pool-select` | Cloud Run job, on demand (main image, 2 CPU / 4 GiB, 1 h). Picks the pool, probes YouTube embeddability, queues songs. | us-central1, SA `voice-pool` |
-| `voice-pool-fetch` | Cloud Run job, hourly at :07 UTC from scheduler `voice-pool-fetch-hourly` (main image, 1 CPU / 1 GiB, 3900 s). Downloads songs through flacfetch, hands batches to separation, starts analyse. | us-central1, SA `voice-pool` |
+| `voice-pool-fetch` | Cloud Run job, hourly at :07 UTC from scheduler `voice-pool-fetch-hourly` (main image, 1 CPU / 2 GiB, 3900 s). Resolves missing Spotify ids (catalog.db + BigQuery), downloads songs through flacfetch, hands batches to separation, starts analyse. | us-central1, SA `voice-pool` |
 | `voice-pool-separate-job` | karaoke-gen's GPU job (1 x L4, `parallelism=1`, 1 h per task). Owned by gen's Pulumi. | us-east4 |
 | `voice-pool-analyse` | Cloud Run job, started by fetch (`karaoke-decide-vocal` image, 4 CPU / 8 GiB, 6 h, 1 task). Computes markers, then publishes voice.db. | us-central1, SA `voice-pool` |
 | Queue | Firestore `voice_pool_fetch/{pool_id}`; status `queued → downloading → fetched → separating → separated → analysed` (or `failed`) | |
@@ -214,6 +214,24 @@ python scripts/voice/repair_failed_vocals.py --project nomadkaraoke --apply
 
 A run of 5 or more songs in which none was analysed (all failed, missing vocals included) now sets
 `all_failed`: one ERROR, "voice analysis: every song of the run failed", and no publish.
+
+### Songs failed as "no spotify id" (Andrew's sheet, 2026-10-25, fixed in v0.28.3)
+
+Songs queued without a Spotify track (the sheet import and personal pools enqueue only
+song_key / artist / title) used to fail at once with `"no spotify id"`. Since v0.28.3 each fetch
+run first resolves them in one batched lookup, the selection job's own rule
+(`voice_pool/spotify.py`: catalog.db `kn_song_map` KaraokeNerds ids → BigQuery
+`karaoke_recording_links` / `spotify_tracks`, most popular track), and writes `spotify_id` /
+`duration_ms` onto the doc. catalog.db alone is downloaded, and only in runs that need it. Songs
+still without a track fail with `"no spotify id"` and one aggregated WARNING per run ("N queued
+songs can't be fetched", song keys in `json_fields`). If the lookup itself can't run (catalog not
+published, BigQuery transient) they stay `queued`, with one WARNING. To put the songs failed before
+the fix back in the queue (Firestore write, `/gcp-admin`; keeps `priority`, `source`, `attempts`):
+
+```bash
+python scripts/voice/requeue_unresolved.py --project nomadkaraoke --dry-run
+python scripts/voice/requeue_unresolved.py --project nomadkaraoke --apply
+```
 
 ## Cost
 

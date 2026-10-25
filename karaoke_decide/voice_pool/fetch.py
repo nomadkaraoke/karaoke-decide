@@ -5,7 +5,13 @@ One run (``run_fetch``):
 1. Poll every ``downloading`` song: flacfetch ``complete`` -> ``fetched`` (``audio_gcs``);
    ``failed`` / ``cancelled`` -> ``attempts += 1``, back to ``queued`` (``failed`` at 3). An id
    flacfetch forgot (restart) counts as fetched when the audio is already in GCS, else failed.
-2. Submit queued songs, best ``(priority, added_at)`` first, while the run has time left and
+2. Resolve queued songs enqueued without a Spotify track (Andrew's sheet, personal pools): ONE
+   batched lookup per run (``resolve``: catalog.db KaraokeNerds ids -> BigQuery, the selection
+   job's own rule, ``spotify.resolve_song_keys``) writes ``spotify_id`` / ``duration_ms`` onto the
+   doc. Songs still without one (or with a duration flacfetch can't take) are marked ``failed``
+   with ONE aggregated WARNING per run. When the lookup itself is unavailable (catalog not loaded,
+   BigQuery transient) they stay ``queued`` for the next run.
+   Submit queued songs, best ``(priority, added_at)`` first, while the run has time left and
    flacfetch's Spotify budget allows a batch download; ``uniform(45, 180)`` s between
    submissions (``rng`` is seeded from the run id). Each song is claimed transactionally first
    (overlapping executions skip it); a 400 / 422 for one song is that song's failed attempt. When flacfetch says "not now" (budget
@@ -77,6 +83,20 @@ _JOB_UNAVAILABLE = (NotFound, Forbidden)  # PermissionDenied (gRPC) subclasses F
 
 Sleep = Callable[[float], Awaitable[None]]
 Now = Callable[[], float]
+# ``resolve(song_keys)`` -> ``{song_key: (spotify_id, duration_ms)}`` for the keys it can resolve.
+Resolver = Callable[[list[str]], dict[str, tuple[str | None, int | None]]]
+NO_SPOTIFY_ID = "no spotify id"
+
+
+class SpotifyResolveUnavailableError(RuntimeError):
+    """The Spotify id lookup can't run this run (e.g. catalog.db not loaded); songs stay queued."""
+
+
+_RESOLVE_UNAVAILABLE: tuple[type[BaseException], ...] = (
+    GoogleAPICallError,
+    SpotifyResolveUnavailableError,
+    *TRANSIENT_ERRORS,
+)
 
 
 def audio_dir(pid: str) -> str:
@@ -157,7 +177,7 @@ async def poll_downloads(fs: Any, ff: FlacfetchClient, gcs: Any, now: Now) -> tu
 
 def _unfetchable(doc: dict[str, Any]) -> str | None:
     if not doc.get("spotify_id"):
-        return "no spotify id"
+        return NO_SPOTIFY_ID
     if not 1 <= round((doc.get("duration_ms") or 0) / 1000) <= MAX_EXPECTED_DURATION_S:
         return f"duration {doc.get('duration_ms')} ms outside flacfetch's 1-{MAX_EXPECTED_DURATION_S} s"
     return None
@@ -191,21 +211,81 @@ def _start(ff: FlacfetchClient, doc: dict[str, Any]) -> str | Refused:
     return ff.start_batch(doc["spotify_id"], round(doc["duration_ms"] / 1000), audio_dir(doc["id"]), "original")
 
 
+def _needs_track(doc: dict[str, Any]) -> bool:
+    return not doc.get("spotify_id") or not doc.get("duration_ms")
+
+
+async def resolve_missing(
+    fs: Any, docs: list[dict[str, Any]], resolve: Resolver | None, now: Now
+) -> tuple[int, set[str]]:
+    """Step 2a: fill ``spotify_id`` / ``duration_ms`` on queued ``docs`` that lack them, with one
+    ``resolve`` call (none when nothing is missing). A doc that already has a ``spotify_id`` only
+    takes the duration of that same track. Returns ``(resolved, held)``: ``held`` are the ids left
+    queued because the lookup is unavailable this run (a WARNING). ``docs`` are updated in place."""
+    missing = [d for d in docs if _needs_track(d)]
+    if not missing or resolve is None:
+        return 0, set()
+    try:
+        tracks = resolve(sorted({d["song_key"] for d in missing}))
+    except _RESOLVE_UNAVAILABLE as e:
+        logger.warning(
+            "voice pool: can't resolve Spotify ids for %d queued songs (%s: %s); they stay queued for the next run",
+            len(missing), type(e).__name__, e,
+        )  # fmt: skip
+        return 0, {d["id"] for d in missing}
+    resolved = 0
+    for d in missing:
+        sid, dur = tracks.get(d["song_key"], (None, None))
+        if not sid or (d.get("spotify_id") and d["spotify_id"] != sid):
+            continue
+        data = {"spotify_id": sid, "duration_ms": dur}
+        await _update(fs, d["id"], data, now)
+        d.update(data)
+        resolved += 1
+    return resolved, set()
+
+
+async def fail_unfetchable(fs: Any, docs: list[dict[str, Any]], run: str, now: Now) -> tuple[list[dict[str, Any]], int]:
+    """Step 2b: mark ``failed`` every doc flacfetch can't take (no Spotify id, bad duration), with
+    ONE WARNING for the run. Returns ``(fetchable docs, songs failed for no spotify id)``."""
+    ok: list[dict[str, Any]] = []
+    reasons: Counter[str] = Counter()
+    failed_keys: list[str] = []
+    for doc in docs:
+        reason = _unfetchable(doc)
+        if not reason:
+            ok.append(doc)
+            continue
+        await _update(fs, doc["id"], {"status": "failed", "error": reason}, now)
+        reasons["no spotify id" if reason == NO_SPOTIFY_ID else "duration out of range"] += 1
+        failed_keys.append(str(doc.get("song_key")))
+    if reasons:
+        logger.warning(
+            "voice pool fetch: %d queued songs can't be fetched (%s); marked failed",
+            sum(reasons.values()), ", ".join(f"{n} {r}" for r, n in reasons.most_common()),
+            extra={"json_fields": {"run": run, "reasons": dict(reasons), "song_keys": failed_keys[:50]}},
+        )  # fmt: skip
+    return ok, reasons["no spotify id"]
+
+
 async def submit_downloads(
-    fs: Any, ff: FlacfetchClient, *, deadline: float, rng: random.Random, sleep: Sleep, now: Now
+    fs: Any,
+    ff: FlacfetchClient,
+    docs: list[dict[str, Any]],
+    *,
+    deadline: float,
+    rng: random.Random,
+    sleep: Sleep,
+    now: Now,
 ) -> tuple[int, str | None]:
-    """Step 2; returns ``(submitted, why_stopped)`` (None: queue drained or deadline).
+    """Step 2c: submit the fetchable queued ``docs`` in order; returns ``(submitted, why_stopped)``
+    (None: queue drained or deadline).
 
     Each song is claimed (``queued`` -> ``downloading``, transactionally) before flacfetch is
     asked, so overlapping executions never submit it twice; a refusal or outage puts it back.
     """
     submitted = 0
-    for doc in await queue.next_queued(fs, QUEUE_SCAN):
-        reason = _unfetchable(doc)
-        if reason:
-            logger.info("voice pool: %s (%s) can't be fetched: %s", doc["id"], doc.get("song_key"), reason)
-            await _update(fs, doc["id"], {"status": "failed", "error": reason}, now)
-            continue
+    for doc in docs:
         if submitted:
             await sleep(rng.uniform(*SPACING_S))
         while True:
@@ -362,9 +442,11 @@ async def run_fetch(
     deadline_s: float = 3300,
     sleep: Sleep = asyncio.sleep,
     now: Now = time.time,
+    resolve: Resolver | None = None,
 ) -> dict[str, Any]:
-    """One scheduler run (see module doc). Returns ``{run, polled, fetched, submitted, refused_code,
-    separated, requeued, separating, analyse_started}``."""
+    """One scheduler run (see module doc). Returns ``{run, polled, fetched, resolved, unresolved,
+    submitted, refused_code, separated, requeued, separating, analyse_started}``; ``resolve`` is the
+    Spotify id lookup (None: songs without one fail)."""
     deadline = now() + deadline_s
     polled, fetched, failures = await poll_downloads(fs, ff, gcs, now)
     downloads_failing = sum(failures.values()) >= SYSTEMATIC_DOWNLOAD_FAILURES and fetched == 0
@@ -378,8 +460,14 @@ async def run_fetch(
                                    "top_error": top_error[:500], "top_error_count": top_count}},
         )  # fmt: skip
         submitted, refused_code = 0, "downloads_failing"
+        resolved = unresolved = 0
     else:
-        submitted, refused_code = await submit_downloads(fs, ff, deadline=deadline, rng=rng, sleep=sleep, now=now)
+        queued = await queue.next_queued(fs, QUEUE_SCAN)
+        resolved, held = await resolve_missing(fs, queued, resolve, now)
+        fetchable, unresolved = await fail_unfetchable(fs, [d for d in queued if d["id"] not in held], run, now)
+        submitted, refused_code = await submit_downloads(
+            fs, ff, fetchable, deadline=deadline, rng=rng, sleep=sleep, now=now
+        )
     errors: list[Exception] = []
     separated, requeued = await collect_separations(fs, gcs, runner, now, errors)
     separating = await maybe_separate(fs, gcs, runner, run, now, errors)
@@ -388,6 +476,8 @@ async def run_fetch(
         "run": run,
         "polled": polled,
         "fetched": fetched,
+        "resolved": resolved,
+        "unresolved": unresolved,
         "submitted": submitted,
         "refused_code": refused_code,
         "separated": separated,

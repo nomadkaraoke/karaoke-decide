@@ -1602,7 +1602,8 @@ voice_pool_fetch_job = gcp.cloudrunv2.Job(
                             for _env, _secret in VOICE_POOL_SECRETS.items()
                         ],
                     ],
-                    "resources": {"limits": {"cpu": "1", "memory": "1Gi"}},
+                    # 2Gi: runs that resolve missing Spotify ids load catalog.db (~150 MB) into in-memory /tmp.
+                    "resources": {"limits": {"cpu": "1", "memory": "2Gi"}},
                 }
             ],
             "service_account": voice_pool_sa.email,

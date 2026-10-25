@@ -29,9 +29,10 @@ from google.cloud import bigquery
 
 from karaoke_decide.catalog.bq_source import P
 from karaoke_decide.catalog.reader import CatalogReader
-from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
 from karaoke_decide.voice_pool import queue
 from karaoke_decide.voice_pool.models import PoolCandidate, Version, pool_id
+from karaoke_decide.voice_pool.spotify import SpotifyTrack, spotify_tracks
+from karaoke_decide.voice_pool.spotify import bq_query as _query
 from karaoke_decide.voice_pool.strata import MIN_POOL, coverage, select_pool
 from karaoke_decide.voice_pool.versions import (
     OEMBED_LIMITER,
@@ -53,17 +54,6 @@ UNKNOWN_PROBE_WARN_FRACTION = 0.5  # more unknown oEmbed answers than this: YouT
 
 BUCKET = "nomadkaraoke-musicbrainz-data"
 POOL_TABLE = f"{P}.voice_pool_songs"
-
-# One Spotify track per karaoke_id, chosen exactly as catalog/bq_source.SONG_FACETS_SQL does.
-SPOTIFY_FOR_KN_SQL = f"""
-SELECT l.karaoke_id, t.spotify_id, t.duration_ms, t.popularity AS spotify_pop
-FROM `{P}.karaoke_recording_links` l
-JOIN `{P}.spotify_tracks` t ON t.spotify_id = l.spotify_track_id
-LEFT JOIN `{P}.spotify_audio_features` af ON af.track_id = t.spotify_id
-WHERE l.spotify_track_id IS NOT NULL AND l.karaoke_id IN UNNEST(@kn_ids)
-QUALIFY ROW_NUMBER() OVER (PARTITION BY l.karaoke_id
-                           ORDER BY t.popularity DESC, af.track_id IS NULL, t.spotify_id) = 1
-"""
 
 ULTRASTAR_SQL = f"""
 SELECT DISTINCT song_key FROM `{P}.song_vocal_range_sources`
@@ -139,31 +129,6 @@ def _community_versions(reader: CatalogReader, floor: int) -> dict[str, tuple[Ve
     return community_versions(reader.conn().execute(_VERSIONS_SQL, (floor,)))
 
 
-def _query(bq: Any, sql: str, params: list[bigquery.ArrayQueryParameter]) -> list[dict[str, Any]]:
-    config = bigquery.QueryJobConfig(
-        maximum_bytes_billed=MAX_BYTES_CATALOG, query_parameters=params, use_query_cache=True
-    )
-    return [dict(r) for r in bq.query(sql, job_config=config).result()]
-
-
-def _spotify_tracks(bq: Any, kn_by_song: dict[str, list[int]]) -> dict[str, tuple[str | None, int | None]]:
-    """``{song_key: (spotify_id, duration_ms)}``: across a song's KaraokeNerds ids, the most
-    popular linked track (ties: spotify_id)."""
-    kn_ids = sorted({kn for ids in kn_by_song.values() for kn in ids})
-    if not kn_ids:
-        return {}
-    rows = _query(bq, SPOTIFY_FOR_KN_SQL, [bigquery.ArrayQueryParameter("kn_ids", "INT64", kn_ids)])
-    by_kn = {int(r["karaoke_id"]): r for r in rows if r.get("spotify_id")}
-    out: dict[str, tuple[str | None, int | None]] = {}
-    for key, ids in kn_by_song.items():
-        tracks = [by_kn[kn] for kn in ids if kn in by_kn]
-        if tracks:
-            best = min(tracks, key=lambda t: (-(t.get("spotify_pop") or 0), t["spotify_id"]))
-            dur = best.get("duration_ms")
-            out[key] = (best["spotify_id"], None if dur is None else int(dur))
-    return out
-
-
 def _ultrastar_keys(bq: Any, song_keys: list[str]) -> set[str]:
     if bq is None or not song_keys:
         return set()
@@ -209,13 +174,13 @@ def load_candidates(
     for kn, key in conn.execute(_KN_IDS_SQL, (floor,)):
         if key in versions:
             kn_by_song.setdefault(key, []).append(int(kn))
-    tracks: dict[str, tuple[str | None, int | None]]
+    tracks: dict[str, SpotifyTrack]
     if bq is None:
         # Local dev only (BIGQUERY_DISABLED): catalog.db's duration (the same Spotify track), no ids.
         logger.warning("BigQuery disabled: no Spotify ids or UltraStar flags; durations from catalog.db")
         tracks = {r["song_key"]: (None, r["duration_ms"]) for r in songs}
     else:
-        tracks = _spotify_tracks(bq, kn_by_song)
+        tracks = spotify_tracks(bq, kn_by_song)
     songs = [
         r
         for r in songs
