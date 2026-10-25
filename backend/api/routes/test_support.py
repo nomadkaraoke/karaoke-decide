@@ -18,6 +18,7 @@ from backend.api.deps import (
     get_auth_service_dep,
     get_firestore,
     get_import_ingest_service_dep,
+    get_karaoke_log_service,
     get_music_service_service_dep,
     get_settings,
 )
@@ -29,7 +30,13 @@ from backend.models.karaoke_log import KaraokeLogEntry
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportIngestService
-from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLLECTION, log_doc_id
+from backend.services.karaoke_log_service import (
+    LOG_COLLECTION,
+    UNRESOLVED_COLLECTION,
+    KaraokeLogError,
+    KaraokeLogService,
+    log_doc_id,
+)
 from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
 from backend.services.playlist_service import PlaylistService
@@ -255,6 +262,34 @@ async def read_profile(email: Annotated[str, Query()], fs: FirestoreDep, auth: A
         "hidden": [s.song_key for s in await feedback.list_hidden(user_id)] if user_id else [],
         "voice_profile": doc.get("voice_profile"),
     }
+
+
+class KaraokeLogSeedBody(BaseModel):
+    email: str
+    entries: list[dict[str, Any]]
+
+
+@router.post("/karaoke-log/seed")
+async def seed_karaoke_log(
+    body: KaraokeLogSeedBody,
+    auth: AuthDep,
+    log_service: Annotated[KaraokeLogService, Depends(get_karaoke_log_service)],
+) -> dict[str, Any]:
+    """Write app (``app_…``) karaoke-log entries for the user (created if needed) through
+    ``KaraokeLogService.upsert_user``, so counts and survey placeholders match a real app write.
+    Each entry is an app patch plus its ``id``."""
+    for entry in body.entries:
+        entry_id = entry.get("id")
+        if not isinstance(entry_id, str) or not entry_id.startswith("app_"):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid")
+    user = await auth.resolve_gen_user(body.email)
+    for entry in body.entries:
+        patch = {k: v for k, v in entry.items() if k != "id"}
+        try:
+            await log_service.upsert_user(user.id, entry["id"], patch, email=body.email)
+        except KaraokeLogError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.code) from exc
+    return {"user_id": user.id, "count": len(body.entries)}
 
 
 @router.get("/karaoke-log")

@@ -434,3 +434,47 @@ def test_reset_clears_playlists(client: TestClient, fs: FakeFirestore) -> None:
     assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
 
     assert list(fs.cols["playlists"]) == ["pl_other1234"]
+
+
+def test_seed_karaoke_log(client: TestClient) -> None:
+    entries = [
+        {
+            "id": "app_seed0001",
+            "state": "sung",
+            "artist": "Invented Band",
+            "title": "First Song",
+            "song_key": "invented band|first song",
+            "times": 2,
+            "origin": "backfill",
+            "survey": {"feel": "great", "vibes": ["party"]},
+        },
+        {
+            "id": "app_seed0002",
+            "state": "sung",
+            "artist": "Other Act",
+            "title": "Second Song",
+            "survey": {"feel": "bad", "reasons": ["too_hard"]},
+        },
+    ]
+    resp = client.post("/api/test/karaoke-log/seed", json={"email": EMAIL, "entries": entries})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["count"] == 2 and body["user_id"]
+
+    got = client.get("/api/test/karaoke-log", params={"email": EMAIL}).json()
+    assert got["user_id"] == body["user_id"]
+    assert sorted(e["id"] for e in got["entries"]) == ["app_seed0001", "app_seed0002"]
+    assert any(s["artist"] == "Invented Band" and s["times_sung"] == 2 for s in got["sung"])
+
+
+def test_seed_karaoke_log_rejects_non_app_ids(client: TestClient) -> None:
+    resp = client.post(
+        "/api/test/karaoke-log/seed",
+        json={"email": EMAIL, "entries": [{"id": "kj_1", "state": "sung", "artist": "A", "title": "B"}]},
+    )
+    assert resp.status_code == 400
+    resp = client.post(
+        "/api/test/karaoke-log/seed",
+        json={"email": EMAIL, "entries": [{"id": "app_seed0003", "state": "sung", "artist": "A"}]},
+    )
+    assert resp.status_code == 400
