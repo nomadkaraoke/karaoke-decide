@@ -134,7 +134,32 @@ class PitchSummaryIn(_Request):
         return self
 
 
+NoteLabel = Literal["falsetto", "full", "unsure"]
+MAX_NOTE_LABELS = 40
+
+
+class NoteLabelIn(_Request):
+    """One held high note the singer labelled: live (the "High note: falsetto?" chip) or in the quiz catch-up.
+    ``t_start`` / ``t_end`` are seconds on the take's stream clock; ``midi`` the held note."""
+
+    t_start: float = Field(ge=0, le=3600)
+    t_end: float = Field(ge=0, le=3600)
+    midi: float = MidiFloat
+    label: NoteLabel
+    source: Literal["live", "quiz"]
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.t_end < self.t_start:
+            raise ValueError("require t_end >= t_start")
+        return self
+
+
 class AttemptIn(_Request):
+    """``pitch`` is the chest-only summary (the app drops falsetto-labelled spans; Phase 3d batch 1, Part C);
+    ``pitch_all`` the unfiltered one, kept for analysis. Old apps send an unfiltered ``pitch`` and neither new
+    field, which stays valid."""
+
     song_key: str = Field(max_length=500)
     video_id: str = Field(max_length=64)
     started_at: datetime
@@ -142,6 +167,8 @@ class AttemptIn(_Request):
     stopped_early: bool
     quiz: QuizIn
     pitch: PitchSummaryIn | None = None
+    pitch_all: PitchSummaryIn | None = None
+    note_labels: list[NoteLabelIn] = Field(default_factory=list, max_length=MAX_NOTE_LABELS)
 
     @model_validator(mode="after")
     def _ended_after_start(self) -> Self:

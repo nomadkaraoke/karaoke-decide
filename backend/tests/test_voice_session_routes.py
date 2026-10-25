@@ -1454,3 +1454,71 @@ def test_exclude_with_missing_session_leaves_no_flag(client: TestClient, fs: Rou
     r = client.patch("/api/voice/attempts/s1:1", json={"excluded": True})
     assert r.status_code == 404
     assert "excluded" not in fs.cols["voice_attempts"]["s1:1"]
+
+
+# ---------------------------------------------------------------- falsetto (Phase 3d batch 1, Part C)
+
+CHEST = {"voiced_s": 60, "held_count": 8, "held_low": 48, "held_high": 64, "p10": 50, "p50": 55, "p90": 62}
+UNFILTERED = {"voiced_s": 66, "held_count": 10, "held_low": 48, "held_high": 69, "p10": 50, "p50": 56, "p90": 66}
+
+
+def _label(t: float, midi: float = 69.0, label: str = "falsetto", source: str = "live") -> dict[str, Any]:
+    return {"t_start": t, "t_end": t + 0.8, "midi": midi, "label": label, "source": source}
+
+
+def test_attempt_accepts_note_labels_and_pitch_all(client: TestClient, fs: RouteFirestore) -> None:
+    """The app sends the chest-only summary as ``pitch``, the unfiltered one as ``pitch_all`` and its per-note
+    labels; all three are stored on the attempt. An old app's request (none of the new fields) still works."""
+    sid = _create(client)
+    song = _next(client, sid)
+    labels = [_label(31.0), _label(95.5, 67.0, "unsure", "quiz"), _label(120.0, 66.0, "full", "quiz")]
+    out = _post_attempt(client, sid, _attempt(song, 0, pitch=CHEST, pitch_all=UNFILTERED, note_labels=labels))
+    doc = fs.cols["voice_attempts"][out["attempt_id"]]
+    assert doc["pitch"]["held_high"] == 64
+    assert doc["pitch_all"] == {**UNFILTERED, "held_count": 10}
+    assert doc["note_labels"] == labels
+
+    old = _post_attempt(client, sid, _attempt(_next(client, sid), 1, pitch=UNFILTERED))
+    old_doc = fs.cols["voice_attempts"][old["attempt_id"]]
+    assert old_doc["note_labels"] == [] and old_doc["pitch_all"] is None
+
+
+def test_note_labels_reject_extra_keys(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    bad_labels = (
+        {**_label(1.0), "audio": "AAAA"},
+        {**_label(1.0), "t_end": 0.5},  # ends before it starts
+        {**_label(1.0), "label": "head"},
+        {**_label(1.0), "source": "admin"},
+        {**_label(1.0), "midi": 120},
+        {**_label(1.0), "t_start": -1},
+        {**_label(4000.0)},
+    )
+    for bad in bad_labels:
+        r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, note_labels=[bad]))
+        assert r.status_code == 422, bad
+    r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, pitch_all={**CHEST, "frames": []}))
+    assert r.status_code == 422
+    assert "voice_attempts" not in fs.cols
+
+
+def test_note_labels_cap_40(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    too_many = [_label(float(i)) for i in range(41)]
+    r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, note_labels=too_many))
+    assert r.status_code == 422
+    out = _post_attempt(client, sid, _attempt(song, 0, note_labels=too_many[:40]))
+    assert len(fs.cols["voice_attempts"][out["attempt_id"]]["note_labels"]) == 40
+
+
+def test_history_counts_falsetto_notes(client: TestClient, fs: RouteFirestore) -> None:
+    """``falsetto_notes`` counts the notes labelled falsetto (not "full" or "unsure"); attempts stored before
+    labels existed read 0."""
+    _seed_session(fs, "s1", attempts=2)
+    fs.cols["voice_attempts"]["s1:1"]["note_labels"] = [
+        _label(10.0), _label(20.0), _label(30.0, 66.0, "full"), _label(40.0, 68.0, "unsure"), _label(50.0, 70.0)
+    ]  # fmt: skip
+    attempts = client.get("/api/voice/history").json()["sessions"][0]["attempts"]
+    assert [a["falsetto_notes"] for a in attempts] == [3, 0]

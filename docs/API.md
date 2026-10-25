@@ -2183,11 +2183,12 @@ Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "
 
 ### POST /api/voice/sessions/{session_id}/attempts
 
-One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `started_at`), `stopped_early`, `quiz` and an optional `pitch` summary.
+One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `started_at`), `stopped_early`, `quiz`, an optional `pitch` summary and (since v0.33.0, both optional) `pitch_all` and `note_labels`.
 
 ```json
 {"song_key": "artist|title", "video_id": "FIXTURE11", "started_at": "2026-10-22T19:00:00Z", "ended_at": "2026-10-22T19:03:00Z",
- "stopped_early": false, "pitch": null,
+ "stopped_early": false, "pitch": null, "pitch_all": null,
+ "note_labels": [{"t_start": 151.2, "t_end": 152.0, "midi": 69.0, "label": "falsetto|full|unsure", "source": "live|quiz"}],
  "quiz": {"feel": "loved|fine|not_for_me", "position": "too_low|comfortable|too_high|both_ends",
           "difficulty": "easy|stretch|couldnt", "knew": "well|partly|barely", "would_sing": "yes|yes_other_key|no",
           "would_work_if": ["warmer", "other_key", "other_octave", "practice", "fine"], "voice_now": "fresh|warm|tired",
@@ -2195,7 +2196,9 @@ One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `start
           "tags": ["fast_lyrics", "long_gaps", "needed_warmup", "crowd_song", "mood_only"]}}
 ```
 
-`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`. The song and version the last `next` offered are always accepted, even after a voice.db swap dropped them (the attempt stores the offer's snapshot of the song).
+`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`).
+
+**Falsetto (since v0.33.0).** `pitch` is the **chest-only** summary: the app removes the spans the singer labelled falsetto before summarising. `pitch_all` (same shape, optional) is the unfiltered summary, stored for analysis only. `note_labels` (optional, at most 40) are the singer's answers about held high notes: `t_start`/`t_end` in seconds on the take's stream clock (0-3600, `t_end >= t_start`), `midi` the held note (24-96), `label` `falsetto|full|unsure`, `source` `live` (the chip while singing) or `quiz` (the catch-up). Old apps send an unfiltered `pitch` and neither field, which stays valid. When `note_labels` has falsetto notes but `pitch_all` is absent, the model can't trust `pitch` to be chest-only, so it caps `held_high` 1 semitone below the lowest falsetto-labelled note. Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`. The song and version the last `next` offered are always accepted, even after a voice.db swap dropped them (the attempt stores the offer's snapshot of the song).
 
 ### GET /api/voice/sessions/{session_id}/result
 

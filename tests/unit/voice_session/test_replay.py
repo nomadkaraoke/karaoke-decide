@@ -197,3 +197,47 @@ def test_stored_session_profile_prior_centres_on_the_full_range() -> None:
     probs = replay.prior_from_profile(session).probs()
     top = max(probs.values())
     assert {h for h, p in probs.items() if p == pytest.approx(top)} == {("baritone", 0)}
+
+
+def _labelled_song3(fx: dict[str, Any], *, pitch_all: bool) -> dict[str, Any]:
+    """Song 3 with its 8 held A4s (69) labelled falsetto, as Andrew confirmed; ``pitch`` left unfiltered (the
+    stored summary includes them). With ``pitch_all`` the app claims ``pitch`` is already chest-only."""
+    out = copy.deepcopy(fx)
+    a = out["attempts"][2]
+    a["note_labels"] = [
+        {"t_start": 30.0 + 10 * i, "t_end": 30.8 + 10 * i, "midi": 69.0, "label": "falsetto", "source": "live"}
+        for i in range(8)
+    ]
+    if pitch_all:
+        a["pitch_all"] = dict(a["pitch"])
+    return out
+
+
+def _shown(trace: list[Any]) -> list[tuple[Any, ...]]:
+    return [(s.voice_type, round(s.top_p, 6), s.confidence_label, s.comfort, s.comfort_source, s.full) for s in trace]
+
+
+def test_falsetto_labels_without_pitch_all_cap_held_high() -> None:
+    """Ruling: labels with falsetto spans but no ``pitch_all`` mean ``pitch`` may still hold the falsetto notes,
+    so ``held_high`` is capped 1 semitone below the lowest falsetto-labelled note. For Andrew's song 3 that is the
+    same as the gate's manual relabelling (held_high 68)."""
+    labelled = replay.replay_fixture(_labelled_song3(_fixture(), pitch_all=False))
+    assert _shown(labelled) == _shown(replay.replay_fixture(_relabelled(_fixture())))
+    assert _shown(labelled) != _shown(replay.replay_fixture(_fixture()))
+
+
+def test_pitch_all_means_pitch_is_already_chest_only() -> None:
+    """With ``pitch_all`` present (the new app), ``pitch`` is the chest-only summary and is used as sent."""
+    trusted = replay.replay_fixture(_labelled_song3(_fixture(), pitch_all=True))
+    assert _shown(trusted) == _shown(replay.replay_fixture(_fixture()))
+
+
+def test_chest_pitch_cap_keeps_the_summary_ordered() -> None:
+    p = replay.PitchSummary(voiced_s=60, held_count=5, held_low=66, held_high=70, p10=60, p50=64, p90=69)
+    labels = [{"t_start": 1, "t_end": 2, "midi": 66.4, "label": "falsetto", "source": "quiz"},
+              {"t_start": 3, "t_end": 4, "midi": 60.0, "label": "unsure", "source": "quiz"}]  # fmt: skip
+    out = replay.chest_pitch(p, labels, None)
+    assert out is not None and out.held_high == pytest.approx(65.4) and out.held_low == pytest.approx(65.4)
+    assert replay.chest_pitch(p, labels[1:], None) == p  # unsure alone never caps
+    assert replay.chest_pitch(p, labels, {"voiced_s": 1}) == p
+    assert replay.chest_pitch(None, labels, None) is None

@@ -155,3 +155,17 @@ def test_export_keeps_the_excluded_flag_only_when_set() -> None:
     base = {"n": 1, "song_key": "a|b", "quiz": {}, "pitch": {}, "context": {}}
     assert "excluded" not in export_attempt(base)
     assert export_attempt({**base, "excluded": True})["excluded"] is True
+
+
+def test_export_keeps_note_labels_and_pitch_all_when_set() -> None:
+    """Falsetto labels (numbers and the label/source literals only) and the unfiltered pitch replay through
+    ``replay.chest_pitch``; attempts without them export exactly as before."""
+    from scripts.voice.export_session_fixture import export_attempt
+
+    base = {"n": 1, "song_key": "a|b", "quiz": {}, "pitch": {}, "context": {}}
+    assert not {"note_labels", "pitch_all"} & set(export_attempt(base))
+    pitch = {"voiced_s": 60, "held_count": 5, "held_low": 48, "held_high": 69, "p10": 50, "p50": 55, "p90": 66}
+    label = {"t_start": 31, "t_end": 31.8, "midi": 69, "label": "falsetto", "source": "live", "note": "x"}
+    out = export_attempt({**base, "pitch_all": pitch, "note_labels": [label]})
+    assert out["note_labels"] == [{"t_start": 31.0, "t_end": 31.8, "midi": 69.0, "label": "falsetto", "source": "live"}]
+    assert out["pitch_all"] == {k: float(v) for k, v in pitch.items()}

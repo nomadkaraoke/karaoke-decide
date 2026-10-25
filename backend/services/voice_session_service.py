@@ -10,9 +10,11 @@ Firestore:
   the attempt snapshot of the song and ``offer`` the ``NextSongOut`` sent. An attempt or skip of the offered
   song and version is accepted from that snapshot even when a new voice.db no longer has them (hot swap).
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
-  pitch, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the setup at
-  attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
-  posterior can be rebuilt without voice.db.
+  pitch, pitch_all, note_labels, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the
+  setup at attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
+  posterior can be rebuilt without voice.db. ``pitch`` is chest-only (the app drops falsetto-labelled spans),
+  ``pitch_all`` the unfiltered summary (null from old apps) and ``note_labels`` the singer's per-note falsetto /
+  full / unsure labels (``[]`` from old apps; see ``replay.chest_pitch`` for labels without ``pitch_all``).
 
 The posterior is never stored: every call rebuilds it from the prior and all attempts (at most 12).
 Session-state mapping onto C2's ``SessionState``:
@@ -512,6 +514,7 @@ def _history_attempt(a: dict[str, Any], recordings: dict[str, dict[str, Any]]) -
         position=quiz.get("position"),
         excluded=bool(a.get("excluded")),
         recording=_recording_out(rec),
+        falsetto_notes=sum(1 for n in a.get("note_labels") or () if n.get("label") == "falsetto"),
     )
 
 
@@ -891,6 +894,8 @@ class VoiceSessionService:
             "quiz": body.quiz.model_dump(),
             "context": dict(session.get("setup") or {}),
             "pitch": body.pitch.model_dump() if body.pitch else None,
+            "pitch_all": body.pitch_all.model_dump() if body.pitch_all else None,
+            "note_labels": [label.model_dump() for label in body.note_labels],
             "stopped_early": body.stopped_early,
             "started_at": body.started_at,
             "ended_at": body.ended_at,

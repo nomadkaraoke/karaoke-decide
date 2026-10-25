@@ -4,7 +4,8 @@
 Reads ``decide_users/{sha256(lowercase email)}`` (for the user id), ``voice_sessions/{session}`` and the
 session's ``voice_attempts``, and writes what ``karaoke_decide.voice_session.replay.replay_fixture`` reads::
 
-    {schema, notes, setup, prior_profile, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?}]}
+    {schema, notes, setup, prior_profile,
+     attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?, note_labels?, pitch_all?}]}
 
 ``song_key`` becomes ``sha1(song_key)[:10]``; ``demand`` is the attempt's stored song snapshot demand
 (``{low, high, p10, p50, p90}``, null if the snapshot has none). No titles, artists, video ids, device names,
@@ -38,6 +39,7 @@ _CONTEXT_KEYS = ("posture", "warmth", "headphones")
 _SETUP_KEYS = ("posture", "warmth", "headphones", "record")
 _PITCH_KEYS = ("voiced_s", "held_count", "held_low", "held_high", "p10", "p50", "p90")
 _DEMAND_KEYS = ("low", "high", "p10", "p50", "p90")
+_LABEL_NUMBERS = ("t_start", "t_end", "midi")
 _PROFILE_KEYS = ("method", "voice_type", "voice_type_between", "register", "low_midi", "high_midi",
                  "comfort_low", "comfort_high", "confidence", "evidence_count")  # fmt: skip
 
@@ -79,6 +81,15 @@ def export_attempt(a: Mapping[str, Any]) -> dict[str, Any]:
     }
     if a.get("excluded"):
         out["excluded"] = True  # "don't count this one": replay.rebuild skips it, as the live service did
+    if a.get("pitch_all"):
+        out["pitch_all"] = _numbers(a.get("pitch_all"), _PITCH_KEYS)
+    if a.get("note_labels"):  # falsetto labels: replay.chest_pitch / falsetto_high read them
+        labels = []
+        for n in a["note_labels"]:
+            nums = _numbers(n, _LABEL_NUMBERS)
+            if nums is not None:
+                labels.append({**nums, "label": str(n.get("label")), "source": str(n.get("source"))})
+        out["note_labels"] = labels
     return out
 
 
