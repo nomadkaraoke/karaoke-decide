@@ -6,6 +6,7 @@ Runs through the real app with C3's fixtures (fixture voice.db + catalog.db, in-
 
 from __future__ import annotations
 
+import dataclasses
 import random
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -511,3 +512,27 @@ def test_version_stats_increment(client: TestClient, fs: RouteFirestore) -> None
     _post_attempt(client, sid, _attempt(other, 1, _quiz(version_quality="good")))
     ostats = fs.cols["voice_version_stats"][other["version"]["video_id"]]
     assert ostats == {"plays": 1, "good": 1, "not_great": 0, "early_exit": 0, "issues": {}}
+
+
+# ---------------------------------------------------------------- falsetto and singing background (Part C, C2)
+
+
+def test_session_profile_copies_falsetto_high_and_background() -> None:
+    """The session profile carries the result's ``falsetto_high`` and the setup's singing background; a falsetto
+    top below the chest range's low end (nonsense) is dropped rather than losing the whole profile."""
+    fx = replay.load_fixture(FIXTURE)
+    docs = [{**a, "song": {"demand": a["demand"]}} for a in fx["attempts"]]
+    docs[2]["note_labels"] = [{"t_start": 30.0, "t_end": 30.8, "midi": 69.0, "label": "falsetto", "source": "live"}]
+    state = replay.rebuild(replay.prior_from_profile(fx["prior_profile"]), fx["setup"], docs)
+    s = summary(state)
+    assert s.falsetto_high == 69
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    setup = {**fx["setup"], "experience": "some", "uses_falsetto": "sometimes"}
+    p = session_profile(s, state.range_attempts, "s", now, setup=setup)
+    assert p is not None
+    assert (p.falsetto_high, p.falsetto_low, p.experience, p.uses_falsetto) == (69, None, "some", "sometimes")
+    bare = session_profile(s, state.range_attempts, "s", now)
+    assert bare is not None and (bare.experience, bare.uses_falsetto) == (None, None)
+    odd = session_profile(dataclasses.replace(s, falsetto_high=30), state.range_attempts, "s", now, setup=setup)
+    assert odd is not None and odd.falsetto_high is None
+    assert RecVoice(has_profile=True, method=p.method).method == "session"  # recs v2 ignores the new keys

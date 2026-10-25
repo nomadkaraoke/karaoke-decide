@@ -187,3 +187,10 @@ def test_summary_uses_measured_and_clamps_to_full() -> None:
     # An explicit evidence list overrides the state's.
     explicit = stopping.summary(_state(bari), evidence=[_comfortable_sung(50, 58), _comfortable_sung(50, 58)])
     assert explicit.comfort == (49, 59)
+
+
+def test_summary_reports_falsetto_high() -> None:
+    """``falsetto_high`` is the state's highest falsetto-labelled note (rounded), null without one."""
+    post = posterior({("tenor", 0): 0.8, ("baritone", 0): 0.2})
+    assert stopping.summary(_state(post)).falsetto_high is None
+    assert stopping.summary(_state(post, falsetto_high=71.6)).falsetto_high == 72

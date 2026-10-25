@@ -272,3 +272,38 @@ def test_test_api_seed_voice_keeps_mic_copy(monkeypatch: pytest.MonkeyPatch) -> 
     self_report = {**PROFILE, "method": "self", "confidence": "low"}
     assert c.post("/api/test/voice/seed", json={"email": EMAIL, "profile": self_report}).status_code == 204
     assert doc["voice_profile"]["method"] == "self" and doc["voice_profile_mic"]["method"] == "mic"
+
+
+# ---------------------------------------------------------------- falsetto and singing background (Part C, C2)
+
+
+def test_profile_accepts_falsetto_and_background(client: TestClient, fs: RouteFirestore) -> None:
+    """The public PUT takes the falsetto range and the setup's singing background, for mic and self profiles."""
+    body = {**PROFILE, "falsetto_high": 76, "falsetto_low": 66, "experience": "some", "uses_falsetto": "yes"}
+    r = client.put("/api/my/voice", json=body)
+    assert r.status_code == 200, r.text
+    got = client.get("/api/my/voice").json()
+    for k in ("falsetto_high", "falsetto_low", "experience", "uses_falsetto"):
+        assert got["profile"][k] == body[k] and got["mic"][k] == body[k], k
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["falsetto_high"] == 76
+
+    self_report = {**PROFILE, "method": "self", "confidence": "low", "voice_type": None, "voice_type_between": None,
+                   "register": "middle", "experience": "none", "uses_falsetto": "unsure"}  # fmt: skip
+    assert client.put("/api/my/voice", json=self_report).status_code == 200
+    for bad in (
+        {"falsetto_high": 39},  # below low_midi
+        {"falsetto_high": 70, "falsetto_low": 72},  # low above high
+        {"falsetto_high": 120},
+        {"experience": "pro"},
+        {"uses_falsetto": "always"},
+    ):
+        assert client.put("/api/my/voice", json={**PROFILE, **bad}).status_code == 422, bad
+
+
+def test_old_profile_without_fields_still_validates(client: TestClient, fs: RouteFirestore) -> None:
+    """A stored profile from before v0.33.0 (and an old app's PUT body) has none of the new fields: they read null."""
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {**PROFILE, "updated_at": "2026-10-22T10:00:00Z"}
+    got = client.get("/api/my/voice").json()["profile"]
+    assert got["voice_type"] == "baritone"
+    assert (got["falsetto_high"], got["falsetto_low"], got["experience"], got["uses_falsetto"]) == (None,) * 4
+    assert client.put("/api/my/voice", json=PROFILE).json()["falsetto_high"] is None

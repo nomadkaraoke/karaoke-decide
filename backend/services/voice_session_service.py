@@ -10,9 +10,11 @@ Firestore:
   the attempt snapshot of the song and ``offer`` the ``NextSongOut`` sent. An attempt or skip of the offered
   song and version is accepted from that snapshot even when a new voice.db no longer has them (hot swap).
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
-  pitch, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the setup at
-  attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
-  posterior can be rebuilt without voice.db.
+  pitch, pitch_all, note_labels, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the
+  setup at attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
+  posterior can be rebuilt without voice.db. ``pitch`` is chest-only (the app drops falsetto-labelled spans),
+  ``pitch_all`` the unfiltered summary (null from old apps) and ``note_labels`` the singer's per-note falsetto /
+  full / unsure labels (``[]`` from old apps; see ``replay.chest_pitch`` for labels without ``pitch_all``).
 
 The posterior is never stored: every call rebuilds it from the prior and all attempts (at most 12).
 Session-state mapping onto C2's ``SessionState``:
@@ -66,6 +68,7 @@ from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
     AttemptPatchOut,
+    ComfortEstimateOut,
     HistoryAttemptOut,
     HistoryRecordingOut,
     HistorySessionOut,
@@ -105,11 +108,12 @@ from karaoke_decide.core.models import User
 from karaoke_decide.voice_pool.models import Version
 from karaoke_decide.voice_pool.versions import VersionStats, choose_versions
 from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
+from karaoke_decide.voice_session.comfort import comfort_band
 from karaoke_decide.voice_session.model import Posterior, SongDemand, key_shift_direction
 from karaoke_decide.voice_session.replay import demand_from_doc as _demand
 from karaoke_decide.voice_session.replay import rebuild
 from karaoke_decide.voice_session.select import CandidateSong, SessionState, choose_next, know_weight
-from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, summary
+from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, comfort_sd, summary
 
 logger = logging.getLogger(__name__)
 
@@ -345,11 +349,50 @@ def summary_out(
         comfort_low=s.comfort[0],
         comfort_high=s.comfort[1],
         comfort_source=s.comfort_source,
+        falsetto_high=s.falsetto_high,
         attempts=state.attempts,
         evidence_attempts=state.range_attempts,
         profile_saved=profile_saved,
         computed_at=now,
     )
+
+
+_BACKGROUND = ("experience", "uses_falsetto")
+
+
+def _stored_setup(setup: SessionSetup) -> dict[str, Any]:
+    """The setup as stored: the optional singing-background answers only when given (older docs have none)."""
+    return setup.model_dump(exclude={k for k in _BACKGROUND if getattr(setup, k) is None})
+
+
+def _prior_comfort(session: dict[str, Any]) -> tuple[int, int] | None:
+    """The comfort band of the session's prior profile (frozen at setup), or None without a valid one."""
+    raw = session.get("prior_profile")
+    if not raw:
+        return None
+    try:
+        p = VoiceProfileOut.model_validate(raw)
+    except ValidationError:
+        return None  # _prior already logged it
+    return p.comfort_low, p.comfort_high
+
+
+def comfort_estimate(session: dict[str, Any], state: SessionState) -> ComfortEstimateOut:
+    """The chest comfort reference for the app's live falsetto chip, as the session stands.
+
+    The measured band once the songs rated comfortable measure it (``comfort.comfort_band``, as ``summary`` shows
+    it); else, before any attempt counts, the prior profile's own band ("profile"); else the posterior mean
+    ("model"). ``sd_high`` is the model's posterior SD of the comfort top in every case."""
+    sd_high = round(comfort_sd(state)[1], 2)
+    f_lo, f_hi = state.posterior.full_estimate()
+    band = comfort_band(state.evidence, (round(f_lo), round(f_hi)))
+    if band is not None:
+        return ComfortEstimateOut(low=band[0], high=band[1], sd_high=sd_high, source="measured")
+    prior = _prior_comfort(session)
+    if not state.evidence and prior is not None:
+        return ComfortEstimateOut(low=prior[0], high=prior[1], sd_high=sd_high, source="profile")
+    c_lo, c_hi = state.posterior.comfort_estimate()
+    return ComfortEstimateOut(low=round(c_lo, 1), high=round(c_hi, 1), sd_high=sd_high, source="model")
 
 
 def _ever_warm(session: dict[str, Any], attempts: Sequence[dict[str, Any]]) -> bool:
@@ -512,6 +555,7 @@ def _history_attempt(a: dict[str, Any], recordings: dict[str, dict[str, Any]]) -
         position=quiz.get("position"),
         excluded=bool(a.get("excluded")),
         recording=_recording_out(rec),
+        falsetto_notes=sum(1 for n in a.get("note_labels") or () if n.get("label") == "falsetto"),
     )
 
 
@@ -653,7 +697,7 @@ class VoiceSessionService:
             session_id,
             {
                 "user_id": user.id,
-                "setup": setup.model_dump(),
+                "setup": _stored_setup(setup),
                 "state": "active",
                 "created_at": now,
                 "updated_at": now,
@@ -726,7 +770,13 @@ class VoiceSessionService:
             last = session.get("last_offer") or {}
             reason = last.get("reason_type") if last.get("song_key") == pending else "explore"
             offer = await self._offer(
-                session_id, index[pending], reason or "explore", skips, link_out_ok=True, attempt_n=state.attempts + 1
+                session_id,
+                index[pending],
+                reason or "explore",
+                skips,
+                link_out_ok=True,
+                attempt_n=state.attempts + 1,
+                comfort=comfort_estimate(session, state),
             )
             assert offer is not None  # link_out_ok always offers
             return offer
@@ -744,6 +794,7 @@ class VoiceSessionService:
                 skips,
                 link_out_ok=attempt == MAX_REPICKS,
                 attempt_n=state.attempts + 1,
+                comfort=comfort_estimate(session, state),
             )
             if offer is not None:
                 return offer
@@ -763,6 +814,7 @@ class VoiceSessionService:
         *,
         link_out_ok: bool,
         attempt_n: int,
+        comfort: ComfortEstimateOut | None = None,
     ) -> NextSongOut | None:
         """The song with its best playable version (live stats), a link-out offer, or None (no version)."""
         stats = await self._version_stats(e.versions)
@@ -783,6 +835,7 @@ class VoiceSessionService:
             alternatives=[_version_out(v) for v in playable[1 : 1 + ALTERNATIVES]],
             song_range=SongRangeOut(low=d.low, high=d.high, p10=d.p10, p50=d.p50, p90=d.p90),
             attempt_n=attempt_n,
+            comfort_estimate=comfort,
         )
         last_offer = {
             "song_key": e.song_key,
@@ -891,6 +944,8 @@ class VoiceSessionService:
             "quiz": body.quiz.model_dump(),
             "context": dict(session.get("setup") or {}),
             "pitch": body.pitch.model_dump() if body.pitch else None,
+            "pitch_all": body.pitch_all.model_dump() if body.pitch_all else None,
+            "note_labels": [label.model_dump() for label in body.note_labels],
             "stopped_early": body.stopped_early,
             "started_at": body.started_at,
             "ended_at": body.ended_at,
@@ -1034,7 +1089,7 @@ class VoiceSessionService:
         saved = bool(session.get("profile_saved"))
         changes: dict[str, Any] = {}
         current = await self._profiles.get(user_id)
-        derived = session_profile(s, state.range_attempts, session_id, now)
+        derived = session_profile(s, state.range_attempts, session_id, now, setup=session.get("setup"))
         if current is not None and current.method == "session" and current.session_id == session_id:
             if derived is not None:
                 await self._profiles.put(user_id, derived)
@@ -1080,7 +1135,7 @@ class VoiceSessionService:
         attempts = await self._attempts(user.id, session_id)
         state, _, s = await asyncio.to_thread(summarize, session, attempts)
         now = datetime.now(UTC)
-        derived = session_profile(s, state.range_attempts, session_id, now)
+        derived = session_profile(s, state.range_attempts, session_id, now, setup=session.get("setup"))
         if derived is None:
             raise NoEvidenceError(session_id)
         try:
@@ -1113,7 +1168,9 @@ class VoiceSessionService:
                 logger.warning("voice session %s: outputs of attempt %s failed", session_id, a.get("n"), exc_info=True)
         state, done_reason, s = await asyncio.to_thread(summarize, session, attempts)
         finishing = was == "active"  # only finishing an active session may save its profile
-        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=finishing)
+        profile, saved = await self._save_profile(
+            user.id, session_id, s, state.range_attempts, may_save=finishing, setup=session.get("setup")
+        )
         if not finishing:  # done or abandoned: keep what was stored (an adopt may have saved it)
             saved = bool(session.get("profile_saved"))
         suited = await self._suited(user, profile)
@@ -1145,6 +1202,7 @@ class VoiceSessionService:
             comfort_low=s.comfort[0],
             comfort_high=s.comfort[1],
             comfort_source=s.comfort_source,
+            falsetto_high=s.falsetto_high,
             attempts=state.attempts,
             partial=done_reason != "confident",
             improve_hint=s.improve_hint,
@@ -1155,7 +1213,14 @@ class VoiceSessionService:
         )
 
     async def _save_profile(
-        self, user_id: str, session_id: str, s: ResultSummary, evidence_count: int, *, may_save: bool
+        self,
+        user_id: str,
+        session_id: str,
+        s: ResultSummary,
+        evidence_count: int,
+        *,
+        may_save: bool,
+        setup: dict[str, Any] | None = None,
     ) -> tuple[VoiceProfileOut | None, bool]:
         """(the profile the result stands for, whether it was saved now).
 
@@ -1165,7 +1230,7 @@ class VoiceSessionService:
         result's profile (for ``suited``); with no range evidence there is none and the stored profile stands."""
         existing = await self._profiles.get(user_id)
         now = datetime.now(UTC)
-        derived = session_profile(s, evidence_count, session_id, now)
+        derived = session_profile(s, evidence_count, session_id, now, setup=setup)
         if derived is None:
             return existing, False
         if may_save and should_save(s.confidence_label, existing):

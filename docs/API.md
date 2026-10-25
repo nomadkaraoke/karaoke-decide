@@ -164,7 +164,7 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `POST /api/test/profile/reset` | `{email}` → 204; deletes the user's decide data |
 | `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
 | `GET /api/test/profile?email=` | Reads the profile back |
-| `POST /api/test/voice/seed-history` | `{email, sessions: [{state, result_summary?, attempts: [{song_key, artist, title, quiz, pitch?, recording, excluded?}]}]}` → `{user_id, sessions: [{session_id, attempt_ids, recording_ids}]}`. Replaces the user's voice history (oldest session first); `recording: true` stores a short synthetic WAV that `GET /api/voice/recordings/{id}/audio` plays (docs/TESTING.md § Voice session) |
+| `POST /api/test/voice/seed-history` | `{email, sessions: [{state, result_summary?, attempts: [{song_key, artist, title, quiz, pitch?, note_labels?, recording, excluded?}]}]}` → `{user_id, sessions: [{session_id, attempt_ids, recording_ids}]}`. Replaces the user's voice history (oldest session first); `recording: true` stores a short synthetic WAV that `GET /api/voice/recordings/{id}/audio` plays (docs/TESTING.md § Voice session) |
 | `POST /api/test/karaoke-log/seed` | `{email, entries: [{id: "app_…", ...app patch}]}` → `{user_id, count}`. Writes app karaoke-log entries through `KaraokeLogService.upsert_user` (counts and survey placeholders as a real app write); creates the user if needed. Non-`app_` ids → 400 `invalid`. |
 | `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log and the user's playlists. |
 | `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
@@ -445,6 +445,8 @@ The singer's voice profile, stored on their `decide_users` doc (auth required; v
 ```
 
 Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self (`session` is `422` here: only a voice session's result saves those), and `self` requires `confidence: low`.
+
+Optional since v0.33.0 (null when absent, so old apps and stored profiles are unchanged): `falsetto_high` / `falsetto_low` (MIDI 24-96, `falsetto_high >= low_midi`, `falsetto_low <= falsetto_high`): the falsetto / head-voice range, kept apart from the chest range `low_midi..high_midi` (the mic test's "Was your top note falsetto?"); `experience` (none|some|trained) and `uses_falsetto` (yes|sometimes|no|unsure): the singing background from the session setup. A session profile carries the result's `falsetto_high` and its setup's background.
 
 ### GET /api/catalog/songs/{song_key}/vocal-range
 
@@ -2145,7 +2147,7 @@ Phase 3d. A guided singing session that finds the singer's voice type and key-fi
 
 ### POST /api/voice/sessions
 
-Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel"}` (`device` optional, max 80). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
+Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel", "experience": "none|some|trained", "uses_falsetto": "yes|sometimes|no|unsure"}` (`device` optional, max 80; `experience` and `uses_falsetto`, the optional "About your singing" answers, since v0.33.0: stored in the setup only when given, read back as `null` otherwise, and copied into the session's voice profile). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
 
 ### GET /api/voice/sessions/{session_id}
 
@@ -2153,7 +2155,8 @@ The session as it stands, for resuming it. Read-only: never changes the session.
 
 ```json
 {"session_id": "abc123", "state": "active|abandoned|done",
- "setup": {"posture": "standing", "warmth": "warm", "record": false, "headphones": true, "device": "Pixel"},
+ "setup": {"posture": "standing", "warmth": "warm", "record": false, "headphones": true, "device": "Pixel",
+           "experience": null, "uses_falsetto": null},
  "attempts": 2, "top_p": 0.41, "done_reason": null, "last_offer": {"kind": "song", "song_key": "artist|title", "...": "..."},
  "profile_saved": false}
 ```
@@ -2172,10 +2175,13 @@ The next song, or the end of the session. Errors: `404 session_not_found`, `409 
 {"kind": "song", "song_key": "artist|title", "artist": "Artist", "title": "Title", "duration_s": 215,
  "reason_type": "explore", "version": {"video_id": "FIXTURE11", "brand_code": "SING", "brand_name": "Sing King", "embeddable": true},
  "alternatives": [], "song_range": {"low": 48, "high": 70, "p10": 52, "p50": 59, "p90": 66},
- "attempt_n": 3, "max_attempts": 12}
+ "attempt_n": 3, "max_attempts": 12,
+ "comfort_estimate": {"low": 49, "high": 59, "sd_high": 1.4, "source": "measured|model|profile"}}
 ```
 
 or `{"kind": "done", "reason": "..."}`. `attempt_n` is the 1-based number an attempt on this song would get, out of `max_attempts` (12). `version.embeddable` is `false` only for the link-out offer (no embeddable version is left): the app opens YouTube instead of embedding. `alternatives` holds at most 2 versions; `song_range` is `null` without data.
+
+`comfort_estimate` (since v0.33.0) is the session's chest comfort band when the song is offered, the reference for the app's live "High note: falsetto?" chip: `measured` once the songs rated comfortable measure it (the band the result would show), else `profile` while no attempt counts yet and the session's prior profile (frozen at setup) has a band (its own `comfort_low`/`comfort_high`), else `model` (the posterior mean, one decimal). `sd_high` is always the model's posterior SD of the comfort top. Excluded attempts don't count. It is stored with the offer, so `GET /api/voice/sessions/{id}` `last_offer` repeats it.
 
 ### POST /api/voice/sessions/{session_id}/skips
 
@@ -2183,11 +2189,12 @@ Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "
 
 ### POST /api/voice/sessions/{session_id}/attempts
 
-One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `started_at`), `stopped_early`, `quiz` and an optional `pitch` summary.
+One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `started_at`), `stopped_early`, `quiz`, an optional `pitch` summary and (since v0.33.0, both optional) `pitch_all` and `note_labels`.
 
 ```json
 {"song_key": "artist|title", "video_id": "FIXTURE11", "started_at": "2026-10-22T19:00:00Z", "ended_at": "2026-10-22T19:03:00Z",
- "stopped_early": false, "pitch": null,
+ "stopped_early": false, "pitch": null, "pitch_all": null,
+ "note_labels": [{"t_start": 151.2, "t_end": 152.0, "midi": 69.0, "label": "falsetto|full|unsure", "source": "live|quiz"}],
  "quiz": {"feel": "loved|fine|not_for_me", "position": "too_low|comfortable|too_high|both_ends",
           "difficulty": "easy|stretch|couldnt", "knew": "well|partly|barely", "would_sing": "yes|yes_other_key|no",
           "would_work_if": ["warmer", "other_key", "other_octave", "practice", "fine"], "voice_now": "fresh|warm|tired",
@@ -2195,7 +2202,9 @@ One sung song. Body: `song_key`, `video_id`, `started_at`, `ended_at` (>= `start
           "tags": ["fast_lyrics", "long_gaps", "needed_warmup", "crowd_song", "mood_only"]}}
 ```
 
-`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`. The song and version the last `next` offered are always accepted, even after a voice.db swap dropped them (the attempt stores the offer's snapshot of the song).
+`feel` and `position` are required; the other quiz fields are optional. `pitch` is `{voiced_s, held_count, held_low, held_high, p10, p50, p90}` in MIDI numbers (24-96, `held_low <= held_high`, `p10 <= p50 <= p90`).
+
+**Falsetto (since v0.33.0).** `pitch` is the **chest-only** summary: the app removes the spans the singer labelled falsetto before summarising. `pitch_all` (same shape, optional) is the unfiltered summary, stored for analysis only. `note_labels` (optional, at most 40) are the singer's answers about held high notes: `t_start`/`t_end` in seconds on the take's stream clock (0-3600, `t_end >= t_start`), `midi` the held note (24-96), `label` `falsetto|full|unsure`, `source` `live` (the chip while singing) or `quiz` (the catch-up). Old apps send an unfiltered `pitch` and neither field, which stays valid. When `note_labels` has falsetto notes but `pitch_all` is absent, the model can't trust `pitch` to be chest-only, so it caps `held_high` 1 semitone below the lowest falsetto-labelled note (if every held note was falsetto, it ignores the held notes instead). Returns `{"attempt_id": "<session>:<n>", "n": 1, "done": false, "done_reason": null, "top_p": 0.4}`. Each attempt also writes (once) the song's `user_songs` row (`source: voice_session` on a new row, `session_*` labels, `times_sung` + 1), version stats, and a "Love it" for `feel: loved`. Errors: `404 session_not_found`, `409 session_not_active`, `409 max_attempts` (12 per session), `422` validation, `unknown_song`, `unknown_version`. The song and version the last `next` offered are always accepted, even after a voice.db swap dropped them (the attempt stores the offer's snapshot of the song).
 
 ### GET /api/voice/sessions/{session_id}/result
 
@@ -2203,9 +2212,11 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
 
 ```json
 {"voice_type": "tenor", "between": null, "confidence_label": "low", "top_p": 0.5, "low": 45, "high": 69,
- "comfort_low": 49, "comfort_high": 59, "comfort_source": "measured", "attempts": 3, "partial": false, "improve_hint": null, "done_reason": "confident", "profile_saved": false,
+ "comfort_low": 49, "comfort_high": 59, "comfort_source": "measured", "falsetto_high": 69, "attempts": 3, "partial": false, "improve_hint": null, "done_reason": "confident", "profile_saved": false,
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
+
+`falsetto_high` (since v0.33.0; `null` without one) is the highest note labelled falsetto (`note_labels`, rounded) on an attempt that counts: excluded attempts' labels don't. Falsetto notes are kept out of the chest range: `low`/`high` and the comfort come from the chest-only `pitch` the app sends with `pitch_all`. For an attempt with labels but no `pitch_all` (an older app), only `held_high` is capped below the lowest falsetto label; its percentiles are kept, so the tessitura evidence can still include falsetto notes there.
 
 `comfort_source` (since v0.32.0; default `model`) says where `comfort_low`/`comfort_high` come from: `measured` once at least 2 songs rated comfortable and easy, known better than "barely", carry a usable `pitch` (60 s voiced in total): the voiced-seconds-weighted mean of their sung p10/p90 (each kept inside that song's held notes), widened to at least 11 keys around its centre and to cover each of those songs' p10..p90, shifted inside `low`..`high`; `model` otherwise: the voice model's estimate for the likely types. A saved `method: session` profile stores the same comfort. `confidence_label` is `medium` ("between") only when the top type has at least 0.7 within the first 5 counting songs (excluded ones don't count) (any settled adjacent pair after that), and a measured comfort counts as settled (see `docs/VOICE-SESSION-TUNING.md`).
 
@@ -2222,7 +2233,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
 ```json
 {"sessions": [{"session_id": "abc123", "created_at": "2026-10-25T19:00:00Z", "state": "done",
   "result": {"session_id": "abc123", "voice_type": "baritone", "between": null, "confidence_label": "low", "top_p": 0.5,
-             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "comfort_source": "model", "attempts": 4, "evidence_attempts": 4,
+             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "comfort_source": "model", "falsetto_high": null, "attempts": 4, "evidence_attempts": 4,
              "profile_saved": false, "computed_at": "2026-10-25T19:40:00Z"},
   "attempts": [{"attempt_id": "abc123:1", "n": 1, "song_key": "artist|title", "artist": "Artist", "title": "Title",
                 "sung_at": "2026-10-25T19:08:00Z", "feel": "loved", "position": "comfortable", "excluded": false,
@@ -2230,7 +2241,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
                 "falsetto_notes": 0}]}]}
 ```
 
-`result` is the session's result as last computed (`null` before the first `GET .../result`). Its `comfort_source` is the result's (`measured` / `model`; summaries stored before v0.32.0 read as `model`), and a "Don't count this one" recompute updates it: excluding a comfortable song can leave too few to measure. `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
+`result` is the session's result as last computed (`null` before the first `GET .../result`). Its `comfort_source` is the result's (`measured` / `model`; summaries stored before v0.32.0 read as `model`), and a "Don't count this one" recompute updates it: excluding a comfortable song can leave too few to measure. `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`). `falsetto_notes` is how many of the attempt's `note_labels` say falsetto; the `result`'s `falsetto_high` is as in `GET .../result`.
 
 ### PATCH /api/voice/attempts/{attempt_id}
 

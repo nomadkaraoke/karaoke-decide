@@ -9,7 +9,8 @@ measured two ways:
 
 Plan: nomadkaraoke workspace `docs/archive/2026-10-25-mobile-phase3d-tuning-batch-1-plan.md` (Part E).
 This page records the **baseline before any tuning (Task E1, v0.31.x weights)**, then the
-[tuning batch 1 results (E2–E5, D1, v0.32.0)](#tuning-batch-1-e2e5-d1-v0320) below it.
+[tuning batch 1 results (E2–E5, D1, v0.32.0)](#tuning-batch-1-e2e5-d1-v0320) below it, then
+[falsetto (Part C, v0.33.0)](#falsetto-part-c-v0330).
 
 ## How to run
 
@@ -399,8 +400,51 @@ As recorded, falsetto left in (what today's app sends; not gated):
 3. **The realistic sim is still a model.** It doesn't simulate falsetto-rated songs, octave errors in the demand
    analysis (Andrew's song 4 was sung 10 semitones below its demand), or wrong "knew" answers. Andrew's second
    session (manual gate 3) is the real check.
-4. **C1 (chest-only pitch) is still needed.** The replay gate keeps the falsetto percentiles. The comfort comes
-   out right only because the falsetto song was also rated a stretch.
+4. ~~**C1 (chest-only pitch) is still needed.**~~ **Done in v0.33.0** (below): the app sends a chest-only `pitch`;
+   labels without `pitch_all` cap `held_high`. The replay gate still keeps the falsetto percentiles, and the comfort
+   comes out right because the falsetto song was also rated a stretch.
 5. ~~Excluded attempts (PR 1, A4) and `state.evidence`~~ **Resolved** in the rebase onto v0.31.0.
    `replay.rebuild` (which `rebuild_state` calls) skips excluded attempts before `state.evidence.append`. This is
    pinned by `test_rebuild_state_with_an_excluded_attempt_keeps_v031_semantics`.
+
+## Falsetto (Part C, v0.33.0)
+
+No weights changed. What the model reads from an attempt:
+
+- **`pitch` is chest-only.** The app removes the spans the singer labelled falsetto before summarising and sends the
+  unfiltered summary as `pitch_all` (stored, never read by the model) with the labels as `note_labels`.
+- **Ruling: labels without `pitch_all`** (`replay.chest_pitch`). Then `pitch` may still hold the falsetto notes,
+  so `held_high` is capped 1 semitone below the lowest falsetto-labelled note.
+  - If the cap falls below `held_low`, every held note was falsetto. No chest note is invented: the summary keeps
+    no held evidence (`held_count` 0). Then `likelihood_pitch` is 1.0, and tessitura, the measured comfort and range
+    evidence don't use this pitch.
+  - Percentiles are kept, as the gate's manual relabelling (`_relabelled`) does. The measured comfort clamps them
+    to the held notes, but `likelihood_tessitura` reads p10/p50/p90 unclamped. An old app's falsetto can still
+    lift the tessitura of a song rated comfortable and easy.
+  - For Andrew's song 3 (8 held A4s, all confirmed falsetto) this is exactly the gate's relabelling
+    (`test_falsetto_labels_without_pitch_all_cap_held_high`).
+  - With `pitch_all` present, `pitch` is used as sent.
+  - "unsure" and "full" labels never cap.
+- **`falsetto_high`** is the highest falsetto-labelled note (rounded) on an attempt that counts. Excluded attempts'
+  labels don't count. It is in the result, the stored summary and the session profile, never in the chest range
+  or comfort.
+- **`comfort_estimate`** goes on every offered song. It is the chest reference for the app's live chip: measured,
+  else the prior profile's band before any attempt counts, else the model mean with its SD.
+
+**Gates re-run on v0.33.0 (unchanged from v0.32.0).** `sim_grid.py --evaluate`, seed 20261025:
+
+- exact@5 81.0%, adjacent@5 100%, confident≤5 58%, wrong≤5 5.0%, open exact@5 77%;
+- Andrew: baritone .82, high, 48–59;
+- old gate: confident≤10 98%, adjacent 100%, exact 82%.
+
+The simulation doesn't go through `replay.rebuild`, so labels can't move it.
+
+**Andrew's replay, song 3 labelled through `note_labels`** (no `pitch_all`, as the stored attempt would be). It
+matches the relabelled gate trace:
+
+| after song | type | top_p | pair_p | label | comfort | source | full | falsetto_high |
+|---|---|---|---|---|---|---|---|---|
+| 1 | baritone | .62 | .91 | low | 49–63 | model | 44–68 | – |
+| 2 | baritone | .62 | .92 | low | 48–62 | model | 43–67 | – |
+| 3 | baritone | .69 | .98 | low | 50–64 | model | 45–69 | 69 |
+| 4 | baritone | .82 | .98 | **high** | **48–59** | measured | 45–69 | 69 |

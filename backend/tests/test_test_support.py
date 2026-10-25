@@ -509,7 +509,8 @@ def test_seed_history_creates_playable_recording(
                      "pitch": {"voiced_s": 30, "held_count": 3, "held_low": 50, "held_high": 66, "p10": 52, "p50": 57,
                                "p90": 63}, "recording": True},
                     {"song_key": "artist c|song c", "artist": "Artist C", "title": "Song C", "quiz": quiz,
-                     "recording": False, "excluded": True},
+                     "recording": False, "excluded": True,
+                     "note_labels": [{"t_start": 31, "t_end": 31.8, "midi": 69, "label": "falsetto", "source": "live"}]},
                 ],
             },
         ],
@@ -533,6 +534,7 @@ def test_seed_history_creates_playable_recording(
     a1, a2 = sessions[0]["attempts"]
     assert a1["recording"]["recording_id"] == rid and a1["recording"]["content_type"] == "audio/wav"
     assert a2["excluded"] is True and a2["recording"] is None and a2["feel"] == "loved"
+    assert (a1["falsetto_notes"], a2["falsetto_notes"]) == (0, 1)
     audio = c.get(f"/api/voice/recordings/{rid}/audio")
     assert audio.status_code == 200 and audio.headers["content-type"] == "audio/wav"
     assert audio.content[:4] == b"RIFF" and len(audio.content) == a1["recording"]["bytes"]

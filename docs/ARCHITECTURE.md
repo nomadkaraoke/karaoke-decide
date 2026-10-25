@@ -338,6 +338,15 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   docs by `erase_voice_data`; `decide_users.voice_profile_mic` (the kept mic-test result) is cleared by
   `DELETE /api/my/voice` and goes with the `decide_users` doc on account deletion. Asserted in
   `backend/tests/test_user_deletion.py`.
+- **Falsetto data (Phase 3d batch 1, Part C, v0.33.0; no new collections)**: `voice_attempts.note_labels` (the
+  singer's per-note falsetto / full / unsure answers: times on the take's clock, the MIDI note, live or quiz;
+  numbers and labels only) and `voice_attempts.pitch_all` (the unfiltered pitch summary next to the chest-only
+  `pitch`) go with their attempt docs in `erase_voice_data`. `voice_sessions.setup.experience` / `uses_falsetto`
+  (the optional singing background, also copied into each attempt's `voice_attempts.context`) and
+  `result_summary.falsetto_high` go with the session and attempt docs. On the voice
+  profile (`decide_users.voice_profile`, `voice_profile_mic`), `falsetto_high`, `falsetto_low`, `experience` and
+  `uses_falsetto` are cleared with the profile by `DELETE /api/my/voice` and go with the `decide_users` doc on
+  account deletion. Asserted in `backend/tests/test_user_deletion.py`.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);

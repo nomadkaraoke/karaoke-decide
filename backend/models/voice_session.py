@@ -12,7 +12,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.services.recs_v2.service import RecSong
-from backend.services.voice_profile_service import VoiceProfileOut
+from backend.services.voice_profile_service import Experience, UsesFalsetto, VoiceProfileOut
 from karaoke_decide.voice_session.select import ReasonType
 from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ComfortSource, ConfidenceLabel, DoneReason, ImproveHint
 
@@ -35,6 +35,10 @@ class SessionSetup(_Request):
     record: bool
     headphones: bool
     device: str | None = Field(default=None, max_length=80)
+    # Optional "About your singing" answers (since v0.33.0): stored in the setup, copied into the session profile;
+    # the app's live falsetto chip uses ``uses_falsetto`` for its offset.
+    experience: Experience | None = None
+    uses_falsetto: UsesFalsetto | None = None
 
 
 class SessionPatch(_Request):
@@ -45,6 +49,8 @@ class SessionPatch(_Request):
     record: bool | None = None
     headphones: bool | None = None
     device: str | None = Field(default=None, max_length=80)
+    experience: Experience | None = None
+    uses_falsetto: UsesFalsetto | None = None
 
 
 class SessionCreated(BaseModel):
@@ -68,6 +74,19 @@ class SongRangeOut(BaseModel):
     p90: float
 
 
+class ComfortEstimateOut(BaseModel):
+    """The session's chest comfort estimate when the song is offered (the live falsetto chip's reference).
+
+    ``source``: "measured" (from the songs rated comfortable, as the result shows it), "model" (the posterior
+    mean) or "profile" (no attempt counts yet: the prior profile's own band). ``sd_high`` is always the model's
+    posterior SD of the comfort top, so the app can tell a settled model estimate from a guess."""
+
+    low: float
+    high: float
+    sd_high: float
+    source: Literal["measured", "model", "profile"]
+
+
 class NextSongOut(BaseModel):
     kind: Literal["song"] = "song"
     song_key: str
@@ -80,6 +99,7 @@ class NextSongOut(BaseModel):
     song_range: SongRangeOut | None
     attempt_n: int  # the 1-based number an attempt on this song would get
     max_attempts: int = MAX_ATTEMPTS
+    comfort_estimate: ComfortEstimateOut | None = None  # since v0.33.0
 
 
 class NextDoneOut(BaseModel):
@@ -134,7 +154,32 @@ class PitchSummaryIn(_Request):
         return self
 
 
+NoteLabel = Literal["falsetto", "full", "unsure"]
+MAX_NOTE_LABELS = 40
+
+
+class NoteLabelIn(_Request):
+    """One held high note the singer labelled: live (the "High note: falsetto?" chip) or in the quiz catch-up.
+    ``t_start`` / ``t_end`` are seconds on the take's stream clock; ``midi`` the held note."""
+
+    t_start: float = Field(ge=0, le=3600)
+    t_end: float = Field(ge=0, le=3600)
+    midi: float = MidiFloat
+    label: NoteLabel
+    source: Literal["live", "quiz"]
+
+    @model_validator(mode="after")
+    def _ordered(self) -> Self:
+        if self.t_end < self.t_start:
+            raise ValueError("require t_end >= t_start")
+        return self
+
+
 class AttemptIn(_Request):
+    """``pitch`` is the chest-only summary (the app drops falsetto-labelled spans; Phase 3d batch 1, Part C);
+    ``pitch_all`` the unfiltered one, kept for analysis. Old apps send an unfiltered ``pitch`` and neither new
+    field, which stays valid."""
+
     song_key: str = Field(max_length=500)
     video_id: str = Field(max_length=64)
     started_at: datetime
@@ -142,6 +187,8 @@ class AttemptIn(_Request):
     stopped_early: bool
     quiz: QuizIn
     pitch: PitchSummaryIn | None = None
+    pitch_all: PitchSummaryIn | None = None
+    note_labels: list[NoteLabelIn] = Field(default_factory=list, max_length=MAX_NOTE_LABELS)
 
     @model_validator(mode="after")
     def _ended_after_start(self) -> Self:
@@ -175,6 +222,8 @@ class ResultOut(BaseModel):
     comfort_high: int
     # "measured": from the songs rated comfortable and easy, with usable pitch; "model": the voice model's estimate.
     comfort_source: ComfortSource = "model"
+    # The highest note labelled falsetto on an attempt that counts (since v0.33.0); null without one.
+    falsetto_high: int | None = None
     attempts: int
     partial: bool
     improve_hint: ImproveHint | None
@@ -222,6 +271,7 @@ class SessionResultSummaryOut(BaseModel):
     comfort_low: int
     comfort_high: int
     comfort_source: ComfortSource = "model"  # as ResultOut; summaries stored before v0.32.0 read as "model"
+    falsetto_high: int | None = None  # as ResultOut; summaries stored before v0.33.0 read null
     attempts: int
     evidence_attempts: int  # attempts with range evidence that count (excluded ones don't)
     profile_saved: bool

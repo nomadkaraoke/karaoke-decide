@@ -854,7 +854,8 @@ def test_get_session_for_resume_is_read_only(make_client: MakeClient, fs: RouteF
     got = client.get(f"/api/voice/sessions/{sid}")
     assert got.status_code == 200, got.text
     assert got.json() == {
-        "session_id": sid, "state": "active", "setup": SETUP, "attempts": 0, "top_p": got.json()["top_p"],
+        "session_id": sid, "state": "active", "setup": {**SETUP, "experience": None, "uses_falsetto": None},
+        "attempts": 0, "top_p": got.json()["top_p"],
         "done_reason": None, "last_offer": None, "profile_saved": False,
     }  # fmt: skip
 
@@ -1454,3 +1455,169 @@ def test_exclude_with_missing_session_leaves_no_flag(client: TestClient, fs: Rou
     r = client.patch("/api/voice/attempts/s1:1", json={"excluded": True})
     assert r.status_code == 404
     assert "excluded" not in fs.cols["voice_attempts"]["s1:1"]
+
+
+# ---------------------------------------------------------------- falsetto (Phase 3d batch 1, Part C)
+
+CHEST = {"voiced_s": 60, "held_count": 8, "held_low": 48, "held_high": 64, "p10": 50, "p50": 55, "p90": 62}
+UNFILTERED = {"voiced_s": 66, "held_count": 10, "held_low": 48, "held_high": 69, "p10": 50, "p50": 56, "p90": 66}
+
+
+def _label(t: float, midi: float = 69.0, label: str = "falsetto", source: str = "live") -> dict[str, Any]:
+    return {"t_start": t, "t_end": t + 0.8, "midi": midi, "label": label, "source": source}
+
+
+def test_attempt_accepts_note_labels_and_pitch_all(client: TestClient, fs: RouteFirestore) -> None:
+    """The app sends the chest-only summary as ``pitch``, the unfiltered one as ``pitch_all`` and its per-note
+    labels; all three are stored on the attempt. An old app's request (none of the new fields) still works."""
+    sid = _create(client)
+    song = _next(client, sid)
+    labels = [_label(31.0), _label(95.5, 67.0, "unsure", "quiz"), _label(120.0, 66.0, "full", "quiz")]
+    out = _post_attempt(client, sid, _attempt(song, 0, pitch=CHEST, pitch_all=UNFILTERED, note_labels=labels))
+    doc = fs.cols["voice_attempts"][out["attempt_id"]]
+    assert doc["pitch"]["held_high"] == 64
+    assert doc["pitch_all"] == {**UNFILTERED, "held_count": 10}
+    assert doc["note_labels"] == labels
+
+    old = _post_attempt(client, sid, _attempt(_next(client, sid), 1, pitch=UNFILTERED))
+    old_doc = fs.cols["voice_attempts"][old["attempt_id"]]
+    assert old_doc["note_labels"] == [] and old_doc["pitch_all"] is None
+
+
+def test_note_labels_reject_extra_keys(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    bad_labels = (
+        {**_label(1.0), "audio": "AAAA"},
+        {**_label(1.0), "t_end": 0.5},  # ends before it starts
+        {**_label(1.0), "label": "head"},
+        {**_label(1.0), "source": "admin"},
+        {**_label(1.0), "midi": 120},
+        {**_label(1.0), "t_start": -1},
+        {**_label(4000.0)},
+    )
+    for bad in bad_labels:
+        r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, note_labels=[bad]))
+        assert r.status_code == 422, bad
+    r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, pitch_all={**CHEST, "frames": []}))
+    assert r.status_code == 422
+    assert "voice_attempts" not in fs.cols
+
+
+def test_note_labels_cap_40(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    song = _next(client, sid)
+    too_many = [_label(float(i)) for i in range(41)]
+    r = client.post(f"/api/voice/sessions/{sid}/attempts", json=_attempt(song, 0, note_labels=too_many))
+    assert r.status_code == 422
+    out = _post_attempt(client, sid, _attempt(song, 0, note_labels=too_many[:40]))
+    assert len(fs.cols["voice_attempts"][out["attempt_id"]]["note_labels"]) == 40
+
+
+def test_history_counts_falsetto_notes(client: TestClient, fs: RouteFirestore) -> None:
+    """``falsetto_notes`` counts the notes labelled falsetto (not "full" or "unsure"); attempts stored before
+    labels existed read 0."""
+    _seed_session(fs, "s1", attempts=2)
+    fs.cols["voice_attempts"]["s1:1"]["note_labels"] = [
+        _label(10.0), _label(20.0), _label(30.0, 66.0, "full"), _label(40.0, 68.0, "unsure"), _label(50.0, 70.0)
+    ]  # fmt: skip
+    attempts = client.get("/api/voice/history").json()["sessions"][0]["attempts"]
+    assert [a["falsetto_notes"] for a in attempts] == [3, 0]
+
+
+def test_session_result_reports_falsetto_high(client: TestClient, fs: RouteFirestore) -> None:
+    """The highest note labelled falsetto (rounded) is the result's ``falsetto_high``: in the result, the stored
+    summary (history, Me) and the saved session profile. "unsure" / "full" notes don't count; no labels → null."""
+    sid = _create(client)
+    labels = [_label(30.0, 69.2), _label(40.0, 71.0, "unsure"), _label(50.0, 67.6), _label(60.0, 73.0, "full")]
+    for i in range(3):
+        song = _next(client, sid)
+        extra: dict[str, Any] = {"note_labels": labels, "pitch_all": UNFILTERED} if i == 1 else {}
+        _post_attempt(client, sid, _attempt(song, i, pitch=CHEST, **extra))
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["falsetto_high"] == 69
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["falsetto_high"] == 69
+    assert client.get("/api/voice/history").json()["sessions"][0]["result"]["falsetto_high"] == 69
+    assert res["profile_saved"] is True  # over no profile, whatever the confidence
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["falsetto_high"] == 69
+
+    plain = _create(client)
+    _post_attempt(client, plain, _attempt(_next(client, plain), 0, pitch=CHEST))
+    assert client.get(f"/api/voice/sessions/{plain}/result").json()["falsetto_high"] is None
+
+
+def test_excluded_attempt_falsetto_ignored(client: TestClient, fs: RouteFirestore) -> None:
+    """ "Don't count this one" takes the attempt's falsetto labels out of ``falsetto_high`` too (and undo restores)."""
+    sid = _create(client)
+    ids = []
+    for i, top in enumerate((72.0, 68.0)):
+        body = _attempt(_next(client, sid), i, pitch=CHEST, pitch_all=UNFILTERED, note_labels=[_label(30.0, top)])
+        ids.append(_post_attempt(client, sid, body)["attempt_id"])
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["falsetto_high"] == 72
+    assert _patch_attempt(client, ids[0], True)["result"]["falsetto_high"] == 68
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["falsetto_high"] == 68
+    assert _patch_attempt(client, ids[1], True)["result"]["falsetto_high"] is None
+    assert _patch_attempt(client, ids[0], False)["result"]["falsetto_high"] == 72
+
+
+def test_stored_summary_without_falsetto_high_reads_null() -> None:
+    raw = {"session_id": "s", "voice_type": "bass", "between": None, "confidence_label": "low", "top_p": 0.4,
+           "low": 40, "high": 64, "comfort_low": 45, "comfort_high": 58, "attempts": 1, "evidence_attempts": 1,
+           "profile_saved": False, "computed_at": "2026-10-25T19:00:00Z"}  # fmt: skip
+    assert SessionResultSummaryOut.model_validate(raw).falsetto_high is None
+
+
+# ---------------------------------------------------------------- setup background + live chip reference (C3)
+
+
+def test_setup_accepts_background(client: TestClient, fs: RouteFirestore) -> None:
+    """``experience`` / ``uses_falsetto`` are optional setup answers, stored in ``voice_sessions.setup``, changeable
+    with PATCH, returned on resume, and copied into the session's voice profile. Old setups (without them) work."""
+    sid = _create(client, experience="some", uses_falsetto="yes")
+    setup = fs.cols["voice_sessions"][sid]["setup"]
+    assert (setup["experience"], setup["uses_falsetto"]) == ("some", "yes")
+    assert client.patch(f"/api/voice/sessions/{sid}", json={"uses_falsetto": "sometimes"}).status_code == 204
+    got = client.get(f"/api/voice/sessions/{sid}").json()["setup"]
+    assert (got["experience"], got["uses_falsetto"]) == ("some", "sometimes")
+    for bad in ({"experience": "pro"}, {"uses_falsetto": "always"}):
+        assert client.post("/api/voice/sessions", json={**SETUP, **bad}).status_code == 422, bad
+        assert client.patch(f"/api/voice/sessions/{sid}", json=bad).status_code == 422, bad
+
+    _post_attempt(client, sid, _attempt(_next(client, sid), 0, pitch=CHEST))
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["profile_saved"] is True
+    profile = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert (profile["method"], profile["experience"], profile["uses_falsetto"]) == ("session", "some", "sometimes")
+
+    old = _create(client)
+    assert client.get(f"/api/voice/sessions/{old}").json()["setup"]["experience"] is None
+
+
+def test_next_song_carries_comfort_estimate(client: TestClient) -> None:
+    """Each offered song carries the chest comfort estimate for the live falsetto chip: the model's (posterior
+    mean, with its SD) until the comfort is measured, then the measured band (as the result shows it)."""
+    sid = _create(client)
+    first = _next(client, sid)["comfort_estimate"]
+    assert first["source"] == "model" and first["low"] <= first["high"] and first["sd_high"] > 0
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    for i in range(2):
+        _post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))
+    song = _next(client, sid)
+    est = song["comfort_estimate"]
+    assert (est["source"], est["low"], est["high"]) == ("measured", 49, 59)
+    assert est["sd_high"] >= 0
+    resumed = client.get(f"/api/voice/sessions/{sid}").json()["last_offer"]
+    assert resumed["song_key"] == song["song_key"] and resumed["comfort_estimate"] == est
+
+
+def test_comfort_estimate_source_profile_on_first_song(client: TestClient, fs: RouteFirestore) -> None:
+    """Before any attempt counts, a prior profile with a comfort band is the reference ("profile", its own
+    numbers); once an attempt counts the session's estimate takes over. An excluded attempt doesn't count."""
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = MIC_PROFILE
+    sid = _create(client)
+    est = _next(client, sid)["comfort_estimate"]
+    assert (est["source"], est["low"], est["high"]) == ("profile", 50, 61)
+    assert est["sd_high"] >= 0
+    out = _post_attempt(client, sid, _attempt(_next(client, sid), 0))
+    assert _next(client, sid)["comfort_estimate"]["source"] == "model"
+    _patch_attempt(client, out["attempt_id"], True)
+    assert _next(client, sid)["comfort_estimate"]["source"] == "profile"

@@ -5,7 +5,8 @@ validated prior and the Firestore docs); ``replay_attempts`` runs it for each pr
 the result the singer would have seen after each song. Fixtures (``tests/unit/voice_session/fixtures``,
 written by ``scripts/voice/export_session_fixture.py``) hold numbers only::
 
-    {prior_profile, setup?, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?}]}
+    {prior_profile, setup?, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?,
+                                        note_labels?, pitch_all?}]}
 
 ``song_key`` is ``sha1(song_key)[:10]``; ``demand`` is the attempt's song snapshot demand
 (``{low, high, p10, p50, p90}``), or null with the demand passed in ``demands`` instead.
@@ -57,6 +58,42 @@ def pitch_from_doc(d: Mapping[str, Any] | None) -> PitchSummary | None:
     return PitchSummary(**{k: float(d[k]) for k in _PITCH_KEYS})
 
 
+def chest_pitch(
+    pitch: PitchSummary | None,
+    note_labels: Sequence[Mapping[str, Any]] | None,
+    pitch_all: Mapping[str, Any] | None,
+) -> PitchSummary | None:
+    """The attempt's chest-only pitch summary.
+
+    The app sends a chest-only ``pitch`` together with the unfiltered ``pitch_all``; then ``pitch`` is used as
+    sent. Labels with falsetto spans but no ``pitch_all`` mean ``pitch`` may still contain the falsetto notes, so
+    ``held_high`` is capped 1 semitone below the lowest falsetto-labelled note. If that cap is below ``held_low``,
+    every held note was falsetto: rather than invent a chest note at the cap, the summary keeps no held evidence
+    (``held_count`` 0, so ``usable_pitch`` is false and ``likelihood_pitch`` is 1.0; tessitura, the measured
+    comfort and range evidence then don't use this pitch either). "unsure" and "full" never cap.
+
+    Percentiles are kept, as the gate's manual relabelling does. The measured comfort clamps them to the held
+    notes (``comfort._counted``), but ``model.likelihood_tessitura`` reads p10/p50/p90 unclamped, so an old app's
+    falsetto can still lift the tessitura of a song rated comfortable and easy.
+    """
+    if pitch is None or pitch_all:
+        return pitch
+    falsetto = falsetto_midis(note_labels)
+    if not falsetto:
+        return pitch
+    cap = min(falsetto) - 1
+    if pitch.held_high <= cap:
+        return pitch
+    if cap < pitch.held_low:
+        return dataclasses.replace(pitch, held_count=0)
+    return dataclasses.replace(pitch, held_high=cap)
+
+
+def falsetto_midis(note_labels: Sequence[Mapping[str, Any]] | None) -> list[float]:
+    """The notes labelled falsetto ("unsure" and "full" are not)."""
+    return [float(n["midi"]) for n in note_labels or () if n.get("label") == "falsetto"]
+
+
 def demand_from_doc(d: Mapping[str, Any]) -> SongDemand:
     return SongDemand(**{k: float(d[k]) for k in _DEMAND_KEYS})
 
@@ -80,9 +117,10 @@ def rebuild(
     """SessionState from the prior, the session setup and its attempt docs (in ``n`` order).
 
     Attempt docs are the stored ``voice_attempts`` shape: ``quiz``, ``pitch``, ``context``, ``stopped_early``,
-    ``song_key`` and ``song.demand`` (``song.stratum`` optional). An ``excluded`` attempt ("Don't count this one")
-    counts in ``attempts`` and done songs only: no posterior update, ``range_attempts``, ``tired_count`` or
-    ``comfort_history`` entry. ``on_attempt(state, doc)`` runs after each one, excluded or not.
+    ``song_key`` and ``song.demand`` (``song.stratum`` optional); ``note_labels`` / ``pitch_all`` optional
+    (``chest_pitch``; falsetto labels also set ``state.falsetto_high``). An ``excluded`` attempt ("Don't count this one")
+    counts in ``attempts`` and done songs only: no posterior update, ``range_attempts``, ``tired_count``,
+    ``comfort_history`` entry or ``falsetto_high``. ``on_attempt(state, doc)`` runs after each one, excluded or not.
     """
     state = SessionState(
         posterior=prior,
@@ -98,7 +136,8 @@ def rebuild(
         state.done_keys.add(a["song_key"])
         state.recent_strata.append(song.get("stratum") or "")
         if not a.get("excluded"):  # "Don't count this one": it took its turn, but it is no evidence
-            quiz, pitch = quiz_from_doc(a["quiz"]), pitch_from_doc(a.get("pitch"))
+            quiz = quiz_from_doc(a["quiz"])
+            pitch = chest_pitch(pitch_from_doc(a.get("pitch")), a.get("note_labels"), a.get("pitch_all"))
             c = a.get("context") or {}
             ctx = Context(posture=c.get("posture") or "standing", warmth=c.get("warmth") or "cold",
                           headphones=bool(c.get("headphones")))  # fmt: skip
@@ -109,6 +148,9 @@ def rebuild(
             state.range_attempts += int(has_range_evidence(quiz, pitch))
             state.tired_count += int(quiz.voice_now == "tired")
             state.comfort_history.append(state.posterior.comfort_estimate())
+            if falsetto := falsetto_midis(a.get("note_labels")):  # falsetto is never chest evidence, but it is a range
+                top = max(falsetto)
+                state.falsetto_high = top if state.falsetto_high is None else max(state.falsetto_high, top)
         if on_attempt is not None:
             on_attempt(state, a)
     state.done_keys |= done_skip_keys(skips)
