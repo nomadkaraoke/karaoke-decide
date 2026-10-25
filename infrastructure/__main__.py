@@ -256,7 +256,7 @@ decide_users_created_user_id_index = gcp.firestore.Index(
 
 # Composite index for playlists listing a user's setlists, most recently updated first
 # Required by: GET /api/playlists (PlaylistService.list_playlists)
-# Already exists in prod (created automatically), so it is imported on first apply.
+# Existed in prod before it was managed here; imported into state on 2026-10-25.
 playlists_user_updated_index = gcp.firestore.Index(
     "playlists-user-updated-index",
     project=project,
@@ -266,11 +266,7 @@ playlists_user_updated_index = gcp.firestore.Index(
         {"field_path": "user_id", "order": "ASCENDING"},
         {"field_path": "updated_at", "order": "DESCENDING"},
     ],
-    opts=pulumi.ResourceOptions(
-        protect=True,
-        # remove import_ after first apply
-        import_="projects/nomadkaraoke/databases/(default)/collectionGroups/playlists/indexes/CICAgJjFqZMK",
-    ),
+    opts=pulumi.ResourceOptions(protect=True),
 )
 
 
