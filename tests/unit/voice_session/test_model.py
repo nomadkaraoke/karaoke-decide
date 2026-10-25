@@ -19,10 +19,11 @@ from karaoke_decide.voice_session.model import (
     likelihood_difficulty,
     likelihood_pitch,
     likelihood_position,
+    likelihood_tessitura,
     likely_octave,
     sung_octave,
 )
-from karaoke_decide.voice_session.weights import OCTAVE_PRIOR, TEMP
+from karaoke_decide.voice_session.weights import OCTAVE_PRIOR, TEMP, W_PITCH_HEADPHONES, W_TESSITURA
 
 from .builders import ctx, evidence, quiz, song
 
@@ -337,3 +338,91 @@ def test_full_estimate_wider_than_comfort() -> None:
     c_lo, c_hi = post.comfort_estimate()
     f_lo, f_hi = post.full_estimate()
     assert f_lo == pytest.approx(c_lo - 5) and f_hi == pytest.approx(c_hi + 5)
+
+
+# ---------------------------------------------------------------- tessitura (E2)
+
+
+def _tess_by_type(pitch: PitchSummary, position: str = "comfortable", octave: int | None = 0) -> dict[str, float]:
+    """Mean tessitura likelihood over each type's shifts."""
+    out: dict[str, float] = {}
+    for t in VOICE_TYPES:
+        vals = [likelihood_tessitura(h, pitch, position, octave) for h in HYPOTHESES if h[0] == t]  # type: ignore[arg-type]
+        out[t] = sum(vals) / len(vals)
+    return out
+
+
+def _sung(p10: float, p50: float, p90: float, *, voiced_s: float = 90.0) -> PitchSummary:
+    return PitchSummary(
+        voiced_s=voiced_s, held_count=20, held_low=p10 - 1, held_high=p90 + 1, p10=p10, p50=p50, p90=p90
+    )
+
+
+def test_tessitura_separates_bass_baritone_tenor() -> None:
+    """A comfortable song sung at 49/54/59: tenor (comfort 53-67) is at least 3x less likely than bass or baritone."""
+    by_type = _tess_by_type(_sung(49, 54, 59))
+    assert by_type["baritone"] >= 3 * by_type["tenor"]
+    assert by_type["bass"] >= 3 * by_type["tenor"]
+    assert by_type["tenor"] >= 3 * by_type["alto"]
+    # Andrew's sung median (~56.5) sits at baritone's comfort centre (57): baritone over bass and tenor.
+    andrew = _tess_by_type(_sung(50, 56.5, 58))
+    assert andrew["baritone"] > andrew["bass"]
+    assert andrew["baritone"] > andrew["tenor"]
+    # The posterior follows: one comfortable song with this pitch from a flat start.
+    s = song(49, 59)
+    post = Posterior.uniform().update(
+        evidence(s, quiz(position="comfortable"), ctx(headphones=True), _sung(49, 54, 59))
+    )
+    marg = post.type_marginal()
+    assert marg["baritone"] >= 3 * marg["tenor"]
+
+
+def test_tessitura_neutral_when_not_comfortable() -> None:
+    pitch = _sung(49, 54, 59)
+    for position in ("too_high", "too_low", "both_ends"):
+        assert all(likelihood_tessitura(h, pitch, position, 0) == 1.0 for h in HYPOTHESES)  # type: ignore[arg-type]
+
+
+def test_tessitura_neutral_without_usable_pitch() -> None:
+    thin = _sung(49, 54, 59, voiced_s=10)
+    few = PitchSummary(voiced_s=90, held_count=1, held_low=49, held_high=59, p10=49, p50=54, p90=59)
+    for h in HYPOTHESES:
+        assert likelihood_tessitura(h, None, "comfortable", 0) == 1.0
+        assert likelihood_tessitura(h, thin, "comfortable", None) == 1.0
+        assert likelihood_tessitura(h, few, "comfortable", 0) == 1.0
+
+
+def test_tessitura_uses_the_pitch_as_sung_in_any_octave() -> None:
+    """The percentiles are the singer's own notes: a female-range song sung an octave down still reads as baritone."""
+    pitch = _sung(51, 57, 62)
+    assert _tess_by_type(pitch, octave=-12) == _tess_by_type(pitch, octave=0)
+    by_type = _tess_by_type(pitch, octave=-12)
+    assert max(by_type, key=lambda t: by_type[t]) == "baritone"
+
+
+def test_tessitura_weight_counts_in_the_update() -> None:
+    s = song(49, 59)
+    pitch = _sung(49, 54, 59)
+    with_pitch = Posterior.uniform().update(evidence(s, quiz(position="comfortable"), ctx(headphones=True), pitch))
+    for h in HYPOTHESES:
+        o = sung_octave(s, pitch)
+        expected = (
+            math.log(likelihood_position(h, s, "comfortable", o))
+            + W_PITCH_HEADPHONES * math.log(likelihood_pitch(h, pitch))
+            + W_TESSITURA * math.log(likelihood_tessitura(h, pitch, "comfortable", o))
+        )
+        ref = ("baritone", 0)
+        ref_expected = (
+            math.log(likelihood_position(ref, s, "comfortable", o))
+            + W_PITCH_HEADPHONES * math.log(likelihood_pitch(ref, pitch))
+            + W_TESSITURA * math.log(likelihood_tessitura(ref, pitch, "comfortable", o))
+        )
+        assert with_pitch.log_p[h] - with_pitch.log_p[ref] == pytest.approx(expected - ref_expected, abs=1e-9)
+
+
+def test_posterior_stays_valid_with_extreme_pitch() -> None:
+    post = Posterior.uniform()
+    for p in (_sung(10, 20, 30), _sung(100, 110, 127), _sung(20, 64, 110)):
+        for _ in range(20):
+            post = post.update(evidence(song(55, 65), quiz(position="comfortable"), ctx(headphones=True), p))
+            _assert_valid(post)

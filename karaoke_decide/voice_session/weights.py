@@ -12,8 +12,14 @@ if TYPE_CHECKING:
     from karaoke_decide.voice_session.model import Evidence
 
 W_QUIZ = 1.0
-W_PITCH_HEADPHONES = 1.5
-W_PITCH_OPEN = 0.6
+W_PITCH_HEADPHONES = 2.0
+W_PITCH_OPEN = 1.0
+# Tessitura (model.likelihood_tessitura): where a song rated comfortable was actually sung, against each
+# hypothesis's comfortable band. TESS_TEMP softens the band edges; TESS_SD is how far (semitones) the sung
+# median may sit from the band's centre.
+W_TESSITURA = 1.0
+TESS_TEMP = 1.0
+TESS_SD = 3.0
 K_KNEW: dict[str | None, float] = {"well": 1.0, "partly": 0.7, "barely": 0.3, None: 0.8}
 K_WARM_MISS = {"cold": 0.5, "bit_warm": 0.8, "warm": 1.0}
 K_TIRED_MISS = 0.5
@@ -47,9 +53,11 @@ def _miss_factor(ev: Evidence) -> float:
     return k
 
 
-def evidence_weight(ev: Evidence, kind: Literal["quiz", "pitch"]) -> float:
+def evidence_weight(ev: Evidence, kind: Literal["quiz", "pitch", "tessitura"]) -> float:
     """Exponent applied to this evidence's log-likelihood in the posterior update."""
     knew = K_KNEW[ev.quiz.knew]
+    if kind == "tessitura":
+        return W_TESSITURA * knew
     if kind == "pitch":
         return (W_PITCH_HEADPHONES if ev.ctx.headphones else W_PITCH_OPEN) * knew
     return W_QUIZ * knew * (_miss_factor(ev) if is_miss(ev) else 1.0)

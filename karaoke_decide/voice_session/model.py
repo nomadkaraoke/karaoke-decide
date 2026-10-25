@@ -18,6 +18,8 @@ from karaoke_decide.voice_session.weights import (
     EPS_POSITION,
     OCTAVE_PRIOR,
     TEMP,
+    TESS_SD,
+    TESS_TEMP,
     evidence_weight,
 )
 
@@ -50,6 +52,12 @@ def comfort(h: Hyp) -> tuple[int, int]:
 def full(h: Hyp) -> tuple[int, int]:
     lo, hi = VOICE_TYPES[h[0]]
     return lo + h[1], hi + h[1]
+
+
+def centre(h: Hyp) -> float:
+    """The middle of h's comfortable range (MIDI)."""
+    c_lo, c_hi = comfort(h)
+    return (c_lo + c_hi) / 2
 
 
 @dataclass(frozen=True)
@@ -233,6 +241,24 @@ def likelihood_pitch(h: Hyp, pitch: PitchSummary | None) -> float:
     return _sigmoid((f_hi - pitch.held_high + 1) / 1.0) * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
 
 
+def likelihood_tessitura(h: Hyp, pitch: PitchSummary | None, position: Position, octave: int | None) -> float:
+    """Where a song rated comfortable was actually sung, against h's comfortable range.
+
+    σ((c_hi − p90 + 1)/TESS_TEMP) · σ((p10 − c_lo + 1)/TESS_TEMP) · exp(−(p50 − centre(h))² / (2·TESS_SD²)).
+    Only for a "comfortable" answer with usable pitch (1.0 otherwise). The percentiles are the singer's own
+    notes in the octave they sang (``octave``, from ``sung_octave``), so they are compared with h's range as
+    they are: a female-range song a baritone takes an octave down is measured where he sang it.
+    """
+    if position != "comfortable" or octave is None or pitch is None or not usable_pitch(pitch):
+        return 1.0
+    c_lo, c_hi = comfort(h)
+    return (
+        _sigmoid((c_hi - pitch.p90 + 1) / TESS_TEMP)
+        * _sigmoid((pitch.p10 - c_lo + 1) / TESS_TEMP)
+        * math.exp(-((pitch.p50 - centre(h)) ** 2) / (2 * TESS_SD**2))
+    )
+
+
 def _logsumexp(values: list[float]) -> float:
     m = max(values)
     return m + math.log(sum(math.exp(v - m) for v in values))
@@ -327,6 +353,7 @@ class Posterior:
         w_quiz = evidence_weight(ev, "quiz")
         use_pitch = usable_pitch(ev.pitch)
         w_pitch = evidence_weight(ev, "pitch") if use_pitch else 0.0
+        w_tess = evidence_weight(ev, "tessitura") if use_pitch and ev.quiz.position == "comfortable" else 0.0
         new: dict[Hyp, float] = {}
         for h, lp in self.log_p.items():
             ll = math.log(likelihood_position(h, ev.song, ev.quiz.position, octave))
@@ -335,6 +362,10 @@ class Posterior:
             total = lp + w_quiz * ll
             if use_pitch:
                 total += w_pitch * math.log(likelihood_pitch(h, ev.pitch))
+            if w_tess:
+                # floored so a far-off hypothesis keeps a finite log (exp of −(Δ²)/(2·SD²) underflows for |Δ| ≳ 115)
+                tess = likelihood_tessitura(h, ev.pitch, ev.quiz.position, octave)
+                total += w_tess * math.log(max(tess, 1e-300))
             new[h] = total
         return Posterior(_normalised(new))
 
