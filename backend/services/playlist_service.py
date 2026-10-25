@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from backend.config import BackendSettings
 from backend.services.catalog_facets import song_titles
@@ -30,8 +30,15 @@ class PlaylistItemIn(BaseModel):
 
     item_id: str | None = Field(default=None, max_length=64)
     song_key: str | None = Field(default=None, max_length=600)
-    artist: str = Field(..., min_length=1, max_length=300)
-    title: str = Field(..., min_length=1, max_length=300)
+    artist: str = Field(default="", max_length=300)
+    title: str = Field(default="", max_length=300)
+
+    @model_validator(mode="after")
+    def _names_or_key(self) -> "PlaylistItemIn":
+        # Legacy catalogued entries may have empty names; uncatalogued ones need both.
+        if not self.song_key and not (self.artist and self.title):
+            raise ValueError("artist and title are required when song_key is empty")
+        return self
 
 
 @dataclass

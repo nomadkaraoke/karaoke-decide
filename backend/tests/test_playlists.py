@@ -538,6 +538,22 @@ class TestOrderedItems:
         kwargs = mock_playlist_service.replace_items.call_args.kwargs
         assert kwargs["base_rev"] == 3 and kwargs["items"][0].title == "T"
 
+    def test_put_items_keyed_empty_names_ok_but_unkeyed_empty_title_422(
+        self, playlist_client: TestClient, mock_playlist_service: MagicMock
+    ) -> None:
+        ok = playlist_client.put(
+            "/api/playlists/playlist-1/items",
+            headers={"Authorization": "Bearer test-token"},
+            json={"items": [{"song_key": "k|1", "artist": "", "title": ""}], "base_rev": 0},
+        )
+        assert ok.status_code == 200
+        bad = playlist_client.put(
+            "/api/playlists/playlist-1/items",
+            headers={"Authorization": "Bearer test-token"},
+            json={"items": [{"song_key": None, "artist": "A", "title": ""}], "base_rev": 0},
+        )
+        assert bad.status_code == 422
+
     def test_put_items_limit(self, playlist_client: TestClient) -> None:
         items = [{"song_key": None, "artist": "a", "title": str(n)} for n in range(501)]
         response = playlist_client.put(

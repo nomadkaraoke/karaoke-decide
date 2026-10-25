@@ -174,8 +174,8 @@ function PlaylistsContent() {
           remaining.map((i) => ({
             item_id: i.item_id,
             song_key: i.song_key,
-            artist: i.artist || i.song_key || "-",
-            title: i.title || i.song_key || "-",
+            artist: i.artist,
+            title: i.title,
           })),
           selectedPlaylist.rev
         );
@@ -199,8 +199,10 @@ function PlaylistsContent() {
     });
   };
 
-  const itemLabel = (item: PlaylistItem) =>
-    item.artist && item.title ? null : item.song_key || item.artist || item.title;
+  const hasNames = (item: PlaylistItem) => Boolean(item.artist && item.title);
+
+  const displayTitle = (item: PlaylistItem) =>
+    hasNames(item) ? item.title : item.song_key || item.title || item.artist;
 
   const openKaraokeSearch = (item: PlaylistItem) => {
     const query =
@@ -324,9 +326,9 @@ function PlaylistsContent() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-[var(--text)] font-medium truncate">
-                            {itemLabel(item) ?? item.title}
+                            {displayTitle(item)}
                           </p>
-                          {!itemLabel(item) && (
+                          {hasNames(item) && (
                             <p className="text-[var(--text-muted)] text-sm truncate">
                               {item.artist}
                             </p>

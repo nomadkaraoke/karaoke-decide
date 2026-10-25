@@ -59,6 +59,23 @@ async def test_create_with_items(fs: MemoryFirestore) -> None:
 
 
 @pytest.mark.asyncio
+async def test_replace_items_accepts_keyed_item_with_empty_names(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    await svc.replace_items(PL_ID, USER, [PlaylistItemIn(song_key="k|1", artist="", title="")], base_rev=0)
+    stored = fs.cols["playlists"][PL_ID]["items"][0]
+    assert stored["song_key"] == "k|1" and stored["artist"] == "" and stored["title"] == ""
+
+
+def test_item_without_key_needs_both_names() -> None:
+    with pytest.raises(ValueError):
+        PlaylistItemIn(song_key=None, artist="A", title="")
+    with pytest.raises(ValueError):
+        PlaylistItemIn(song_key="", artist="", title="")
+    assert PlaylistItemIn(song_key=None, artist="A", title="T").title == "T"
+
+
+@pytest.mark.asyncio
 async def test_replace_items_orders_and_bumps_rev(fs: MemoryFirestore) -> None:
     svc = _svc(fs)
     await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
