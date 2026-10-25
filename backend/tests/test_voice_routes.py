@@ -258,3 +258,17 @@ def test_delete_voice_clears_mic_copy(client: TestClient, fs: RouteFirestore) ->
     doc = fs.cols["decide_users"][EMAIL_HASH]
     assert doc["voice_profile"] is None and doc["voice_profile_mic"] is None
     assert client.get("/api/my/voice").json() == {"profile": None, "mic": None, "latest_session": None}
+
+
+def test_test_api_seed_voice_keeps_mic_copy(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.tests.test_test_support import FakeFirestore
+
+    c = _test_app(monkeypatch, True)
+    fake = FakeFirestore()
+    c.app.dependency_overrides[get_firestore] = lambda: fake  # type: ignore[attr-defined]
+    assert c.post("/api/test/voice/seed", json={"email": EMAIL, "profile": PROFILE}).status_code == 204
+    doc = fake.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile_mic"] == doc["voice_profile"]
+    self_report = {**PROFILE, "method": "self", "confidence": "low"}
+    assert c.post("/api/test/voice/seed", json={"email": EMAIL, "profile": self_report}).status_code == 204
+    assert doc["voice_profile"]["method"] == "self" and doc["voice_profile_mic"]["method"] == "mic"

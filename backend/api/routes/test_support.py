@@ -164,9 +164,9 @@ async def seed_voice(body: VoiceSeedBody, fs: FirestoreDep, auth: AuthDep) -> Re
     """Set the user's voice profile (validated like PUT /api/my/voice) on their profile doc."""
     await auth.resolve_gen_user(body.email)
     profile = VoiceProfileOut(**body.profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
-    await fs.update_document(
-        USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json", by_alias=True)}
-    )
+    stored = profile.model_dump(mode="json", by_alias=True)
+    fields = {"voice_profile": stored, **({"voice_profile_mic": stored} if profile.method == "mic" else {})}
+    await fs.update_document(USERS, auth._hash_email(body.email.lower()), fields)  # as VoiceProfileService.put
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

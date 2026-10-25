@@ -302,3 +302,18 @@ async def test_account_deletion_erases_mic_copy_and_summaries(fs: FakeFirestore,
     assert not [d for d in fs.cols["decide_users"].values() if "voice_profile_mic" in d]
     assert not [d for d in fs.cols["voice_sessions"].values() if d.get("user_id") == USER_A]
     assert "s1" not in fs.cols["voice_sessions"]
+
+
+async def test_erase_voice_data_removes_exclusion_and_displacement_markers(
+    fs: FakeFirestore, bucket: LocalBucket
+) -> None:
+    _seed_voice(fs, bucket, USER_A)
+    fs.cols["voice_attempts"]["s1:1"].update({"excluded": True, "excluded_at": "2026-10-25T20:00:00+00:00"})
+    fs.cols["voice_sessions"]["s1"]["profile_displaced_by_exclusion"] = True
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+
+    assert list(fs.cols["voice_attempts"]) == ["sx:1"]
+    assert not [d for d in fs.cols["voice_attempts"].values() if "excluded" in d or "excluded_at" in d]
+    assert list(fs.cols["voice_sessions"]) == ["sx"]
+    assert not [d for d in fs.cols["voice_sessions"].values() if "profile_displaced_by_exclusion" in d]

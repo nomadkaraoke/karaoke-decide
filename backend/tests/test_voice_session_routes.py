@@ -1316,3 +1316,77 @@ def test_suited_tops_up_with_fit_when_no_taste(make_client: MakeClient, fs: Rout
     suited = client.get(f"/api/voice/sessions/{sid}/result").json()["suited"]
     assert [s["song_key"] for s in suited] == [f"x|{i}" for i in range(vss.SUITED_LIMIT)]
     assert recs.calls == [("best", True)]
+
+
+# ---------------------------------------------------------------- review fixes
+
+
+LEGACY_MIC = {**MIC_PROFILE}  # a mic result saved before v0.31.0: voice_profile only, no voice_profile_mic
+
+
+def test_legacy_mic_profile_survives_a_session_save(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = dict(LEGACY_MIC)
+    assert client.get("/api/my/voice").json()["mic"]["voice_type"] == "bass"  # read falls back to voice_profile
+    sid = _saved_session(client, monkeypatch, k=1)
+    doc = fs.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile"]["method"] == "session"
+    assert doc["voice_profile_mic"]["method"] == "mic" and doc["voice_profile_mic"]["voice_type"] == "bass"
+    assert client.get("/api/my/voice").json()["mic"]["voice_type"] == "bass"
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["profile"] == "reverted_to_mic"
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["voice_type"] == "bass"
+
+
+def test_legacy_mic_profile_survives_adopt(client: TestClient, fs: RouteFirestore) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = dict(LEGACY_MIC)
+    sid = _create(client)
+    _sing(client, sid, 1)
+    client.get(f"/api/voice/sessions/{sid}/result")
+    assert client.post(f"/api/voice/sessions/{sid}/adopt").status_code == 200
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile_mic"]["method"] == "mic"
+
+
+def test_unexclude_after_revert_restores_session_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile_mic"] = dict(MIC_PROFILE)
+    sid = _saved_session(client, monkeypatch, k=1)
+    assert _patch_attempt(client, f"{sid}:1", True)["profile"] == "reverted_to_mic"
+    assert fs.cols["voice_sessions"][sid]["profile_displaced_by_exclusion"] is True
+    out = _patch_attempt(client, f"{sid}:1", False)
+    assert out["profile"] == "updated" and out["result"]["profile_saved"] is True
+    profile = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert profile["method"] == "session" and profile["session_id"] == sid
+    assert not fs.cols["voice_sessions"][sid].get("profile_displaced_by_exclusion")
+
+
+def test_unexclude_after_remove_restores_session_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = _saved_session(client, monkeypatch, k=1)
+    assert _patch_attempt(client, f"{sid}:1", True)["profile"] == "removed"
+    out = _patch_attempt(client, f"{sid}:1", False)
+    assert out["profile"] == "updated"
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["session_id"] == sid
+
+
+def test_unexclude_does_not_override_a_newer_choice(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the revert the user saved a new mic test: undoing the exclusion must not overwrite it."""
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile_mic"] = dict(MIC_PROFILE)
+    sid = _saved_session(client, monkeypatch, k=1)
+    _patch_attempt(client, f"{sid}:1", True)
+    assert client.put("/api/my/voice", json={**MIC_PROFILE_IN, "voice_type": "tenor"}).status_code == 200
+    assert _patch_attempt(client, f"{sid}:1", False)["profile"] == "unchanged"
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["voice_type"] == "tenor"
+
+
+def test_exclude_with_missing_session_leaves_no_flag(client: TestClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "s1", attempts=1)
+    del fs.cols["voice_sessions"]["s1"]
+    r = client.patch("/api/voice/attempts/s1:1", json={"excluded": True})
+    assert r.status_code == 404
+    assert "excluded" not in fs.cols["voice_attempts"]["s1:1"]

@@ -98,7 +98,12 @@ class VoiceProfileService:
         return await self._read(user_id, FIELD)
 
     async def get_mic(self, user_id: str) -> VoiceProfileOut | None:
-        """The last mic-test result (``voice_profile_mic``), whatever the current profile is."""
+        """The last mic-test result (``voice_profile_mic``), whatever the current profile is. A mic result
+        saved before v0.31.0 has no copy yet: then it is ``voice_profile`` itself, while that is a mic one."""
+        doc, _ = await self._doc(user_id)
+        if not (doc or {}).get(MIC_FIELD):
+            current = await self._read(user_id, FIELD)
+            return current if current is not None and current.method == "mic" else None
         return await self._read(user_id, MIC_FIELD)
 
     async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut:
@@ -106,14 +111,16 @@ class VoiceProfileService:
 
         A mic profile is also kept as ``voice_profile_mic``, so a later session result can sit beside it
         (and "Don't count this one" can fall back to it); other methods leave that copy alone."""
-        _, doc_id = await self._doc(user_id)
-        if doc_id is None:
+        doc, doc_id = await self._doc(user_id)
+        if doc is None or doc_id is None:
             raise VoiceProfileUserNotFoundError(user_id)
         out = VoiceProfileOut(**profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
         stored = out.model_dump(mode="json", by_alias=True)
         fields: dict[str, Any] = {FIELD: stored}
         if out.method == "mic":
             fields[MIC_FIELD] = stored
+        elif not doc.get(MIC_FIELD) and (doc.get(FIELD) or {}).get("method") == "mic":
+            fields[MIC_FIELD] = doc[FIELD]  # a pre-v0.31.0 mic result had no copy: keep it before overwriting
         await self.firestore.update_document(USERS_COLLECTION, doc_id, fields)
         return out
 

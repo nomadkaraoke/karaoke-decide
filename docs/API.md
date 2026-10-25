@@ -2240,7 +2240,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
  "profile": "updated"}
 ```
 
-`profile`: `updated` (saved again from the attempts that still count, whatever its confidence), `reverted_to_mic` (no evidence left: your last mic-test result is your profile again), `removed` (no evidence left and no mic result), or `unchanged` (the saved profile isn't this session's). Song feedback (`user_songs`) is untouched. Open to every signed-in user, even with the session flag off. Errors: `404 attempt_not_found` (unknown, or another user's).
+`profile`: `updated` (saved again from the attempts that still count, whatever its confidence), `reverted_to_mic` (no evidence left: your last mic-test result is your profile again), `removed` (no evidence left and no mic result), or `unchanged` (the saved profile isn't this session's). Counting the attempt again after `reverted_to_mic` / `removed` saves the session's profile again (`updated`), unless you have chosen another profile since. A mic result saved before v0.31.0 (no kept copy yet) is copied aside the first time a session or adopt saves over it, so it is never lost. Song feedback (`user_songs`) is untouched. Open to every signed-in user, even with the session flag off. Errors: `404 attempt_not_found` (unknown, or another user's).
 
 ### POST /api/voice/recordings
 

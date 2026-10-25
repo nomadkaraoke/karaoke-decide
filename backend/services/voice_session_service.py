@@ -1074,6 +1074,7 @@ class VoiceSessionService:
         attempt = await self._fs.get_document(ATTEMPTS_COLLECTION, attempt_id)
         if not attempt or attempt.get("user_id") != user.id:
             raise AttemptNotFoundError(attempt_id)
+        await self._owned(user.id, str(attempt["session_id"]))  # before any write: no orphaned flag behind a 404
         await self._fs.update_document(
             ATTEMPTS_COLLECTION,
             attempt_id,
@@ -1089,30 +1090,47 @@ class VoiceSessionService:
         is returned but not stored (its result is written when it finishes). When the saved profile is this
         session's (``method: session``), it is re-derived: saved again while evidence remains (no
         ``should_save`` gate: the user is correcting it), else the kept mic result is restored, else the
-        profile is removed."""
+        profile is removed. Those two leave ``profile_displaced_by_exclusion`` on the session (with
+        ``displaced_restored_at``, the restored profile's ``updated_at``, or None when removed): undoing the
+        exclusion while the profile is still that restored mic copy (or still none) saves the session's
+        profile again, so "Don't count" is fully undoable; a profile the user chose since is left alone."""
         session = await self._owned(user_id, session_id)
         attempts = await self._attempts(user_id, session_id)
         state, _, s = await asyncio.to_thread(summarize, session, attempts)
         now = datetime.now(UTC)
         outcome: ProfileOutcome = "unchanged"
         saved = bool(session.get("profile_saved"))
+        changes: dict[str, Any] = {}
         current = await self._profiles.get(user_id)
+        derived = session_profile(s, state.range_attempts, session_id, now)
         if current is not None and current.method == "session" and current.session_id == session_id:
-            derived = session_profile(s, state.range_attempts, session_id, now)
             if derived is not None:
                 await self._profiles.put(user_id, derived)
                 outcome, saved = "updated", True
                 logger.info("voice session %s: profile re-derived for %s after an exclusion", session_id, user_id)
             elif (mic := await self._profiles.get_mic(user_id)) is not None:
-                await self._profiles.put(user_id, VoiceProfileIn.model_validate(mic.model_dump(exclude={"updated_at"})))
+                restored = await self._profiles.put(
+                    user_id, VoiceProfileIn.model_validate(mic.model_dump(exclude={"updated_at"}))
+                )
                 outcome, saved = "reverted_to_mic", False
+                changes.update(profile_displaced_by_exclusion=True, displaced_restored_at=restored.updated_at)
                 logger.info("voice session %s: no evidence left; %s's mic result restored", session_id, user_id)
             else:
                 await self._profiles.delete(user_id)
                 outcome, saved = "removed", False
+                changes.update(profile_displaced_by_exclusion=True, displaced_restored_at=None)
                 logger.info("voice session %s: no evidence left; %s's voice profile removed", session_id, user_id)
+        elif derived is not None and session.get("profile_displaced_by_exclusion"):
+            restored_at = _as_datetime(session.get("displaced_restored_at"))
+            untouched = (current is None) if restored_at is None else (
+                current is not None and current.method == "mic" and current.updated_at == restored_at
+            )  # fmt: skip
+            if untouched:
+                await self._profiles.put(user_id, derived)
+                outcome, saved = "updated", True
+                logger.info("voice session %s: exclusion undone; %s's session profile saved again", session_id, user_id)
+            changes.update(profile_displaced_by_exclusion=False, displaced_restored_at=None)
         out = summary_out(session_id, state, s, profile_saved=saved, now=now)
-        changes: dict[str, Any] = {}
         if session.get("state") != "active":
             changes["result_summary"] = out.model_dump(mode="json")
         if saved != bool(session.get("profile_saved")):
