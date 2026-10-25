@@ -344,6 +344,7 @@ def summary_out(
         high=s.full[1],
         comfort_low=s.comfort[0],
         comfort_high=s.comfort[1],
+        comfort_source=s.comfort_source,
         attempts=state.attempts,
         evidence_attempts=state.range_attempts,
         profile_saved=profile_saved,

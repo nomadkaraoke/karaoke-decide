@@ -149,3 +149,24 @@ def test_andrew_replay_unlabelled_report() -> None:
     trace = replay.replay_fixture(_fixture())
     print("\nAndrew, as recorded:\n" + _trace_lines(trace))
     assert len(trace) == 4
+
+
+def test_andrew_replay_without_the_falsetto_song_is_still_baritone() -> None:
+    """ "Don't count this one" on song 3 (the falsetto song): the other three songs alone say baritone, and comfort
+    is still measured from songs 1 and 4. The excluded attempt still takes its turn (4 results, 4 attempts)."""
+    fx = copy.deepcopy(_fixture())
+    fx["attempts"][2]["excluded"] = True
+    trace = replay.replay_fixture(fx)
+    print("\nAndrew, song 3 excluded:\n" + _trace_lines(trace))
+    assert len(trace) == 4
+    assert trace[2] == trace[1]  # the excluded song moves nothing
+    last = trace[3]
+    assert last.voice_type == "baritone"
+    assert (last.comfort, last.comfort_source) == ((50, 58), "measured")
+    state = replay.rebuild(
+        replay.prior_from_profile(fx["prior_profile"]),
+        fx["setup"],
+        [{**a, "song": {"demand": a["demand"]}} for a in fx["attempts"]],
+    )
+    assert (state.attempts, state.range_attempts, len(state.evidence), len(state.comfort_history)) == (4, 3, 3, 4)
+    assert "cef30cca65" in state.done_keys

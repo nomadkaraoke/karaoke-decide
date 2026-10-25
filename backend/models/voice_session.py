@@ -221,6 +221,7 @@ class SessionResultSummaryOut(BaseModel):
     high: int
     comfort_low: int
     comfort_high: int
+    comfort_source: ComfortSource = "model"  # as ResultOut; summaries stored before v0.32.0 read as "model"
     attempts: int
     evidence_attempts: int  # attempts with range evidence that count (excluded ones don't)
     profile_saved: bool

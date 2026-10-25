@@ -2222,7 +2222,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
 ```json
 {"sessions": [{"session_id": "abc123", "created_at": "2026-10-25T19:00:00Z", "state": "done",
   "result": {"session_id": "abc123", "voice_type": "baritone", "between": null, "confidence_label": "low", "top_p": 0.5,
-             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "attempts": 4, "evidence_attempts": 4,
+             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "comfort_source": "model", "attempts": 4, "evidence_attempts": 4,
              "profile_saved": false, "computed_at": "2026-10-25T19:40:00Z"},
   "attempts": [{"attempt_id": "abc123:1", "n": 1, "song_key": "artist|title", "artist": "Artist", "title": "Title",
                 "sung_at": "2026-10-25T19:08:00Z", "feel": "loved", "position": "comfortable", "excluded": false,
@@ -2230,7 +2230,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
                 "falsetto_notes": 0}]}]}
 ```
 
-`result` is the session's result as last computed (`null` before the first `GET .../result`). `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
+`result` is the session's result as last computed (`null` before the first `GET .../result`). Its `comfort_source` is the result's (`measured` / `model`; summaries stored before v0.32.0 read as `model`), and a "Don't count this one" recompute updates it: excluding a comfortable song can leave too few to measure. `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
 
 ### PATCH /api/voice/attempts/{attempt_id}
 

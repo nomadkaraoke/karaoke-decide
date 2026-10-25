@@ -32,6 +32,7 @@ from backend.api.deps import (
 )
 from backend.config import BackendSettings
 from backend.main import app
+from backend.models.voice_session import SessionResultSummaryOut
 from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.recs_v2.service import RecSection, RecSong
@@ -553,6 +554,37 @@ def test_result_reports_measured_comfort_source(client: TestClient) -> None:
     for i in range(3):
         _post_attempt(client, quiz_only, _attempt(_next(client, quiz_only), i))
     assert client.get(f"/api/voice/sessions/{quiz_only}/result").json()["comfort_source"] == "model"
+
+
+def test_comfort_source_in_result_summaries_and_after_exclude(client: TestClient, fs: RouteFirestore) -> None:
+    """The stored result summary (Me's latest_session, the history) carries comfort_source; excluding one of the
+    two comfortable songs leaves too few to measure, so the recomputed comfort is the model's again."""
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    sid = _create(client)
+    ids = [_post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))["attempt_id"] for i in range(2)]
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["comfort_source"] == "measured"
+    latest = client.get("/api/my/voice").json()["latest_session"]
+    assert (latest["session_id"], latest["comfort_source"]) == (sid, "measured")
+    assert (latest["comfort_low"], latest["comfort_high"]) == (50, 58)
+
+    patched = _patch_attempt(client, ids[0], True)
+    assert patched["result"]["comfort_source"] == "model"
+    assert client.get("/api/my/voice").json()["latest_session"]["comfort_source"] == "model"
+    history = client.get("/api/voice/history").json()["sessions"]
+    assert history[0]["result"]["comfort_source"] == "model"
+
+    assert _patch_attempt(client, ids[0], False)["result"]["comfort_source"] == "measured"
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["comfort_source"] == "measured"
+
+
+def test_stored_summary_without_comfort_source_reads_as_model() -> None:
+    """Summaries stored before v0.32.0 have no comfort_source: they read as the model's estimate."""
+    stored = {
+        "session_id": "s", "voice_type": "baritone", "between": None, "confidence_label": "low", "top_p": 0.5,
+        "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 64, "attempts": 3, "evidence_attempts": 3,
+        "profile_saved": False, "computed_at": "2026-10-25T19:00:00Z",
+    }  # fmt: skip
+    assert SessionResultSummaryOut.model_validate(stored).comfort_source == "model"
 
 
 def test_from_profile_reads_voice_profile_out_register() -> None:
