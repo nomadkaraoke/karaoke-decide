@@ -50,12 +50,17 @@ def _str(node: ast.AST | None) -> str | None:
     return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
 
 
+def _target_name(node: ast.AST) -> str:
+    """``X`` for ``X = ...``, ``attr`` for ``self.attr = ...``."""
+    return node.id if isinstance(node, ast.Name) else node.attr if isinstance(node, ast.Attribute) else ""
+
+
 def _collection_literals(tree: ast.AST) -> Iterator[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign | ast.AnnAssign):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             value = _str(node.value)
-            if value is not None and any(isinstance(t, ast.Name) and "COLLECTION" in t.id.upper() for t in targets):
+            if value is not None and any("COLLECTION" in _target_name(t).upper() for t in targets):
                 yield value
         elif isinstance(node, ast.Call):
             func = node.func
