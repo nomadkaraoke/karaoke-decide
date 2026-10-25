@@ -52,6 +52,7 @@ class ResultSummary:
     full: tuple[int, int]
     improve_hint: ImproveHint | None
     comfort_source: ComfortSource = "model"  # "measured": from the songs rated comfortable (comfort.py)
+    falsetto_high: int | None = None  # highest note labelled falsetto on a counted attempt (never chest range)
 
 
 def _top(marg: dict[str, float]) -> tuple[str, float]:
@@ -164,4 +165,5 @@ def summary(
         full=(f_lo, f_hi),
         improve_hint=hint,
         comfort_source=source,
+        falsetto_high=round(state.falsetto_high) if state.falsetto_high is not None else None,
     )

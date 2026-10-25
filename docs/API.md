@@ -446,6 +446,8 @@ The singer's voice profile, stored on their `decide_users` doc (auth required; v
 
 Rules: MIDI 24-96; `low <= comfort_low <= comfort_high <= high`; exactly one of `voice_type` (bass|baritone|tenor|alto|mezzo|soprano) / `register` (lower|middle|higher); `method` mic|self (`session` is `422` here: only a voice session's result saves those), and `self` requires `confidence: low`.
 
+Optional since v0.33.0 (null when absent, so old apps and stored profiles are unchanged): `falsetto_high` / `falsetto_low` (MIDI 24-96, `falsetto_high >= low_midi`, `falsetto_low <= falsetto_high`): the falsetto / head-voice range, kept apart from the chest range `low_midi..high_midi` (the mic test's "Was your top note falsetto?"); `experience` (none|some|trained) and `uses_falsetto` (yes|sometimes|no|unsure): the singing background from the session setup. A session profile carries the result's `falsetto_high` and its setup's background.
+
 ### GET /api/catalog/songs/{song_key}/vocal-range
 
 Public. A song's vocal range from `catalog.db` (MIDI numbers; `tier: rough` = the artist's range standing in; `is_duet` null when unknown). `range` is `null` for an unknown song or one without data. `503 warming_up` (`Retry-After: 30`) until `catalog.db` has loaded. URL-encode the key (`muse%7Cuprising`).
@@ -2206,9 +2208,11 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
 
 ```json
 {"voice_type": "tenor", "between": null, "confidence_label": "low", "top_p": 0.5, "low": 45, "high": 69,
- "comfort_low": 49, "comfort_high": 59, "comfort_source": "measured", "attempts": 3, "partial": false, "improve_hint": null, "done_reason": "confident", "profile_saved": false,
+ "comfort_low": 49, "comfort_high": 59, "comfort_source": "measured", "falsetto_high": 69, "attempts": 3, "partial": false, "improve_hint": null, "done_reason": "confident", "profile_saved": false,
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
+
+`falsetto_high` (since v0.33.0; `null` without one) is the highest note labelled falsetto (`note_labels`, rounded) on an attempt that counts: excluded attempts' labels don't. Falsetto notes are never chest range: `low`/`high` and the comfort come from the chest-only `pitch`.
 
 `comfort_source` (since v0.32.0; default `model`) says where `comfort_low`/`comfort_high` come from: `measured` once at least 2 songs rated comfortable and easy, known better than "barely", carry a usable `pitch` (60 s voiced in total): the voiced-seconds-weighted mean of their sung p10/p90 (each kept inside that song's held notes), widened to at least 11 keys around its centre and to cover each of those songs' p10..p90, shifted inside `low`..`high`; `model` otherwise: the voice model's estimate for the likely types. A saved `method: session` profile stores the same comfort. `confidence_label` is `medium` ("between") only when the top type has at least 0.7 within the first 5 counting songs (excluded ones don't count) (any settled adjacent pair after that), and a measured comfort counts as settled (see `docs/VOICE-SESSION-TUNING.md`).
 
@@ -2225,7 +2229,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
 ```json
 {"sessions": [{"session_id": "abc123", "created_at": "2026-10-25T19:00:00Z", "state": "done",
   "result": {"session_id": "abc123", "voice_type": "baritone", "between": null, "confidence_label": "low", "top_p": 0.5,
-             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "comfort_source": "model", "attempts": 4, "evidence_attempts": 4,
+             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "comfort_source": "model", "falsetto_high": null, "attempts": 4, "evidence_attempts": 4,
              "profile_saved": false, "computed_at": "2026-10-25T19:40:00Z"},
   "attempts": [{"attempt_id": "abc123:1", "n": 1, "song_key": "artist|title", "artist": "Artist", "title": "Title",
                 "sung_at": "2026-10-25T19:08:00Z", "feel": "loved", "position": "comfortable", "excluded": false,
@@ -2233,7 +2237,7 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
                 "falsetto_notes": 0}]}]}
 ```
 
-`result` is the session's result as last computed (`null` before the first `GET .../result`). Its `comfort_source` is the result's (`measured` / `model`; summaries stored before v0.32.0 read as `model`), and a "Don't count this one" recompute updates it: excluding a comfortable song can leave too few to measure. `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
+`result` is the session's result as last computed (`null` before the first `GET .../result`). Its `comfort_source` is the result's (`measured` / `model`; summaries stored before v0.32.0 read as `model`), and a "Don't count this one" recompute updates it: excluding a comfortable song can leave too few to measure. `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`). `falsetto_notes` is how many of the attempt's `note_labels` say falsetto; the `result`'s `falsetto_high` is as in `GET .../result`.
 
 ### PATCH /api/voice/attempts/{attempt_id}
 

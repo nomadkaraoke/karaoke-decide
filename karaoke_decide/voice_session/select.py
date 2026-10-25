@@ -71,6 +71,7 @@ class SessionState:
     ``comfort_history`` holds ``posterior.comfort_estimate()`` before the first attempt and after each one.
     ``range_attempts`` counts attempts whose answers carry range evidence.
     ``evidence`` holds each counted attempt's evidence, in order (for the measured comfort).
+    ``falsetto_high`` is the highest note the singer labelled falsetto on a counted attempt (None without one).
     """
 
     posterior: Posterior
@@ -82,6 +83,7 @@ class SessionState:
     recent_strata: list[str] = field(default_factory=list)
     comfort_history: list[tuple[float, float]] = field(default_factory=list)
     evidence: list[Evidence] = field(default_factory=list)
+    falsetto_high: float | None = None
 
 
 @dataclass(frozen=True)

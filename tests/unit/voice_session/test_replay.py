@@ -241,3 +241,11 @@ def test_chest_pitch_cap_keeps_the_summary_ordered() -> None:
     assert replay.chest_pitch(p, labels[1:], None) == p  # unsure alone never caps
     assert replay.chest_pitch(p, labels, {"voiced_s": 1}) == p
     assert replay.chest_pitch(None, labels, None) is None
+
+
+def test_falsetto_high_from_labels_of_counting_attempts() -> None:
+    """Andrew's 8 falsetto A4s on song 3 make falsetto_high 69 from song 3 on; excluding song 3 drops it."""
+    fx = _labelled_song3(_fixture(), pitch_all=False)
+    assert [s.falsetto_high for s in replay.replay_fixture(fx)] == [None, None, 69, 69]
+    fx["attempts"][2]["excluded"] = True
+    assert [s.falsetto_high for s in replay.replay_fixture(fx)] == [None] * 4

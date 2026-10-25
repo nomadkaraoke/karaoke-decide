@@ -1522,3 +1522,45 @@ def test_history_counts_falsetto_notes(client: TestClient, fs: RouteFirestore) -
     ]  # fmt: skip
     attempts = client.get("/api/voice/history").json()["sessions"][0]["attempts"]
     assert [a["falsetto_notes"] for a in attempts] == [3, 0]
+
+
+def test_session_result_reports_falsetto_high(client: TestClient, fs: RouteFirestore) -> None:
+    """The highest note labelled falsetto (rounded) is the result's ``falsetto_high``: in the result, the stored
+    summary (history, Me) and the saved session profile. "unsure" / "full" notes don't count; no labels → null."""
+    sid = _create(client)
+    labels = [_label(30.0, 69.2), _label(40.0, 71.0, "unsure"), _label(50.0, 67.6), _label(60.0, 73.0, "full")]
+    for i in range(3):
+        song = _next(client, sid)
+        extra: dict[str, Any] = {"note_labels": labels, "pitch_all": UNFILTERED} if i == 1 else {}
+        _post_attempt(client, sid, _attempt(song, i, pitch=CHEST, **extra))
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["falsetto_high"] == 69
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["falsetto_high"] == 69
+    assert client.get("/api/voice/history").json()["sessions"][0]["result"]["falsetto_high"] == 69
+    assert res["profile_saved"] is True  # over no profile, whatever the confidence
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["falsetto_high"] == 69
+
+    plain = _create(client)
+    _post_attempt(client, plain, _attempt(_next(client, plain), 0, pitch=CHEST))
+    assert client.get(f"/api/voice/sessions/{plain}/result").json()["falsetto_high"] is None
+
+
+def test_excluded_attempt_falsetto_ignored(client: TestClient, fs: RouteFirestore) -> None:
+    """ "Don't count this one" takes the attempt's falsetto labels out of ``falsetto_high`` too (and undo restores)."""
+    sid = _create(client)
+    ids = []
+    for i, top in enumerate((72.0, 68.0)):
+        body = _attempt(_next(client, sid), i, pitch=CHEST, pitch_all=UNFILTERED, note_labels=[_label(30.0, top)])
+        ids.append(_post_attempt(client, sid, body)["attempt_id"])
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["falsetto_high"] == 72
+    assert _patch_attempt(client, ids[0], True)["result"]["falsetto_high"] == 68
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["falsetto_high"] == 68
+    assert _patch_attempt(client, ids[1], True)["result"]["falsetto_high"] is None
+    assert _patch_attempt(client, ids[0], False)["result"]["falsetto_high"] == 72
+
+
+def test_stored_summary_without_falsetto_high_reads_null() -> None:
+    raw = {"session_id": "s", "voice_type": "bass", "between": None, "confidence_label": "low", "top_p": 0.4,
+           "low": 40, "high": 64, "comfort_low": 45, "comfort_high": 58, "attempts": 1, "evidence_attempts": 1,
+           "profile_saved": False, "computed_at": "2026-10-25T19:00:00Z"}  # fmt: skip
+    assert SessionResultSummaryOut.model_validate(raw).falsetto_high is None

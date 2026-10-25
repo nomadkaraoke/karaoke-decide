@@ -202,6 +202,8 @@ class ResultOut(BaseModel):
     comfort_high: int
     # "measured": from the songs rated comfortable and easy, with usable pitch; "model": the voice model's estimate.
     comfort_source: ComfortSource = "model"
+    # The highest note labelled falsetto on an attempt that counts (since v0.33.0); null without one.
+    falsetto_high: int | None = None
     attempts: int
     partial: bool
     improve_hint: ImproveHint | None
@@ -249,6 +251,7 @@ class SessionResultSummaryOut(BaseModel):
     comfort_low: int
     comfort_high: int
     comfort_source: ComfortSource = "model"  # as ResultOut; summaries stored before v0.32.0 read as "model"
+    falsetto_high: int | None = None  # as ResultOut; summaries stored before v0.33.0 read null
     attempts: int
     evidence_attempts: int  # attempts with range evidence that count (excluded ones don't)
     profile_saved: bool

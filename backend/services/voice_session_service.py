@@ -347,6 +347,7 @@ def summary_out(
         comfort_low=s.comfort[0],
         comfort_high=s.comfort[1],
         comfort_source=s.comfort_source,
+        falsetto_high=s.falsetto_high,
         attempts=state.attempts,
         evidence_attempts=state.range_attempts,
         profile_saved=profile_saved,
@@ -1039,7 +1040,7 @@ class VoiceSessionService:
         saved = bool(session.get("profile_saved"))
         changes: dict[str, Any] = {}
         current = await self._profiles.get(user_id)
-        derived = session_profile(s, state.range_attempts, session_id, now)
+        derived = session_profile(s, state.range_attempts, session_id, now, setup=session.get("setup"))
         if current is not None and current.method == "session" and current.session_id == session_id:
             if derived is not None:
                 await self._profiles.put(user_id, derived)
@@ -1085,7 +1086,7 @@ class VoiceSessionService:
         attempts = await self._attempts(user.id, session_id)
         state, _, s = await asyncio.to_thread(summarize, session, attempts)
         now = datetime.now(UTC)
-        derived = session_profile(s, state.range_attempts, session_id, now)
+        derived = session_profile(s, state.range_attempts, session_id, now, setup=session.get("setup"))
         if derived is None:
             raise NoEvidenceError(session_id)
         try:
@@ -1118,7 +1119,9 @@ class VoiceSessionService:
                 logger.warning("voice session %s: outputs of attempt %s failed", session_id, a.get("n"), exc_info=True)
         state, done_reason, s = await asyncio.to_thread(summarize, session, attempts)
         finishing = was == "active"  # only finishing an active session may save its profile
-        profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=finishing)
+        profile, saved = await self._save_profile(
+            user.id, session_id, s, state.range_attempts, may_save=finishing, setup=session.get("setup")
+        )
         if not finishing:  # done or abandoned: keep what was stored (an adopt may have saved it)
             saved = bool(session.get("profile_saved"))
         suited = await self._suited(user, profile)
@@ -1150,6 +1153,7 @@ class VoiceSessionService:
             comfort_low=s.comfort[0],
             comfort_high=s.comfort[1],
             comfort_source=s.comfort_source,
+            falsetto_high=s.falsetto_high,
             attempts=state.attempts,
             partial=done_reason != "confident",
             improve_hint=s.improve_hint,
@@ -1160,7 +1164,14 @@ class VoiceSessionService:
         )
 
     async def _save_profile(
-        self, user_id: str, session_id: str, s: ResultSummary, evidence_count: int, *, may_save: bool
+        self,
+        user_id: str,
+        session_id: str,
+        s: ResultSummary,
+        evidence_count: int,
+        *,
+        may_save: bool,
+        setup: dict[str, Any] | None = None,
     ) -> tuple[VoiceProfileOut | None, bool]:
         """(the profile the result stands for, whether it was saved now).
 
@@ -1170,7 +1181,7 @@ class VoiceSessionService:
         result's profile (for ``suited``); with no range evidence there is none and the stored profile stands."""
         existing = await self._profiles.get(user_id)
         now = datetime.now(UTC)
-        derived = session_profile(s, evidence_count, session_id, now)
+        derived = session_profile(s, evidence_count, session_id, now, setup=setup)
         if derived is None:
             return existing, False
         if may_save and should_save(s.confidence_label, existing):

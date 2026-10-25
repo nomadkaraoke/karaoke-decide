@@ -28,6 +28,8 @@ FIELD = "voice_profile"
 MIC_FIELD = "voice_profile_mic"  # the last mic-test result, kept beside a session result (Phase 3d batch 1)
 
 VoiceType = Literal["bass", "baritone", "tenor", "alto", "mezzo", "soprano"]
+Experience = Literal["none", "some", "trained"]
+UsesFalsetto = Literal["yes", "sometimes", "no", "unsure"]
 Midi = Field(ge=24, le=96)
 
 
@@ -47,11 +49,21 @@ class VoiceProfileIn(BaseModel):
     measured_at: datetime
     evidence_count: int | None = Field(default=None, ge=0)
     session_id: str | None = Field(default=None, max_length=64)
+    # Phase 3d batch 1, Part C (all optional; profiles stored before v0.33.0 read null). The falsetto range is
+    # kept apart from the chest range (low_midi..high_midi), which never includes falsetto notes.
+    falsetto_high: int | None = Field(default=None, ge=24, le=96)
+    falsetto_low: int | None = Field(default=None, ge=24, le=96)
+    experience: Experience | None = None  # singing background from the session setup
+    uses_falsetto: UsesFalsetto | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
         if not (self.low_midi <= self.comfort_low <= self.comfort_high <= self.high_midi):
             raise ValueError("require low_midi <= comfort_low <= comfort_high <= high_midi")
+        if self.falsetto_high is not None and self.falsetto_high < self.low_midi:
+            raise ValueError("require falsetto_high >= low_midi")
+        if self.falsetto_low is not None and self.falsetto_high is not None and self.falsetto_low > self.falsetto_high:
+            raise ValueError("require falsetto_low <= falsetto_high")
         if (self.voice_type is None) == (self.register_ is None):
             raise ValueError("exactly one of voice_type / register must be set")
         if self.method == "self" and self.confidence != "low":

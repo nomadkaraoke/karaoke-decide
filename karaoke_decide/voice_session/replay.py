@@ -73,13 +73,18 @@ def chest_pitch(
     """
     if pitch is None or pitch_all:
         return pitch
-    falsetto = [float(n["midi"]) for n in note_labels or () if n.get("label") == "falsetto"]
+    falsetto = falsetto_midis(note_labels)
     if not falsetto:
         return pitch
     cap = min(falsetto) - 1
     if pitch.held_high <= cap:
         return pitch
     return dataclasses.replace(pitch, held_high=cap, held_low=min(pitch.held_low, cap))
+
+
+def falsetto_midis(note_labels: Sequence[Mapping[str, Any]] | None) -> list[float]:
+    """The notes labelled falsetto ("unsure" and "full" are not)."""
+    return [float(n["midi"]) for n in note_labels or () if n.get("label") == "falsetto"]
 
 
 def demand_from_doc(d: Mapping[str, Any]) -> SongDemand:
@@ -106,9 +111,9 @@ def rebuild(
 
     Attempt docs are the stored ``voice_attempts`` shape: ``quiz``, ``pitch``, ``context``, ``stopped_early``,
     ``song_key`` and ``song.demand`` (``song.stratum`` optional); ``note_labels`` / ``pitch_all`` optional
-    (``chest_pitch``). An ``excluded`` attempt ("Don't count this one")
-    counts in ``attempts`` and done songs only: no posterior update, ``range_attempts``, ``tired_count`` or
-    ``comfort_history`` entry. ``on_attempt(state, doc)`` runs after each one, excluded or not.
+    (``chest_pitch``; falsetto labels also set ``state.falsetto_high``). An ``excluded`` attempt ("Don't count this one")
+    counts in ``attempts`` and done songs only: no posterior update, ``range_attempts``, ``tired_count``,
+    ``comfort_history`` entry or ``falsetto_high``. ``on_attempt(state, doc)`` runs after each one, excluded or not.
     """
     state = SessionState(
         posterior=prior,
@@ -136,6 +141,9 @@ def rebuild(
             state.range_attempts += int(has_range_evidence(quiz, pitch))
             state.tired_count += int(quiz.voice_now == "tired")
             state.comfort_history.append(state.posterior.comfort_estimate())
+            if falsetto := falsetto_midis(a.get("note_labels")):  # falsetto is never chest evidence, but it is a range
+                top = max(falsetto)
+                state.falsetto_high = top if state.falsetto_high is None else max(state.falsetto_high, top)
         if on_attempt is not None:
             on_attempt(state, a)
     state.done_keys |= done_skip_keys(skips)

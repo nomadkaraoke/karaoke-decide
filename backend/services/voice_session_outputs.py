@@ -14,11 +14,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
-from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
+from backend.services.voice_profile_service import Experience, UsesFalsetto, VoiceProfileIn, VoiceProfileOut
 from karaoke_decide.voice_session.stopping import ResultSummary
 
 logger = logging.getLogger(__name__)
@@ -28,23 +28,39 @@ KeyHint = Literal["down", "up", "octave"]
 _STAT_COUNTERS = ("plays", "good", "not_great", "early_exit")
 _COMFORT = {"easy": "easy", "stretch": "challenging", "couldnt": "challenging"}
 _MIDI_MIN, _MIDI_MAX = 24, 96
+_EXPERIENCE = get_args(Experience)
+_USES_FALSETTO = get_args(UsesFalsetto)
 
 
 # ---------------------------------------------------------------- profile
 
 
-def session_profile(s: ResultSummary, evidence_count: int, session_id: str, now: datetime) -> VoiceProfileIn | None:
-    """The profile a session measured; None without range evidence (``evidence_count`` < 1)."""
+def session_profile(
+    s: ResultSummary,
+    evidence_count: int,
+    session_id: str,
+    now: datetime,
+    *,
+    setup: Mapping[str, Any] | None = None,
+) -> VoiceProfileIn | None:
+    """The profile a session measured; None without range evidence (``evidence_count`` < 1).
+
+    It carries the result's ``falsetto_high`` (dropped if below the chest range's low end, so it can never cost
+    the profile) and the setup's singing background (``experience``, ``uses_falsetto``)."""
     if evidence_count < 1:
         return None
 
     def midi(v: int) -> int:
         return max(_MIDI_MIN, min(_MIDI_MAX, v))
 
+    setup = setup or {}
+    low = midi(s.full[0])
+    falsetto_high = midi(s.falsetto_high) if s.falsetto_high is not None else None
+
     try:
         return VoiceProfileIn.model_validate(
             {
-                "low_midi": midi(s.full[0]),
+                "low_midi": low,
                 "high_midi": midi(s.full[1]),
                 "comfort_low": midi(s.comfort[0]),
                 "comfort_high": midi(s.comfort[1]),
@@ -56,6 +72,9 @@ def session_profile(s: ResultSummary, evidence_count: int, session_id: str, now:
                 "evidence_count": evidence_count,
                 "session_id": session_id,
                 "measured_at": now,
+                "falsetto_high": falsetto_high if falsetto_high is not None and falsetto_high >= low else None,
+                "experience": setup.get("experience") if setup.get("experience") in _EXPERIENCE else None,
+                "uses_falsetto": setup.get("uses_falsetto") if setup.get("uses_falsetto") in _USES_FALSETTO else None,
             }
         )
     except ValidationError:
