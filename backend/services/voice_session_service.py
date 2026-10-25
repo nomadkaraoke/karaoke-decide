@@ -21,6 +21,7 @@ Session-state mapping onto C2's ``SessionState``:
 * ``range_attempts`` counts attempts carrying range evidence: Q2 (position) answered, which the API
   requires, and either the singer knew the song better than "barely" or the pitch summary is usable
   (``model.usable_pitch``). Every attempt still updates the posterior (with its context weight).
+  The loop itself is the pure ``karaoke_decide.voice_session.replay.rebuild`` (shared with session replays).
 * ``tired_count`` = attempts whose Q7 ``voice_now`` is "tired".
 * An attempt marked ``excluded`` ("Don't count this one", ``set_excluded``) still counts in ``attempts``
   and done songs but leaves the posterior, ``range_attempts``, ``tired_count`` and ``comfort_history``.
@@ -104,16 +105,9 @@ from karaoke_decide.core.models import User
 from karaoke_decide.voice_pool.models import Version
 from karaoke_decide.voice_pool.versions import VersionStats, choose_versions
 from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
-from karaoke_decide.voice_session.model import (
-    Context,
-    Evidence,
-    PitchSummary,
-    Posterior,
-    Quiz,
-    SongDemand,
-    key_shift_direction,
-    usable_pitch,
-)
+from karaoke_decide.voice_session.model import Posterior, SongDemand, key_shift_direction
+from karaoke_decide.voice_session.replay import demand_from_doc as _demand
+from karaoke_decide.voice_session.replay import rebuild
 from karaoke_decide.voice_session.select import CandidateSong, SessionState, choose_next, know_weight
 from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, summary
 
@@ -308,38 +302,6 @@ def _matching_attempt(
     return None
 
 
-def _quiz(d: dict[str, Any]) -> Quiz:
-    return Quiz(
-        feel=d["feel"],
-        position=d["position"],
-        difficulty=d.get("difficulty"),
-        knew=d.get("knew"),
-        would_sing=d.get("would_sing"),
-        would_work_if=frozenset(d.get("would_work_if") or ()),
-        voice_now=d.get("voice_now"),
-        version_quality=d.get("version_quality"),
-        version_issues=frozenset(d.get("version_issues") or ()),
-        tags=frozenset(d.get("tags") or ()),
-    )
-
-
-def _pitch(d: dict[str, Any] | None) -> PitchSummary | None:
-    if not d:
-        return None
-    return PitchSummary(
-        **{k: float(d[k]) for k in ("voiced_s", "held_count", "held_low", "held_high", "p10", "p50", "p90")}
-    )
-
-
-def _demand(d: dict[str, Any]) -> SongDemand:
-    return SongDemand(**{k: float(d[k]) for k in ("low", "high", "p10", "p50", "p90")})
-
-
-def has_range_evidence(quiz: Quiz, pitch: PitchSummary | None) -> bool:
-    """Q2 answered (always, the API requires it) and the song known better than "barely" or pitch usable."""
-    return quiz.position is not None and (quiz.knew != "barely" or usable_pitch(pitch))
-
-
 def _prior(session: dict[str, Any]) -> Posterior:
     raw = session.get("prior_profile")
     profile: VoiceProfileOut | None = None
@@ -353,40 +315,9 @@ def _prior(session: dict[str, Any]) -> Posterior:
     return Posterior.from_profile(profile)
 
 
-def _done_skip_keys(skips: Sequence[dict[str, Any]]) -> set[str]:
-    return {s["song_key"] for s in skips if s.get("done")}
-
-
 def rebuild_state(session: dict[str, Any], attempts: Sequence[dict[str, Any]]) -> SessionState:
     """C2's SessionState from the session doc and its attempt docs (see the module doc for the mapping)."""
-    post = _prior(session)
-    setup = session.get("setup") or {}
-    state = SessionState(
-        posterior=post,
-        warmth=setup.get("warmth") or "cold",
-        attempts=0,
-        range_attempts=0,
-        tired_count=0,
-        comfort_history=[post.comfort_estimate()],
-    )
-    for a in sorted(attempts, key=lambda a: int(a["n"])):
-        song = a["song"]
-        state.attempts += 1
-        state.done_keys.add(a["song_key"])
-        state.recent_strata.append(song.get("stratum") or "")
-        if a.get("excluded"):  # "Don't count this one": it took its turn, but it is no evidence
-            continue
-        quiz, pitch = _quiz(a["quiz"]), _pitch(a.get("pitch"))
-        c = a.get("context") or {}
-        ctx = Context(posture=c.get("posture") or "standing", warmth=c.get("warmth") or "cold",
-                      headphones=bool(c.get("headphones")))  # fmt: skip
-        ev = Evidence(_demand(song["demand"]), quiz, ctx, pitch, stopped_early=bool(a.get("stopped_early")))
-        state.posterior = state.posterior.update(ev)
-        state.range_attempts += int(has_range_evidence(quiz, pitch))
-        state.tired_count += int(quiz.voice_now == "tired")
-        state.comfort_history.append(state.posterior.comfort_estimate())
-    state.done_keys |= _done_skip_keys(session.get("skips") or [])
-    return state
+    return rebuild(_prior(session), session.get("setup") or {}, attempts, session.get("skips") or [])
 
 
 def summarize(
