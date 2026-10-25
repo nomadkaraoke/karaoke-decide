@@ -29,7 +29,7 @@ def _client(monkeypatch: pytest.MonkeyPatch, fs: FakeFirestore, tmp_path: Path, 
         google_cloud_project="test-project",
         jwt_secret="test-jwt-secret-key-for-testing-only",
         decide_gen_partner_secret=secret,
-    )  # type: ignore[call-arg]
+    )
     monkeypatch.setattr(main, "get_backend_settings", lambda: settings)
     c = TestClient(main.create_app())
     c.app.dependency_overrides[get_settings] = lambda: settings  # type: ignore[attr-defined]
