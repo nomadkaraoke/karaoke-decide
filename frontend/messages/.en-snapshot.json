@@ -407,8 +407,6 @@
     "addFromRecs": "Add from Recommendations",
     "sing": "Sing",
     "removeFromPlaylist": "Remove from playlist",
-    "songIdLabel": "Song ID: {id}",
-    "songDetailsWillLoad": "Song details will be loaded from catalog",
     "createNewPlaylist": "Create New Playlist",
     "nameLabel": "Name",
     "namePlaceholder": "My Awesome Playlist",
@@ -812,7 +810,9 @@
       "checkingAuth": "Checking authentication..."
     },
     "sourceBadge": {
-      "screenshot": "Screenshot"
+      "screenshot": "Screenshot",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

@@ -407,8 +407,6 @@
     "addFromRecs": "Tilføj fra anbefalinger",
     "sing": "Syng",
     "removeFromPlaylist": "Fjern fra afspilningsliste",
-    "songIdLabel": "Sang-ID: {id}",
-    "songDetailsWillLoad": "Sangdetaljer vil blive indlæst fra kataloget",
     "createNewPlaylist": "Opret ny afspilningsliste",
     "nameLabel": "Navn",
     "namePlaceholder": "Min fantastiske afspilningsliste",
@@ -812,7 +810,9 @@
       "checkingAuth": "Tjekker godkendelse..."
     },
     "sourceBadge": {
-      "screenshot": "Skærmbillede"
+      "screenshot": "Skærmbillede",
+      "karaokeLog": "Sunget til karaoke",
+      "manual": "Tilføjet af dig"
     }
   },
   "common": {

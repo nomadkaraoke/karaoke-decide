@@ -257,12 +257,23 @@ export interface QuizEnjoySingingResponse {
 // Playlist Types
 // ============================================================================
 
+export interface PlaylistItem {
+  item_id: string;
+  song_key: string | null;
+  artist: string;
+  title: string;
+  added_at: string;
+  facets: Record<string, unknown> | null;
+}
+
 export interface Playlist {
   id: string;
   name: string;
   description: string | null;
   song_ids: string[];
   song_count: number;
+  items: PlaylistItem[];
+  rev: number;
   created_at: string;
   updated_at: string;
 }

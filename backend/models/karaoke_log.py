@@ -8,13 +8,17 @@ as ISO strings. See the Phase 5 "Tonight" spec section 7.1.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 LogSource = Literal["kjbox", "app"]
 LogState = Literal["planned", "requested", "sung", "sung_unplayed", "skipped"]
 SongKeyStatus = Literal["resolved", "unresolved"]
+Vibe = Literal["party", "ballad", "warm_up", "duet", "emotional", "rock_out", "singalong"]
+Reason = Literal["out_of_range", "too_hard", "crowd_quiet", "awkward_music", "too_long", "didnt_know_it"]
+LogOrigin = Literal["live", "backfill"]
+DatePrecision = Literal["day", "month", "year", "unknown"]
 
 NOTES_MAX_CHARS = 2000
 
@@ -28,7 +32,22 @@ class Survey(BaseModel):
     key: Literal["too_low", "right", "too_high"] | None = None
     crowd_pleaser: bool | None = None
     notes: str | None = Field(default=None, max_length=NOTES_MAX_CHARS)
+    vibes: list[Vibe] = Field(default_factory=list, max_length=7)
+    reasons: list[Reason] = Field(default_factory=list, max_length=6)
     answered_at: datetime | None = None
+
+    @field_validator("vibes", "reasons", mode="before")
+    @classmethod
+    def _dedupe(cls, value: Any) -> Any:
+        """Drop repeats, keeping first-seen order (a None means none)."""
+        if value is None:
+            return []
+        if isinstance(value, list):
+            try:
+                return list(dict.fromkeys(value))
+            except TypeError:  # unhashable items: let the type check reject them
+                return value
+        return value
 
 
 class LogNight(BaseModel):
@@ -38,6 +57,7 @@ class LogNight(BaseModel):
     kind: Literal["nomad", "other"] | None = None
     venue_name: str | None = None
     date: str | None = None
+    date_precision: DatePrecision | None = None
 
 
 class LogMedia(BaseModel):
@@ -74,6 +94,8 @@ class KaraokeLogEntry(BaseModel):
     survey: Survey | None = None
     media: LogMedia | None = None
     deleted: bool = False
+    origin: LogOrigin | None = None
+    times: int = Field(1, ge=1, le=50)
     # kjbox extras (Nomad nights only)
     box_id: str | None = None
     entry_id: str | None = None

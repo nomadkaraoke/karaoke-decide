@@ -407,8 +407,6 @@
     "addFromRecs": "从推荐中添加",
     "sing": "演唱",
     "removeFromPlaylist": "从播放列表中移除",
-    "songIdLabel": "歌曲 ID：{id}",
-    "songDetailsWillLoad": "歌曲详情将从曲库中加载",
     "createNewPlaylist": "创建新播放列表",
     "nameLabel": "名称",
     "namePlaceholder": "我超棒的播放列表",
@@ -812,7 +810,9 @@
       "checkingAuth": "正在检查身份验证..."
     },
     "sourceBadge": {
-      "screenshot": "截图"
+      "screenshot": "截图",
+      "karaokeLog": "在KTV唱过",
+      "manual": "由你添加"
     }
   },
   "common": {

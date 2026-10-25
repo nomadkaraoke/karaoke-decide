@@ -407,8 +407,6 @@
     "addFromRecs": "Dodaj z rekomendacji",
     "sing": "Śpiewaj",
     "removeFromPlaylist": "Usuń z playlisty",
-    "songIdLabel": "ID piosenki: {id}",
-    "songDetailsWillLoad": "Szczegóły piosenki zostaną załadowane z katalogu",
     "createNewPlaylist": "Utwórz nową playlistę",
     "nameLabel": "Nazwa",
     "namePlaceholder": "Moja niesamowita playlista",
@@ -812,7 +810,9 @@
       "checkingAuth": "Sprawdzanie uwierzytelniania..."
     },
     "sourceBadge": {
-      "screenshot": "Zrzut ekranu"
+      "screenshot": "Zrzut ekranu",
+      "karaokeLog": "Zaśpiewane na karaoke",
+      "manual": "Dodane przez Ciebie"
     }
   },
   "common": {

@@ -407,8 +407,6 @@
     "addFromRecs": "Adaugă din recomandări",
     "sing": "Cântă",
     "removeFromPlaylist": "Elimină din playlist",
-    "songIdLabel": "ID Melodie: {id}",
-    "songDetailsWillLoad": "Detaliile melodiei vor fi încărcate din catalog",
     "createNewPlaylist": "Creează un playlist nou",
     "nameLabel": "Nume",
     "namePlaceholder": "Playlistul meu grozav",
@@ -812,7 +810,9 @@
       "checkingAuth": "Se verifică autentificarea..."
     },
     "sourceBadge": {
-      "screenshot": "Captură de ecran"
+      "screenshot": "Captură de ecran",
+      "karaokeLog": "Cântată la karaoke",
+      "manual": "Adăugată de tine"
     }
   },
   "common": {

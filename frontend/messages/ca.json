@@ -407,8 +407,6 @@
     "addFromRecs": "Afegeix de Recomanacions",
     "sing": "Canta",
     "removeFromPlaylist": "Elimina de la llista de reproducció",
-    "songIdLabel": "ID de la cançó: {id}",
-    "songDetailsWillLoad": "Els detalls de la cançó es carregaran del catàleg",
     "createNewPlaylist": "Crea una nova llista de reproducció",
     "nameLabel": "Nom",
     "namePlaceholder": "La meva llista increïble",
@@ -812,7 +810,9 @@
       "checkingAuth": "Comprovant autenticació..."
     },
     "sourceBadge": {
-      "screenshot": "Captura de pantalla"
+      "screenshot": "Captura de pantalla",
+      "karaokeLog": "Cantada al karaoke",
+      "manual": "Afegida per tu"
     }
   },
   "common": {

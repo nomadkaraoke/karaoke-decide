@@ -61,7 +61,20 @@ MAX_LIST_LIMIT = 500
 
 # Who may write which fields (spec 7.2).
 USER_APP_FIELDS = frozenset(
-    {"state", "artist", "title", "song_key", "night", "sung_at", "ended_at", "media", "survey", "deleted"}
+    {
+        "state",
+        "artist",
+        "title",
+        "song_key",
+        "night",
+        "sung_at",
+        "ended_at",
+        "media",
+        "survey",
+        "deleted",
+        "origin",
+        "times",
+    }
 )
 USER_KJ_FIELDS = frozenset({"survey", "deleted"})
 PARTNER_FIELDS = frozenset(
@@ -135,6 +148,14 @@ def email_hash(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
+def library_key(doc: dict[str, Any]) -> str:
+    """The song's identity in the app's library: its catalog ``song_key`` once resolved,
+    else ``"u:"`` + the normalized artist|title (same as the app's ``songKey``)."""
+    if doc.get("song_key_status") == "resolved" and doc.get("song_key"):
+        return str(doc["song_key"])
+    return "u:" + make_song_key(doc.get("artist") or "", doc.get("title") or "")
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -181,6 +202,7 @@ def _counts(doc: dict[str, Any]) -> bool:
     return doc.get("state") in SUNG_STATES and not doc.get("deleted") and bool(doc.get("artist") and doc.get("title"))
 
 
+MAX_TIMES = 50
 MAX_SINGERS = 6
 MAX_SINGER_CHARS = 100
 
@@ -260,13 +282,25 @@ def _user_patch(entry_id: str, patch: dict[str, Any]) -> dict[str, Any]:
         raise NotOwnerError(f"kjbox owns {sorted(extra)} on this record; you may set survey and deleted")
     if extra:
         raise KaraokeLogInvalidError(f"unknown fields: {sorted(extra)}")
+    if "times" in patch and (
+        isinstance(patch["times"], bool) or not isinstance(patch["times"], int) or not 1 <= patch["times"] <= MAX_TIMES
+    ):
+        raise KaraokeLogInvalidError(f"times must be a whole number from 1 to {MAX_TIMES}")
     return dict(patch)
 
 
 # ---------------------------------------------------------------- counter docs
 
 
-def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: str) -> dict[str, Any]:
+def _times(doc: dict[str, Any] | None) -> int:
+    """How many sings a log record counts for (backfill records may say more than one)."""
+    try:
+        return max(1, int((doc or {}).get("times") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: str, times: int = 1) -> dict[str, Any]:
     when = new.get("sung_at") or new.get("ended_at") or now
     if doc is None:
         doc = {
@@ -295,21 +329,19 @@ def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: s
         doc["title"] = doc.get("title") or new["title"]
     if target[0] == USER_SONGS_COLLECTION:
         doc["song_key"] = new["song_key"]
-    doc["times_sung"] = int(doc.get("times_sung") or 0) + 1
+    doc["times_sung"] = int(doc.get("times_sung") or 0) + times
     doc["last_sung_at"] = _later(doc.get("last_sung_at"), when)
     doc["updated_at"] = now
     return doc
 
 
-def _dec(doc: dict[str, Any], target: Target, now: str) -> dict[str, Any] | None:
+def _dec(doc: dict[str, Any], target: Target, now: str, times: int = 1) -> dict[str, Any] | None:
     """The decremented doc, or None to delete it (a counter doc the log alone created)."""
-    times = max(0, int(doc.get("times_sung") or 0) - 1)
-    if times == 0 and (
-        target[0] == UNRESOLVED_COLLECTION or (doc.get("source") == "karaoke_log" and not is_loved(doc))
-    ):
+    left = max(0, int(doc.get("times_sung") or 0) - times)
+    if left == 0 and (target[0] == UNRESOLVED_COLLECTION or (doc.get("source") == "karaoke_log" and not is_loved(doc))):
         return None
-    out = {**doc, "times_sung": times, "updated_at": now}
-    if times == 0:
+    out = {**doc, "times_sung": left, "updated_at": now}
+    if left == 0:
         out["last_sung_at"] = None
     return out
 
@@ -436,20 +468,30 @@ class KaraokeLogService:
                     new_target = (UNRESOLVED_COLLECTION, unresolved_doc_id(user_id, new["artist"], new["title"]))
             counted = (cur or {}).get("counted")
             old_target: Target | None = (counted["collection"], counted["doc_id"]) if counted else None
-            if old_target != new_target:
+            old_times = int(counted.get("times") or 1) if counted else 1  # pre-backfill docs: 1
+            new_times = _times(new)
+            if (old_target, old_times) != (new_target, new_times):
                 for t in (old_target, new_target):
                     if t is not None and t not in reads:
                         reads[t] = await txn.get(*t)
                 # all reads done; writes from here on
-                if old_target is not None and reads[old_target] is not None:
-                    dec = _dec(reads[old_target], old_target, now)  # type: ignore[arg-type]
-                    if dec is None:
-                        txn.delete(*old_target)
-                    else:
-                        txn.set(*old_target, dec)
-                if new_target is not None:
-                    txn.set(*new_target, _inc(reads[new_target], new_target, new, now))
-            new["counted"] = {"collection": new_target[0], "doc_id": new_target[1]} if new_target else None
+                old_doc = reads[old_target] if old_target is not None else None
+                dec = _dec(old_doc, old_target, now, old_times) if old_doc is not None and old_target else None
+                if old_target is not None and old_target == new_target:
+                    # same row, new times: one write (a row the log created must not vanish between)
+                    txn.set(*old_target, _inc(dec, old_target, new, now, new_times))
+                else:
+                    if old_target is not None and old_doc is not None:
+                        if dec is None:
+                            txn.delete(*old_target)
+                        else:
+                            txn.set(*old_target, dec)
+                    if new_target is not None:
+                        txn.set(*new_target, _inc(reads[new_target], new_target, new, now, new_times))
+            if new_target:
+                new["counted"] = {"collection": new_target[0], "doc_id": new_target[1], "times": new_times}
+            else:
+                new["counted"] = None
             txn.set(LOG_COLLECTION, doc_id, new)
             return new
 
@@ -471,6 +513,9 @@ class KaraokeLogService:
         for field in ("state", "artist", "title", "box_id", "entry_id"):
             if field in patch:
                 new[field] = patch[field] if patch[field] is not None or field == "state" else ""
+        for field in ("origin", "times"):
+            if field in patch:
+                new[field] = patch[field]
         for field in ("sung_at", "ended_at"):
             if field in patch:
                 new[field] = _iso(patch[field])
@@ -665,13 +710,15 @@ class KaraokeLogService:
         night_id: str | None = None,
         limit: int = DEFAULT_LIST_LIMIT,
         cursor: str | None = None,
+        song: str | None = None,
     ) -> tuple[list[KaraokeLogEntry], str | None]:
         """The user's records, newest ``updated_at`` first, and the next page's cursor.
 
         Without ``since``: live records only. With ``since`` (a sync pull): everything updated
         after it, deleted records included so the app can drop them. Survey-only placeholders
         (kjbox facts not delivered yet) are never listed. One equality query on ``user_id``
-        (no composite index); filtering and paging happen here."""
+        (no composite index); filtering and paging happen here. ``song`` (a ``library_key``)
+        keeps one song's records, applied before paging."""
         since_dt = _parse_dt(since)
         after = _decode_cursor(cursor) if cursor else None
         limit = max(1, min(int(limit), MAX_LIST_LIMIT))
@@ -681,6 +728,8 @@ class KaraokeLogService:
             if d.get("state") is None:
                 continue
             if night_id is not None and (d.get("night") or {}).get("id") != night_id:
+                continue
+            if song is not None and library_key(d) != song:
                 continue
             updated = _parse_dt(d.get("updated_at")) or datetime.min.replace(tzinfo=UTC)
             if since_dt is not None:

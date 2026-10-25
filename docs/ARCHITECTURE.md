@@ -289,7 +289,7 @@ GET /api/my/songs?sort=play_count
 | `karaoke_songs` | normalized artist-title | Song catalog (shared) |
 | `user_songs` | user_id + song_id | User-song relationships |
 | `user_artists` | user_id + artist_name | User-artist relationships |
-| `playlists` | auto-generated | User playlists |
+| `playlists` | auto-generated, or a client `pl_…` id | User setlists: ordered `items`, `rev`, `user_id` |
 | `sync_jobs` | auto-generated | Music sync job tracking |
 | `sung_records` | auto-generated | Singing history |
 
@@ -334,8 +334,12 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
      row strip the `session_*` fields and remove `"voice_session"` from `sources` (and from `source`, replaced
      by the first remaining source).
 
-  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) does exactly
-  this and is the template. Any new store of user audio or voice data must be added to both.
+  4. delete the user's `playlists` documents (setlists, per `user_id`), and the user's `karaoke_log`,
+     `user_songs`, `user_karaoke_unresolved` rows. Playlists are user data for this registry;
+     `POST /api/test/profile/reset` already clears them (now including `playlists` and `karaoke_log`).
+
+  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) is the template
+  for steps 1-3; the profile reset (`POST /api/test/profile/reset`) is the template for step 4. Any new store of user audio or voice data must be added to both.
 
 ## Security Considerations
 

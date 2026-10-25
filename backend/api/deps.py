@@ -17,6 +17,7 @@ from backend.services.guest_claim_service import GuestClaimService
 from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import KaraokeLogService
 from backend.services.known_songs_service import KnownSongsService, get_known_songs_service
+from backend.services.library_service import LibraryService
 from backend.services.music_service_service import MusicServiceService, get_music_service_service
 from backend.services.playlist_service import PlaylistService, get_playlist_service
 from backend.services.quiz_service import QuizService, get_quiz_service
@@ -312,6 +313,16 @@ async def get_karaoke_log_service(
     return KaraokeLogService(firestore, catalog=catalog, resolve_user=resolve_user, find_user=find_user)
 
 
+async def get_library_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    feedback: Annotated[SongFeedbackService, Depends(get_song_feedback_service)],
+    playlists: Annotated[PlaylistService, Depends(get_playlist_service_dep)],
+    store: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
+) -> LibraryService:
+    """The Me library aggregate (karaoke log + loves + setlists + catalog facets)."""
+    return LibraryService(firestore, feedback, playlists, store)
+
+
 async def get_voice_profile_service(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
 ) -> VoiceProfileService:
@@ -379,6 +390,7 @@ KnownSongsServiceDep = Annotated[KnownSongsService, Depends(get_known_songs_serv
 UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_dep)]
 GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
+LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]
 ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]
 VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]
 VoiceDataStoreDep = Annotated[VoiceDataStore, Depends(get_voice_store)]

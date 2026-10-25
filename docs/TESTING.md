@@ -215,6 +215,7 @@ The local stack's API always runs with **`DECIDE_FAKE_EXTERNALS=1`** and **`DECI
   - `PUT /api/test/fake-externals {"knobs": {...}}`: resets every fake to the defaults, then sets the knobs. Knobs: `metabrainz=deny` (authorize returns `error=access_denied`), `metabrainz_user=<name>`, `spotify_embed=changed` (the import answers 422), `screenshot=fail` (extract answers 503). Unknown knobs are a 422.
   - `POST /api/test/fake-listenbrainz/users {"username", "listens": [{"artist","title","listened_at"}]}`
   - `POST /api/test/fake-lastfm/users {"username", "top_tracks": [{"artist","title","playcount"}], "top_artists": [{"name","playcount"}]}`
+  - `POST /api/test/karaoke-log/seed {"email", "entries": [{"id": "app_…", ...}]}` writes app karaoke-log entries (counts and placeholders as a real write).
   - `POST /api/test/listenbrainz/poll` runs the `lb-poll` job's poller once (listens and pending imports).
 - Running a second stack next to another session's: `DECIDE_LOCAL_PORT=8031 SEARCH_LOCAL_PORT=8022 scripts/local-stack.sh up`. Avoid port 8021 on macOS: launchd holds it for the ftp-proxy service.
 - Tests: `backend/tests/test_fakes.py` runs the app in a real uvicorn server pointed at its own `/fake` routes.

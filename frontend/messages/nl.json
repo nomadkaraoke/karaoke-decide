@@ -407,8 +407,6 @@
     "addFromRecs": "Toevoegen uit Aanbevelingen",
     "sing": "Zingen",
     "removeFromPlaylist": "Verwijderen uit afspeellijst",
-    "songIdLabel": "Nummer ID: {id}",
-    "songDetailsWillLoad": "Nummerdetails worden geladen uit de catalogus",
     "createNewPlaylist": "Nieuwe afspeellijst maken",
     "nameLabel": "Naam",
     "namePlaceholder": "Mijn geweldige afspeellijst",
@@ -812,7 +810,9 @@
       "checkingAuth": "Authenticatie controleren..."
     },
     "sourceBadge": {
-      "screenshot": "Screenshot"
+      "screenshot": "Screenshot",
+      "karaokeLog": "Gezongen tijdens karaoke",
+      "manual": "Door jou toegevoegd"
     }
   },
   "common": {

@@ -407,8 +407,6 @@
     "addFromRecs": "Přidat z doporučení",
     "sing": "Zpívat",
     "removeFromPlaylist": "Odstranit z playlistu",
-    "songIdLabel": "ID písně: {id}",
-    "songDetailsWillLoad": "Detaily písně se načtou z katalogu",
     "createNewPlaylist": "Vytvořit nový playlist",
     "nameLabel": "Název",
     "namePlaceholder": "Můj úžasný playlist",
@@ -812,7 +810,9 @@
       "checkingAuth": "Kontrola ověření..."
     },
     "sourceBadge": {
-      "screenshot": "Snímek obrazovky"
+      "screenshot": "Snímek obrazovky",
+      "karaokeLog": "Zpíváno na karaoke",
+      "manual": "Přidáno tebou"
     }
   },
   "common": {

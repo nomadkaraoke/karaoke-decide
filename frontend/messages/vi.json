@@ -407,8 +407,6 @@
     "addFromRecs": "Thêm từ Đề xuất",
     "sing": "Hát",
     "removeFromPlaylist": "Xóa khỏi danh sách phát",
-    "songIdLabel": "ID bài hát: {id}",
-    "songDetailsWillLoad": "Chi tiết bài hát sẽ được tải từ danh mục",
     "createNewPlaylist": "Tạo danh sách phát mới",
     "nameLabel": "Tên",
     "namePlaceholder": "Danh sách phát tuyệt vời của tôi",
@@ -812,7 +810,9 @@
       "checkingAuth": "Đang kiểm tra xác thực..."
     },
     "sourceBadge": {
-      "screenshot": "Ảnh chụp màn hình"
+      "screenshot": "Ảnh chụp màn hình",
+      "karaokeLog": "Đã hát karaoke",
+      "manual": "Do bạn thêm"
     }
   },
   "common": {

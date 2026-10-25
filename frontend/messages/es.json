@@ -407,8 +407,6 @@
     "addFromRecs": "Agregar de Recomendaciones",
     "sing": "Cantar",
     "removeFromPlaylist": "Eliminar de la lista de reproducción",
-    "songIdLabel": "ID de canción: {id}",
-    "songDetailsWillLoad": "Los detalles de la canción se cargarán del catálogo",
     "createNewPlaylist": "Crear nueva lista de reproducción",
     "nameLabel": "Nombre",
     "namePlaceholder": "Mi lista de reproducción increíble",
@@ -812,7 +810,9 @@
       "checkingAuth": "Comprobando autenticación..."
     },
     "sourceBadge": {
-      "screenshot": "Captura de pantalla"
+      "screenshot": "Captura de pantalla",
+      "karaokeLog": "Cantada en karaoke",
+      "manual": "Añadida por ti"
     }
   },
   "common": {

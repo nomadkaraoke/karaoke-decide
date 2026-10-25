@@ -407,8 +407,6 @@
     "addFromRecs": "إضافة من التوصيات",
     "sing": "غناء",
     "removeFromPlaylist": "إزالة من قائمة التشغيل",
-    "songIdLabel": "معرف الأغنية: {id}",
-    "songDetailsWillLoad": "سيتم تحميل تفاصيل الأغنية من الكتالوج",
     "createNewPlaylist": "إنشاء قائمة تشغيل جديدة",
     "nameLabel": "الاسم",
     "namePlaceholder": "قائمة التشغيل الرائعة الخاصة بي",
@@ -812,7 +810,9 @@
       "checkingAuth": "جاري التحقق من المصادقة..."
     },
     "sourceBadge": {
-      "screenshot": "لقطة شاشة"
+      "screenshot": "لقطة شاشة",
+      "karaokeLog": "غُنّيت في الكاريوكي",
+      "manual": "أضفتَها أنت"
     }
   },
   "common": {

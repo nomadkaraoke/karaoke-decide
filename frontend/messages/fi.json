@@ -407,8 +407,6 @@
     "addFromRecs": "Lisää suosituksista",
     "sing": "Laula",
     "removeFromPlaylist": "Poista soittolistalta",
-    "songIdLabel": "Kappaleen tunnus: {id}",
-    "songDetailsWillLoad": "Kappaleen tiedot ladataan valikoimasta",
     "createNewPlaylist": "Luo uusi soittolista",
     "nameLabel": "Nimi",
     "namePlaceholder": "Mahtava soittolistani",
@@ -812,7 +810,9 @@
       "checkingAuth": "Tarkistetaan todennusta..."
     },
     "sourceBadge": {
-      "screenshot": "Kuvankaappaus"
+      "screenshot": "Kuvankaappaus",
+      "karaokeLog": "Laulettu karaokessa",
+      "manual": "Sinun lisäämäsi"
     }
   },
   "common": {

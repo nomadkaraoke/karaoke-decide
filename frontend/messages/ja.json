@@ -407,8 +407,6 @@
     "addFromRecs": "おすすめから追加",
     "sing": "歌う",
     "removeFromPlaylist": "プレイリストから削除",
-    "songIdLabel": "曲ID: {id}",
-    "songDetailsWillLoad": "曲の詳細はカタログから読み込まれます",
     "createNewPlaylist": "新しいプレイリストを作成",
     "nameLabel": "名前",
     "namePlaceholder": "最高のプレイリスト",
@@ -812,7 +810,9 @@
       "checkingAuth": "認証を確認中..."
     },
     "sourceBadge": {
-      "screenshot": "スクリーンショット"
+      "screenshot": "スクリーンショット",
+      "karaokeLog": "カラオケで歌唱",
+      "manual": "手動で追加"
     }
   },
   "common": {

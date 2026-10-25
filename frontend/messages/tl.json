@@ -407,8 +407,6 @@
     "addFromRecs": "Idagdag mula sa Mga Rekomendasyon",
     "sing": "Kantahin",
     "removeFromPlaylist": "Alisin sa playlist",
-    "songIdLabel": "Song ID: {id}",
-    "songDetailsWillLoad": "Ilo-load ang mga detalye ng kanta mula sa catalog",
     "createNewPlaylist": "Gumawa ng Bagong Playlist",
     "nameLabel": "Pangalan",
     "namePlaceholder": "Aking Astig na Playlist",
@@ -812,7 +810,9 @@
       "checkingAuth": "Sinusuri ang authentication..."
     },
     "sourceBadge": {
-      "screenshot": "Screenshot"
+      "screenshot": "Screenshot",
+      "karaokeLog": "Kinanta sa karaoke",
+      "manual": "Idinagdag mo"
     }
   },
   "common": {

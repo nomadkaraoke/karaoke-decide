@@ -60,6 +60,8 @@ const SOURCE_BADGES: Record<string, { variant: BadgeProps["variant"]; label?: st
   apple_music: { variant: "default", label: "Apple Music" },
   apple_export: { variant: "default", label: "Apple Music" },
   screenshot: { variant: "default", labelKey: "screenshot" },
+  karaoke_log: { variant: "default", labelKey: "karaokeLog" },
+  manual: { variant: "default", labelKey: "manual" },
 };
 
 export function SourceBadge({ source }: { source: string }) {

@@ -407,8 +407,6 @@
     "addFromRecs": "เพิ่มจากคำแนะนำ",
     "sing": "ร้อง",
     "removeFromPlaylist": "ลบออกจากเพลย์ลิสต์",
-    "songIdLabel": "รหัสเพลง: {id}",
-    "songDetailsWillLoad": "รายละเอียดเพลงจะถูกโหลดจากแคตตาล็อก",
     "createNewPlaylist": "สร้างเพลย์ลิสต์ใหม่",
     "nameLabel": "ชื่อ",
     "namePlaceholder": "เพลย์ลิสต์สุดเจ๋งของฉัน",
@@ -812,7 +810,9 @@
       "checkingAuth": "กำลังตรวจสอบการยืนยันตัวตน..."
     },
     "sourceBadge": {
-      "screenshot": "ภาพหน้าจอ"
+      "screenshot": "ภาพหน้าจอ",
+      "karaokeLog": "ร้องที่คาราโอเกะแล้ว",
+      "manual": "คุณเพิ่มเอง"
     }
   },
   "common": {

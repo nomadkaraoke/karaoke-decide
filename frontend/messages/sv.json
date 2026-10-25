@@ -407,8 +407,6 @@
     "addFromRecs": "Lägg till från rekommendationer",
     "sing": "Sjung",
     "removeFromPlaylist": "Ta bort från spellista",
-    "songIdLabel": "Låt-ID: {id}",
-    "songDetailsWillLoad": "Låtdetaljer kommer att laddas från katalogen",
     "createNewPlaylist": "Skapa ny spellista",
     "nameLabel": "Namn",
     "namePlaceholder": "Min grymma spellista",
@@ -812,7 +810,9 @@
       "checkingAuth": "Kontrollerar autentisering..."
     },
     "sourceBadge": {
-      "screenshot": "Skärmdump"
+      "screenshot": "Skärmdump",
+      "karaokeLog": "Sjungen på karaoke",
+      "manual": "Tillagd av dig"
     }
   },
   "common": {

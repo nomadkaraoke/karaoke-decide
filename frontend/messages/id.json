@@ -407,8 +407,6 @@
     "addFromRecs": "Tambah dari Rekomendasi",
     "sing": "Nyanyi",
     "removeFromPlaylist": "Hapus dari daftar putar",
-    "songIdLabel": "ID Lagu: {id}",
-    "songDetailsWillLoad": "Detail lagu akan dimuat dari katalog",
     "createNewPlaylist": "Buat Daftar Putar Baru",
     "nameLabel": "Nama",
     "namePlaceholder": "Daftar Putar Keren Saya",
@@ -812,7 +810,9 @@
       "checkingAuth": "Memeriksa autentikasi..."
     },
     "sourceBadge": {
-      "screenshot": "Tangkapan Layar"
+      "screenshot": "Tangkapan Layar",
+      "karaokeLog": "Dinyanyikan di karaoke",
+      "manual": "Ditambahkan oleh Anda"
     }
   },
   "common": {

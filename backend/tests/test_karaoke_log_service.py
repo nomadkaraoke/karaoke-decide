@@ -19,6 +19,7 @@ from backend.services.karaoke_log_service import (
     KaraokeLogNotFoundError,
     KaraokeLogService,
     NotOwnerError,
+    library_key,
     log_doc_id,
     unresolved_doc_id,
 )
@@ -521,6 +522,33 @@ async def test_list_for_user_filters_and_pages(svc: KaraokeLogService, fs: Memor
 
 
 @pytest.mark.asyncio
+async def test_list_filter_by_library_key(svc: KaraokeLogService) -> None:
+    for i in range(2):
+        await svc.upsert_user(USER, f"app_{i}", _app_entry(artist="Adele", title="Hello", song_key="adele|hello"))
+        await asyncio.sleep(0.002)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts(artist="Nobody Knows", title="My Song"))
+    await asyncio.sleep(0.002)
+    assert len((await svc.list_for_user(USER))[0]) == 3
+
+    hits, _ = await svc.list_for_user(USER, song="adele|hello")
+    assert [e.id for e in hits] == ["app_1", "app_0"]
+    hits, _ = await svc.list_for_user(USER, song="u:nobody knows|my song")
+    assert [e.id for e in hits] == [KJ_ID]
+    assert (await svc.list_for_user(USER, song="nope|nope")) == ([], None)
+
+    # the filter applies before paging
+    page1, cursor = await svc.list_for_user(USER, song="adele|hello", limit=1)
+    page2, cursor2 = await svc.list_for_user(USER, song="adele|hello", limit=1, cursor=cursor)
+    assert [e.id for e in page1] == ["app_1"] and [e.id for e in page2] == ["app_0"] and cursor2 is None
+
+
+def test_library_key() -> None:
+    assert library_key({"song_key": "adele|hello", "song_key_status": "resolved"}) == "adele|hello"
+    key = library_key({"artist": "Nobody Knows", "title": "My Song", "song_key_status": "unresolved"})
+    assert key == "u:" + make_song_key("Nobody Knows", "My Song")
+
+
+@pytest.mark.asyncio
 async def test_user_undelete_does_not_revive_host_undo(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
     row_id = loved_doc_id(USER, HELLO_KEY)
     await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
@@ -630,3 +658,100 @@ async def test_love_then_sing_uses_the_same_kn_row(
     assert list(fs.user_songs()) == [kn_row_id]
     row = fs.user_songs()[kn_row_id]
     assert (row["times_sung"], row["loved"], row["source"]) == (1, True, "spotify")
+
+
+# ---------------------------------------------------------------- survey chips + backfill records
+
+
+@pytest.mark.asyncio
+async def test_survey_vibes_and_reasons_roundtrip(svc: KaraokeLogService) -> None:
+    entry = await svc.upsert_user(
+        USER,
+        APP_ID,
+        _app_entry(
+            artist="Adele",
+            title="Hello",
+            survey={"feel": "ok", "vibes": ["ballad", "ballad", "emotional"], "reasons": ["too_long"]},
+        ),
+    )
+    assert entry.survey is not None
+    assert entry.survey.vibes == ["ballad", "emotional"]
+    assert entry.survey.reasons == ["too_long"]
+
+
+@pytest.mark.asyncio
+async def test_unknown_vibe_rejected(svc: KaraokeLogService) -> None:
+    with pytest.raises(KaraokeLogInvalidError):
+        await svc.upsert_user(USER, APP_ID, _app_entry(survey={"vibes": ["moshpit"]}))
+    with pytest.raises(KaraokeLogInvalidError):
+        await svc.upsert_user(USER, APP_ID, _app_entry(survey={"reasons": ["boring"]}))
+
+
+def _backfill(**over: Any) -> dict[str, Any]:
+    return _app_entry(
+        sung_at=None,
+        origin="backfill",
+        times=5,
+        night={"kind": "other", "date": "2024", "date_precision": "year"},
+        **over,
+    )
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_counts(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    entry = await svc.upsert_user(USER, APP_ID, _backfill())
+    assert entry.origin == "backfill" and entry.times == 5
+    assert entry.night is not None and entry.night.date_precision == "year"
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["times_sung"] == 5
+    assert fs.log(APP_ID)["counted"]["times"] == 5
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_edit_moves_by_delta(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, APP_ID, _backfill())
+    await svc.upsert_user(USER, APP_ID, {"times": 2})
+    assert fs.user_songs()[row_id]["times_sung"] == 2
+    await svc.upsert_user(USER, APP_ID, {"times": 2})  # same again: no change
+    assert fs.user_songs()[row_id]["times_sung"] == 2
+    await svc.delete(USER, APP_ID)
+    assert row_id not in fs.user_songs()  # 0 and log-created: removed
+
+
+@pytest.mark.asyncio
+async def test_backfill_times_edit_keeps_existing_row_at_zero(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    kn_row_id = f"{USER}:{KN_ID}"
+    fs.cols["user_songs"] = {
+        kn_row_id: {"user_id": USER, "song_id": str(KN_ID), "source": "quiz", "times_sung": 0, "last_sung_at": None}
+    }
+    await svc.upsert_user(USER, APP_ID, _backfill())
+    assert fs.user_songs()[kn_row_id]["times_sung"] == 5
+    await svc.delete(USER, APP_ID)
+    assert fs.user_songs()[kn_row_id]["times_sung"] == 0
+
+
+@pytest.mark.asyncio
+async def test_old_counted_without_times_means_one(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, APP_ID, _app_entry())
+    fs.log(APP_ID)["counted"].pop("times", None)  # a doc written before backfill existed
+    await svc.upsert_user(USER, APP_ID, {"times": 3})
+    assert fs.user_songs()[row_id]["times_sung"] == 3
+
+
+@pytest.mark.asyncio
+async def test_times_bounds(svc: KaraokeLogService) -> None:
+    for bad in (0, 51, -1, "3", True, 2.5):
+        with pytest.raises(KaraokeLogInvalidError):
+            await svc.upsert_user(USER, APP_ID, _app_entry(times=bad))
+    entry = await svc.upsert_user(USER, APP_ID, _app_entry(times=50))
+    assert entry.times == 50
+
+
+@pytest.mark.asyncio
+async def test_kj_record_cannot_set_times(svc: KaraokeLogService) -> None:
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    with pytest.raises(NotOwnerError):
+        await svc.upsert_user(USER, KJ_ID, {"times": 3})
+    with pytest.raises(NotOwnerError):
+        await svc.upsert_user(USER, KJ_ID, {"origin": "backfill"})

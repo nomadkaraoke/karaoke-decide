@@ -407,8 +407,6 @@
     "addFromRecs": "Aus Empfehlungen hinzufügen",
     "sing": "Singen",
     "removeFromPlaylist": "Aus Playlist entfernen",
-    "songIdLabel": "Song-ID: {id}",
-    "songDetailsWillLoad": "Songdetails werden aus dem Katalog geladen",
     "createNewPlaylist": "Neue Playlist erstellen",
     "nameLabel": "Name",
     "namePlaceholder": "Meine tolle Playlist",
@@ -812,7 +810,9 @@
       "checkingAuth": "Authentifizierung wird überprüft..."
     },
     "sourceBadge": {
-      "screenshot": "Screenshot"
+      "screenshot": "Screenshot",
+      "karaokeLog": "Beim Karaoke gesungen",
+      "manual": "Von dir hinzugefügt"
     }
   },
   "common": {

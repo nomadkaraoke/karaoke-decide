@@ -16,7 +16,7 @@ import {
   LoaderIcon,
 } from "@/components/icons";
 import { Button, LoadingPulse, EmptyState, Input } from "@/components/ui";
-import type { Playlist } from "@/types";
+import type { Playlist, PlaylistItem } from "@/types";
 
 function PlaylistsContent() {
   const router = useRouter();
@@ -150,17 +150,26 @@ function PlaylistsContent() {
     }
   };
 
-  const handleRemoveSong = async (songId: string) => {
+  const handleRemoveSong = async (item: PlaylistItem) => {
     if (!selectedPlaylist) return;
 
     try {
-      setRemovingSongId(songId);
-      await api.playlists.removeSong(selectedPlaylist.id, songId);
-      const updated = {
-        ...selectedPlaylist,
-        song_ids: selectedPlaylist.song_ids.filter((id) => id !== songId),
-        song_count: selectedPlaylist.song_count - 1,
-      };
+      setRemovingSongId(item.item_id);
+      // Drop only the chosen item (duplicates of a song keep their own entries) and
+      // take the server's response as the new state.
+      const remaining = selectedPlaylist.items.filter(
+        (i) => i.item_id !== item.item_id
+      );
+      const updated = await api.playlists.putItems(
+        selectedPlaylist.id,
+        remaining.map((i) => ({
+          item_id: i.item_id,
+          song_key: i.song_key,
+          artist: i.artist,
+          title: i.title,
+        })),
+        selectedPlaylist.rev
+      );
       setSelectedPlaylist(updated);
       setPlaylists((prev) =>
         prev.map((p) => (p.id === updated.id ? updated : p))
@@ -180,11 +189,18 @@ function PlaylistsContent() {
     });
   };
 
-  const openKaraokeSearch = (songId: string) => {
+  const hasNames = (item: PlaylistItem) => Boolean(item.artist && item.title);
+
+  const displayTitle = (item: PlaylistItem) =>
+    hasNames(item) ? item.title : item.song_key || item.title || item.artist;
+
+  const openKaraokeSearch = (item: PlaylistItem) => {
+    const query =
+      item.artist && item.title
+        ? `${item.artist} ${item.title} karaoke`
+        : `${item.song_key || item.artist || item.title} karaoke`;
     window.open(
-      `https://www.youtube.com/results?search_query=${encodeURIComponent(
-        songId + " karaoke"
-      )}`,
+      `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`,
       "_blank",
       "noopener,noreferrer"
     );
@@ -273,7 +289,7 @@ function PlaylistsContent() {
               </div>
 
               {/* Songs */}
-              {selectedPlaylist.song_ids.length === 0 ? (
+              {selectedPlaylist.items.length === 0 ? (
                 <EmptyState
                   icon={<MusicIcon className="w-8 h-8 text-[var(--text-subtle)]" />}
                   title={t("noSongsYet")}
@@ -289,9 +305,9 @@ function PlaylistsContent() {
                 />
               ) : (
                 <div className="flex flex-col gap-2">
-                  {selectedPlaylist.song_ids.map((songId, index) => (
+                  {selectedPlaylist.items.map((item, index) => (
                     <div
-                      key={songId}
+                      key={item.item_id}
                       className="group bg-[var(--card)] hover:bg-[var(--secondary)] rounded-xl p-3 transition-all border border-[var(--card-border)] flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -300,28 +316,30 @@ function PlaylistsContent() {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-[var(--text)] font-medium truncate">
-                            {t("songIdLabel", { id: songId })}
+                            {displayTitle(item)}
                           </p>
-                          <p className="text-[var(--text-muted)] text-sm">
-                            {t("songDetailsWillLoad")}
-                          </p>
+                          {hasNames(item) && (
+                            <p className="text-[var(--text-muted)] text-sm truncate">
+                              {item.artist}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => openKaraokeSearch(songId)}
+                          onClick={() => openKaraokeSearch(item)}
                         >
                           {t("sing")}
                         </Button>
                         <button
-                          onClick={() => handleRemoveSong(songId)}
+                          onClick={() => handleRemoveSong(item)}
                           className="p-2 text-[var(--text-subtle)] hover:text-red-400 transition-colors"
-                          disabled={removingSongId === songId}
+                          disabled={removingSongId === item.item_id}
                           title={t("removeFromPlaylist")}
                         >
-                          {removingSongId === songId ? (
+                          {removingSongId === item.item_id ? (
                             <span className="w-4 h-4 block animate-pulse">...</span>
                           ) : (
                             <TrashIcon className="w-4 h-4" />

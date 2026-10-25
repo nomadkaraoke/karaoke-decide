@@ -407,8 +407,6 @@
     "addFromRecs": "Добавить из рекомендаций",
     "sing": "Петь",
     "removeFromPlaylist": "Удалить из плейлиста",
-    "songIdLabel": "ID песни: {id}",
-    "songDetailsWillLoad": "Детали песни будут загружены из каталога",
     "createNewPlaylist": "Создать новый плейлист",
     "nameLabel": "Название",
     "namePlaceholder": "Мой крутой плейлист",
@@ -812,7 +810,9 @@
       "checkingAuth": "Проверка аутентификации..."
     },
     "sourceBadge": {
-      "screenshot": "Скриншот"
+      "screenshot": "Скриншот",
+      "karaokeLog": "Спето в караоке",
+      "manual": "Добавлено тобой"
     }
   },
   "common": {

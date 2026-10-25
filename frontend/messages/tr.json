@@ -407,8 +407,6 @@
     "addFromRecs": "Önerilerden Ekle",
     "sing": "Söyle",
     "removeFromPlaylist": "Çalma listesinden çıkar",
-    "songIdLabel": "Şarkı Kimliği: {id}",
-    "songDetailsWillLoad": "Şarkı detayları katalogdan yüklenecek",
     "createNewPlaylist": "Yeni Çalma Listesi Oluştur",
     "nameLabel": "İsim",
     "namePlaceholder": "Harika Çalma Listem",
@@ -812,7 +810,9 @@
       "checkingAuth": "Kimlik doğrulama kontrol ediliyor..."
     },
     "sourceBadge": {
-      "screenshot": "Ekran Görüntüsü"
+      "screenshot": "Ekran Görüntüsü",
+      "karaokeLog": "Karaokede söylendi",
+      "manual": "Senin eklediğin"
     }
   },
   "common": {

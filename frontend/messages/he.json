@@ -407,8 +407,6 @@
     "addFromRecs": "הוסף מההמלצות",
     "sing": "שיר",
     "removeFromPlaylist": "הסר מהפלייליסט",
-    "songIdLabel": "מזהה שיר: {id}",
-    "songDetailsWillLoad": "פרטי השיר ייטענו מהקטלוג",
     "createNewPlaylist": "צור פלייליסט חדש",
     "nameLabel": "שם",
     "namePlaceholder": "הפלייליסט המדהים שלי",
@@ -812,7 +810,9 @@
       "checkingAuth": "בודק אימות..."
     },
     "sourceBadge": {
-      "screenshot": "צילום מסך"
+      "screenshot": "צילום מסך",
+      "karaokeLog": "הושר בקריוקי",
+      "manual": "הוספת בעצמך"
     }
   },
   "common": {

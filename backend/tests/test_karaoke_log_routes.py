@@ -307,6 +307,15 @@ def test_list_filters_by_night_and_since(client: TestClient) -> None:
     assert [e["id"] for e in client.get("/api/my/karaoke-log").json()["entries"]] == [APP_ID]
 
 
+def test_list_filters_by_song(client: TestClient) -> None:
+    client.put(f"/api/my/karaoke-log/{APP_ID}", json=_app_entry())
+    other = "app_99999999-1111-4222-8333-944445555666"
+    client.put(f"/api/my/karaoke-log/{other}", json=_app_entry(artist="Adele", title="Hello", song_key="adele|hello"))
+    r = client.get("/api/my/karaoke-log", params={"song": "adele|hello"}).json()
+    assert [e["id"] for e in r["entries"]] == [other]
+    assert client.get("/api/my/karaoke-log", params={"song": "x" * 601}).status_code == 422
+
+
 def test_app_cannot_write_kj_prefixed_facts(client: TestClient, fs: RouteFirestore) -> None:
     path = f"/api/partner/kjbox/karaoke-log/{KJ_ID}"
     assert client.put(path, json=_outbox(), headers=_partner()).status_code == 200
