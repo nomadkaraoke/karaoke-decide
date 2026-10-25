@@ -1182,7 +1182,7 @@ class VoiceSessionService:
         state, done_reason, s = await asyncio.to_thread(summarize, session, attempts)
         finishing = was == "active"  # only finishing an active session may save its profile
         profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=finishing)
-        if was == "done":
+        if not finishing:  # done or abandoned: keep what was stored (an adopt may have saved it)
             saved = bool(session.get("profile_saved"))
         suited = await self._suited(user, profile)
         loved: dict[str, LovedSongOut] = {}

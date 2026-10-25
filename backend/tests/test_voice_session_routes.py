@@ -1204,6 +1204,17 @@ def test_adopt_low_confidence_session_saves_profile(client: TestClient, fs: Rout
     assert client.post("/api/voice/sessions/nope/adopt").status_code == 404
 
 
+def test_refetching_an_adopted_abandoned_session_keeps_it_saved(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    _sing(client, sid, 1)
+    _create(client)  # a new session abandons the first one
+    assert fs.cols["voice_sessions"][sid]["state"] == "abandoned"
+    assert client.post(f"/api/voice/sessions/{sid}/adopt").status_code == 200
+    r = client.get(f"/api/voice/sessions/{sid}/result")
+    assert r.status_code == 200 and r.json()["profile_saved"] is True
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["profile_saved"] is True
+
+
 def test_adopt_without_evidence_409(client: TestClient, make_client: MakeClient, fs: RouteFirestore) -> None:
     sid = _create(client)
     client.get(f"/api/voice/sessions/{sid}/result")  # finished before singing anything
