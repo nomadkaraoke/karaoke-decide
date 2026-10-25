@@ -10,10 +10,10 @@
     "Live result: Probably Baritone, low confidence, A#2-A#4 (46-70), comfortable D#3-F4 (51-65)."
   ],
   "setup": {
-    "record": true,
     "posture": "standing",
     "warmth": "bit_warm",
-    "headphones": true
+    "headphones": true,
+    "record": true
   },
   "prior_profile": {
     "method": "mic",
@@ -32,11 +32,11 @@
       "n": 1,
       "song_key": "6659ae3c00",
       "demand": {
-        "low": 49.5921,
-        "high": 57.6921,
-        "p10": 51.6921,
-        "p50": 56.3921,
-        "p90": 57.2921
+        "low": 49.592097194045536,
+        "high": 57.69209719404554,
+        "p10": 51.69209719404554,
+        "p50": 56.39209719404553,
+        "p90": 57.29209719404554
       },
       "quiz": {
         "feel": "fine",
@@ -44,20 +44,24 @@
         "difficulty": "easy",
         "knew": "well",
         "would_sing": "yes",
-        "would_work_if": [],
+        "would_work_if": [
+          "fine"
+        ],
         "voice_now": "warm",
         "version_quality": "good",
         "version_issues": [],
-        "tags": []
+        "tags": [
+          "mood_only"
+        ]
       },
       "pitch": {
-        "voiced_s": 92.2,
-        "held_count": 76,
-        "held_low": 49,
-        "held_high": 59,
-        "p10": 51.28,
-        "p50": 56.25,
-        "p90": 57.24
+        "voiced_s": 92.19199999998985,
+        "held_count": 76.0,
+        "held_low": 49.0,
+        "held_high": 59.0,
+        "p10": 51.28475459406327,
+        "p50": 56.24552712912109,
+        "p90": 57.23897191008382
       },
       "context": {
         "posture": "standing",
@@ -70,11 +74,11 @@
       "n": 2,
       "song_key": "f52116e348",
       "demand": {
-        "low": 47.0921,
-        "high": 63.9921,
-        "p10": 48.7921,
-        "p50": 56.8921,
-        "p90": 62.0921
+        "low": 47.09209719404554,
+        "high": 63.99209719404554,
+        "p10": 48.79209719404554,
+        "p50": 56.89209719404554,
+        "p90": 62.092097194045536
       },
       "quiz": {
         "feel": "not_for_me",
@@ -82,20 +86,22 @@
         "difficulty": "stretch",
         "knew": "barely",
         "would_sing": "no",
-        "would_work_if": [],
-        "voice_now": null,
-        "version_quality": null,
+        "would_work_if": [
+          "practice"
+        ],
+        "voice_now": "warm",
+        "version_quality": "good",
         "version_issues": [],
         "tags": []
       },
       "pitch": {
-        "voiced_s": 23.1,
-        "held_count": 11,
-        "held_low": 46,
-        "held_high": 57,
-        "p10": 48.5,
-        "p50": 54.04,
-        "p90": 60.85
+        "voiced_s": 23.103999999997455,
+        "held_count": 11.0,
+        "held_low": 46.0,
+        "held_high": 57.0,
+        "p10": 48.50367911579026,
+        "p50": 54.03621988875278,
+        "p90": 60.84921784155587
       },
       "context": {
         "posture": "standing",
@@ -108,11 +114,11 @@
       "n": 3,
       "song_key": "cef30cca65",
       "demand": {
-        "low": 52.0921,
-        "high": 69.2921,
-        "p10": 55.9921,
-        "p50": 60.5921,
-        "p90": 69.0921
+        "low": 52.092097194045536,
+        "high": 69.29209719404554,
+        "p10": 55.99209719404554,
+        "p50": 60.592097194045536,
+        "p90": 69.09209719404554
       },
       "quiz": {
         "feel": "loved",
@@ -120,22 +126,24 @@
         "difficulty": "stretch",
         "knew": "well",
         "would_sing": "yes",
-        "would_work_if": [],
-        "voice_now": null,
-        "version_quality": null,
+        "would_work_if": [
+          "fine"
+        ],
+        "voice_now": "warm",
+        "version_quality": "good",
         "version_issues": [],
         "tags": [
           "needed_warmup"
         ]
       },
       "pitch": {
-        "voiced_s": 99.0,
-        "held_count": 69,
-        "held_low": 52,
-        "held_high": 69,
-        "p10": 56.2,
-        "p50": 60.36,
-        "p90": 69.12
+        "voiced_s": 99.00800000003306,
+        "held_count": 69.0,
+        "held_low": 52.0,
+        "held_high": 69.0,
+        "p10": 56.20200756944365,
+        "p50": 60.35638830886761,
+        "p90": 69.12229270760547
       },
       "context": {
         "posture": "standing",
@@ -148,11 +156,11 @@
       "n": 4,
       "song_key": "0e4496e95a",
       "demand": {
-        "low": 56.4921,
-        "high": 73.6921,
-        "p10": 58.4921,
-        "p50": 60.7921,
-        "p90": 72.8921
+        "low": 56.49209719404554,
+        "high": 73.69209719404554,
+        "p10": 58.49209719404554,
+        "p50": 60.79209719404554,
+        "p90": 72.89209719404553
       },
       "quiz": {
         "feel": "fine",
@@ -160,20 +168,24 @@
         "difficulty": "easy",
         "knew": "well",
         "would_sing": "yes",
-        "would_work_if": [],
-        "voice_now": null,
-        "version_quality": null,
+        "would_work_if": [
+          "fine"
+        ],
+        "voice_now": "warm",
+        "version_quality": "good",
         "version_issues": [],
-        "tags": []
+        "tags": [
+          "mood_only"
+        ]
       },
       "pitch": {
-        "voiced_s": 66.0,
-        "held_count": 29,
-        "held_low": 47,
-        "held_high": 61,
-        "p10": 48.87,
-        "p50": 56.65,
-        "p90": 58.89
+        "voiced_s": 66.04800000002206,
+        "held_count": 29.0,
+        "held_low": 47.0,
+        "held_high": 61.0,
+        "p10": 48.87248338015877,
+        "p50": 56.65044691482978,
+        "p90": 58.89240753766187
       },
       "context": {
         "posture": "standing",
