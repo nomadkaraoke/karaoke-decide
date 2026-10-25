@@ -44,7 +44,7 @@ def test_library_etag_304(client: TestClient, fs: MemoryFirestore) -> None:
 
     import asyncio
 
-    asyncio.run(SongFeedbackService(fs).love(USER, LOUD, "The Lanterns", "Paper Harbour"))
+    asyncio.run(SongFeedbackService(fs).love(USER, LOUD, "The Lanterns", "Paper Harbour"))  # type: ignore[arg-type]
     r3 = client.get("/api/my/library", headers={"If-None-Match": etag})
     assert r3.status_code == 200 and r3.headers["ETag"] != etag
     assert r3.json()["items"][0]["loved"] is True

@@ -110,7 +110,7 @@ async def test_library_latest_survey_wins(fs: MemoryFirestore) -> None:
 
 @pytest.mark.asyncio
 async def test_library_includes_loved_unsung_and_setlist_items(fs: MemoryFirestore) -> None:
-    await SongFeedbackService(fs).love(USER, SOFT, "Moss and Ember", "Slow Tide")
+    await SongFeedbackService(fs).love(USER, SOFT, "Moss and Ember", "Slow Tide")  # type: ignore[arg-type]
     fs.cols["playlists"] = {
         "pl_abcdefgh1": {
             "user_id": USER,
@@ -140,7 +140,7 @@ async def test_library_uncatalogued(fs: MemoryFirestore) -> None:
 
 @pytest.mark.asyncio
 async def test_library_excludes_hidden_only_and_deleted(fs: MemoryFirestore) -> None:
-    await SongFeedbackService(fs).hide(USER, SOFT, "Moss and Ember", "Slow Tide")
+    await SongFeedbackService(fs).hide(USER, SOFT, "Moss and Ember", "Slow Tide")  # type: ignore[arg-type]
     _put(fs, "app_1", deleted=True)
     _put(fs, "app_2", state="planned")
     _put(fs, "app_3", state=None)
@@ -151,7 +151,7 @@ async def test_library_excludes_hidden_only_and_deleted(fs: MemoryFirestore) -> 
 
 @pytest.mark.asyncio
 async def test_library_hidden_but_sung_is_flagged(fs: MemoryFirestore) -> None:
-    await SongFeedbackService(fs).hide(USER, LOUD, "The Lanterns", "Paper Harbour")
+    await SongFeedbackService(fs).hide(USER, LOUD, "The Lanterns", "Paper Harbour")  # type: ignore[arg-type]
     _put(fs, "app_1")
     item = (await _svc(fs).get_library(USER)).items[0]
     assert item.hidden is True and item.times_sung == 1
@@ -175,5 +175,5 @@ async def test_library_etag_stable_and_changes(fs: MemoryFirestore) -> None:
     svc = _svc(fs)
     e1 = (await svc.get_library(USER)).etag
     assert e1 == (await svc.get_library(USER)).etag
-    await SongFeedbackService(fs).love(USER, LOUD, "The Lanterns", "Paper Harbour")
+    await SongFeedbackService(fs).love(USER, LOUD, "The Lanterns", "Paper Harbour")  # type: ignore[arg-type]
     assert (await svc.get_library(USER)).etag != e1
