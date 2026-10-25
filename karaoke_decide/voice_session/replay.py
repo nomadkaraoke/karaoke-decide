@@ -5,7 +5,7 @@ validated prior and the Firestore docs); ``replay_attempts`` runs it for each pr
 the result the singer would have seen after each song. Fixtures (``tests/unit/voice_session/fixtures``,
 written by ``scripts/voice/export_session_fixture.py``) hold numbers only::
 
-    {prior_profile, setup?, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early}]}
+    {prior_profile, setup?, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?}]}
 
 ``song_key`` is ``sha1(song_key)[:10]``; ``demand`` is the attempt's song snapshot demand
 (``{low, high, p10, p50, p90}``), or null with the demand passed in ``demands`` instead.

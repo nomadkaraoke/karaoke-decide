@@ -147,3 +147,11 @@ def test_sim_report_prints_prior_pitch_k_table(capsys: pytest.CaptureFixture[str
     assert sim_report.main(["--n", "3", "--priors", "uniform", "--pitches", "none", "--styles", "model"]) == 0
     out = capsys.readouterr().out
     assert "| model | uniform | none | 5 |" in out and "| realistic |" not in out
+
+
+def test_export_keeps_the_excluded_flag_only_when_set() -> None:
+    from scripts.voice.export_session_fixture import export_attempt
+
+    base = {"n": 1, "song_key": "a|b", "quiz": {}, "pitch": {}, "context": {}}
+    assert "excluded" not in export_attempt(base)
+    assert export_attempt({**base, "excluded": True})["excluded"] is True

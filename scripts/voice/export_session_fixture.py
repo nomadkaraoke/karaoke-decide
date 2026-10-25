@@ -4,7 +4,7 @@
 Reads ``decide_users/{sha256(lowercase email)}`` (for the user id), ``voice_sessions/{session}`` and the
 session's ``voice_attempts``, and writes what ``karaoke_decide.voice_session.replay.replay_fixture`` reads::
 
-    {schema, notes, setup, prior_profile, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early}]}
+    {schema, notes, setup, prior_profile, attempts: [{n, song_key, demand, quiz, pitch, context, stopped_early, excluded?}]}
 
 ``song_key`` becomes ``sha1(song_key)[:10]``; ``demand`` is the attempt's stored song snapshot demand
 (``{low, high, p10, p50, p90}``, null if the snapshot has none). No titles, artists, video ids, device names,
@@ -68,7 +68,7 @@ def _numbers(d: Mapping[str, Any] | None, keys: tuple[str, ...]) -> dict[str, fl
 
 
 def export_attempt(a: Mapping[str, Any]) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "n": int(a["n"]),
         "song_key": short_key(str(a["song_key"])),
         "demand": _numbers((a.get("song") or {}).get("demand"), _DEMAND_KEYS),
@@ -77,6 +77,9 @@ def export_attempt(a: Mapping[str, Any]) -> dict[str, Any]:
         "context": _pick(a.get("context"), _CONTEXT_KEYS),
         "stopped_early": bool(a.get("stopped_early")),
     }
+    if a.get("excluded"):
+        out["excluded"] = True  # "don't count this one": replay.rebuild skips it, as the live service did
+    return out
 
 
 def build_fixture(db: Any, email: str, session_id: str) -> dict[str, Any]:
