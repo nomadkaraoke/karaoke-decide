@@ -6,11 +6,15 @@ import pytest
 
 from karaoke_decide.voice_session.model import Posterior
 from karaoke_decide.voice_session.select import (
+    LIKE_BASE,
+    SEP_WEIGHT,
     SessionState,
     choose_next,
     eig,
     expected_stretch,
     know_weight,
+    like,
+    separation,
 )
 
 from .builders import candidate, posterior, song
@@ -119,11 +123,59 @@ def test_unknown_artist_downweighted_after_two_dont_know() -> None:
     assert pick is not None and pick.song_key == "b"
 
 
-def test_preference_breaks_near_ties() -> None:
+def test_separation_prefers_song_between_top_two_centres() -> None:
+    """A song at the top of baritone's comfort but inside tenor's splits them; one comfortable for both doesn't."""
+    between = song(54, 66)
+    inside = song(55, 61)
+    far_low = song(38, 46)  # too low for both
+    assert separation(BARI_TENOR, between) > 2 * separation(BARI_TENOR, inside)
+    assert separation(BARI_TENOR, between) > separation(BARI_TENOR, far_low)
+    assert 0.0 <= separation(BARI_TENOR, inside) <= 1.0
+    # Scaled by how much mass the top two hold: the same split with a third type in play counts for less.
+    spread = posterior({("baritone", 0): 0.3, ("tenor", 0): 0.3, ("soprano", 0): 0.4})
+    assert separation(spread, between) < separation(BARI_TENOR, between)
+    assert 0 < SEP_WEIGHT < 1
+
+
+def test_equal_information_prefers_liked_known_song() -> None:
     s = song(54, 66)
-    cands = [candidate("a", s, pref=0.0), candidate("b", s, pref=1.0)]
+    cands = [candidate("a", s, pref=0.0, know=1.0), candidate("b", s, pref=1.0, know=1.0)]
     pick = choose_next(_state(BARI_TENOR), cands)
     assert pick is not None and pick.song_key == "b"
+    # Taste scales the score, so a liked song beats a slightly more informative one nobody likes.
+    near = song(54.5, 65.5)
+    cands = [candidate("a-best", s, pref=0.0, know=1.0), candidate("b-liked", near, pref=1.0, know=1.0)]
+    pick = choose_next(_state(BARI_TENOR), cands)
+    assert pick is not None and pick.song_key == "b-liked"
+    assert like(candidate("x", s, pref=0.0)) == pytest.approx(LIKE_BASE)
+    assert like(candidate("x", s, pref=1.0)) == pytest.approx(1.0)
+
+
+def test_loved_song_counts_as_liked() -> None:
+    s = song(54, 66)
+    assert like(candidate("x", s, pref=0.0, loved=True)) == pytest.approx(1.0)
+    cands = [candidate("a", s, pref=0.0, know=1.0), candidate("b", s, pref=0.0, know=1.0, loved=True)]
+    pick = choose_next(_state(BARI_TENOR), cands)
+    assert pick is not None and pick.song_key == "b"
+
+
+def test_first_pick_familiar_pool_is_taste_weighted() -> None:
+    """The first song comes from the most familiar songs, now weighted by taste: a liked known song makes the pool."""
+    comfy = song(52, 60)
+    unliked = [candidate(f"u{i:02d}", comfy, know=1.0, pref=0.0, popularity=60) for i in range(20)]
+    # Less stretchy, but less popular: without taste it falls outside the 20 most familiar.
+    liked = candidate("zz-liked", song(53, 61), know=1.0, pref=1.0, popularity=40)
+    pick = choose_next(_state(BARI_TENOR, attempts=0), [*unliked, liked])
+    assert pick is not None and pick.song_key == "zz-liked"
+
+
+def test_cold_filter_still_applies() -> None:
+    """Taste never lets a stretchy song past the cold-voice filter."""
+    easy, hard = song(55, 63), song(58, 71)
+    cands = [candidate("easy", easy, pref=0.0), candidate("hard", hard, pref=1.0, loved=True, know=1.0)]
+    for attempts in (0, 1):
+        pick = choose_next(_state(BARI_TENOR, warmth="cold", attempts=attempts), cands)
+        assert pick is not None and pick.song_key == "easy"
 
 
 def test_reason_labels() -> None:

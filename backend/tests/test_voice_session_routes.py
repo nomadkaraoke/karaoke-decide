@@ -32,6 +32,7 @@ from backend.api.deps import (
 )
 from backend.config import BackendSettings
 from backend.main import app
+from backend.models.voice_session import SessionResultSummaryOut
 from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.recs_v2.service import RecSection, RecSong
@@ -523,8 +524,9 @@ def test_result_with_zero_attempts_is_partial(client: TestClient, fs: RouteFires
 
 
 def test_result_type_from_profile_prior_and_loved(client: TestClient, fs: RouteFirestore) -> None:
+    # A mic profile's prior is centred on its comfort band (E3): a soprano band (centre 71.5, read 1 low).
     fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {
-        "low_midi": 52, "high_midi": 81, "comfort_low": 57, "comfort_high": 76, "voice_type": "soprano",
+        "low_midi": 59, "high_midi": 84, "comfort_low": 64, "comfort_high": 79, "voice_type": "soprano",
         "voice_type_between": None, "register": None, "confidence": "high", "method": "mic",
         "measured_at": "2026-10-20T10:00:00Z", "updated_at": "2026-10-20T10:00:00Z",
     }  # fmt: skip
@@ -537,6 +539,54 @@ def test_result_type_from_profile_prior_and_loved(client: TestClient, fs: RouteF
     assert len(res["suited"]) <= 15
 
 
+def test_result_reports_measured_comfort_source(client: TestClient) -> None:
+    """With two or more songs rated comfortable and easy, sung with usable pitch, the result's comfort is what was
+    sung (voiced-seconds-weighted p10/p90) and says so; quiz-only sessions keep the model's estimate."""
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    sid = _create(client)
+    for i in range(3):
+        _post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["comfort_source"] == "measured"
+    assert (res["comfort_low"], res["comfort_high"]) == (49, 59)  # sung 50-58, widened to 11 keys
+
+    quiz_only = _create(client)
+    for i in range(3):
+        _post_attempt(client, quiz_only, _attempt(_next(client, quiz_only), i))
+    assert client.get(f"/api/voice/sessions/{quiz_only}/result").json()["comfort_source"] == "model"
+
+
+def test_comfort_source_in_result_summaries_and_after_exclude(client: TestClient, fs: RouteFirestore) -> None:
+    """The stored result summary (Me's latest_session, the history) carries comfort_source; excluding one of the
+    two comfortable songs leaves too few to measure, so the recomputed comfort is the model's again."""
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    sid = _create(client)
+    ids = [_post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))["attempt_id"] for i in range(2)]
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["comfort_source"] == "measured"
+    latest = client.get("/api/my/voice").json()["latest_session"]
+    assert (latest["session_id"], latest["comfort_source"]) == (sid, "measured")
+    assert (latest["comfort_low"], latest["comfort_high"]) == (49, 59)
+
+    patched = _patch_attempt(client, ids[0], True)
+    assert patched["result"]["comfort_source"] == "model"
+    assert client.get("/api/my/voice").json()["latest_session"]["comfort_source"] == "model"
+    history = client.get("/api/voice/history").json()["sessions"]
+    assert history[0]["result"]["comfort_source"] == "model"
+
+    assert _patch_attempt(client, ids[0], False)["result"]["comfort_source"] == "measured"
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["comfort_source"] == "measured"
+
+
+def test_stored_summary_without_comfort_source_reads_as_model() -> None:
+    """Summaries stored before v0.32.0 have no comfort_source: they read as the model's estimate."""
+    stored = {
+        "session_id": "s", "voice_type": "baritone", "between": None, "confidence_label": "low", "top_p": 0.5,
+        "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 64, "attempts": 3, "evidence_attempts": 3,
+        "profile_saved": False, "computed_at": "2026-10-25T19:00:00Z",
+    }  # fmt: skip
+    assert SessionResultSummaryOut.model_validate(stored).comfort_source == "model"
+
+
 def test_from_profile_reads_voice_profile_out_register() -> None:
     """3c's VoiceProfileOut keeps the register on ``register_`` with values lower/middle/higher."""
     base = {
@@ -547,7 +597,10 @@ def test_from_profile_reads_voice_profile_out_register() -> None:
     lower = Posterior.from_profile(VoiceProfileOut.model_validate({**base, "register": "lower"})).type_marginal()
     higher = Posterior.from_profile(VoiceProfileOut.model_validate({**base, "register": "higher"})).type_marginal()
     assert lower["bass"] > lower["soprano"] and higher["soprano"] > higher["bass"]
-    mic = VoiceProfileOut.model_validate({**base, "voice_type": "tenor", "method": "mic", "confidence": "high"})
+    # A mic profile is read through its comfort band (centre 59, +1 mic bias = tenor's centre 60), not its name.
+    mic = VoiceProfileOut.model_validate(
+        {**base, "voice_type": "tenor", "method": "mic", "confidence": "high", "comfort_low": 54, "comfort_high": 64}
+    )
     marg = Posterior.from_profile(mic).type_marginal()
     assert max(marg, key=lambda t: marg[t]) == "tenor"
 

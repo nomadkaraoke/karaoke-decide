@@ -16,8 +16,14 @@ from karaoke_decide.vocal_range.notes import VOICE_TYPES
 from karaoke_decide.voice_session.weights import (
     EPS_DIFFICULTY,
     EPS_POSITION,
+    HELD_HIGH_FALSETTO_P,
+    MIC_BIAS,
     OCTAVE_PRIOR,
+    PRIOR_FLOOR,
+    PRIOR_SD,
     TEMP,
+    TESS_SD,
+    TESS_TEMP,
     evidence_weight,
 )
 
@@ -50,6 +56,12 @@ def comfort(h: Hyp) -> tuple[int, int]:
 def full(h: Hyp) -> tuple[int, int]:
     lo, hi = VOICE_TYPES[h[0]]
     return lo + h[1], hi + h[1]
+
+
+def centre(h: Hyp) -> float:
+    """The middle of h's comfortable range (MIDI)."""
+    c_lo, c_hi = comfort(h)
+    return (c_lo + c_hi) / 2
 
 
 @dataclass(frozen=True)
@@ -117,6 +129,9 @@ class VoiceProfileLike(Protocol):
 
     @property
     def voice_type_between(self) -> str | None: ...  # the adjacent type when reported "between"
+
+    # Optional, read with getattr: the comfortable band (``comfort_low`` / ``comfort_high``) and the full range
+    # (``low_midi`` / ``high_midi``), MIDI.
 
 
 def _sigmoid(x: float) -> float:
@@ -225,12 +240,39 @@ def likelihood_difficulty(h: Hyp, song: SongDemand, answer: Difficulty, octave: 
 def likelihood_pitch(h: Hyp, pitch: PitchSummary | None) -> float:
     """Held notes are achieved notes: they bound the full range and are never a "miss".
 
-    Returns 1.0 (no information) when the pitch summary is absent or too thin to use.
+    The top bound keeps a floor of HELD_HIGH_FALSETTO_P: a held top far above the range may be one falsetto note
+    the app didn't label, so it can't rule a type out on its own. Returns 1.0 (no information) when the pitch
+    summary is absent or too thin to use.
     """
     if pitch is None or not usable_pitch(pitch):
         return 1.0
     f_lo, f_hi = full(h)
-    return _sigmoid((f_hi - pitch.held_high + 1) / 1.0) * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
+    top = (1 - HELD_HIGH_FALSETTO_P) * _sigmoid((f_hi - pitch.held_high + 1) / 1.0) + HELD_HIGH_FALSETTO_P
+    return top * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
+
+
+def tessitura_applies(ev: Evidence) -> bool:
+    """Tessitura counts only for a song rated comfortable and not a stretch, with usable pitch (as the measured
+    comfort, ``comfort.counts_for_comfort``): a stretch reached past the comfortable band."""
+    return ev.quiz.position == "comfortable" and ev.quiz.difficulty in (None, "easy") and usable_pitch(ev.pitch)
+
+
+def likelihood_tessitura(h: Hyp, pitch: PitchSummary | None, position: Position, octave: int | None) -> float:
+    """Where a song rated comfortable was actually sung, against h's comfortable range.
+
+    σ((c_hi − p90 + 1)/TESS_TEMP) · σ((p10 − c_lo + 1)/TESS_TEMP) · exp(−(p50 − centre(h))² / (2·TESS_SD²)).
+    Only for a "comfortable" answer with usable pitch (1.0 otherwise). The percentiles are the singer's own
+    notes in the octave they sang (``octave``, from ``sung_octave``), so they are compared with h's range as
+    they are: a female-range song a baritone takes an octave down is measured where he sang it.
+    """
+    if position != "comfortable" or octave is None or pitch is None or not usable_pitch(pitch):
+        return 1.0
+    c_lo, c_hi = comfort(h)
+    return (
+        _sigmoid((c_hi - pitch.p90 + 1) / TESS_TEMP)
+        * _sigmoid((pitch.p10 - c_lo + 1) / TESS_TEMP)
+        * math.exp(-((pitch.p50 - centre(h)) ** 2) / (2 * TESS_SD**2))
+    )
 
 
 def _logsumexp(values: list[float]) -> float:
@@ -283,6 +325,36 @@ def _profile_register(profile: VoiceProfileLike) -> str | None:
     return None
 
 
+def _profile_centre(profile: VoiceProfileLike) -> float | None:
+    """Where a measured profile's range-shaped prior is centred, or None for a type-weighted prior.
+
+    mic: the middle of the comfortable band (the free-sing centre; MIC_BIAS corrects its low reading).
+    session: the middle of the saved full range (``low_midi``/``high_midi``, the posterior mean). Its comfort may
+    be measured from the songs sung (comfort.py), which is not centred on the type; the full range is, so the
+    next session leans the way this one ended. Falls back to the comfort band when the full range is missing."""
+    if profile.method not in MIC_BIAS:
+        return None
+
+    def mid(lo_attr: str, hi_attr: str) -> float | None:
+        lo, hi = getattr(profile, lo_attr, None), getattr(profile, hi_attr, None)
+        if not isinstance(lo, int | float) or not isinstance(hi, int | float) or hi < lo:
+            return None
+        return (lo + hi) / 2
+
+    if profile.method == "session" and (full_mid := mid("low_midi", "high_midi")) is not None:
+        return full_mid
+    return mid("comfort_low", "comfort_high")
+
+
+def _range_prior(profile_centre: float, bias: float) -> dict[Hyp, float]:
+    """Weights over HYPOTHESES centred on the bias-corrected measured comfort centre, never below PRIOR_FLOOR."""
+    target = profile_centre + bias
+    return {
+        h: PRIOR_FLOOR + (1 - PRIOR_FLOOR) * math.exp(-((centre(h) - target) ** 2) / (2 * PRIOR_SD**2))
+        for h in HYPOTHESES
+    }
+
+
 def _type_prior(profile: VoiceProfileLike | None) -> dict[str, float]:
     types = list(VOICE_TYPES)
     weights = dict.fromkeys(types, 1.0)
@@ -318,7 +390,14 @@ class Posterior:
 
     @classmethod
     def from_profile(cls, profile: VoiceProfileLike | None) -> Posterior:
-        """Prior from a stored voice profile; shifts are uniform within each type."""
+        """Prior from a stored voice profile.
+
+        A mic or session profile with a measured range gives a range-shaped prior (``_range_prior``) over
+        type × shift, floored, centred on the mic's comfortable band (moved up by MIC_BIAS) or the session's full
+        range (``_profile_centre``); its named type is not used. Otherwise type weights (``_type_prior``) with shifts uniform within each type."""
+        if profile is not None and (pc := _profile_centre(profile)) is not None:
+            rw = _range_prior(pc, MIC_BIAS[profile.method])
+            return cls(_normalised({h: math.log(w) for h, w in rw.items()}))
         tw = _type_prior(profile)
         return cls(_normalised({h: math.log(tw[h[0]]) for h in HYPOTHESES}))
 
@@ -327,6 +406,7 @@ class Posterior:
         w_quiz = evidence_weight(ev, "quiz")
         use_pitch = usable_pitch(ev.pitch)
         w_pitch = evidence_weight(ev, "pitch") if use_pitch else 0.0
+        w_tess = evidence_weight(ev, "tessitura") if tessitura_applies(ev) else 0.0
         new: dict[Hyp, float] = {}
         for h, lp in self.log_p.items():
             ll = math.log(likelihood_position(h, ev.song, ev.quiz.position, octave))
@@ -335,6 +415,10 @@ class Posterior:
             total = lp + w_quiz * ll
             if use_pitch:
                 total += w_pitch * math.log(likelihood_pitch(h, ev.pitch))
+            if w_tess:
+                # floored so a far-off hypothesis keeps a finite log (exp of −(Δ²)/(2·SD²) underflows for |Δ| ≳ 115)
+                tess = likelihood_tessitura(h, ev.pitch, ev.quiz.position, octave)
+                total += w_tess * math.log(max(tess, 1e-300))
             new[h] = total
         return Posterior(_normalised(new))
 

@@ -1,8 +1,9 @@
-"""Next-song choice: expected information gain on the voice type, with warm-up ordering.
+"""Next-song choice: information on the voice type among songs the user knows and likes, with warm-up ordering.
 
-Pure Python. The first song is the most comfortable of the user's most familiar songs; later songs
-maximise the expected drop in voice-type entropy from the "where did it sit?" answer, weighted by how
-well the user knows the song. A cold voice is only offered songs that stay near the comfortable range.
+Pure Python. The first song is the most comfortable of the user's most familiar (taste-weighted) songs; later
+songs maximise a mix of the expected drop in voice-type entropy from the "where did it sit?" answer (EIG) and
+how well that answer splits the two likeliest types (``separation``), scaled by how well the user knows the
+song and how much they like it (``like``). A cold voice is only offered songs that stay near the comfortable range.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Literal
 from karaoke_decide.voice_session.model import (
     HYPOTHESES,
     VOICE_TYPES,
+    Evidence,
     Hyp,
     Position,
     Posterior,
@@ -24,6 +26,7 @@ from karaoke_decide.voice_session.model import (
     likelihood_position,
     likely_octave,
 )
+from karaoke_decide.voice_session.weights import LIKE_BASE, SEP_WEIGHT
 
 Warmth = Literal["cold", "bit_warm", "warm"]
 ReasonType = Literal["comfortable_start", "upper_range", "lower_range", "loved", "known", "explore"]
@@ -40,7 +43,6 @@ COLD_STRETCH_FIRST = 1.0  # attempts 0-1 while cold
 COLD_STRETCH_LATER = 3.0
 COLD_EARLY_ATTEMPTS = 2
 COLD_FALLBACK = 20  # least-stretchy songs kept when the cold filter would empty the list
-PREF_WEIGHT = 0.03
 STRATUM_PENALTY = 0.05
 RECENT_STRATA = 2
 REASON_MARGIN = 1.0
@@ -68,6 +70,7 @@ class SessionState:
 
     ``comfort_history`` holds ``posterior.comfort_estimate()`` before the first attempt and after each one.
     ``range_attempts`` counts attempts whose answers carry range evidence.
+    ``evidence`` holds each counted attempt's evidence, in order (for the measured comfort).
     """
 
     posterior: Posterior
@@ -78,6 +81,7 @@ class SessionState:
     done_keys: set[str] = field(default_factory=set)
     recent_strata: list[str] = field(default_factory=list)
     comfort_history: list[tuple[float, float]] = field(default_factory=list)
+    evidence: list[Evidence] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -171,8 +175,47 @@ def expected_stretch(posterior: Posterior, song: SongDemand) -> float:
     return _expected_stretch(_probs(posterior), song)
 
 
+def _top_two(p: list[float]) -> tuple[int, int, float, float]:
+    """(A, B, P(A), P(B)): the two likeliest voice types (indices into the type list) and their masses."""
+    marg = [0.0] * len(_TYPES)
+    for i, pi in enumerate(p):
+        marg[_TYPE_OF[i]] += pi
+    a, b = sorted(range(len(_TYPES)), key=lambda t: -marg[t])[:2]
+    return a, b, marg[a], marg[b]
+
+
+def _separation(p: list[float], song: SongDemand, top2: tuple[int, int, float, float] | None = None) -> float:
+    """TV distance between P(position | A) and P(position | B) for the two likeliest types A, B, × P(A) + P(B).
+
+    Each type's answer distribution is its posterior-weighted mixture over shifts (octave unknown)."""
+    a, b, ma, mb = top2 or _top_two(p)
+    if ma <= 0 or mb <= 0:
+        return 0.0
+    tv = 0.0
+    for row in _answer_table(song):
+        ja = jb = 0.0
+        for i, (pi, li) in enumerate(zip(p, row, strict=True)):
+            t = _TYPE_OF[i]
+            if t == a:
+                ja += pi * li
+            elif t == b:
+                jb += pi * li
+        tv += abs(ja / ma - jb / mb)
+    return 0.5 * tv * (ma + mb)
+
+
+def separation(posterior: Posterior, song: SongDemand) -> float:
+    """How well this song's position answer would split the two likeliest voice types (0-1)."""
+    return _separation(_probs(posterior), song)
+
+
+def like(c: CandidateSong) -> float:
+    """Taste factor: LIKE_BASE for a song nobody signalled, up to 1.0 for a top artist or a loved song."""
+    return LIKE_BASE + (1 - LIKE_BASE) * max(c.pref, 1.0 if c.loved else 0.0)
+
+
 def _familiarity(c: CandidateSong) -> float:
-    return c.know * (0.5 + c.popularity / 200)
+    return c.know * (0.5 + c.popularity / 200) * like(c)
 
 
 def _reason(posterior: Posterior, c: CandidateSong) -> ReasonType:
@@ -212,11 +255,13 @@ def choose_next(state: SessionState, cands: list[CandidateSong]) -> NextPick | N
         return NextPick(first.song_key, "comfortable_start", -stretch[first.song_key])
 
     h0 = _type_entropy(p)
+    top2 = _top_two(p)
     recent = set(state.recent_strata[-RECENT_STRATA:])
 
     def score(c: CandidateSong) -> float:
         penalty = STRATUM_PENALTY if c.stratum in recent else 0.0
-        return _eig(p, h0, c.demand) * c.know + PREF_WEIGHT * c.pref - penalty
+        info = (1 - SEP_WEIGHT) * _eig(p, h0, c.demand) + SEP_WEIGHT * _separation(p, c.demand, top2)
+        return like(c) * c.know * info - penalty
 
     scored = [(score(c), c) for c in familiar[:PREFILTER]]
     best_score, best = min(scored, key=lambda sc: (-sc[0], sc[1].song_key))

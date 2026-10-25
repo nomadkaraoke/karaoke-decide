@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from karaoke_decide.voice_session import stopping
-from karaoke_decide.voice_session.model import Posterior
+from karaoke_decide.voice_session.model import PitchSummary, Posterior
 from karaoke_decide.voice_session.select import SessionState
 
-from .builders import posterior
+from .builders import ctx, evidence, posterior, quiz, song
 
 STABLE = [(53.0, 67.0), (53.5, 67.2), (53.0, 67.0)]
 
@@ -48,13 +48,47 @@ def test_stop_confident_top_075_and_stable() -> None:
 
 
 def test_stop_pair_085_reports_between() -> None:
-    state = _state(posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1}))
+    # After MEDIUM_LEAN_UNTIL songs a settled adjacent pair is enough (early on it also needs a lean: see below).
+    state = _state(
+        posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1}),
+        attempts=stopping.MEDIUM_LEAN_UNTIL + 1,
+        evidence=[_comfortable_sung(50, 58)] * (stopping.MEDIUM_LEAN_UNTIL + 1),
+    )
     assert stopping.check(state) == "confident"
     s = stopping.summary(state)
     assert s.voice_type == "baritone"
     assert s.between == "tenor"
     assert s.confidence_label == "medium"
     assert abs(s.pair_p - 0.9) < 1e-6
+
+
+def test_early_medium_needs_a_clear_lean() -> None:
+    """Within MEDIUM_LEAN_UNTIL songs, "between X and Y" stops only when X leads with MEDIUM_MIN_TOP: a near 50/50
+    pair is where a type is most often wrong (adjacent types share ranges at the ends of their shifts)."""
+    assert (stopping.MEDIUM_MIN_TOP, stopping.MEDIUM_LEAN_UNTIL) == (0.7, 5)
+    split = posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1})
+    for attempts in (3, 4, 5):
+        assert stopping.check(_state(split, attempts=attempts)) is None
+        assert stopping.summary(_state(split, attempts=attempts)).confidence_label == "low"
+    # Excluded attempts don't count toward the window: 8 attempts, 4 of them counting, still needs the lean.
+    assert stopping.check(_state(split, attempts=8, evidence=[_comfortable_sung(50, 58)] * 4)) is None
+    lean = posterior({("baritone", 0): 0.72, ("tenor", 0): 0.2, ("bass", 0): 0.08})
+    assert stopping.check(_state(lean, attempts=3)) == "confident"
+    s = stopping.summary(_state(lean, attempts=3))
+    assert (s.confidence_label, s.between) == ("medium", "tenor")
+
+
+def test_measured_comfort_settles_the_range() -> None:
+    """A comfort measured from comfortable songs is what the result shows, so the model's moving estimate
+    (comfort_history) no longer holds the label at "low"."""
+    sure = posterior({("baritone", 0): 0.9, ("tenor", 0): 0.1})
+    moved = [(48.0, 62.0), (51.0, 65.0), (50.7, 64.7)]
+    assert stopping.check(_state(sure, comfort_history=moved)) is None
+    measured = [_comfortable_sung(50, 58), _comfortable_sung(50.5, 58.5)]
+    assert stopping.check(_state(sure, comfort_history=moved, evidence=measured)) == "confident"
+    assert stopping.summary(_state(sure, comfort_history=moved, evidence=measured)).confidence_label == "high"
+    # Still needs MIN_RANGE_ATTEMPTS attempts with range evidence.
+    assert stopping.check(_state(sure, comfort_history=moved, evidence=measured, range_attempts=2)) is None
 
 
 def test_non_adjacent_pair_is_not_confident() -> None:
@@ -130,3 +164,26 @@ def test_no_candidates_end() -> None:
     assert cold.improve_hint == "sing_higher_warm"
     warm = stopping.summary(_state(Posterior.uniform(), attempts=2), done_reason="no_candidates")
     assert warm.improve_hint == "sing_lower"
+
+
+def _comfortable_sung(p10: float, p90: float, voiced_s: float = 90.0):  # type: ignore[no-untyped-def]
+    pitch = PitchSummary(voiced_s=voiced_s, held_count=20, held_low=p10 - 1, held_high=p90 + 1, p10=p10,
+                         p50=(p10 + p90) / 2, p90=p90)  # fmt: skip
+    return evidence(song(p10, p90), quiz(position="comfortable", difficulty="easy"), ctx(headphones=True), pitch=pitch)
+
+
+def test_summary_uses_measured_and_clamps_to_full() -> None:
+    bari = posterior({("baritone", 0): 1.0})  # comfort 50-64, full 45-69
+    model = stopping.summary(_state(bari))
+    assert (model.comfort, model.comfort_source) == ((50, 64), "model")
+    measured = stopping.summary(_state(bari, evidence=[_comfortable_sung(50.4, 57.6), _comfortable_sung(50.2, 58.2)]))
+    assert measured.comfort_source == "measured"
+    assert measured.comfort == (49, 59)  # mean 50.3-57.9, widened to 11 keys around 54.1
+    # Kept inside the full-range estimate: an overhang shifts the band, which keeps its width.
+    low = stopping.summary(_state(bari, evidence=[_comfortable_sung(40, 50), _comfortable_sung(41, 51)]))
+    assert low.comfort == (45, 56)
+    high = stopping.summary(_state(bari, evidence=[_comfortable_sung(66, 74), _comfortable_sung(66, 75)]))
+    assert high.comfort == (59, 69)
+    # An explicit evidence list overrides the state's.
+    explicit = stopping.summary(_state(bari), evidence=[_comfortable_sung(50, 58), _comfortable_sung(50, 58)])
+    assert explicit.comfort == (49, 59)

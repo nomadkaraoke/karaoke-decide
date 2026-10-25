@@ -9,6 +9,7 @@ from __future__ import annotations
 import random
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,10 +18,12 @@ from pydantic import ValidationError
 
 from backend.api.deps import get_recommendation_service_v2_dep
 from backend.main import app
+from backend.models.voice_session import ResultOut
 from backend.services import voice_session_service as vss
 from backend.services.recs_v2.service import RecVoice
 from backend.services.song_feedback_service import loved_doc_id
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
+from backend.services.voice_session_outputs import session_profile
 from backend.tests.test_karaoke_log_routes import RouteFirestore
 from backend.tests.test_voice_session_routes import (  # noqa: F401  (pytest fixtures)
     EMAIL_HASH,
@@ -43,8 +46,23 @@ from backend.tests.test_voice_session_routes import (  # noqa: F401  (pytest fix
 )
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import UserSong
-from karaoke_decide.voice_session.model import Hyp, Posterior
+from karaoke_decide.voice_session import replay
+from karaoke_decide.voice_session.model import (
+    HYPOTHESES,
+    Context,
+    Evidence,
+    Hyp,
+    PitchSummary,
+    Posterior,
+    SongDemand,
+    centre,
+)
+from karaoke_decide.voice_session.select import SessionState
 from karaoke_decide.voice_session.simulate import answer
+from karaoke_decide.voice_session.stopping import summary
+from karaoke_decide.voice_session.weights import MIC_BIAS
+
+FIXTURE = Path(__file__).resolve().parents[2] / "tests/unit/voice_session/fixtures/andrew_2026_10_25.json"
 
 PROFILE_BASE: dict[str, Any] = {
     "low_midi": 41, "high_midi": 69, "comfort_low": 46, "comfort_high": 64, "voice_type": "baritone",
@@ -236,19 +254,88 @@ def _session_profile(confidence: str) -> VoiceProfileOut:
 
 
 def test_session_profile_prior_weights() -> None:
-    mic = Posterior.from_profile(VoiceProfileOut.model_validate(PROFILE_BASE)).type_marginal()
+    """Measured profiles seed a range-shaped prior: the mic's on its comfort band (46-64, centre 55) moved up by its
+    bias, a session's on its full range (41-69, centre 55), whatever its confidence. Self reports keep type weights."""
+
+    def peak(post: Posterior) -> set[float]:
+        probs = post.probs()
+        top = max(probs.values())
+        return {centre(h) for h, p in probs.items() if p == pytest.approx(top)}
+
+    mic = Posterior.from_profile(VoiceProfileOut.model_validate(PROFILE_BASE))
+    assert peak(mic) == {55.0 + MIC_BIAS["mic"]}
+    sessions = [Posterior.from_profile(_session_profile(c)) for c in ("high", "medium", "low")]
+    for post in sessions:
+        assert peak(post) == {55.0}
+        assert post.log_p == pytest.approx(sessions[0].log_p)
     self_ = Posterior.from_profile(
         VoiceProfileOut.model_validate({**PROFILE_BASE, "method": "self", "confidence": "low"})
     ).type_marginal()
-    uniform = Posterior.uniform().type_marginal()
-    for confidence in ("high", "medium"):
-        marg = Posterior.from_profile(_session_profile(confidence)).type_marginal()
-        assert marg == pytest.approx(mic)
-    low = Posterior.from_profile(_session_profile("low")).type_marginal()
-    assert low == pytest.approx(self_)
-    assert low["baritone"] > uniform["baritone"]
-    assert mic["baritone"] / mic["soprano"] == pytest.approx(4.0)
-    assert low["baritone"] / low["soprano"] == pytest.approx(3.0)
+    assert self_["baritone"] / self_["soprano"] == pytest.approx(3.0)
+    assert mic.type_marginal()["baritone"] > Posterior.uniform().type_marginal()["baritone"]
+
+
+def test_session_profile_saves_measured_comfort() -> None:
+    """The saved session profile carries the comfort measured from the songs rated comfortable (D1)."""
+    pitch = {"voiced_s": 90.0, "held_count": 20.0, "held_low": 49.0, "held_high": 59.0,
+             "p10": 50.0, "p50": 54.0, "p90": 58.0}  # fmt: skip
+    demand = {"low": 48.0, "high": 60.0, "p10": 50.0, "p50": 54.0, "p90": 58.0}
+    quiz = {"feel": "fine", "position": "comfortable", "difficulty": "easy", "knew": "well"}
+    docs = [
+        {"n": n, "song_key": f"k{n}", "quiz": quiz, "pitch": pitch, "stopped_early": False,
+         "context": {"posture": "standing", "warmth": "warm", "headphones": True}, "song": {"demand": demand}}
+        for n in (1, 2, 3)
+    ]  # fmt: skip
+    state = vss.rebuild_state({"id": "s", "setup": {"warmth": "warm"}, "prior_profile": None}, docs)
+    s = summary(state)
+    assert s.comfort_source == "measured"
+    assert s.comfort == (49, 59)  # sung 50-58, widened to 11 keys around its centre
+    profile = session_profile(s, state.range_attempts, "s", datetime(2026, 10, 25, tzinfo=UTC))
+    assert profile is not None
+    assert (profile.comfort_low, profile.comfort_high) == (49, 59)
+
+
+def _round_trip_top(s: Any, evidence_count: int) -> str:
+    """summary -> saved session profile -> the next session's prior: its top type."""
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    derived = session_profile(s, evidence_count, "s", now)
+    assert derived is not None
+    saved = VoiceProfileOut(**derived.model_dump(by_alias=True), updated_at=now)
+    marg = Posterior.from_profile(saved).type_marginal()
+    return max(marg, key=lambda t: marg[t])
+
+
+def test_session_profile_seeds_the_next_session_with_the_same_type() -> None:
+    """A saved session profile's prior centres on its full range (the posterior mean, untouched by the measured
+    comfort), so the next session leans the way this one ended: Andrew (baritone, comfort 48-59) not bass."""
+    fx = replay.load_fixture(FIXTURE)
+    docs = [{**a, "song": {"demand": a["demand"]}} for a in fx["attempts"]]
+    state = replay.rebuild(replay.prior_from_profile(fx["prior_profile"]), fx["setup"], docs)
+    s = summary(state)
+    assert (s.voice_type, s.comfort_source) == ("baritone", "measured")
+    assert _round_trip_top(s, state.range_attempts) == "baritone"
+
+    def sung(p10: float, p90: float) -> Evidence:
+        p = PitchSummary(voiced_s=90, held_count=20, held_low=p10 - 1, held_high=p90 + 1, p10=p10,
+                         p50=(p10 + p90) / 2, p90=p90)  # fmt: skip
+        q = replay.quiz_from_doc({"feel": "fine", "position": "comfortable", "difficulty": "easy", "knew": "well"})
+        return Evidence(SongDemand(p10 - 2, p90 + 2, p10, (p10 + p90) / 2, p90), q,
+                        Context("standing", "warm", True), p, False)  # fmt: skip
+
+    # A tenor (full 48-72) who sings comfortably low (comfort centre 57 reads baritone) and a soprano (full 60-84)
+    # who sings low (centre 69 reads mezzo): the next session still leans tenor / soprano.
+    for hyp, songs in ((("tenor", 0), [(52, 60), (53, 61)]), (("soprano", 0), [(64, 72), (65, 73)])):
+        st = SessionState(posterior=Posterior({h: 0.0 if h == hyp else -50.0 for h in HYPOTHESES}), warmth="warm",
+                          attempts=3, range_attempts=3, tired_count=0,
+                          evidence=[sung(lo, hi) for lo, hi in songs])  # fmt: skip
+        s = summary(st)
+        assert (s.voice_type, s.comfort_source) == (hyp[0], "measured")
+        assert _round_trip_top(s, 3) == hyp[0]
+
+
+def test_result_models_default_comfort_source_to_model() -> None:
+    """Old clients and stored summaries without the field read as the model's estimate."""
+    assert ResultOut.model_fields["comfort_source"].default == "model"
 
 
 # ---------------------------------------------------------------- per-song labels

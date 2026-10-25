@@ -6,8 +6,20 @@ import random
 
 import pytest
 
-from karaoke_decide.voice_session.model import HYPOTHESES, VOICE_TYPES
-from karaoke_decide.voice_session.simulate import run_population, simulate, synthetic_pool
+from karaoke_decide.voice_session.model import HYPOTHESES, VOICE_TYPES, full, usable_pitch
+from karaoke_decide.voice_session.simulate import (
+    KS,
+    REALISTIC_COMFORT_P,
+    answer,
+    mic_profile,
+    run_population,
+    sim_pitch,
+    simulate,
+    starting_posterior,
+    synthetic_pool,
+)
+
+from .builders import song
 
 
 def test_synthetic_pool_shape() -> None:
@@ -57,3 +69,154 @@ def test_simulated_users_quiz_only_from_uniform_report() -> None:
     for rate in (stats.confident_within_10, stats.adjacent, stats.exact):
         assert 0.0 <= rate <= 1.0
     print(f"\nquiz-only uniform prior: {stats.describe()}")
+
+
+def test_mic_prior_sim_is_deterministic() -> None:
+    pool = synthetic_pool(random.Random(6), n=300)
+    a = simulate(("baritone", 1), pool, random.Random(7), prior="mic", pitch="headphones")
+    b = simulate(("baritone", 1), pool, random.Random(7), prior="mic", pitch="headphones")
+    assert a == b
+    p1 = starting_posterior(("tenor", 0), "mic", random.Random(8))
+    p2 = starting_posterior(("tenor", 0), "mic", random.Random(8))
+    assert p1 == p2
+    assert max(p1.type_marginal().values()) > 1 / 6  # a named type, not flat
+
+
+def test_mic_profile_band_is_11_keys_and_biased_low() -> None:
+    rng = random.Random(9)
+    profiles = [mic_profile(("baritone", 0), rng) for _ in range(400)]
+    assert all(p.comfort_high - p.comfort_low == 10 for p in profiles)
+    centres = [(p.comfort_low + p.comfort_high) / 2 for p in profiles]
+    true_centre = 57.0  # baritone comfort 50..64
+    assert sum(centres) / len(centres) == pytest.approx(true_centre - 1.0, abs=0.4)
+    assert all(p.method == "mic" and p.voice_type in VOICE_TYPES for p in profiles)
+    assert sum(p.voice_type == "baritone" for p in profiles) > 100
+
+
+def test_trace_has_one_summary_per_attempt() -> None:
+    pool = synthetic_pool(random.Random(10), n=300)
+    r = simulate(("alto", -1), pool, random.Random(11), prior="mic", pitch="open")
+    assert len(r.trace) == r.attempts >= 1
+    assert (r.trace[-1].voice_type, r.trace[-1].comfort) == (r.summary.voice_type, r.summary.comfort)
+    short = simulate(("alto", -1), pool, random.Random(11), prior="uniform", budget=3)
+    assert short.attempts <= 3 and len(short.trace) == short.attempts
+
+
+def test_no_pitch_default_keeps_old_sessions() -> None:
+    """pitch="none" and the old priors draw nothing extra: the existing gates see identical runs."""
+    pool = synthetic_pool(random.Random(2), n=300)
+    a = simulate(("tenor", 0), pool, random.Random(3))
+    b = simulate(("tenor", 0), pool, random.Random(3), pitch="none", budget=None)
+    assert a == b
+
+
+def test_exact_at_k_uses_trace() -> None:
+    stats = run_population(random.Random(12), n_users=30, prior="mic", pitch="headphones")
+    types = list(VOICE_TYPES)
+    assert set(stats.exact_at) == set(stats.adjacent_at) == set(stats.confident_within) == set(KS)
+    for k in KS:
+        at = [r.trace[min(k, len(r.trace)) - 1] for _, r in stats.results]
+        dist = [abs(types.index(h[0]) - types.index(s.voice_type)) for (h, _), s in zip(stats.results, at, strict=True)]
+        assert stats.exact_at[k] == pytest.approx(sum(d == 0 for d in dist) / 30)
+        assert stats.adjacent_at[k] == pytest.approx(sum(d <= 1 for d in dist) / 30)
+        conf = [r.done_reason == "confident" and r.attempts <= k for _, r in stats.results]
+        assert stats.confident_within[k] == pytest.approx(sum(conf) / 30)
+    assert stats.confident_within[10] == stats.confident_within_10
+    assert "exact@5" in stats.describe()
+
+
+def test_simulated_pitch_respects_singer_range() -> None:
+    rng = random.Random(13)
+    h = ("baritone", 0)
+    f_lo, f_hi = full(h)
+    assert sim_pitch(rng, h, song(50, 60), "none") is None
+    leaks = 0
+    for i in range(500):
+        s = song(40 + i % 40, 52 + i % 40)
+        p = sim_pitch(rng, h, s, "headphones")
+        assert p is not None and usable_pitch(p)
+        assert 60 <= p.voiced_s <= 180
+        assert p.p10 <= p.p50 <= p.p90
+        assert f_lo - 3 <= p.p10 and p.p90 <= f_hi + 3  # clipped into the chest range, then σ=0.7 noise
+        assert p.held_low >= f_lo
+        if p.held_high > f_hi:
+            assert p.held_high == f_hi + 3  # a falsetto note leaked
+            leaks += 1
+    assert 0.2 <= leaks / 500 <= 0.4
+
+
+# ---------------------------------------------------------------- realistic singers (E5)
+
+
+def test_realistic_answers_say_comfortable_inside_full_range() -> None:
+    """Real singers call a song comfortable when it stays inside their full chest range (Andrew: 4/4)."""
+    h = ("baritone", 0)  # full 45-69, comfort 50-64
+    inside = song(47, 67)  # past the comfortable band, inside the full range
+    rng = random.Random(14)
+    real = [answer(rng, h, inside, 0.0, style="realistic")[0] for _ in range(2000)]
+    rng = random.Random(14)
+    model = [answer(rng, h, inside, 0.0)[0] for _ in range(2000)]
+    share = real.count("comfortable") / 2000
+    assert share >= REALISTIC_COMFORT_P - 0.03  # 0.8 of the draws, plus the rare model "comfortable"
+    assert share > model.count("comfortable") / 2000 + 0.5
+    # Clearly outside the full range: the model-likelihood answer, draw for draw.
+    outside = song(50, 74)  # 24 semitones: wider than the full range at any octave
+    rng_a, rng_b = random.Random(15), random.Random(15)
+    for _ in range(200):
+        assert answer(rng_a, h, outside, 0.15, style="realistic") == answer(rng_b, h, outside, 0.15)
+
+
+def test_model_style_is_the_default() -> None:
+    pool = synthetic_pool(random.Random(16), n=300)
+    a = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones")
+    b = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones", answer_style="model")
+    assert a == b
+    c = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones", answer_style="realistic")
+    assert len(c.trace) == c.attempts
+
+
+def test_confidently_wrong_within_k() -> None:
+    stats = run_population(random.Random(18), n_users=30, prior="mic", pitch="headphones", answer_style="realistic")
+    assert set(stats.confidently_wrong_within) == set(KS)
+    for k in KS:
+        wrong = [
+            r.done_reason == "confident" and r.attempts <= k and r.summary.voice_type != h[0] for h, r in stats.results
+        ]
+        assert stats.confidently_wrong_within[k] == pytest.approx(sum(wrong) / 30)
+        assert stats.confidently_wrong_within[k] <= stats.confident_within[k]
+    assert "wrong≤5" in stats.describe()
+
+
+# ---------------------------------------------------------------- 3-5 song gates (E5)
+
+GATE_SEED = 20261025
+GATE_N = 300
+
+
+def test_converges_within_5_songs_mic_prior_with_pitch() -> None:
+    """Realistic singers (comfortable inside their full range), the 3c mic test as prior, on-device pitch."""
+    hp = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="mic", pitch="headphones", budget=10, answer_style="realistic"
+    )
+    print(f"\nmic + headphones, realistic answers: {hp.describe()}")
+    assert hp.exact_at[5] >= 0.70, hp
+    assert hp.adjacent_at[5] >= 0.92, hp
+    assert hp.confident_within[5] >= 0.50, hp
+    assert hp.confidently_wrong_within[5] <= 0.10, hp
+    open_mic = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="mic", pitch="open", budget=10, answer_style="realistic"
+    )
+    print(f"mic + open mic, realistic answers: {open_mic.describe()}")
+    assert open_mic.exact_at[5] >= 0.60, open_mic
+
+
+def test_quiz_only_budget_report() -> None:
+    """Not gated: quiz answers alone from a flat start, realistic singers, after 3-5 songs."""
+    stats = run_population(
+        random.Random(GATE_SEED), n_users=GATE_N, prior="uniform", pitch="none", budget=10, answer_style="realistic"
+    )
+    print(
+        "\nquiz-only uniform prior, realistic answers: "
+        + " ".join(f"exact@{k}={stats.exact_at[k]:.0%}" for k in (3, 4, 5))
+    )
+    assert all(0.0 <= stats.exact_at[k] <= 1.0 for k in (3, 4, 5))
