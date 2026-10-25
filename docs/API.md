@@ -98,13 +98,24 @@ Every song the user sang (or planned / requested), from kjbox at Nomad nights (`
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/my/karaoke-log?since=&night_id=&limit=100&cursor=` | `{entries: [entry], next_cursor}`, newest `updated_at` first. Without `since`: live records. With `since` (ISO): every record updated after it, deleted ones included (sync pull). Survey-only placeholders are never listed. |
-| `PUT /api/my/karaoke-log/{id}` | Upsert with field-level merge → the entry. `app_` ids: any of `state, artist, title, song_key, night, sung_at, ended_at, media, survey, deleted` (a new entry needs `state`, `artist`, `title`). `kj_` ids: only `survey` and `deleted` (other kjbox fields → 403 `not_owner`); a survey written before kjbox delivers is kept and merged later. `deleted: false` never revives a record the host un-did. |
+| `GET /api/my/karaoke-log?since=&night_id=&song=&limit=100&cursor=` | `{entries: [entry], next_cursor}`, newest `updated_at` first. `song=<libraryKey>` keeps only that song's records (the key from `library_key()`: the resolved `song_key`, else the normalised artist + title). Without `since`: live records. With `since` (ISO): every record updated after it, deleted ones included (sync pull). Survey-only placeholders are never listed. |
+| `PUT /api/my/karaoke-log/{id}` | Upsert with field-level merge → the entry. `app_` ids: any of `state, artist, title, song_key, night, sung_at, ended_at, media, survey, origin, times, deleted` (a new entry needs `state`, `artist`, `title`). `kj_` ids: only `survey` and `deleted` (other kjbox fields → 403 `not_owner`); a survey written before kjbox delivers is kept and merged later. `deleted: false` never revives a record the host un-did. |
 | `DELETE /api/my/karaoke-log/{id}` | Soft delete → the entry (`deleted: true`); reverses its sung count. |
 
-Entry: `{id, source: kjbox|app, state: planned|requested|sung|sung_unplayed|skipped, artist, title, song_key, song_key_status: resolved|unresolved, night: {id, kind: nomad|other, venue_name, date}, sung_at, ended_at, created_at, updated_at, survey: {feel: great|ok|bad, key: too_low|right|too_high, crowd_pleaser, notes (≤2000), answered_at}, media: {brand_code, gen_job_id, source_type}, deleted, box_id, entry_id, singers}`.
+Entry: `{id, source: kjbox|app, state: planned|requested|sung|sung_unplayed|skipped, artist, title, song_key, song_key_status: resolved|unresolved, night: {id, kind: nomad|other, venue_name, date, date_precision: day|month|year|unknown}, sung_at, ended_at, created_at, updated_at, origin: live|backfill, times (1–50), survey: {feel: great|ok|bad, key: too_low|right|too_high, crowd_pleaser, vibes: [party|ballad|warm_up|duet|emotional|rock_out|singalong] (≤7), reasons: [out_of_range|too_hard|crowd_quiet|awkward_music|too_long|didnt_know_it] (≤6), notes (≤2000), answered_at}, media: {brand_code, gen_job_id, source_type}, deleted, box_id, entry_id, singers}`.
 
-Counts: a `sung`/`sung_unplayed` record that isn't deleted adds one to `user_songs.times_sung` (same row rule as Love) when `song_key` is resolved, else to `user_karaoke_unresolved` (per normalised artist + title). `song_key` is resolved server-side with a 300 ms budget; unresolved records are retried in the background at most once per 24 h per user, on `GET` (marker `karaoke_log_retry_at` on the `decide_users` doc).
+Counts: a `sung`/`sung_unplayed` record that isn't deleted adds `times` (default 1; backfill records say "sung it 5 times" with `origin: backfill`) to `user_songs.times_sung` (same row rule as Love) when `song_key` is resolved, else to `user_karaoke_unresolved` (per normalised artist + title). `song_key` is resolved server-side with a 300 ms budget; unresolved records are retried in the background at most once per 24 h per user, on `GET` (marker `karaoke_log_retry_at` on the `decide_users` doc).
+
+### Library: GET /api/my/library
+
+The Me tab's collection in one call: every song the user has sung, loved, hidden or put on a setlist, aggregated from the karaoke log, `user_songs` and playlists. Bearer gen session token.
+
+`{items: [item], etag}`. Item: `{key, song_key, artist, title, times_sung, backfill_times, first_sung_at, last_sung_at, feel_counts: {great, ok, bad}, latest_feel, latest_key, crowd_pleaser_count, vibes, loved, hidden, setlist_ids, facets}`.
+
+- `key` is the library key: the resolved `song_key`, else the normalised artist + title (the value for `karaoke-log?song=`). `song_key` is null for unresolved songs.
+- `latest_feel` and `latest_key` are the newest answer per field (feel and key are tracked separately). `backfill_times` is the part of `times_sung` that came from backfill records.
+- `facets`: `{mood, energy_band, has_karaoke, community, karafun, vr_tier}` from catalog.db; null when the song is unresolved or the catalog is unavailable.
+- The response carries `ETag`; a matching `If-None-Match` gets **304** with no body.
 
 ### kjbox partner: /api/partner/kjbox/karaoke-log
 
@@ -149,7 +160,8 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `POST /api/test/profile/reset` | `{email}` → 204; deletes the user's decide data |
 | `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
 | `GET /api/test/profile?email=` | Reads the profile back |
-| `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log. |
+| `POST /api/test/karaoke-log/seed` | `{email, entries: [{id: "app_…", ...app patch}]}` → `{user_id, count}`. Writes app karaoke-log entries through `KaraokeLogService.upsert_user` (counts and survey placeholders as a real app write); creates the user if needed. Non-`app_` ids → 400 `invalid`. |
+| `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log and the user's playlists. |
 | `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
 | `PUT /api/test/fake-externals` | `{knobs: {metabrainz?: "deny", metabrainz_user?, spotify_embed?: "changed", screenshot?: "fail"}}` → `{knobs}`; resets every `DECIDE_FAKE_EXTERNALS` fake to its defaults, then sets the knobs (422 unknown knob; 409 `fake_externals_disabled` when the fakes are off, as for the two below) |
 | `POST /api/test/fake-listenbrainz/users` | `{username, listens: [{artist, title, listened_at}]}` → creates/replaces a fake ListenBrainz user |
@@ -1844,161 +1856,52 @@ Mark a song as sung with optional rating.
 
 ---
 
-## Playlists ✅ Implemented
+## Playlists (setlists) ✅ Implemented
+
+A playlist is an ordered list of `items`. All routes need a Bearer token; another user's playlist is 403, an unknown id 404.
+
+Playlist: `{id, name, description, song_ids, song_count, created_at, updated_at, items, rev}`.
+
+- `items`: ordered `{item_id, song_key | null, artist, title, added_at, facets}`. `facets` is as in `/api/my/library`. `song_ids` and `song_count` are kept for older clients (the web app's legacy routes).
+- `rev` increments on every write.
+- Names are never filled in with the key: a keyed item with empty names is named from catalog titles when known (reads only), else `artist` and `title` stay empty and clients show `song_key`. A keyed item may have empty names; an unkeyed item needs artist and title (else 422).
 
 ### GET /api/playlists
 
-List user's playlists.
-
-**Requires:** Bearer token
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| limit | int | Max playlists to return (default: 50, max: 100) |
-| offset | int | Number of playlists to skip (default: 0) |
-
-**Response:**
-```json
-{
-  "playlists": [
-    {
-      "id": "playlist-uuid",
-      "name": "Friday Night Karaoke",
-      "description": "Songs for Friday night sessions",
-      "song_ids": ["1", "2", "3"],
-      "song_count": 3,
-      "created_at": "2024-12-30T12:00:00Z",
-      "updated_at": "2024-12-30T12:00:00Z"
-    }
-  ],
-  "total": 1
-}
-```
+`?limit=` (default 50, max 100) and `?offset=`. → `{playlists: [playlist], total}`.
 
 ### POST /api/playlists
 
-Create a new playlist.
+`{name (1–100), description?, id?, items?}` → `201` playlist.
 
-**Requires:** Bearer token
-
-**Request:**
-```json
-{
-  "name": "Friday Night Karaoke",
-  "description": "Songs for Friday night sessions"
-}
-```
-
-**Response:** `201 Created`
-```json
-{
-  "id": "playlist-uuid",
-  "name": "Friday Night Karaoke",
-  "description": "Songs for Friday night sessions",
-  "song_ids": [],
-  "song_count": 0,
-  "created_at": "2024-12-30T12:00:00Z",
-  "updated_at": "2024-12-30T12:00:00Z"
-}
-```
+- `id` is a client-generated id matching `^pl_[A-Za-z0-9-]{8,64}$`. Creating is idempotent: posting an `id` that already belongs to the caller returns that playlist unchanged. An id that belongs to another user → 403.
+- `items` (≤500) seeds the playlist (same item shape as `PUT /items`).
 
 ### GET /api/playlists/{playlist_id}
 
-Get playlist details.
-
-**Requires:** Bearer token
-
-**Response:**
-```json
-{
-  "id": "playlist-uuid",
-  "name": "Friday Night Karaoke",
-  "description": "Songs for Friday night sessions",
-  "song_ids": ["1", "2", "3"],
-  "song_count": 3,
-  "created_at": "2024-12-30T12:00:00Z",
-  "updated_at": "2024-12-30T12:00:00Z"
-}
-```
-
-**Error Responses:**
-- `404` - Playlist not found
-- `403` - Access denied (not your playlist)
+→ playlist.
 
 ### PUT /api/playlists/{playlist_id}
 
-Update a playlist's name or description.
+`{name?, description?}` → playlist (`rev` incremented). Items are untouched.
 
-**Requires:** Bearer token
+### PUT /api/playlists/{playlist_id}/items
 
-**Request:**
-```json
-{
-  "name": "Updated Name",
-  "description": "Updated description"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "playlist-uuid",
-  "name": "Updated Name",
-  "description": "Updated description",
-  "song_ids": ["1", "2", "3"],
-  "song_count": 3,
-  "created_at": "2024-12-30T12:00:00Z",
-  "updated_at": "2024-12-30T14:00:00Z"
-}
-```
+`{items (≤500), base_rev?}` → playlist. Replaces the whole ordered list. Last writer wins: `base_rev` is accepted but a stale value does not reject the write. Each item is `{item_id?, song_key?, artist?, title?}` (`song_key` ≤600 chars, names ≤300). Names are stored as sent (the server does not merge in earlier names, so clients should echo them back); `item_id` is kept for an existing item (with its `added_at`), otherwise generated.
 
 ### DELETE /api/playlists/{playlist_id}
 
-Delete a playlist.
-
-**Requires:** Bearer token
-
-**Response:** `204 No Content`
+`204`.
 
 ### POST /api/playlists/{playlist_id}/songs
 
-Add a song to a playlist.
+`{song_id}` → playlist. Legacy add (transactional): duplicates are ignored.
 
-**Requires:** Bearer token
+### DELETE /api/playlists/{playlist_id}/songs/{song_id:path}
 
-**Request:**
-```json
-{
-  "song_id": "queen-bohemian-rhapsody"
-}
-```
+`204`. Removes the song; the id is a path parameter and may contain `/`. Not in the playlist: no-op.
 
-**Response:**
-```json
-{
-  "id": "playlist-uuid",
-  "name": "Friday Night Karaoke",
-  "description": "Songs for Friday night sessions",
-  "song_ids": ["1", "2", "3", "queen-bohemian-rhapsody"],
-  "song_count": 4,
-  "created_at": "2024-12-30T12:00:00Z",
-  "updated_at": "2024-12-30T14:00:00Z"
-}
-```
-
-Note: Duplicate songs are silently ignored (no error, but not added again).
-
-### DELETE /api/playlists/{playlist_id}/songs/{song_id}
-
-Remove a song from a playlist.
-
-**Requires:** Bearer token
-
-**Response:** `204 No Content`
-
-Note: If the song is not in the playlist, this is a no-op (no error).
+**Index:** listing queries `playlists` on `(user_id ASC, updated_at DESC)`, declared in Pulumi (`infrastructure/__main__.py`, imported from the existing index).
 
 ---
 
