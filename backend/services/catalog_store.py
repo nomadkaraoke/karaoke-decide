@@ -358,6 +358,22 @@ _store: CatalogStore | None = None
 _store_lock = threading.Lock()
 
 
+def load_catalog_only(settings: Settings, client: Any = None) -> CatalogReader:
+    """catalog.db alone (no availability.db, no background threads) for a batch job that only needs
+    ``kn_song_map`` lookups, e.g. the voice-pool fetch job (1 GiB). Raises ``CatalogLoadError`` when
+    it isn't published, can't be downloaded, or there is no GCS client."""
+    client_error: str | None = None
+    if client is None and not settings.catalog_local_dir.strip():
+        try:
+            client = _storage_client()
+        except Exception as exc:
+            client_error = str(exc)
+    fetched = CatalogStore._fetch_catalog(settings, client, client_error)
+    if fetched is None:
+        raise CatalogLoadError("no published catalog.db")
+    return CatalogReader(fetched[0], None)
+
+
 def get_catalog_store() -> CatalogStore:
     global _store
     with _store_lock:

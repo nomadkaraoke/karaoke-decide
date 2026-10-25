@@ -218,6 +218,20 @@ class CatalogReader:
                 out.setdefault(r[0], int(r[1]))
         return out
 
+    def all_kn_ids_for_song_keys(self, song_keys: Sequence[str]) -> dict[str, list[int]]:
+        """``{song_key: [kn_id, ...]}``: every KaraokeNerds row of each song (ascending kn_id);
+        songs with none are absent."""
+        keys = list(dict.fromkeys(song_keys))
+        out: dict[str, list[int]] = {}
+        for chunk in _chunks(keys):
+            rows = self.conn().execute(
+                f"SELECT song_key, kn_id FROM kn_song_map WHERE song_key IN ({_marks(len(chunk))}) ORDER BY kn_id",
+                tuple(chunk),
+            )
+            for r in rows:
+                out.setdefault(r[0], []).append(int(r[1]))
+        return out
+
     def has_karaoke_key(self, song_key: str) -> bool:
         """Whether ``song_key`` has a karaoke version: it is in ``availability.db`` or is a
         catalog.db song that came from KaraokeNerds (the two sources spell some titles differently)."""

@@ -14,7 +14,7 @@ from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 
 from karaoke_decide.services.bq_limits import MAX_BYTES_CATALOG
-from karaoke_decide.voice_pool import queue, select
+from karaoke_decide.voice_pool import queue, select, spotify
 from karaoke_decide.voice_pool.models import pool_id
 from karaoke_decide.voice_pool.versions import RateLimiter
 from tests.unit.fake_gcs import FakeBucket
@@ -83,10 +83,10 @@ def test_min_pop_steps_down(reader, fake_bq, caplog):
 def test_bq_query_has_byte_cap(reader, fake_bq):
     bq = fake_bq()
     select.load_candidates(reader, bq, n=10)
-    assert bq.sqls == [select.SPOTIFY_FOR_KN_SQL, select.ULTRASTAR_SQL]
+    assert bq.sqls == [spotify.SPOTIFY_FOR_KN_SQL, select.ULTRASTAR_SQL]
     assert all(c.maximum_bytes_billed == MAX_BYTES_CATALOG for c in bq.configs)
-    assert "QUALIFY ROW_NUMBER() OVER (PARTITION BY l.karaoke_id" in select.SPOTIFY_FOR_KN_SQL
-    assert "UNNEST(@kn_ids)" in select.SPOTIFY_FOR_KN_SQL
+    assert "QUALIFY ROW_NUMBER() OVER (PARTITION BY l.karaoke_id" in spotify.SPOTIFY_FOR_KN_SQL
+    assert "UNNEST(@kn_ids)" in spotify.SPOTIFY_FOR_KN_SQL
     assert "song_vocal_range_sources" in select.ULTRASTAR_SQL and "source = 'ultrastar'" in select.ULTRASTAR_SQL
     (kn_param,) = bq.configs[0].query_parameters
     assert kn_param.name == "kn_ids" and kn_param.array_type == "INT64" and kn_param.values

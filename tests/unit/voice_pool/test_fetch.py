@@ -228,6 +228,95 @@ async def test_unfetchable_items_fail_without_submitting(fs, ff, runner, gcs, cl
     assert "spotify" in fs.cols[FETCH][no_id]["error"] and "duration" in fs.cols[FETCH][long_]["error"]
 
 
+# ------------------------------------------------------------------ Spotify id resolution
+
+
+class FakeResolver:
+    """``resolve(song_keys)``: the scripted tracks for the keys it knows; records each call."""
+
+    def __init__(self, tracks: dict[str, tuple[str | None, int | None]] | None = None, error: Exception | None = None):
+        self.tracks = tracks or {}
+        self.error = error
+        self.calls: list[list[str]] = []
+
+    def __call__(self, song_keys: list[str]) -> dict[str, tuple[str | None, int | None]]:
+        self.calls.append(list(song_keys))
+        if self.error is not None:
+            raise self.error
+        return {k: self.tracks[k] for k in song_keys if k in self.tracks}
+
+
+async def test_missing_spotify_ids_are_resolved_and_submitted(fs, ff, runner, gcs, clock, caplog):
+    caplog.set_level(logging.INFO)
+    a, b = await seed(fs, 2, prefix="sheet", spotify_id=None, duration_ms=None, source="andrew_sheet", priority=0)
+    resolver = FakeResolver({"sheet|000": ("spA", 181_000), "sheet|001": ("spB", 240_400)})
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert resolver.calls == [["sheet|000", "sheet|001"]]  # one batched lookup per run
+    assert out["submitted"] == 2 and out["resolved"] == 2 and out["unresolved"] == 0
+    assert [(s["source_id"], s["expected_duration_s"]) for s in ff.started] == [("spA", 181), ("spB", 240)]
+    for pid, sid, dur in ((a, "spA", 181_000), (b, "spB", 240_400)):
+        d = fs.cols[FETCH][pid]
+        assert (d["status"], d["spotify_id"], d["duration_ms"], d["error"]) == ("downloading", sid, dur, None)
+        assert d["source"] == "andrew_sheet" and d["priority"] == 0
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+
+
+async def test_unresolvable_items_fail_with_one_aggregated_warning(fs, ff, runner, gcs, clock, caplog):
+    caplog.set_level(logging.INFO)
+    lost = await seed(fs, 3, prefix="lost", spotify_id=None, duration_ms=None, source="andrew_sheet", priority=0)
+    (found,) = await seed(fs, 1, prefix="found", spotify_id=None, duration_ms=None)
+    (ok,) = await seed(fs, 1, prefix="ok")
+    resolver = FakeResolver({"found|000": ("spF", 200_000)})
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert len(resolver.calls) == 1 and sorted(resolver.calls[0]) == ["found|000", "lost|000", "lost|001", "lost|002"]
+    assert out["resolved"] == 1 and out["unresolved"] == 3 and out["submitted"] == 2
+    for pid in lost:
+        d = fs.cols[FETCH][pid]
+        assert (d["status"], d["error"], d["attempts"]) == ("failed", "no spotify id", 0)
+    assert statuses(fs)[found] == "downloading" and statuses(fs)[ok] == "downloading"
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1 and "3" in warnings[0].getMessage() and "no spotify id" in warnings[0].getMessage()
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+async def test_nothing_to_resolve_makes_no_lookup(fs, ff, runner, gcs, clock):
+    ids = await seed(fs, 2)
+    before = {i: (fs.cols[FETCH][i]["spotify_id"], fs.cols[FETCH][i]["duration_ms"]) for i in ids}
+    resolver = FakeResolver({"song|000": ("other", 99_000)})
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert resolver.calls == [] and out["resolved"] == 0 and out["unresolved"] == 0
+    assert {i: (fs.cols[FETCH][i]["spotify_id"], fs.cols[FETCH][i]["duration_ms"]) for i in ids} == before
+    assert [s["source_id"] for s in ff.started] == ["sp000000", "sp000001"]
+
+
+async def test_missing_duration_is_filled_only_from_the_same_track(fs, ff, runner, gcs, clock):
+    (same,) = await seed(fs, 1, prefix="same", spotify_id="spS", duration_ms=None)
+    (other,) = await seed(fs, 1, prefix="other", spotify_id="spO", duration_ms=None)
+    resolver = FakeResolver({"same|000": ("spS", 210_000), "other|000": ("spX", 300_000)})
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert out["submitted"] == 1 and ff.started[0]["source_id"] == "spS"
+    assert fs.cols[FETCH][same]["duration_ms"] == 210_000
+    d = fs.cols[FETCH][other]
+    assert d["spotify_id"] == "spO" and d["status"] == "failed" and "duration" in d["error"]
+
+
+async def test_resolution_outage_leaves_items_queued(fs, ff, runner, gcs, clock, caplog):
+    (pending,) = await seed(fs, 1, prefix="sheet", spotify_id=None, duration_ms=None)
+    (ok,) = await seed(fs, 1, prefix="ok")
+    resolver = FakeResolver(error=fetch.SpotifyResolveUnavailableError("catalog.db not loaded"))
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert statuses(fs)[pending] == "queued" and fs.cols[FETCH][pending]["error"] is None
+    assert statuses(fs)[ok] == "downloading" and out["submitted"] == 1 and out["unresolved"] == 0
+    assert any(r.levelno == logging.WARNING and "catalog.db" in r.getMessage() for r in caplog.records)
+    assert not any(r.levelno >= logging.ERROR for r in caplog.records)
+
+
+async def test_without_a_resolver_missing_ids_still_fail(fs, ff, runner, gcs, clock):
+    (no_id,) = await seed(fs, 1, prefix="a", spotify_id=None, duration_ms=None)
+    out = await go(fs, ff, runner, gcs, clock)
+    assert fs.cols[FETCH][no_id]["error"] == "no spotify id" and out["unresolved"] == 1
+
+
 async def test_budget_endpoint_unreachable_is_warning_not_error(fs, ff, runner, gcs, clock, caplog):
     await seed(fs, 3)
     ff.down = True
