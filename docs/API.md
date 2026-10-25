@@ -2208,6 +2208,23 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
 
 `suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
 
+### GET /api/voice/history
+
+Your voice data, for "Your recordings" on Me: the signed-in user's sessions that have at least one sung song, newest first, at most 20. Open to every signed-in user, even with the session flag off.
+
+```json
+{"sessions": [{"session_id": "abc123", "created_at": "2026-10-25T19:00:00Z", "state": "done",
+  "result": {"session_id": "abc123", "voice_type": "baritone", "between": null, "confidence_label": "low", "top_p": 0.5,
+             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "attempts": 4, "evidence_attempts": 4,
+             "profile_saved": false, "computed_at": "2026-10-25T19:40:00Z"},
+  "attempts": [{"attempt_id": "abc123:1", "n": 1, "song_key": "artist|title", "artist": "Artist", "title": "Title",
+                "sung_at": "2026-10-25T19:08:00Z", "feel": "loved", "position": "comfortable", "excluded": false,
+                "recording": {"recording_id": "abc123:1", "duration_s": 180.5, "content_type": "audio/mp4", "bytes": 48000},
+                "falsetto_notes": 0}]}]}
+```
+
+`result` is the session's result as last computed (`null` before the first `GET .../result`). `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
+
 ### POST /api/voice/recordings
 
 Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.

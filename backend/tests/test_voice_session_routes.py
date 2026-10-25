@@ -838,3 +838,145 @@ def test_result_carries_done_reason(client: TestClient) -> None:
     assert client.get(f"/api/voice/sessions/{sid}/result").json()["done_reason"] == "tired"
     sid = _create(client)
     assert client.get(f"/api/voice/sessions/{sid}/result").json()["done_reason"] is None
+
+
+# ---------------------------------------------------------------- history (Phase 3d batch 1, Task A1)
+
+
+def _seed_session(
+    fs: RouteFirestore,
+    sid: str,
+    *,
+    user_id: str = USER_ID,
+    created_at: datetime = T0,
+    attempts: int = 2,
+    recorded: tuple[int, ...] = (),
+    state: str = "done",
+    record: bool = True,
+) -> None:
+    """A session in the shape production stores (voice_sessions + voice_attempts + voice_recordings)."""
+    fs.cols.setdefault("voice_sessions", {})[sid] = {
+        "user_id": user_id,
+        "state": state,
+        "setup": {"record": record, "posture": "standing", "warmth": "warm", "device": "Pixel", "headphones": True},
+        "skips": [],
+        "prior_profile": None,
+        "profile_saved": False,
+        "last_offer": None,
+        "created_at": created_at,
+        "updated_at": created_at + timedelta(minutes=30),
+    }
+    for n in range(1, attempts + 1):
+        start = created_at + timedelta(minutes=5 * n)
+        fs.cols.setdefault("voice_attempts", {})[f"{sid}:{n}"] = {
+            "user_id": user_id,
+            "session_id": sid,
+            "n": n,
+            "song_key": f"artist {n}|song {n}",
+            "video_id": f"vid{n}",
+            "context": {"posture": "standing", "warmth": "warm", "headphones": True, "device": "Pixel", "record": True},
+            "quiz": {
+                "would_sing": "yes",
+                "tags": [],
+                "voice_now": "fresh",
+                "knew": "well",
+                "version_issues": [],
+                "difficulty": "easy",
+                "version_quality": "good",
+                "position": "comfortable",
+                "feel": "fine",
+                "would_work_if": [],
+            },  # fmt: skip
+            "pitch": {
+                "held_high": 62.0,
+                "voiced_s": 40.0,
+                "p10": 50.0,
+                "p50": 55.0,
+                "p90": 60.0,
+                "held_count": 6,
+                "held_low": 49.0,
+            },  # fmt: skip
+            "recording_id": f"{sid}:{n}" if n in recorded else None,
+            "song": {
+                "artist": f"Artist {n}",
+                "title": f"Song {n}",
+                "artist_key": f"artist {n}",
+                "stratum": "male_mid",
+                "demand": {"low": 48.0, "high": 64.0, "p10": 50.0, "p50": 55.0, "p90": 60.0},
+            },  # fmt: skip
+            "stopped_early": False,
+            "started_at": start,
+            "ended_at": start + timedelta(minutes=3),
+            "outputs_applied": True,
+        }
+        if n in recorded:
+            fs.cols.setdefault("voice_recordings", {})[f"{sid}:{n}"] = {
+                "user_id": user_id,
+                "session_id": sid,
+                "attempt_n": n,
+                "gcs_path": f"voice-recordings/{user_id}/{sid}/{n}.m4a",
+                "content_type": "audio/mp4",
+                "bytes": 48_000 + n,
+                "duration_s": 180.5,
+                "created_at": start + timedelta(minutes=3),
+            }
+
+
+def test_history_lists_sessions_newest_first_with_attempts_and_recordings(
+    client: TestClient, fs: RouteFirestore
+) -> None:
+    _seed_session(fs, "old", created_at=T0, attempts=1)
+    _seed_session(fs, "new", created_at=T0 + timedelta(days=1), attempts=2, recorded=(2,))
+    r = client.get("/api/voice/history")
+    assert r.status_code == 200, r.text
+    sessions = r.json()["sessions"]
+    assert [s["session_id"] for s in sessions] == ["new", "old"]
+    new = sessions[0]
+    assert new["state"] == "done" and new["result"] is None
+    assert new["created_at"].startswith("2026-10-23T19:00:00")
+    a1, a2 = new["attempts"]
+    assert a1 == {
+        "attempt_id": "new:1", "n": 1, "song_key": "artist 1|song 1", "artist": "Artist 1", "title": "Song 1",
+        "sung_at": a1["sung_at"], "feel": "fine", "position": "comfortable", "excluded": False, "recording": None,
+        "falsetto_notes": 0,
+    }  # fmt: skip
+    assert a1["sung_at"].startswith("2026-10-23T19:08:00")
+    assert a2["n"] == 2
+    assert a2["recording"] == {
+        "recording_id": "new:2",
+        "duration_s": 180.5,
+        "content_type": "audio/mp4",
+        "bytes": 48_002,
+    }
+
+
+def test_history_is_user_scoped(make_client: MakeClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "mine", attempts=1, recorded=(1,))
+    _seed_session(fs, "theirs", user_id=OTHER_ID, attempts=1, recorded=(1,))
+    # an attempt of another user filed under my session id never shows up
+    fs.cols["voice_attempts"]["mine:9"] = {**fs.cols["voice_attempts"]["theirs:1"], "session_id": "mine", "n": 9}
+    mine = make_client().get("/api/voice/history").json()["sessions"]
+    assert [s["session_id"] for s in mine] == ["mine"] and [a["n"] for a in mine[0]["attempts"]] == [1]
+    theirs = make_client(user_id=OTHER_ID).get("/api/voice/history").json()["sessions"]
+    assert [s["session_id"] for s in theirs] == ["theirs"]
+
+
+def test_history_open_when_session_flag_off(make_client: MakeClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "s1", attempts=1)
+    r = make_client(admin=False, open_=False).get("/api/voice/history")
+    assert r.status_code == 200, r.text
+    assert [s["session_id"] for s in r.json()["sessions"]] == ["s1"]
+
+
+def test_history_omits_empty_sessions(client: TestClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "empty", attempts=0)
+    _seed_session(fs, "sung", attempts=1, created_at=T0 - timedelta(days=1))
+    assert [s["session_id"] for s in client.get("/api/voice/history").json()["sessions"]] == ["sung"]
+
+
+def test_history_caps_at_20(client: TestClient, fs: RouteFirestore) -> None:
+    for i in range(vss.HISTORY_LIMIT + 3):
+        _seed_session(fs, f"s{i:02d}", attempts=1, created_at=T0 + timedelta(hours=i))
+    sessions = client.get("/api/voice/history").json()["sessions"]
+    assert len(sessions) == 20
+    assert sessions[0]["session_id"] == "s22" and sessions[-1]["session_id"] == "s03"

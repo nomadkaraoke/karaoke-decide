@@ -60,6 +60,9 @@ from pydantic import ValidationError
 from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
+    HistoryAttemptOut,
+    HistoryRecordingOut,
+    HistorySessionOut,
     LovedSongOut,
     NextDoneOut,
     NextSongOut,
@@ -67,10 +70,12 @@ from backend.models.voice_session import (
     SessionCreated,
     SessionOut,
     SessionPatch,
+    SessionResultSummaryOut,
     SessionSetup,
     SkipIn,
     SongRangeOut,
     VersionOut,
+    VoiceHistoryOut,
 )
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.firestore_service import FirestoreService
@@ -110,7 +115,9 @@ logger = logging.getLogger(__name__)
 
 SESSIONS_COLLECTION = "voice_sessions"
 ATTEMPTS_COLLECTION = "voice_attempts"
+RECORDINGS_COLLECTION = "voice_recordings"  # owned by voice_recording_service; here so history can join it
 SUITED_LIMIT = 15
+HISTORY_LIMIT = 20  # sessions in GET /api/voice/history, newest first
 ALTERNATIVES = 2
 MAX_REPICKS = 5  # picks whose versions all turned out unembeddable (live stats) before offering a link-out
 _CREATE_RETRIES = 3
@@ -475,6 +482,79 @@ async def active_session_id(fs: FirestoreService, user_id: str) -> str | None:
     return str(newest["id"])
 
 
+# ---------------------------------------------------------------- history (pure)
+
+_EPOCH = datetime.min.replace(tzinfo=UTC)
+
+
+def _summary_out(session: dict[str, Any]) -> SessionResultSummaryOut | None:
+    raw = session.get("result_summary")
+    if not raw:
+        return None
+    try:
+        return SessionResultSummaryOut.model_validate(raw)
+    except ValidationError:
+        logger.warning("voice session %s: stored result summary no longer validates", session.get("id"))
+        return None
+
+
+def _recording_out(doc: dict[str, Any] | None) -> HistoryRecordingOut | None:
+    if not doc:
+        return None
+    return HistoryRecordingOut(
+        recording_id=str(doc["id"]),
+        duration_s=doc.get("duration_s"),
+        content_type=str(doc.get("content_type") or "application/octet-stream"),
+        bytes=doc.get("bytes"),
+    )
+
+
+def _history_attempt(a: dict[str, Any], recordings: dict[str, dict[str, Any]]) -> HistoryAttemptOut:
+    attempt_id = f"{a['session_id']}:{a['n']}"
+    quiz, song = a.get("quiz") or {}, a.get("song") or {}
+    rec = recordings.get(str(a["recording_id"])) if a.get("recording_id") else recordings.get(attempt_id)
+    return HistoryAttemptOut(
+        attempt_id=attempt_id,
+        n=int(a["n"]),
+        song_key=str(a["song_key"]),
+        artist=str(song.get("artist") or ""),
+        title=str(song.get("title") or ""),
+        sung_at=_as_datetime(a.get("ended_at")) or _as_datetime(a.get("started_at")),
+        feel=quiz.get("feel"),
+        position=quiz.get("position"),
+        excluded=bool(a.get("excluded")),
+        recording=_recording_out(rec),
+    )
+
+
+def build_history(
+    sessions: Sequence[dict[str, Any]],
+    attempts: Sequence[dict[str, Any]],
+    recordings: Sequence[dict[str, Any]],
+    limit: int = HISTORY_LIMIT,
+) -> VoiceHistoryOut:
+    """One user's sessions with attempts, newest first, at most ``limit``; sessions never sung are left out."""
+    by_session: dict[str, list[dict[str, Any]]] = {}
+    for a in attempts:
+        by_session.setdefault(str(a.get("session_id")), []).append(a)
+    recs = {str(r["id"]): r for r in recordings}
+    sung = [s for s in sessions if by_session.get(str(s["id"]))]
+    sung.sort(key=lambda s: _as_datetime(s.get("created_at")) or _EPOCH, reverse=True)
+    out = []
+    for s in sung[:limit]:
+        rows = sorted(by_session[str(s["id"])], key=lambda a: int(a["n"]))
+        out.append(
+            HistorySessionOut(
+                session_id=str(s["id"]),
+                created_at=_as_datetime(s.get("created_at")),
+                state=s.get("state") or "active",
+                result=_summary_out(s),
+                attempts=[_history_attempt(a, recs) for a in rows],
+            )
+        )
+    return VoiceHistoryOut(sessions=out)
+
+
 # ---------------------------------------------------------------- service
 
 
@@ -537,6 +617,19 @@ class VoiceSessionService:
                 hidden = set()
             return UserContextV2(user_id=user_id, hidden=hidden)
         return await build_context(self._fs, reader, self._feedback, user_id)
+
+    # ------------------------------------------------------------ history
+
+    async def history(self, user: User) -> VoiceHistoryOut:
+        """``GET /api/voice/history``: the user's sessions, songs and recordings (user-scoped queries;
+        sorted and joined here, so no composite index is needed)."""
+        by_user = [("user_id", "==", user.id)]
+        sessions, attempts, recordings = await asyncio.gather(
+            self._fs.query_documents(SESSIONS_COLLECTION, filters=by_user),
+            self._fs.query_documents(ATTEMPTS_COLLECTION, filters=by_user),
+            self._fs.query_documents(RECORDINGS_COLLECTION, filters=by_user),
+        )
+        return build_history(sessions, attempts, recordings)
 
     # ------------------------------------------------------------ setup
 

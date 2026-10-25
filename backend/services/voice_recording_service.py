@@ -24,10 +24,10 @@ from typing import IO, Any
 
 from backend.services.firestore_service import FirestoreService
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from backend.services.voice_session_service import RECORDINGS_COLLECTION as RECORDINGS_COLLECTION  # re-export
 
 logger = logging.getLogger(__name__)
 
-RECORDINGS_COLLECTION = "voice_recordings"
 PURGES_COLLECTION = "voice_recording_purges"
 RECORDINGS_PREFIX = "voice-recordings/"
 MAX_BYTES = 20 * 1024 * 1024

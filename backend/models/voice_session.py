@@ -19,6 +19,8 @@ Posture = Literal["standing", "sitting", "lying"]
 Warmth = Literal["cold", "bit_warm", "warm"]
 SessionStateName = Literal["active", "abandoned", "done"]
 SkipReason = Literal["dont_know", "something_else", "not_embeddable"]
+Feel = Literal["loved", "fine", "not_for_me"]
+Position = Literal["too_low", "comfortable", "too_high", "both_ends"]
 MidiFloat = Field(ge=24, le=96)
 
 
@@ -93,8 +95,8 @@ class SkipIn(_Request):
 class QuizIn(_Request):
     """Mirrors ``voice_session.model.Quiz``; Q1 ``feel`` and Q2 ``position`` are required."""
 
-    feel: Literal["loved", "fine", "not_for_me"]
-    position: Literal["too_low", "comfortable", "too_high", "both_ends"]
+    feel: Feel
+    position: Position
     difficulty: Literal["easy", "stretch", "couldnt"] | None = None
     knew: Literal["well", "partly", "barely"] | None = None
     would_sing: Literal["yes", "yes_other_key", "no"] | None = None
@@ -198,3 +200,58 @@ class VoiceFlagsOut(BaseModel):
     is_admin: bool
     voice_data: bool
     active_session_id: str | None = None
+
+
+# ---------------------------------------------------------------- your voice data (history, results)
+
+
+class SessionResultSummaryOut(BaseModel):
+    """A session's result as last computed (``voice_sessions.result_summary``): written by every
+    ``GET .../result`` and by a "Don't count this one" recompute."""
+
+    session_id: str
+    voice_type: str
+    between: str | None
+    confidence_label: ConfidenceLabel
+    top_p: float
+    low: int
+    high: int
+    comfort_low: int
+    comfort_high: int
+    attempts: int
+    evidence_attempts: int  # attempts with range evidence that count (excluded ones don't)
+    profile_saved: bool
+    computed_at: datetime
+
+
+class HistoryRecordingOut(BaseModel):
+    recording_id: str
+    duration_s: float | None
+    content_type: str
+    bytes: int | None
+
+
+class HistoryAttemptOut(BaseModel):
+    attempt_id: str
+    n: int
+    song_key: str
+    artist: str
+    title: str
+    sung_at: datetime | None
+    feel: Feel | None
+    position: Position | None
+    excluded: bool = False
+    recording: HistoryRecordingOut | None
+    falsetto_notes: int = 0
+
+
+class HistorySessionOut(BaseModel):
+    session_id: str
+    created_at: datetime | None
+    state: SessionStateName
+    result: SessionResultSummaryOut | None
+    attempts: list[HistoryAttemptOut]
+
+
+class VoiceHistoryOut(BaseModel):
+    sessions: list[HistorySessionOut]

@@ -28,6 +28,7 @@ from backend.models.voice_session import (
     SessionSetup,
     SkipIn,
     VoiceFlagsOut,
+    VoiceHistoryOut,
 )
 from backend.services import voice_recording_service as vrs
 from backend.services.voice_data_store import VoiceDataUnavailable
@@ -73,6 +74,12 @@ async def flags(
         voice_data=store.status == "ready",
         active_session_id=await active_session_id(firestore, user.id),
     )
+
+
+@router.get("/history", response_model=VoiceHistoryOut)
+async def history(user: CurrentUser, service: VoiceSessionServiceDep) -> VoiceHistoryOut:
+    """Your sessions, songs and recordings, newest first. Open even when the session flag is off."""
+    return await _call(service.history(user))
 
 
 @router.post("/sessions", response_model=SessionCreated)
