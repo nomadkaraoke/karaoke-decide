@@ -2233,6 +2233,10 @@ Private, consent-gated audio of one attempt (multipart form: `file`, `session_id
 
 Erases every recording of the signed-in user (objects, documents, attempt links) and withdraws recording consent (`setup.record = false`) on all their sessions, so an upload queued before the delete is refused with `403 recording_not_consented`; the user re-consents with `PATCH` (`{"record": true}`). Idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
 
+### GET /api/voice/recordings/{recording_id}/audio
+
+Streams one of your own recordings with its stored content type (`audio/mp4` or `audio/wav`). No Range support: the app downloads the file, then plays it. Open to every signed-in user, even with the session flag off. `404 recording_not_found` when the recording doesn't exist, belongs to someone else (never `403`), or its object is gone; a stored path outside your own `voice-recordings/<user_id>/` prefix is also a 404 (logged as a WARNING). Admin playback (`/api/admin/voice/recordings/{id}/audio`) is unchanged.
+
 ### GET /api/voice/recordings/count
 
 `{"count": 2}`. Open to every signed-in user.

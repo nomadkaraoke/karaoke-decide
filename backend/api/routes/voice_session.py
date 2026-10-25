@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Annotated, Any, TypeVar
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import Message
@@ -218,6 +219,19 @@ async def upload_recording(
 @recordings_router.delete("/recordings", response_model=RecordingsDeleted)
 async def delete_recordings(user: CurrentUser, service: RecordingServiceDep) -> RecordingsDeleted:
     return RecordingsDeleted(deleted=await service.delete_all_for_user(user.id))
+
+
+@recordings_router.get("/recordings/{recording_id}/audio")
+async def recording_audio(
+    recording_id: str, user: CurrentUser, settings: Settings, service: RecordingServiceDep
+) -> StreamingResponse:
+    """Stream one of your own recordings with its stored content type (no Range: the app downloads, then
+    plays). Another user's recording, a missing one or a missing object: 404 ``recording_not_found``."""
+    try:
+        content_type, chunks = await service.open_own(user.id, recording_id, settings.voice_recordings_bucket)
+    except RecordingError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    return StreamingResponse(chunks, media_type=content_type)
 
 
 @recordings_router.get("/recordings/count", response_model=RecordingsCount)

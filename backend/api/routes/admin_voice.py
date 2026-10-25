@@ -11,7 +11,7 @@ import dataclasses
 import hashlib
 import logging
 from collections import Counter
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
@@ -31,7 +31,12 @@ from backend.services.voice_data_store import (
     VoiceReader,
 )
 from backend.services.voice_profile_service import VoiceProfileService
-from backend.services.voice_recording_service import LocalBucket
+from backend.services.voice_recording_service import (
+    LocalBucket,
+    RecordingObjectMissingError,
+    open_recording,
+    recording_object_name,
+)
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
 from karaoke_decide.vocal_range.fit import UserVoiceRange
@@ -48,7 +53,6 @@ ATTEMPTS_COLLECTION = "voice_attempts"  # Task C3
 RECORDINGS_COLLECTION = "voice_recordings"  # Task C4
 MAX_ROWS = 500
 BUDGET_TIMEOUT_S = 5.0
-AUDIO_CHUNK = 256 * 1024
 
 
 class SheetRowIn(BaseModel):
@@ -435,23 +439,6 @@ async def agreement_report(
     return AgreementOut(**replay(rows, PREDICT_WEIGHTS), skipped_no_profile=no_profile, skipped_no_range=no_range)
 
 
-RECORDINGS_PREFIX = "voice-recordings/"
-
-
-def _object_name(gcs_path: str, bucket_name: str) -> str | None:
-    """The object name inside the recordings bucket, or None for anything outside it
-    (another bucket, outside ``voice-recordings/``, or a ``..`` segment)."""
-    if gcs_path.startswith("gs://"):
-        bucket, _, name = gcs_path[len("gs://") :].partition("/")
-        if bucket != bucket_name:
-            return None
-    else:
-        name = gcs_path
-    if not name.startswith(RECORDINGS_PREFIX) or ".." in name.split("/"):
-        return None
-    return name
-
-
 @router.get("/recordings/{recording_id}/audio")
 async def recording_audio(
     recording_id: str,
@@ -464,33 +451,12 @@ async def recording_audio(
     doc = await firestore.get_document(RECORDINGS_COLLECTION, recording_id)
     if not doc or not doc.get("gcs_path"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found")
-    name = _object_name(str(doc["gcs_path"]), settings.voice_recordings_bucket)
+    name = recording_object_name(str(doc["gcs_path"]), settings.voice_recordings_bucket)
     if name is None:
         logger.warning("voice_recordings/%s has a gcs_path outside the recordings bucket", recording_id)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found")
-    blob = bucket.blob(name)
-
-    def first_chunk() -> tuple[Any, bytes]:
-        f = blob.open("rb")
-        try:
-            return f, f.read(AUDIO_CHUNK)
-        except BaseException:
-            f.close()
-            raise
-
     try:
-        src, head = await asyncio.to_thread(first_chunk)
-    except Exception as exc:
-        if catalog_store._is_not_found(exc):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found") from exc
-        raise
-
-    def chunks() -> Iterator[bytes]:
-        try:
-            yield head
-            while chunk := src.read(AUDIO_CHUNK):
-                yield chunk
-        finally:
-            src.close()
-
-    return StreamingResponse(chunks(), media_type=str(doc.get("content_type") or "application/octet-stream"))
+        chunks = await open_recording(bucket, name)
+    except RecordingObjectMissingError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="recording_not_found") from exc
+    return StreamingResponse(chunks, media_type=str(doc.get("content_type") or "application/octet-stream"))

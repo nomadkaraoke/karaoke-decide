@@ -558,3 +558,60 @@ async def test_upload_undoes_itself_when_consent_withdrawn_mid_flight(bucket: Fa
         )
     assert bucket.objects == {}
     assert rfs.cols["voice_recordings"] == {}
+
+
+# ---------------------------------------------------------------- your own recording (Phase 3d batch 1, Task A2)
+
+
+def _audio(c: TestClient, rid: str) -> Any:
+    return c.get(f"/api/voice/recordings/{rid}/audio")
+
+
+def test_user_streams_own_recording(make_client: MakeClient, fs: RouteFirestore) -> None:
+    _seed(fs)
+    rid = _post(make_client()).json()["recording_id"]
+    res = _audio(make_client(admin=False), rid)  # open to the owner even with the session flag off
+    assert res.status_code == 200, res.text
+    assert res.content == AUDIO and res.headers["content-type"] == "audio/mp4"
+
+
+def test_other_users_recording_is_404(make_client: MakeClient, fs: RouteFirestore) -> None:
+    _seed(fs)
+    rid = _post(make_client()).json()["recording_id"]
+    res = _audio(make_client(user_id=OTHER), rid)
+    assert res.status_code == 404 and res.json() == {"detail": "recording_not_found"}
+    assert _audio(make_client(), "s1:nope").status_code == 404
+
+
+def test_missing_object_is_404(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket, caplog: pytest.LogCaptureFixture
+) -> None:
+    _seed(fs)
+    c = make_client()
+    rid = _post(c).json()["recording_id"]
+    bucket.objects.clear()
+    res = _audio(c, rid)
+    assert res.status_code == 404 and res.json() == {"detail": "recording_not_found"}
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
+
+
+@pytest.mark.parametrize(
+    "gcs_path",
+    [
+        f"voice-recordings/{OTHER}/s1/1.m4a",  # another user's object
+        f"voice-recordings/{SIMILAR}/s1/1.m4a",  # a user id that merely starts with mine
+        f"voice-recordings/{USER}/../{OTHER}/s1/1.m4a",
+        "jobs/abc/output.mp4",
+    ],
+)
+def test_path_outside_user_prefix_is_404_and_warns(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket, caplog: pytest.LogCaptureFixture, gcs_path: str
+) -> None:
+    bucket.objects[gcs_path] = b"must not be served"
+    fs.cols["voice_recordings"] = {
+        "s1:1": {"user_id": USER, "session_id": "s1", "attempt_n": 1, "gcs_path": gcs_path, "content_type": "audio/mp4"}
+    }
+    with caplog.at_level("WARNING"):
+        res = _audio(make_client(), "s1:1")
+    assert res.status_code == 404 and res.json() == {"detail": "recording_not_found"}
+    assert [r.levelname for r in caplog.records if "outside" in r.getMessage()] == ["WARNING"]

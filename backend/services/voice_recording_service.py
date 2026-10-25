@@ -32,6 +32,7 @@ PURGES_COLLECTION = "voice_recording_purges"
 RECORDINGS_PREFIX = "voice-recordings/"
 MAX_BYTES = 20 * 1024 * 1024
 CONTENT_TYPES = {"audio/mp4": "m4a", "audio/wav": "wav"}
+AUDIO_CHUNK = 256 * 1024  # streamed playback reads the object this much at a time
 _COPY = 1024 * 1024
 
 
@@ -70,10 +71,69 @@ class EmptyRecordingError(RecordingError):
     status_code, detail = 422, "empty_recording"
 
 
+class RecordingNotFoundError(RecordingError):
+    """Not the user's recording, no such recording, or its object is gone: always 404 (never 403)."""
+
+    status_code, detail = 404, "recording_not_found"
+
+
+class RecordingObjectMissingError(Exception):
+    """The recording's object is not in the bucket."""
+
+
 def user_prefix(user_id: str) -> str:
     if not user_id or "/" in user_id or ".." in user_id:
         raise ValueError("invalid user id")
     return f"{RECORDINGS_PREFIX}{user_id}/"
+
+
+def _is_not_found(exc: BaseException) -> bool:
+    return isinstance(exc, FileNotFoundError) or getattr(exc, "code", None) == 404
+
+
+def recording_object_name(gcs_path: str, bucket_name: str) -> str | None:
+    """The object name inside the recordings bucket, or None for anything outside it
+    (another bucket, outside ``voice-recordings/``, or a ``..`` segment)."""
+    if gcs_path.startswith("gs://"):
+        bucket, _, name = gcs_path[len("gs://") :].partition("/")
+        if bucket != bucket_name:
+            return None
+    else:
+        name = gcs_path
+    if not name.startswith(RECORDINGS_PREFIX) or ".." in name.split("/"):
+        return None
+    return name
+
+
+async def open_recording(bucket: Any, name: str) -> Iterator[bytes]:
+    """The object's bytes in ``AUDIO_CHUNK`` pieces. The first chunk is read here, so a missing object
+    raises :class:`RecordingObjectMissingError` before any response starts; the rest stream lazily."""
+    blob = bucket.blob(name)
+
+    def first_chunk() -> tuple[Any, bytes]:
+        f = blob.open("rb")
+        try:
+            return f, f.read(AUDIO_CHUNK)
+        except BaseException:
+            f.close()
+            raise
+
+    try:
+        src, head = await asyncio.to_thread(first_chunk)
+    except Exception as exc:
+        if _is_not_found(exc):
+            raise RecordingObjectMissingError(name) from exc
+        raise
+
+    def chunks() -> Iterator[bytes]:
+        try:
+            yield head
+            while chunk := src.read(AUDIO_CHUNK):
+                yield chunk
+        finally:
+            src.close()
+
+    return chunks()
 
 
 # ---------------------------------------------------------------- local-dir bucket (local stack)
@@ -224,6 +284,25 @@ class VoiceRecordingService:
             raise RecordingsDeletedError(recording_id)
         return recording_id
 
+    async def open_own(self, user_id: str, recording_id: str, bucket_name: str) -> tuple[str, Iterator[bytes]]:
+        """(content type, audio chunks) of one of the user's own recordings; RecordingNotFoundError otherwise.
+
+        A stored ``gcs_path`` outside ``voice-recordings/<user_id>/`` is never served (WARNING: the doc is
+        inconsistent); a missing object is a 404 too (WARNING: the doc outlived its object)."""
+        doc = await self._fs.get_document(RECORDINGS_COLLECTION, recording_id)
+        if not doc or doc.get("user_id") != user_id or not doc.get("gcs_path"):
+            raise RecordingNotFoundError(recording_id)
+        name = recording_object_name(str(doc["gcs_path"]), bucket_name)
+        if name is None or not name.startswith(user_prefix(user_id)):
+            logger.warning("voice_recordings/%s has a gcs_path outside its owner's prefix; not served", recording_id)
+            raise RecordingNotFoundError(recording_id)
+        try:
+            chunks = await open_recording(self._bucket, name)
+        except RecordingObjectMissingError as exc:
+            logger.warning("voice_recordings/%s: recording object already gone", recording_id)
+            raise RecordingNotFoundError(recording_id) from exc
+        return str(doc.get("content_type") or "application/octet-stream"), chunks
+
     async def count(self, user_id: str) -> int:
         docs = await self._fs.query_documents(RECORDINGS_COLLECTION, filters=[("user_id", "==", user_id)])
         return len(docs)
@@ -271,7 +350,7 @@ class VoiceRecordingService:
         try:
             self._bucket.blob(name).delete()
         except Exception as exc:
-            if isinstance(exc, FileNotFoundError) or getattr(exc, "code", None) == 404:
+            if _is_not_found(exc):
                 logger.info("recording object already gone: %s", name)
                 return
             raise
