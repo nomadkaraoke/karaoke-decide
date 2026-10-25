@@ -36,7 +36,9 @@ session labels, and ``voice_version_stats/{video_id}`` its counters; a "loved" f
 "Love it". ``result`` first applies any attempt whose outputs were missed, then, only on the
 transition from active to done, saves the session's voice profile (``should_save``; the outcome is kept
 as ``profile_saved`` and returned on later fetches; an abandoned session's result is derived, never saved,
-and the session stays abandoned), and lists the songs that suit it (recs v2 ``singable`` + ``sort=fit``) for the saved profile, or the unsaved derived one.
+and the session stays abandoned), and lists the songs that suit it (recs v2 ``singable`` + ``sort=best``,
+so ranked by taste, topped up from ``sort=fit``) for the saved profile, or the unsaved derived one. Every
+``result`` also stores the summary as ``result_summary`` (Me and the history read it).
 
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
 (``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
@@ -121,6 +123,7 @@ SESSIONS_COLLECTION = "voice_sessions"
 ATTEMPTS_COLLECTION = "voice_attempts"
 RECORDINGS_COLLECTION = "voice_recordings"  # owned by voice_recording_service; here so history can join it
 SUITED_LIMIT = 15
+SUITED_MIN_TASTE = 5  # fewer taste-ranked songs than this: top up from sort=fit
 HISTORY_LIMIT = 20  # sessions in GET /api/voice/history, newest first
 ALTERNATIVES = 2
 MAX_REPICKS = 5  # picks whose versions all turned out unembeddable (live stats) before offering a link-out
@@ -1220,13 +1223,27 @@ class VoiceSessionService:
         return VoiceProfileOut(**derived.model_dump(by_alias=True), updated_at=now), False
 
     async def _suited(self, user: User, profile: VoiceProfileOut | None) -> list[RecSong]:
-        """recs v2 ``singable`` + ``sort=fit`` for ``profile``; [] without one."""
+        """Songs that suit ``profile``, ranked by the user's taste: recs v2 ``sort=best`` + ``singable``
+        (sections flattened in order, deduped by song), topped up from ``sort=fit`` when taste gives fewer
+        than ``SUITED_MIN_TASTE``; [] without a profile."""
         if profile is None:
             return []
-        try:
-            res = await self._recs.recommend(user, RecFilters(singable=True), sort="fit", profile=profile)
-        except Exception:
-            logger.warning("voice session result: suited songs unavailable for %s", user.id, exc_info=True)
-            return []
-        songs: list[RecSong] = [s for sec in res.sections for s in sec.songs]
-        return songs[:SUITED_LIMIT]
+        songs: list[RecSong] = []
+        seen: set[str] = set()
+        for sort, enough in (("best", SUITED_MIN_TASTE), ("fit", SUITED_LIMIT)):
+            try:
+                res = await self._recs.recommend(user, RecFilters(singable=True), sort=sort, profile=profile)
+            except Exception:
+                logger.warning(
+                    "voice session result: suited songs (%s) unavailable for %s", sort, user.id, exc_info=True
+                )
+                continue
+            for song in (x for sec in res.sections for x in sec.songs):
+                if len(songs) >= SUITED_LIMIT:
+                    break
+                if song.song_key not in seen:
+                    seen.add(song.song_key)
+                    songs.append(song)
+            if len(songs) >= enough:
+                break
+        return songs

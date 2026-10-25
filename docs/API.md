@@ -2206,7 +2206,7 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
 
-Every call (finish, refetch, an abandoned session) stores the result as the session's `result_summary` (the `GET /api/voice/history` `result`, with `evidence_attempts` and `computed_at`). `suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
+Every call (finish, refetch, an abandoned session) stores the result as the session's `result_summary` (the `GET /api/voice/history` `result`, with `evidence_attempts` and `computed_at`). `suited` is up to 15 songs in the recommendations v2 shape, ranked by your taste (recommendations v2 `sort=best` with `singable=true`, so songs by artists you know and love come first) and topped up from `sort=fit` when taste gives fewer than 5; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
 
 ### POST /api/voice/sessions/{session_id}/adopt
 

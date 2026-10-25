@@ -26,6 +26,7 @@ from backend.api.deps import (
     get_current_user,
     get_firestore,
     get_hidden_keys_provider,
+    get_recommendation_service_v2_dep,
     get_settings,
     get_voice_store,
 )
@@ -33,6 +34,7 @@ from backend.config import BackendSettings
 from backend.main import app
 from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
+from backend.services.recs_v2.service import RecSection, RecSong
 from backend.services.voice_data_store import VoiceDataStore
 from backend.services.voice_profile_service import VoiceProfileOut
 from backend.tests.test_karaoke_log_routes import RouteFirestore
@@ -1063,6 +1065,7 @@ MIC_PROFILE = {
     "voice_type_between": None, "register": None, "confidence": "medium", "method": "mic",
     "measured_at": "2026-10-20T10:00:00Z", "updated_at": "2026-10-20T10:00:00Z",
 }  # fmt: skip
+MIC_PROFILE_IN = {k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}  # the PUT /api/my/voice body
 
 
 def test_exclude_updates_saved_session_profile(
@@ -1145,9 +1148,7 @@ def test_exclude_on_active_session_changes_next_pick_state(make_client: MakeClie
 
 
 def test_session_save_keeps_mic_copy(client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch) -> None:
-    assert (
-        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
-    )
+    assert client.put("/api/my/voice", json=MIC_PROFILE_IN).status_code == 200
     sid = _saved_session(client, monkeypatch)
     doc = fs.cols["decide_users"][EMAIL_HASH]
     assert doc["voice_profile"]["method"] == "session" and doc["voice_profile"]["session_id"] == sid
@@ -1157,9 +1158,7 @@ def test_session_save_keeps_mic_copy(client: TestClient, fs: RouteFirestore, mon
 def test_get_voice_returns_mic_and_latest_session(
     client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    assert (
-        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
-    )
+    assert client.put("/api/my/voice", json=MIC_PROFILE_IN).status_code == 200
     older = _saved_session(client, monkeypatch)
     newer = _saved_session(client, monkeypatch, k=1)
     fs.cols["voice_sessions"][older]["updated_at"] = T0  # touch order decides "latest", not creation
@@ -1175,9 +1174,7 @@ def test_get_voice_returns_mic_and_latest_session(
 
 
 def test_latest_session_present_when_low_confidence_not_saved(client: TestClient, fs: RouteFirestore) -> None:
-    assert (
-        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
-    )
+    assert client.put("/api/my/voice", json=MIC_PROFILE_IN).status_code == 200
     sid = _create(client)
     _sing(client, sid, 1)
     res = client.get(f"/api/voice/sessions/{sid}/result").json()
@@ -1189,9 +1186,7 @@ def test_latest_session_present_when_low_confidence_not_saved(client: TestClient
 
 
 def test_adopt_low_confidence_session_saves_profile(client: TestClient, fs: RouteFirestore) -> None:
-    assert (
-        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
-    )
+    assert client.put("/api/my/voice", json=MIC_PROFILE_IN).status_code == 200
     sid = _create(client)
     _sing(client, sid, 1)
     assert client.get(f"/api/voice/sessions/{sid}/result").json()["profile_saved"] is False
@@ -1238,3 +1233,85 @@ def test_result_summary_written_on_finish_and_refetch(client: TestClient, fs: Ro
     client.get(f"/api/voice/sessions/{s1}/result")
     assert fs.cols["voice_sessions"][s1]["state"] == "abandoned"
     assert fs.cols["voice_sessions"][s1]["result_summary"]["profile_saved"] is False
+
+
+# ---------------------------------------------------------------- songs that suit you (Task A6)
+
+
+def test_suited_prefers_known_artists_over_popular_unknown(client: TestClient, fs: RouteFirestore) -> None:
+    """On the fixture catalog the singable songs are Muse, Taylor Swift and Adele; by fit alone Muse leads
+    (its songs fit best). The singer loves Adele, so Adele's songs come first."""
+    fs.cols["decide_users"][EMAIL_HASH].update(
+        {
+            "quiz_completed_at": "2026-10-01T00:00:00+00:00",
+            "quiz_artists_known": ["Adele"],
+            "quiz_artist_affinities": [{"artist_name": "Adele", "affinity": "love"}],
+        }
+    )
+    assert client.put("/api/my/voice", json={**MIC_PROFILE_IN, "voice_type": "baritone"}).status_code == 200
+    sid = _create(client)
+    _sing(client, sid, 1)
+    suited = client.get(f"/api/voice/sessions/{sid}/result").json()["suited"]
+    assert len(suited) >= 5
+    assert [s["artist"] for s in suited[:3]] == ["Adele"] * 3
+    assert len({s["song_key"] for s in suited}) == len(suited)
+
+
+class _FakeRecs:
+    """recs v2 with a fixed answer per sort; records the calls."""
+
+    def __init__(self, by_sort: dict[str, list[list[str]]]) -> None:
+        self.by_sort = by_sort
+        self.calls: list[tuple[str, bool]] = []
+
+    @staticmethod
+    def _song(key: str) -> dict[str, Any]:
+        artist, _, title = key.partition("|")
+        return {
+            "song_key": key, "artist": artist, "title": title, "reason": "", "reason_type": "crowd_pleaser",
+            "reason_artist": None, "score": 1.0, "has_karaoke_version": True,
+            "karaoke": {"community": True, "commercial": False, "karafun": False, "brand_count": 1},
+            "facets": {"decade": None, "genres": [], "mood": None, "energy": None, "lead_gender": None,
+                       "duration_ms": None, "popularity": None, "is_classic": False, "explicit": False},
+            "fit": None,
+        }  # fmt: skip
+
+    async def recommend(
+        self, user: User, f: Any, sort: Any = "best", cursor: Any = None, *, profile: Any = None
+    ) -> Any:
+        self.calls.append((sort, bool(f.singable)))
+        sections = [
+            RecSection(
+                id=f"s{i}",
+                title_key="t",
+                reason_key="r",
+                title_params={},
+                songs=[RecSong.model_validate(self._song(k)) for k in keys],
+            )
+            for i, keys in enumerate(self.by_sort.get(sort, []))
+        ]
+        return type("Res", (), {"sections": sections})()
+
+
+def test_suited_tops_up_with_fit_when_no_taste(make_client: MakeClient, fs: RouteFirestore) -> None:
+    recs = _FakeRecs(
+        {
+            "best": [["a|one", "b|two"], ["a|one"]],  # little taste: 2 songs (one repeated across sections)
+            "fit": [["b|two", "c|three", "d|four", "e|five", "f|six"]],
+        }
+    )
+    client = make_client()
+    app.dependency_overrides[get_recommendation_service_v2_dep] = lambda: recs
+    sid = _create(client)
+    _sing(client, sid, 1)
+    suited = client.get(f"/api/voice/sessions/{sid}/result").json()["suited"]
+    assert [s["song_key"] for s in suited] == ["a|one", "b|two", "c|three", "d|four", "e|five", "f|six"]
+    assert recs.calls == [("best", True), ("fit", True)]
+
+    recs.by_sort["best"] = [[f"x|{i}" for i in range(20)]]  # plenty of taste: no top-up, capped at 15
+    recs.calls.clear()
+    sid = _create(client)
+    _sing(client, sid, 1, start=3)
+    suited = client.get(f"/api/voice/sessions/{sid}/result").json()["suited"]
+    assert [s["song_key"] for s in suited] == [f"x|{i}" for i in range(vss.SUITED_LIMIT)]
+    assert recs.calls == [("best", True)]
