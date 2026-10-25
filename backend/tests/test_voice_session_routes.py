@@ -980,3 +980,162 @@ def test_history_caps_at_20(client: TestClient, fs: RouteFirestore) -> None:
     sessions = client.get("/api/voice/history").json()["sessions"]
     assert len(sessions) == 20
     assert sessions[0]["session_id"] == "s22" and sessions[-1]["session_id"] == "s03"
+
+
+# ---------------------------------------------------------------- "Don't count this one" (Task A4)
+
+
+def _patch_attempt(client: TestClient, attempt_id: str, excluded: bool) -> dict[str, Any]:
+    r = client.patch(f"/api/voice/attempts/{attempt_id}", json={"excluded": excluded})
+    assert r.status_code == 200, r.text
+    return dict(r.json())
+
+
+def _sing(client: TestClient, sid: str, k: int, start: int = 0) -> list[dict[str, Any]]:
+    """Sing ``k`` songs as a simulated baritone (quiz + pitch evidence); returns the offered songs."""
+    rng = random.Random(7 + start)
+    bari: Hyp = ("baritone", 0)
+    songs = []
+    for i in range(start, start + k):
+        song = _next(client, sid)
+        assert song["kind"] == "song"
+        position, difficulty = answer(rng, bari, _demand(song), noise=0.0)
+        _post_attempt(
+            client,
+            sid,
+            _attempt(song, i, _quiz(position=position, difficulty=difficulty), pitch=_sung_pitch(bari, _demand(song))),
+        )
+        songs.append(song)
+    return songs
+
+
+def test_excluded_attempt_ignored_by_posterior(fs: RouteFirestore) -> None:
+    _seed_session(fs, "s1", attempts=2)
+    session = {"id": "s1", **fs.cols["voice_sessions"]["s1"]}
+    a1, a2 = ({"id": k, **v} for k, v in sorted(fs.cols["voice_attempts"].items()))
+    a2["quiz"] = {**a2["quiz"], "voice_now": "tired", "position": "too_high"}
+    only_first = vss.rebuild_state(session, [a1])
+    with_excluded = vss.rebuild_state(session, [a1, {**a2, "excluded": True}])
+    assert with_excluded.posterior.type_marginal() == only_first.posterior.type_marginal()
+    assert with_excluded.range_attempts == only_first.range_attempts == 1
+    assert with_excluded.tired_count == 0
+    assert with_excluded.comfort_history == only_first.comfort_history
+    assert with_excluded.attempts == 2  # it still took a turn ...
+    assert a2["song_key"] in with_excluded.done_keys  # ... and is never offered again
+
+
+def test_excluded_attempt_still_blocks_reoffer(client: TestClient) -> None:
+    sid = _create(client)
+    (song,) = _sing(client, sid, 1)
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["attempt_id"] == f"{sid}:1" and out["excluded"] is True and out["profile"] == "unchanged"
+    for _ in range(3):
+        nxt = _next(client, sid)
+        assert nxt["song_key"] != song["song_key"]
+        assert nxt["attempt_n"] == 2
+
+
+def test_exclude_recomputes_summary(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    _sing(client, sid, 2)
+    client.get(f"/api/voice/sessions/{sid}/result")
+    out = _patch_attempt(client, f"{sid}:2", True)
+    stored = fs.cols["voice_sessions"][sid]["result_summary"]
+    assert out["result"]["evidence_attempts"] == 1 and out["result"]["attempts"] == 2
+    assert stored["evidence_attempts"] == 1 and stored["session_id"] == sid
+    attempt = fs.cols["voice_attempts"][f"{sid}:2"]
+    assert attempt["excluded"] is True and isinstance(attempt["excluded_at"], datetime)
+    history = client.get("/api/voice/history").json()["sessions"][0]
+    assert [a["excluded"] for a in history["attempts"]] == [False, True]
+    assert history["result"]["evidence_attempts"] == 1
+
+
+def _saved_session(client: TestClient, monkeypatch: pytest.MonkeyPatch, k: int = 2) -> str:
+    monkeypatch.setattr(vss, "should_save", lambda *_: True)
+    sid = _create(client)
+    _sing(client, sid, k)
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["profile_saved"] is True
+    return sid
+
+
+MIC_PROFILE = {
+    "low_midi": 45, "high_midi": 69, "comfort_low": 50, "comfort_high": 61, "voice_type": "bass",
+    "voice_type_between": None, "register": None, "confidence": "medium", "method": "mic",
+    "measured_at": "2026-10-20T10:00:00Z", "updated_at": "2026-10-20T10:00:00Z",
+}  # fmt: skip
+
+
+def test_exclude_updates_saved_session_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = _saved_session(client, monkeypatch)
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["evidence_count"] == 2
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["profile"] == "updated"
+    profile = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert profile["method"] == "session" and profile["session_id"] == sid and profile["evidence_count"] == 1
+    assert out["result"]["profile_saved"] is True
+
+
+def test_exclude_last_evidence_reverts_to_mic_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile_mic"] = dict(MIC_PROFILE)
+    sid = _saved_session(client, monkeypatch, k=1)
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["profile"] == "reverted_to_mic"
+    profile = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert profile["method"] == "mic" and profile["voice_type"] == "bass" and profile["comfort_high"] == 61
+    assert out["result"]["profile_saved"] is False and out["result"]["evidence_attempts"] == 0
+    assert fs.cols["voice_sessions"][sid]["profile_saved"] is False
+
+
+def test_exclude_last_evidence_without_mic_removes_profile(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = _saved_session(client, monkeypatch, k=1)
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["profile"] == "removed"
+    assert not fs.cols["decide_users"][EMAIL_HASH].get("voice_profile")
+    assert client.get("/api/my/voice").json()["profile"] is None
+
+
+def test_unexclude_restores(client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch) -> None:
+    sid = _saved_session(client, monkeypatch)
+    assert _patch_attempt(client, f"{sid}:2", False)["profile"] == "updated"  # counting it again is a no-op ...
+    before = dict(fs.cols["voice_sessions"][sid]["result_summary"])  # ... that stores the baseline summary
+    assert _patch_attempt(client, f"{sid}:2", True)["profile"] == "updated"
+    out = _patch_attempt(client, f"{sid}:2", False)
+    assert out["excluded"] is False and out["profile"] == "updated"
+    after = fs.cols["voice_sessions"][sid]["result_summary"]
+    assert {k: v for k, v in after.items() if k != "computed_at"} == {
+        k: v for k, v in before.items() if k != "computed_at"
+    }
+    assert fs.cols["voice_attempts"][f"{sid}:2"]["excluded"] is False
+    assert fs.cols["voice_attempts"][f"{sid}:2"]["excluded_at"] is None
+    assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["evidence_count"] == 2
+
+
+def test_exclude_other_user_404(make_client: MakeClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "s1", attempts=1)
+    r = make_client(user_id=OTHER_ID).patch("/api/voice/attempts/s1:1", json={"excluded": True})
+    assert r.status_code == 404 and r.json() == {"detail": "attempt_not_found"}
+    assert "excluded" not in fs.cols["voice_attempts"]["s1:1"]
+    assert make_client().patch("/api/voice/attempts/s1:7", json={"excluded": True}).status_code == 404
+    bad = make_client().patch("/api/voice/attempts/s1:1", json={"excluded": True, "why": "x"})
+    assert bad.status_code == 422
+
+
+def test_exclude_on_active_session_changes_next_pick_state(make_client: MakeClient, fs: RouteFirestore) -> None:
+    client = make_client(admin=False, open_=False)  # PATCH is open even with the session flag off ...
+    admin = make_client()  # ... singing needs it
+    sid = _create(admin)
+    p0 = admin.get(f"/api/voice/sessions/{sid}").json()["top_p"]
+    _sing(admin, sid, 1)
+    p1 = admin.get(f"/api/voice/sessions/{sid}").json()["top_p"]
+    assert p1 != p0
+    out = _patch_attempt(client, f"{sid}:1", True)
+    assert out["profile"] == "unchanged" and out["result"]["evidence_attempts"] == 0
+    got = admin.get(f"/api/voice/sessions/{sid}").json()
+    assert got["top_p"] == p0 and got["attempts"] == 1 and got["state"] == "active"
+    assert "result_summary" not in fs.cols["voice_sessions"][sid]  # an active session's result isn't stored yet

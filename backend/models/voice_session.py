@@ -255,3 +255,21 @@ class HistorySessionOut(BaseModel):
 
 class VoiceHistoryOut(BaseModel):
     sessions: list[HistorySessionOut]
+
+
+ProfileOutcome = Literal["unchanged", "updated", "reverted_to_mic", "removed"]
+
+
+class AttemptPatchIn(_Request):
+    """``PATCH /api/voice/attempts/{attempt_id}``: "Don't count this one" (and its undo)."""
+
+    excluded: bool
+
+
+class AttemptPatchOut(BaseModel):
+    attempt_id: str
+    excluded: bool
+    result: SessionResultSummaryOut | None
+    # What happened to the saved voice profile: re-derived ("updated"), back to the mic result
+    # ("reverted_to_mic"), deleted ("removed"), or untouched (it isn't this session's).
+    profile: ProfileOutcome

@@ -2225,6 +2225,18 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
 
 `result` is the session's result as last computed (`null` before the first `GET .../result`). `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
 
+### PATCH /api/voice/attempts/{attempt_id}
+
+"Don't count this one". Body `{"excluded": true}` (or `false` to count it again; unknown keys `422`). The attempt stays in the history and its song is still never offered again in that session, but it leaves the voice model: it no longer moves the result, counts as range evidence or as a "tired" answer. The session's result is then recomputed (stored as its `result` for a finished session; an active session's next `GET .../next` and `GET .../sessions/{id}` use it at once), and if your saved voice profile came from this session it is re-derived:
+
+```json
+{"attempt_id": "abc123:2", "excluded": true,
+ "result": {"session_id": "abc123", "voice_type": "baritone", "...": "...", "evidence_attempts": 1, "profile_saved": true},
+ "profile": "updated"}
+```
+
+`profile`: `updated` (saved again from the attempts that still count, whatever its confidence), `reverted_to_mic` (no evidence left: your last mic-test result is your profile again), `removed` (no evidence left and no mic result), or `unchanged` (the saved profile isn't this session's). Song feedback (`user_songs`) is untouched. Open to every signed-in user, even with the session flag off. Errors: `404 attempt_not_found` (unknown, or another user's).
+
 ### POST /api/voice/recordings
 
 Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `409 recording_deleted` (the user deleted this take's recording; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.

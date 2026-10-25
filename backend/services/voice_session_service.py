@@ -22,6 +22,8 @@ Session-state mapping onto C2's ``SessionState``:
   requires, and either the singer knew the song better than "barely" or the pitch summary is usable
   (``model.usable_pitch``). Every attempt still updates the posterior (with its context weight).
 * ``tired_count`` = attempts whose Q7 ``voice_now`` is "tired".
+* An attempt marked ``excluded`` ("Don't count this one", ``set_excluded``) still counts in ``attempts``
+  and done songs but leaves the posterior, ``range_attempts``, ``tired_count`` and ``comfort_history``.
 * Done songs = attempted songs, plus "dont_know" / "something_else" skips, plus a "not_embeddable"
   skip once the song has no version left to try (see ``skip``). "no_candidates" is set here, when
   ``choose_next`` finds nothing; Finish is the client calling ``result``.
@@ -60,12 +62,14 @@ from pydantic import ValidationError
 from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
+    AttemptPatchOut,
     HistoryAttemptOut,
     HistoryRecordingOut,
     HistorySessionOut,
     LovedSongOut,
     NextDoneOut,
     NextSongOut,
+    ProfileOutcome,
     ResultOut,
     SessionCreated,
     SessionOut,
@@ -148,6 +152,10 @@ class AttemptLimitError(VoiceSessionError):
     status_code, detail = 409, "max_attempts"
 
 
+class AttemptNotFoundError(VoiceSessionError):
+    status_code, detail = 404, "attempt_not_found"
+
+
 class VoiceStoreProvider(Protocol):
     def require(self) -> VoiceReader: ...
 
@@ -155,7 +163,11 @@ class VoiceStoreProvider(Protocol):
 class VoiceProfileProvider(Protocol):
     async def get(self, user_id: str) -> VoiceProfileOut | None: ...
 
+    async def get_mic(self, user_id: str) -> VoiceProfileOut | None: ...
+
     async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut: ...
+
+    async def delete(self, user_id: str) -> None: ...
 
 
 class SessionFeedbackProvider(HiddenKeysProvider, Protocol):
@@ -347,21 +359,54 @@ def rebuild_state(session: dict[str, Any], attempts: Sequence[dict[str, Any]]) -
         comfort_history=[post.comfort_estimate()],
     )
     for a in sorted(attempts, key=lambda a: int(a["n"])):
+        song = a["song"]
+        state.attempts += 1
+        state.done_keys.add(a["song_key"])
+        state.recent_strata.append(song.get("stratum") or "")
+        if a.get("excluded"):  # "Don't count this one": it took its turn, but it is no evidence
+            continue
         quiz, pitch = _quiz(a["quiz"]), _pitch(a.get("pitch"))
         c = a.get("context") or {}
         ctx = Context(posture=c.get("posture") or "standing", warmth=c.get("warmth") or "cold",
                       headphones=bool(c.get("headphones")))  # fmt: skip
-        song = a["song"]
         ev = Evidence(_demand(song["demand"]), quiz, ctx, pitch, stopped_early=bool(a.get("stopped_early")))
         state.posterior = state.posterior.update(ev)
-        state.attempts += 1
         state.range_attempts += int(has_range_evidence(quiz, pitch))
         state.tired_count += int(quiz.voice_now == "tired")
-        state.done_keys.add(a["song_key"])
-        state.recent_strata.append(song.get("stratum") or "")
         state.comfort_history.append(state.posterior.comfort_estimate())
     state.done_keys |= _done_skip_keys(session.get("skips") or [])
     return state
+
+
+def summarize(
+    session: dict[str, Any], attempts: Sequence[dict[str, Any]]
+) -> tuple[SessionState, DoneReason | None, ResultSummary]:
+    """The rebuilt state, the done reason and C2's result summary for a session as it stands."""
+    state = rebuild_state(session, attempts)
+    done_reason: DoneReason | None = check(state) or session.get("done_reason")
+    # summary() reads "not warm now" as "never warm"; warmth can step down mid-session, so use ever-warm.
+    state.warmth = "warm" if _ever_warm(session, attempts) else state.warmth
+    return state, done_reason, summary(state, done_reason)
+
+
+def summary_out(
+    session_id: str, state: SessionState, s: ResultSummary, *, profile_saved: bool, now: datetime
+) -> SessionResultSummaryOut:
+    return SessionResultSummaryOut(
+        session_id=session_id,
+        voice_type=s.voice_type,
+        between=s.between,
+        confidence_label=s.confidence_label,
+        top_p=round(s.top_p, 4),
+        low=s.full[0],
+        high=s.full[1],
+        comfort_low=s.comfort[0],
+        comfort_high=s.comfort[1],
+        attempts=state.attempts,
+        evidence_attempts=state.range_attempts,
+        profile_saved=profile_saved,
+        computed_at=now,
+    )
 
 
 def _ever_warm(session: dict[str, Any], attempts: Sequence[dict[str, Any]]) -> bool:
@@ -993,6 +1038,61 @@ class VoiceSessionService:
             except Exception:
                 logger.warning("voice session: love failed for %s on %s", user_id, song_key, exc_info=True)
 
+    # ------------------------------------------------------------ "Don't count this one"
+
+    async def set_excluded(self, user: User, attempt_id: str, excluded: bool) -> AttemptPatchOut:
+        """Mark one of the user's attempts as not counting (or counting again), then recompute the session's
+        result and, if the saved profile came from this session, the profile. ``user_songs`` is untouched."""
+        attempt = await self._fs.get_document(ATTEMPTS_COLLECTION, attempt_id)
+        if not attempt or attempt.get("user_id") != user.id:
+            raise AttemptNotFoundError(attempt_id)
+        await self._fs.update_document(
+            ATTEMPTS_COLLECTION,
+            attempt_id,
+            {"excluded": excluded, "excluded_at": datetime.now(UTC) if excluded else None},
+        )
+        result, outcome = await self.recompute_result(user.id, str(attempt["session_id"]))
+        return AttemptPatchOut(attempt_id=attempt_id, excluded=excluded, result=result, profile=outcome)
+
+    async def recompute_result(self, user_id: str, session_id: str) -> tuple[SessionResultSummaryOut, ProfileOutcome]:
+        """Rebuild the session's result from the attempts that count.
+
+        A finished (done or abandoned) session gets its ``result_summary`` rewritten; an active one's result
+        is returned but not stored (its result is written when it finishes). When the saved profile is this
+        session's (``method: session``), it is re-derived: saved again while evidence remains (no
+        ``should_save`` gate: the user is correcting it), else the kept mic result is restored, else the
+        profile is removed."""
+        session = await self._owned(user_id, session_id)
+        attempts = await self._attempts(user_id, session_id)
+        state, _, s = await asyncio.to_thread(summarize, session, attempts)
+        now = datetime.now(UTC)
+        outcome: ProfileOutcome = "unchanged"
+        saved = bool(session.get("profile_saved"))
+        current = await self._profiles.get(user_id)
+        if current is not None and current.method == "session" and current.session_id == session_id:
+            derived = session_profile(s, state.range_attempts, session_id, now)
+            if derived is not None:
+                await self._profiles.put(user_id, derived)
+                outcome, saved = "updated", True
+                logger.info("voice session %s: profile re-derived for %s after an exclusion", session_id, user_id)
+            elif (mic := await self._profiles.get_mic(user_id)) is not None:
+                await self._profiles.put(user_id, VoiceProfileIn.model_validate(mic.model_dump(exclude={"updated_at"})))
+                outcome, saved = "reverted_to_mic", False
+                logger.info("voice session %s: no evidence left; %s's mic result restored", session_id, user_id)
+            else:
+                await self._profiles.delete(user_id)
+                outcome, saved = "removed", False
+                logger.info("voice session %s: no evidence left; %s's voice profile removed", session_id, user_id)
+        out = summary_out(session_id, state, s, profile_saved=saved, now=now)
+        changes: dict[str, Any] = {}
+        if session.get("state") != "active":
+            changes["result_summary"] = out.model_dump(mode="json")
+        if saved != bool(session.get("profile_saved")):
+            changes["profile_saved"] = saved
+        if changes:
+            await self._update(session_id, changes)
+        return out, outcome
+
     # ------------------------------------------------------------ result
 
     async def result(self, user: User, session_id: str) -> ResultOut:
@@ -1009,11 +1109,7 @@ class VoiceSessionService:
                 await self._apply_outputs(user.id, session, attempts, a)
             except Exception:
                 logger.warning("voice session %s: outputs of attempt %s failed", session_id, a.get("n"), exc_info=True)
-        state = await asyncio.to_thread(rebuild_state, session, attempts)
-        done_reason: DoneReason | None = check(state) or session.get("done_reason")
-        # summary() reads "not warm now" as "never warm"; warmth can step down mid-session, so use ever-warm.
-        state.warmth = "warm" if _ever_warm(session, attempts) else state.warmth
-        s = await asyncio.to_thread(summary, state, done_reason)
+        state, done_reason, s = await asyncio.to_thread(summarize, session, attempts)
         finishing = was == "active"  # only finishing an active session may save its profile
         profile, saved = await self._save_profile(user.id, session_id, s, state.range_attempts, may_save=finishing)
         if was == "done":

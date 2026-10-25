@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 USERS_COLLECTION = "decide_users"
 FIELD = "voice_profile"
+MIC_FIELD = "voice_profile_mic"  # the last mic-test result, kept beside a session result (Phase 3d batch 1)
 
 VoiceType = Literal["bass", "baritone", "tenor", "alto", "mezzo", "soprano"]
 Midi = Field(ge=24, le=96)
@@ -86,16 +87,23 @@ class VoiceProfileService:
         docs = await self.firestore.query_documents(USERS_COLLECTION, filters=[("user_id", "==", user_id)], limit=1)
         return (docs[0], docs[0]["id"]) if docs else (None, None)
 
-    async def get(self, user_id: str) -> VoiceProfileOut | None:
+    async def _read(self, user_id: str, field: str) -> VoiceProfileOut | None:
         doc, _ = await self._doc(user_id)
-        raw = (doc or {}).get(FIELD)
+        raw = (doc or {}).get(field)
         if not raw:
             return None
         try:
             return VoiceProfileOut.model_validate(raw)
         except ValidationError:
-            logger.warning("voice_profile for %s no longer validates; treating as unset", user_id)
+            logger.warning("%s for %s no longer validates; treating as unset", field, user_id)
             return None
+
+    async def get(self, user_id: str) -> VoiceProfileOut | None:
+        return await self._read(user_id, FIELD)
+
+    async def get_mic(self, user_id: str) -> VoiceProfileOut | None:
+        """The last mic-test result (``voice_profile_mic``), whatever the current profile is."""
+        return await self._read(user_id, MIC_FIELD)
 
     async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut:
         """Overwrite the stored profile; the last explicit save wins, whatever its measured_at."""

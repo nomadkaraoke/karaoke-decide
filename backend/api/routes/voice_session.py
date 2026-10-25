@@ -20,6 +20,8 @@ from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
+    AttemptPatchIn,
+    AttemptPatchOut,
     NextDoneOut,
     NextSongOut,
     ResultOut,
@@ -122,6 +124,14 @@ async def add_attempt(
 @router.get("/sessions/{session_id}/result", response_model=ResultOut)
 async def session_result(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> ResultOut:
     return await _call(service.result(user, session_id))
+
+
+@router.patch("/attempts/{attempt_id}", response_model=AttemptPatchOut)
+async def patch_attempt(
+    attempt_id: str, body: AttemptPatchIn, user: CurrentUser, service: VoiceSessionServiceDep
+) -> AttemptPatchOut:
+    """ "Don't count this one" (``excluded: true``) or count it again. Open even when the session flag is off."""
+    return await _call(service.set_excluded(user, attempt_id, body.excluded))
 
 
 # ---------------------------------------------------------------- recordings (private, consent-gated)
