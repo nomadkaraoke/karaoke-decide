@@ -487,3 +487,57 @@ def test_seed_karaoke_log_rejects_non_app_ids(client: TestClient) -> None:
         json={"email": EMAIL, "entries": [{"id": "app_seed0003", "state": "sung", "artist": "A"}]},
     )
     assert resp.status_code == 400
+
+
+def test_seed_history_creates_playable_recording(
+    voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore
+) -> None:
+    c, bucket = voice_client
+    quiz = {"feel": "loved", "position": "too_high", "knew": "well"}
+    body = {
+        "email": EMAIL,
+        "sessions": [
+            {"state": "done", "attempts": [{"song_key": "artist a|song a", "artist": "Artist A", "title": "Song A",
+                                            "quiz": quiz, "recording": False}]},
+            {
+                "state": "done",
+                "result_summary": {"voice_type": "baritone", "between": None, "confidence_label": "low", "top_p": 0.4,
+                                   "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "attempts": 2,
+                                   "evidence_attempts": 2, "profile_saved": False},
+                "attempts": [
+                    {"song_key": "artist b|song b", "artist": "Artist B", "title": "Song B", "quiz": quiz,
+                     "pitch": {"voiced_s": 30, "held_count": 3, "held_low": 50, "held_high": 66, "p10": 52, "p50": 57,
+                               "p90": 63}, "recording": True},
+                    {"song_key": "artist c|song c", "artist": "Artist C", "title": "Song C", "quiz": quiz,
+                     "recording": False, "excluded": True},
+                ],
+            },
+        ],
+    }  # fmt: skip
+    r = c.post("/api/test/voice/seed-history", json=body)
+    assert r.status_code == 200, r.text
+    seeded = r.json()
+    user_id = seeded["user_id"]
+    first, second = seeded["sessions"]
+    assert second["attempt_ids"] == [f"{second['session_id']}:1", f"{second['session_id']}:2"]
+    (rid,) = second["recording_ids"]
+    assert first["recording_ids"] == []
+    assert [b.name for b in bucket.list_blobs()] == [f"{user_prefix(user_id)}{second['session_id']}/1.wav"]
+
+    c.app.dependency_overrides[get_current_user] = lambda: User(id=user_id, email=EMAIL)  # type: ignore[attr-defined]
+    history = c.get("/api/voice/history")
+    assert history.status_code == 200, history.text
+    sessions = history.json()["sessions"]
+    assert [s["session_id"] for s in sessions] == [second["session_id"], first["session_id"]]  # newest first
+    assert sessions[0]["result"]["voice_type"] == "baritone" and sessions[0]["result"]["session_id"] == rid[:-2]
+    a1, a2 = sessions[0]["attempts"]
+    assert a1["recording"]["recording_id"] == rid and a1["recording"]["content_type"] == "audio/wav"
+    assert a2["excluded"] is True and a2["recording"] is None and a2["feel"] == "loved"
+    audio = c.get(f"/api/voice/recordings/{rid}/audio")
+    assert audio.status_code == 200 and audio.headers["content-type"] == "audio/wav"
+    assert audio.content[:4] == b"RIFF" and len(audio.content) == a1["recording"]["bytes"]
+
+    # seeding again replaces the user's voice history
+    assert c.post("/api/test/voice/seed-history", json={"email": EMAIL, "sessions": []}).status_code == 200
+    assert c.get("/api/voice/history").json() == {"sessions": []}
+    assert list(bucket.list_blobs()) == []
