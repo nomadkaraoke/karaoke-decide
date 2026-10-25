@@ -40,6 +40,11 @@ MIC_BIAS: dict[str, float] = {"mic": 1.0, "session": 0.0}
 # multiplies it by how well the song fits each hypothesis at that octave.
 OCTAVE_PRIOR: dict[int, float] = {0: 0.6, -12: 0.2, 12: 0.2}
 
+# Next-song choice (select.choose_next): score = like·know·((1 − SEP_WEIGHT)·EIG + SEP_WEIGHT·separation);
+# like = LIKE_BASE + (1 − LIKE_BASE)·max(pref, 1 if loved), so an unliked song keeps LIKE_BASE of its score.
+SEP_WEIGHT = 0.5
+LIKE_BASE = 0.6
+
 CONDITIONAL_REASONS = frozenset({"warmer", "practice"})
 
 
