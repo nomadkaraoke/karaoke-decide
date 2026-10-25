@@ -548,7 +548,7 @@ def test_result_reports_measured_comfort_source(client: TestClient) -> None:
         _post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))
     res = client.get(f"/api/voice/sessions/{sid}/result").json()
     assert res["comfort_source"] == "measured"
-    assert (res["comfort_low"], res["comfort_high"]) == (50, 58)
+    assert (res["comfort_low"], res["comfort_high"]) == (49, 59)  # sung 50-58, widened to 11 keys
 
     quiz_only = _create(client)
     for i in range(3):
@@ -565,7 +565,7 @@ def test_comfort_source_in_result_summaries_and_after_exclude(client: TestClient
     assert client.get(f"/api/voice/sessions/{sid}/result").json()["comfort_source"] == "measured"
     latest = client.get("/api/my/voice").json()["latest_session"]
     assert (latest["session_id"], latest["comfort_source"]) == (sid, "measured")
-    assert (latest["comfort_low"], latest["comfort_high"]) == (50, 58)
+    assert (latest["comfort_low"], latest["comfort_high"]) == (49, 59)
 
     patched = _patch_attempt(client, ids[0], True)
     assert patched["result"]["comfort_source"] == "model"

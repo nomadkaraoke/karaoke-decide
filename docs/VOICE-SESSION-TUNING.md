@@ -182,9 +182,9 @@ named baritone instead of bass, the result after 4 songs is the same: baritone .
 | task | change | where |
 |---|---|---|
 | E2 | **Tessitura**: a song rated comfortable counts its sung p10/p50/p90 against each hypothesis's comfortable band: `σ((c_hi − p90 + 1)/TESS_TEMP)·σ((p10 − c_lo + 1)/TESS_TEMP)·exp(−(p50 − centre)²/(2·TESS_SD²))`, weighted `W_TESSITURA · K_KNEW`. | `model.likelihood_tessitura` |
-| E3 | **Range-shaped prior**: a mic or session profile with a comfort band gives `PRIOR_FLOOR + (1 − PRIOR_FLOOR)·exp(−(centre(h) − (band centre + MIC_BIAS))²/(2·PRIOR_SD²))` over all 30 hypotheses. The named type is no longer used. Self reports are unchanged. | `model.Posterior.from_profile` |
+| E3 | **Range-shaped prior**: a mic or session profile gives `PRIOR_FLOOR + (1 − PRIOR_FLOOR)·exp(−(centre(h) − (profile centre + MIC_BIAS))²/(2·PRIOR_SD²))` over all 30 hypotheses. The mic is centred on its comfort band (+1). A session is centred on its saved **full range** (`low_midi`..`high_midi`, bias 0; review fix, ruling 6). The named type is no longer used. Self reports are unchanged. | `model.Posterior.from_profile` |
 | E4 | **Selection**: `like · know · ((1 − SEP_WEIGHT)·EIG + SEP_WEIGHT·separation) − stratum penalty`. `separation` is the TV distance between the top two types' answer distributions × their mass; `like = LIKE_BASE + (1 − LIKE_BASE)·max(pref, loved)`. The first song's familiar pool is taste-weighted. | `select.choose_next` |
-| D1 | **Measured comfort**: once ≥ 2 songs (≥ 60 s voiced) were rated comfortable and easy, known better than "barely", with usable pitch, comfort is the voiced-seconds-weighted mean of their p10/p90, each kept inside that song's held notes, clamped inside the full estimate. `comfort_source` says which. | `comfort.measured_comfort`, `stopping.summary` |
+| D1 | **Measured comfort**: once ≥ 2 songs (≥ 60 s voiced) were rated comfortable and easy, known better than "barely", with usable pitch, comfort is measured from them. Start from the voiced-seconds-weighted mean of their p10/p90, each kept inside that song's held notes. Widen it to at least 11 keys around its centre and to cover each counted song's p10..p90 (ruling 7). Shift it inside the full estimate. `comfort_source` says which. | `comfort.comfort_band`, `stopping.summary` |
 | E5 | **Realistic simulated singers** and a **confidently-wrong** metric (below), four rulings, then a weight grid. | `simulate.py`, `stopping.py`, `model.py`, `weights.py` |
 
 ### Realistic simulated singers (`answer_style="realistic"`)
@@ -219,8 +219,9 @@ within k songs with the wrong exact type.
    stability window on the *model's* comfort estimate, which jumps when the MAP type flips. Now
    `_enough_evidence` also passes when `measured_comfort` exists, since that is what the result shows and it
    doesn't move with the type. `MIN_RANGE_ATTEMPTS = 3` still applies.
-4. **Early "between" stops need a clear lean**: within `MEDIUM_LEAN_UNTIL = 5` songs, "medium" also needs the top
-   type ≥ `MEDIUM_MIN_TOP = 0.7`. After 5 songs a settled adjacent pair stops as before.
+4. **Early "between" stops need a clear lean**: within `MEDIUM_LEAN_UNTIL = 5` *counting* songs, "medium" also needs
+   the top type ≥ `MEDIUM_MIN_TOP = 0.7`. Counting songs means `len(state.evidence)`; excluded attempts don't count.
+   After 5 songs a settled adjacent pair stops as before.
    - Adjacent types share ranges at the ends of their shifts: baritone+1/+2 ≡ tenor−2/−1, alto+2 ≡ mezzo−2,
      mezzo+1/+2 ≡ soprano−2/−1. A third of the 30 hypotheses are a coin flip on the exact type, so a ~50/50
      pair is most often the confidently-wrong case.
@@ -231,6 +232,20 @@ within k songs with the wrong exact type.
    below `HELD_HIGH_FALSETTO_P = 0.3`. A single falsetto note in `held_high` (the sim leaks one into 30% of songs;
    Andrew's song 3) was ruling the true type out at `W_PITCH`². It drove most remaining confident-wrong answers,
    all of them "one type too high". The lower bound is unchanged, since falsetto only goes up.
+6. **A saved session profile seeds the next session from its full range** (review fix). Since D1, a session's
+   saved comfort can be measured, and it isn't centred on the type: Andrew's 48–59 is centred at 53.5, a bass
+   centre. Centring on it would have started his next session leaning bass (≈ bass 4.07 / baritone 3.51 /
+   tenor 1.92). The saved `low_midi`..`high_midi` is the posterior-mean full range, so the session prior centres
+   there. The mic prior keeps its comfort-band centre. Tests round-trip summary → `session_profile` →
+   `from_profile` and keep the top type: Andrew (baritone), a tenor who sings low, a soprano who sings low.
+7. **The measured band covers the songs that measured it** (review fix). A mean of p10/p90 is narrower than the
+   songs behind it. Song fit (`vocal_range.fit`, measured tier, tolerance 0) needs a song's p10..p90 inside the
+   band, so his own comfortable songs would have stopped being "singable".
+   - The band is at least `MIN_COMFORT_KEYS = 11` keys (inclusive) around the measured centre, like the mic
+     band in nomad-mobile #20.
+   - It also covers every counted song's p10..p90 (floor/ceil), because the strict float comparison would
+     otherwise drop Andrew's song 4 (48.9–58.9) from a centred 49–59.
+   - It is shifted, not cut, to sit inside the full estimate.
 
 ### Gates (seed 20261025, n = 300, realistic answers, mic prior)
 
@@ -241,11 +256,22 @@ within k songs with the wrong exact type.
 | headphones confident≤5 ≥ 50% | 99% | **58%** | pass |
 | headphones confidently-wrong≤5 ≤ 10% | 30% | **5%** | pass |
 | open-mic exact@5 ≥ 60% | 74% | **77%** | pass |
-| Andrew replay (69+ falsetto) after 4: baritone, medium/high, comfort (49, 59) ± 2 | baritone .74, low, 51–65 | **baritone .82, high, 50–58** | pass |
+| Andrew replay (69+ falsetto) after 4: baritone, medium/high, comfort (49, 59) ± 2 | baritone .74, low, 51–65 | **baritone .82, high, 48–59** | pass |
 | existing: model answers, self-register, no pitch (seed 20261022, n 200): confident≤10 ≥ 80%, adjacent ≥ 90%, exact ≥ 70% | pass | **98% / 100% / 82%** | pass |
 
 The E1 sim's 99% confident within 5 songs came with 30% of singers confidently wrong. v0.32 stops later (58%)
 and is wrong a sixth as often.
+
+### Second seeds (not gated)
+
+The current weights on other seeds (`sim_grid.py --evaluate --seed <s>`, n = 300; the existing gate always uses
+seed 20261022). The margins hold:
+
+| seed | exact@5 (≥ 70%) | adjacent@5 (≥ 92%) | confident≤5 (≥ 50%) | wrong≤5 (≤ 10%) | open exact@5 (≥ 60%) |
+|---|---|---|---|---|---|
+| 20261025 (gate) | 81.0% | 100% | 58% | 5.0% | 77% |
+| 20261026 | 80.3% | 100% | 59% | 5.3% | 77% |
+| 20261027 | 79.0% | 100% | 61% | 5.0% | 76% |
 
 ### Before / after: simulation (seed 20261025, n = 300 per row, sessions capped at 10)
 
@@ -339,7 +365,7 @@ Over the whole grid exact@5 ranged 74–81%. Changes of 1–2 points (3–6 sing
 | 1 | baritone | .62 | .91 | low | 49–63 | model | 44–68 |
 | 2 | baritone | .62 | .92 | low | 48–62 | model | 43–67 |
 | 3 | baritone | .69 | .98 | low | 50–64 | model | 45–69 |
-| 4 | baritone | .82 | .98 | **high** | **50–58** | measured | 45–69 |
+| 4 | baritone | .82 | .98 | **high** | **48–59** | measured | 45–69 |
 
 As recorded, falsetto left in (what today's app sends; not gated):
 
@@ -348,14 +374,19 @@ As recorded, falsetto left in (what today's app sends; not gated):
 | 1 | baritone | .62 | .91 | low | 49–63 | model | 44–68 |
 | 2 | baritone | .62 | .92 | low | 48–62 | model | 43–67 |
 | 3 | baritone | .67 | .99 | low | 51–65 | model | 46–70 |
-| 4 | baritone | .80 | .98 | **high** | **50–58** | measured | 45–69 |
+| 4 | baritone | .80 | .98 | **high** | **48–59** | measured | 45–69 |
 
 - **Baritone from song 1.** The range-shaped prior reads the mic band (42–67, centre 54.5 + 1) instead of
   "bass ×4".
 - **Song 3 still dips** because it is rated comfortable on a song whose demand reaches 69. Its tessitura no
   longer counts (a stretch), and the held 68/69 no longer rules out baritone.
-- **Song 4 settles it.** Measured comfort from songs 1 and 4 (50.3–57.9) is available, the stability gate is met,
-  and top_p .82 ≥ .75 gives "high".
+- **Song 4 settles it.** Measured comfort from songs 1 and 4 is available, so the stability gate is met, and
+  top_p .82 ≥ .75 gives "high".
+  - Their mean band is 50.3–57.9, widened to 11 keys around 54.1 (49–59) and to cover song 4's 48.9–58.9.
+  - The result is 48–59.
+- **With song 3 excluded** ("Don't count this one"; `test_andrew_replay_without_the_falsetto_song_is_still_baritone`)
+  the replay ends baritone .70, comfort 48–59 measured. The label is "low": .70 is just under the 0.7 lean
+  floor within 5 songs.
 - **Song 2** (known "barely") never counts toward the measured comfort.
 
 ### Open issues and next levers
@@ -370,5 +401,6 @@ As recorded, falsetto left in (what today's app sends; not gated):
    session (manual gate 3) is the real check.
 4. **C1 (chest-only pitch) is still needed.** The replay gate keeps the falsetto percentiles. The comfort comes
    out right only because the falsetto song was also rated a stretch.
-5. **Excluded attempts (PR 1, A4) never enter `state.evidence`** once `rebuild_state` skips them. When PR 1 and
-   PR 2 meet, check that the exclude path also skips `state.evidence.append`.
+5. ~~Excluded attempts (PR 1, A4) and `state.evidence`~~ **Resolved** in the rebase onto v0.31.0.
+   `replay.rebuild` (which `rebuild_state` calls) skips excluded attempts before `state.evidence.append`. This is
+   pinned by `test_rebuild_state_with_an_excluded_attempt_keeps_v031_semantics`.

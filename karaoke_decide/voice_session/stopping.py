@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from karaoke_decide.voice_session.comfort import measured_comfort
+from karaoke_decide.voice_session.comfort import comfort_band, measured_comfort
 from karaoke_decide.voice_session.model import VOICE_TYPES, Evidence, comfort
 from karaoke_decide.voice_session.select import SessionState
 
@@ -80,18 +80,20 @@ def _enough_evidence(state: SessionState) -> bool:
     return _stable(state.comfort_history) or measured_comfort(state.evidence) is not None
 
 
-def _posterior_label(marg: dict[str, float], attempts: int) -> ConfidenceLabel:
+def _posterior_label(marg: dict[str, float], counting: int) -> ConfidenceLabel:
+    """``counting``: songs that count (excluded attempts don't), for the MEDIUM_LEAN_UNTIL window."""
     top = _top(marg)[1]
     if top >= TOP_THRESHOLD:
         return "high"
-    if _best_pair(marg)[1] >= PAIR_THRESHOLD and (attempts > MEDIUM_LEAN_UNTIL or top >= MEDIUM_MIN_TOP):
+    if _best_pair(marg)[1] >= PAIR_THRESHOLD and (counting > MEDIUM_LEAN_UNTIL or top >= MEDIUM_MIN_TOP):
         return "medium"
     return "low"
 
 
 def _label(state: SessionState) -> ConfidenceLabel:
     """Posterior confidence, capped at 'low' until the evidence gates of the confident stop are met."""
-    return _posterior_label(state.posterior.type_marginal(), state.attempts) if _enough_evidence(state) else "low"
+    marg = state.posterior.type_marginal()
+    return _posterior_label(marg, len(state.evidence)) if _enough_evidence(state) else "low"
 
 
 def check(state: SessionState) -> DoneReason | None:
@@ -121,7 +123,8 @@ def summary(
     ``done_reason`` is how the session ended when the caller knows it (e.g. 'no_candidates', which check()
     can't see); otherwise check(state) decides whether "more songs" is still a useful hint.
     Comfort is measured from the songs rated comfortable (``evidence``, default ``state.evidence``) when there
-    are enough of them, rounded and clamped inside the full-range estimate; else the posterior mean.
+    are enough of them (``comfort.comfort_band``: at least 11 keys, covering each counted song, inside the
+    full-range estimate); else the posterior mean.
     """
     post = state.posterior
     marg = post.type_marginal()
@@ -144,22 +147,20 @@ def summary(
         hint = "more_songs"
 
     f_lo, f_hi = round(post.full_estimate()[0]), round(post.full_estimate()[1])
-    measured = measured_comfort(state.evidence if evidence is None else evidence)
+    band = comfort_band(state.evidence if evidence is None else evidence, (f_lo, f_hi))
     source: ComfortSource = "model"
-    if measured is not None:
-        source = "measured"
-        lo = min(max(round(measured[0]), f_lo), f_hi)
-        comfort_band = (lo, min(max(round(measured[1]), lo), f_hi))
+    if band is not None:
+        source, comfort_band_ = "measured", band
     else:
         c_lo, c_hi = post.comfort_estimate()
-        comfort_band = (round(c_lo), round(c_hi))
+        comfort_band_ = (round(c_lo), round(c_hi))
     return ResultSummary(
         voice_type=voice_type,
         between=between,
         top_p=top_p,
         pair_p=pair_p,
         confidence_label=label,
-        comfort=comfort_band,
+        comfort=comfort_band_,
         full=(f_lo, f_hi),
         improve_hint=hint,
         comfort_source=source,

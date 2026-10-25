@@ -15,6 +15,7 @@ value: one or two singers in 300 is seed noise), and the pass repeats until noth
 
   poetry run python scripts/voice/sim_grid.py                 # about 3 minutes on 8 cores
   poetry run python scripts/voice/sim_grid.py --passes 1 --n 120 --workers 4
+  poetry run python scripts/voice/sim_grid.py --evaluate --seed 20261026   # the current weights on another seed
 """
 
 from __future__ import annotations
@@ -94,8 +95,9 @@ class Score:
         )
 
 
-def evaluate(args: tuple[dict[str, float], int]) -> Score:
-    knobs, n = args
+def evaluate(args: tuple[dict[str, float], int] | tuple[dict[str, float], int, int]) -> Score:
+    knobs, n = args[0], args[1]
+    seed = args[2] if len(args) > 2 else SEED
     apply(knobs)
     from karaoke_decide.voice_session import replay
     from karaoke_decide.voice_session.select import _answer_table, _stretch_vector
@@ -105,7 +107,7 @@ def evaluate(args: tuple[dict[str, float], int]) -> Score:
     _stretch_vector.cache_clear()
 
     def pop(**kw: Any) -> Any:
-        return run_population(random.Random(SEED), n_users=n, prior="mic", budget=10, answer_style="realistic", **kw)
+        return run_population(random.Random(seed), n_users=n, prior="mic", budget=10, answer_style="realistic", **kw)
 
     hp, op = pop(pitch="headphones"), pop(pitch="open")
     fx = replay.load_fixture(FIXTURE)
@@ -167,7 +169,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--n", type=int, default=300, help="simulated singers per run")
     ap.add_argument("--passes", type=int, default=3)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--seed", type=int, default=SEED, help="seed for the realistic-answer runs (--evaluate only)")
+    ap.add_argument("--evaluate", action="store_true", help="score the current weights once, no search")
     args = ap.parse_args(argv)
+    if args.evaluate:
+        print(f"seed {args.seed}: " + evaluate((current(), args.n, args.seed)).line())
+        return 0
     search(args.n, args.passes, args.workers)
     return 0
 

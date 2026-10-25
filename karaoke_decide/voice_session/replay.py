@@ -126,6 +126,8 @@ class StoredProfile:
     register: str | None = None
     comfort_low: int | None = None
     comfort_high: int | None = None
+    low_midi: int | None = None
+    high_midi: int | None = None
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> StoredProfile:
@@ -137,6 +139,8 @@ class StoredProfile:
             register=d.get("register", d.get("register_")),
             comfort_low=d.get("comfort_low"),
             comfort_high=d.get("comfort_high"),
+            low_midi=d.get("low_midi"),
+            high_midi=d.get("high_midi"),
         )
 
 

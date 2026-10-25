@@ -130,7 +130,8 @@ class VoiceProfileLike(Protocol):
     @property
     def voice_type_between(self) -> str | None: ...  # the adjacent type when reported "between"
 
-    # Optional: the measured comfortable band (``comfort_low`` / ``comfort_high``, MIDI), read with getattr.
+    # Optional, read with getattr: the comfortable band (``comfort_low`` / ``comfort_high``) and the full range
+    # (``low_midi`` / ``high_midi``), MIDI.
 
 
 def _sigmoid(x: float) -> float:
@@ -324,14 +325,25 @@ def _profile_register(profile: VoiceProfileLike) -> str | None:
     return None
 
 
-def _profile_comfort_centre(profile: VoiceProfileLike) -> float | None:
-    """The middle of a measured (mic / session) profile's comfortable band, or None."""
+def _profile_centre(profile: VoiceProfileLike) -> float | None:
+    """Where a measured profile's range-shaped prior is centred, or None for a type-weighted prior.
+
+    mic: the middle of the comfortable band (the free-sing centre; MIC_BIAS corrects its low reading).
+    session: the middle of the saved full range (``low_midi``/``high_midi``, the posterior mean). Its comfort may
+    be measured from the songs sung (comfort.py), which is not centred on the type; the full range is, so the
+    next session leans the way this one ended. Falls back to the comfort band when the full range is missing."""
     if profile.method not in MIC_BIAS:
         return None
-    lo, hi = getattr(profile, "comfort_low", None), getattr(profile, "comfort_high", None)
-    if not isinstance(lo, int | float) or not isinstance(hi, int | float) or hi < lo:
-        return None
-    return (lo + hi) / 2
+
+    def mid(lo_attr: str, hi_attr: str) -> float | None:
+        lo, hi = getattr(profile, lo_attr, None), getattr(profile, hi_attr, None)
+        if not isinstance(lo, int | float) or not isinstance(hi, int | float) or hi < lo:
+            return None
+        return (lo + hi) / 2
+
+    if profile.method == "session" and (full_mid := mid("low_midi", "high_midi")) is not None:
+        return full_mid
+    return mid("comfort_low", "comfort_high")
 
 
 def _range_prior(profile_centre: float, bias: float) -> dict[Hyp, float]:
@@ -380,10 +392,10 @@ class Posterior:
     def from_profile(cls, profile: VoiceProfileLike | None) -> Posterior:
         """Prior from a stored voice profile.
 
-        A mic or session profile with a comfortable band gives a range-shaped prior (``_range_prior``) over
-        type × shift, centred on the band (mic readings moved up by MIC_BIAS) and floored; its named type is
-        not used. Otherwise type weights (``_type_prior``) with shifts uniform within each type."""
-        if profile is not None and (pc := _profile_comfort_centre(profile)) is not None:
+        A mic or session profile with a measured range gives a range-shaped prior (``_range_prior``) over
+        type × shift, floored, centred on the mic's comfortable band (moved up by MIC_BIAS) or the session's full
+        range (``_profile_centre``); its named type is not used. Otherwise type weights (``_type_prior``) with shifts uniform within each type."""
+        if profile is not None and (pc := _profile_centre(profile)) is not None:
             rw = _range_prior(pc, MIC_BIAS[profile.method])
             return cls(_normalised({h: math.log(w) for h, w in rw.items()}))
         tw = _type_prior(profile)

@@ -52,6 +52,7 @@ def test_stop_pair_085_reports_between() -> None:
     state = _state(
         posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1}),
         attempts=stopping.MEDIUM_LEAN_UNTIL + 1,
+        evidence=[_comfortable_sung(50, 58)] * (stopping.MEDIUM_LEAN_UNTIL + 1),
     )
     assert stopping.check(state) == "confident"
     s = stopping.summary(state)
@@ -69,6 +70,8 @@ def test_early_medium_needs_a_clear_lean() -> None:
     for attempts in (3, 4, 5):
         assert stopping.check(_state(split, attempts=attempts)) is None
         assert stopping.summary(_state(split, attempts=attempts)).confidence_label == "low"
+    # Excluded attempts don't count toward the window: 8 attempts, 4 of them counting, still needs the lean.
+    assert stopping.check(_state(split, attempts=8, evidence=[_comfortable_sung(50, 58)] * 4)) is None
     lean = posterior({("baritone", 0): 0.72, ("tenor", 0): 0.2, ("bass", 0): 0.08})
     assert stopping.check(_state(lean, attempts=3)) == "confident"
     s = stopping.summary(_state(lean, attempts=3))
@@ -175,14 +178,12 @@ def test_summary_uses_measured_and_clamps_to_full() -> None:
     assert (model.comfort, model.comfort_source) == ((50, 64), "model")
     measured = stopping.summary(_state(bari, evidence=[_comfortable_sung(50.4, 57.6), _comfortable_sung(50.2, 58.2)]))
     assert measured.comfort_source == "measured"
-    assert measured.comfort == (50, 58)
-    # Clamped inside the full-range estimate.
+    assert measured.comfort == (49, 59)  # mean 50.3-57.9, widened to 11 keys around 54.1
+    # Kept inside the full-range estimate: an overhang shifts the band, which keeps its width.
     low = stopping.summary(_state(bari, evidence=[_comfortable_sung(40, 50), _comfortable_sung(41, 51)]))
-    assert low.comfort == (45, 50)
+    assert low.comfort == (45, 56)
     high = stopping.summary(_state(bari, evidence=[_comfortable_sung(66, 74), _comfortable_sung(66, 75)]))
-    assert high.comfort == (66, 69)
+    assert high.comfort == (59, 69)
     # An explicit evidence list overrides the state's.
-    assert stopping.summary(_state(bari), evidence=[_comfortable_sung(50, 58), _comfortable_sung(50, 58)]).comfort == (
-        50,
-        58,
-    )
+    explicit = stopping.summary(_state(bari), evidence=[_comfortable_sung(50, 58), _comfortable_sung(50, 58)])
+    assert explicit.comfort == (49, 59)
