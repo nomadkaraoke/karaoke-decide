@@ -332,6 +332,11 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   204; another user's recording is 404. An upload of that attempt is refused with `409 recording_deleted`, and one
   already in flight re-checks the marker after its write and undoes itself, so a retry can't bring it back. The
   marker lives on the attempt doc, so `erase_voice_data` removes it with the attempt.
+- **Voice data added in Phase 3d batch 1 (no new collections)**: `voice_attempts.excluded` / `excluded_at`
+  ("Don't count this one") and `recording_deleted_at`, and `voice_sessions.result_summary`, are erased with their
+  docs by `erase_voice_data`; `decide_users.voice_profile_mic` (the kept mic-test result) is cleared by
+  `DELETE /api/my/voice` and goes with the `decide_users` doc on account deletion. Asserted in
+  `backend/tests/test_user_deletion.py`.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);

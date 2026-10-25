@@ -1139,3 +1139,102 @@ def test_exclude_on_active_session_changes_next_pick_state(make_client: MakeClie
     got = admin.get(f"/api/voice/sessions/{sid}").json()
     assert got["top_p"] == p0 and got["attempts"] == 1 and got["state"] == "active"
     assert "result_summary" not in fs.cols["voice_sessions"][sid]  # an active session's result isn't stored yet
+
+
+# ---------------------------------------------------------------- both results on Me; adopt (Task A5)
+
+
+def test_session_save_keeps_mic_copy(client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert (
+        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
+    )
+    sid = _saved_session(client, monkeypatch)
+    doc = fs.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile"]["method"] == "session" and doc["voice_profile"]["session_id"] == sid
+    assert doc["voice_profile_mic"]["method"] == "mic" and doc["voice_profile_mic"]["voice_type"] == "bass"
+
+
+def test_get_voice_returns_mic_and_latest_session(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert (
+        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
+    )
+    older = _saved_session(client, monkeypatch)
+    newer = _saved_session(client, monkeypatch, k=1)
+    fs.cols["voice_sessions"][older]["updated_at"] = T0  # touch order decides "latest", not creation
+    fs.cols["voice_sessions"][newer]["updated_at"] = T0 + timedelta(hours=1)
+    got = client.get("/api/my/voice").json()
+    assert got["profile"]["method"] == "session" and got["profile"]["session_id"] == newer
+    assert got["mic"]["method"] == "mic" and got["mic"]["voice_type"] == "bass"
+    latest = got["latest_session"]
+    assert latest["session_id"] == newer and latest["evidence_attempts"] == 1 and latest["profile_saved"] is True
+    # a session whose evidence was all excluded no longer counts as the latest result
+    _patch_attempt(client, f"{newer}:1", True)
+    assert client.get("/api/my/voice").json()["latest_session"]["session_id"] == older
+
+
+def test_latest_session_present_when_low_confidence_not_saved(client: TestClient, fs: RouteFirestore) -> None:
+    assert (
+        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
+    )
+    sid = _create(client)
+    _sing(client, sid, 1)
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["confidence_label"] == "low" and res["profile_saved"] is False
+    got = client.get("/api/my/voice").json()
+    assert got["profile"]["method"] == "mic"
+    assert got["latest_session"]["session_id"] == sid and got["latest_session"]["profile_saved"] is False
+    assert got["latest_session"]["confidence_label"] == "low"
+
+
+def test_adopt_low_confidence_session_saves_profile(client: TestClient, fs: RouteFirestore) -> None:
+    assert (
+        client.put("/api/my/voice", json={k: v for k, v in MIC_PROFILE.items() if k != "updated_at"}).status_code == 200
+    )
+    sid = _create(client)
+    _sing(client, sid, 1)
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["profile_saved"] is False
+    r = client.post(f"/api/voice/sessions/{sid}/adopt")
+    assert r.status_code == 200, r.text
+    adopted = r.json()
+    assert adopted["method"] == "session" and adopted["session_id"] == sid and adopted["confidence"] == "low"
+    doc = fs.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile"]["session_id"] == sid and doc["voice_profile_mic"]["method"] == "mic"
+    session = fs.cols["voice_sessions"][sid]
+    assert session["profile_saved"] is True and session["result_summary"]["profile_saved"] is True
+    assert client.get("/api/my/voice").json()["latest_session"]["profile_saved"] is True
+    # someone else's session is not found
+    assert client.post("/api/voice/sessions/nope/adopt").status_code == 404
+
+
+def test_adopt_without_evidence_409(client: TestClient, make_client: MakeClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    client.get(f"/api/voice/sessions/{sid}/result")  # finished before singing anything
+    r = client.post(f"/api/voice/sessions/{sid}/adopt")
+    assert r.status_code == 409 and r.json() == {"detail": "no_evidence"}
+    assert not fs.cols["decide_users"][EMAIL_HASH].get("voice_profile")
+    assert make_client(user_id=OTHER_ID).post(f"/api/voice/sessions/{sid}/adopt").status_code == 404
+
+
+def test_result_summary_written_on_finish_and_refetch(client: TestClient, fs: RouteFirestore) -> None:
+    sid = _create(client)
+    _sing(client, sid, 2)
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    stored = fs.cols["voice_sessions"][sid]["result_summary"]
+    expected = {k: res[k] for k in ("voice_type", "between", "confidence_label", "top_p", "low", "high",
+                                    "comfort_low", "comfort_high", "attempts", "profile_saved")}  # fmt: skip
+    assert {k: stored[k] for k in expected} == expected
+    assert stored["session_id"] == sid and stored["evidence_attempts"] == 2
+    first_at = stored["computed_at"]
+    fs.cols["voice_sessions"][sid]["result_summary"] = None  # a refetch writes it again
+    client.get(f"/api/voice/sessions/{sid}/result")
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["evidence_attempts"] == 2
+    assert fs.cols["voice_sessions"][sid]["result_summary"]["computed_at"] >= first_at
+    # an abandoned session's result is stored too (never saved)
+    s1 = _create(client)
+    _sing(client, s1, 1, start=5)
+    _create(client)
+    client.get(f"/api/voice/sessions/{s1}/result")
+    assert fs.cols["voice_sessions"][s1]["state"] == "abandoned"
+    assert fs.cols["voice_sessions"][s1]["result_summary"]["profile_saved"] is False

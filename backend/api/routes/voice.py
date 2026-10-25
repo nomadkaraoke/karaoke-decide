@@ -7,20 +7,27 @@ from typing import Self
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import model_validator
 
-from backend.api.deps import CurrentUser, VoiceProfileServiceDep
+from backend.api.deps import CurrentUser, FirestoreServiceDep, VoiceProfileServiceDep
+from backend.models.voice_session import VoiceProfileResponse
 from backend.services.voice_profile_service import (
     VoiceProfileIn,
     VoiceProfileOut,
-    VoiceProfileResponse,
     VoiceProfileUserNotFoundError,
 )
+from backend.services.voice_session_service import latest_session_summary
 
 router = APIRouter()
 
 
 @router.get("/voice", response_model=VoiceProfileResponse)
-async def get_voice(user: CurrentUser, service: VoiceProfileServiceDep) -> VoiceProfileResponse:
-    return VoiceProfileResponse(profile=await service.get(user.id))
+async def get_voice(
+    user: CurrentUser, service: VoiceProfileServiceDep, firestore: FirestoreServiceDep
+) -> VoiceProfileResponse:
+    return VoiceProfileResponse(
+        profile=await service.get(user.id),
+        mic=await service.get_mic(user.id),
+        latest_session=await latest_session_summary(firestore, user.id),
+    )
 
 
 class VoiceProfilePutIn(VoiceProfileIn):

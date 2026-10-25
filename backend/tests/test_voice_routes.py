@@ -87,7 +87,7 @@ def anon(fs: RouteFirestore) -> Iterator[TestClient]:
 
 def test_get_none_when_unset(client: TestClient) -> None:
     r = client.get("/api/my/voice")
-    assert r.status_code == 200 and r.json() == {"profile": None}
+    assert r.status_code == 200 and r.json() == {"profile": None, "mic": None, "latest_session": None}
 
 
 def test_put_then_get(client: TestClient, fs: RouteFirestore) -> None:
@@ -95,7 +95,7 @@ def test_put_then_get(client: TestClient, fs: RouteFirestore) -> None:
     assert r.status_code == 200, r.text
     put = r.json()
     assert put["voice_type"] == "baritone" and put["comfort_high"] == 64 and put["updated_at"]
-    assert client.get("/api/my/voice").json() == {"profile": put}
+    assert client.get("/api/my/voice").json() == {"profile": put, "mic": put, "latest_session": None}
     assert fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]["low_midi"] == 40
 
 
@@ -109,7 +109,7 @@ def test_put_overwrites_even_with_older_measured_at(client: TestClient) -> None:
 def test_delete(client: TestClient) -> None:
     client.put("/api/my/voice", json=PROFILE)
     assert client.delete("/api/my/voice").status_code == 204
-    assert client.get("/api/my/voice").json() == {"profile": None}
+    assert client.get("/api/my/voice").json() == {"profile": None, "mic": None, "latest_session": None}
     assert client.delete("/api/my/voice").status_code == 204  # idempotent
 
 
@@ -155,7 +155,7 @@ def test_gen_session_user_profile_doc(anon: TestClient, fs: RouteFirestore) -> N
     """A gen-token user lands on decide_users/{sha256(email)} and the service reads it by user_id."""
     fs.cols["decide_users"] = {}
     bearer = {"Authorization": f"Bearer {GEN_TOKEN}"}
-    assert anon.get("/api/my/voice", headers=bearer).json() == {"profile": None}
+    assert anon.get("/api/my/voice", headers=bearer).json() == {"profile": None, "mic": None, "latest_session": None}
     assert anon.put("/api/my/voice", json=PROFILE, headers=bearer).status_code == 200
     doc = fs.cols["decide_users"][EMAIL_HASH]
     assert doc["voice_profile"]["voice_type"] == "baritone"
@@ -217,7 +217,7 @@ async def test_invalid_stored_profile_is_unset(fs: RouteFirestore, caplog: pytes
 
 def test_get_route_survives_invalid_stored_profile(client: TestClient, fs: RouteFirestore) -> None:
     fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {"low_midi": 1}
-    assert client.get("/api/my/voice").json() == {"profile": None}
+    assert client.get("/api/my/voice").json() == {"profile": None, "mic": None, "latest_session": None}
 
 
 def test_put_404_when_user_has_no_doc(client: TestClient, fs: RouteFirestore) -> None:
@@ -233,3 +233,28 @@ async def test_stored_profile_with_unknown_key_still_reads(fs: RouteFirestore) -
     fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = stored
     got = await VoiceProfileService(fs).get(USER_ID)  # type: ignore[arg-type]
     assert got is not None and got.low_midi == 40
+
+
+# ---------------------------------------------------------------- the mic result kept beside a session result (A5)
+
+
+def test_mic_put_keeps_mic_copy(client: TestClient, fs: RouteFirestore) -> None:
+    assert client.put("/api/my/voice", json=PROFILE).status_code == 200
+    doc = fs.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile_mic"] == doc["voice_profile"]
+    self_report = {**PROFILE, "method": "self", "confidence": "low", "voice_type": None, "voice_type_between": None,
+                   "register": "lower"}  # fmt: skip
+    assert client.put("/api/my/voice", json=self_report).status_code == 200
+    assert doc["voice_profile"]["method"] == "self"
+    assert doc["voice_profile_mic"]["method"] == "mic" and doc["voice_profile_mic"]["voice_type"] == "baritone"
+    got = client.get("/api/my/voice").json()
+    assert got["profile"]["method"] == "self" and got["mic"]["voice_type"] == "baritone"
+    assert got["latest_session"] is None
+
+
+def test_delete_voice_clears_mic_copy(client: TestClient, fs: RouteFirestore) -> None:
+    assert client.put("/api/my/voice", json=PROFILE).status_code == 200
+    assert client.delete("/api/my/voice").status_code == 204
+    doc = fs.cols["decide_users"][EMAIL_HASH]
+    assert doc["voice_profile"] is None and doc["voice_profile_mic"] is None
+    assert client.get("/api/my/voice").json() == {"profile": None, "mic": None, "latest_session": None}

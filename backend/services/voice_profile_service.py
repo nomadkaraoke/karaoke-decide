@@ -67,10 +67,6 @@ class VoiceProfileOut(VoiceProfileIn):
     updated_at: datetime
 
 
-class VoiceProfileResponse(BaseModel):
-    profile: VoiceProfileOut | None
-
-
 class VoiceProfileUserNotFoundError(Exception):
     """The user has no decide_users doc to hold a profile."""
 
@@ -106,17 +102,23 @@ class VoiceProfileService:
         return await self._read(user_id, MIC_FIELD)
 
     async def put(self, user_id: str, profile: VoiceProfileIn) -> VoiceProfileOut:
-        """Overwrite the stored profile; the last explicit save wins, whatever its measured_at."""
+        """Overwrite the stored profile; the last explicit save wins, whatever its measured_at.
+
+        A mic profile is also kept as ``voice_profile_mic``, so a later session result can sit beside it
+        (and "Don't count this one" can fall back to it); other methods leave that copy alone."""
         _, doc_id = await self._doc(user_id)
         if doc_id is None:
             raise VoiceProfileUserNotFoundError(user_id)
         out = VoiceProfileOut(**profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
-        await self.firestore.update_document(
-            USERS_COLLECTION, doc_id, {FIELD: out.model_dump(mode="json", by_alias=True)}
-        )
+        stored = out.model_dump(mode="json", by_alias=True)
+        fields: dict[str, Any] = {FIELD: stored}
+        if out.method == "mic":
+            fields[MIC_FIELD] = stored
+        await self.firestore.update_document(USERS_COLLECTION, doc_id, fields)
         return out
 
     async def delete(self, user_id: str) -> None:
+        """Clear the profile and the kept mic result."""
         _, doc_id = await self._doc(user_id)
         if doc_id is not None:
-            await self.firestore.update_document(USERS_COLLECTION, doc_id, {FIELD: None})
+            await self.firestore.update_document(USERS_COLLECTION, doc_id, {FIELD: None, MIC_FIELD: None})

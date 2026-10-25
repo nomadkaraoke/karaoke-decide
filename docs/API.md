@@ -434,9 +434,9 @@ Get details for a specific song.
 
 The singer's voice profile, stored on their `decide_users` doc (auth required; verified, guest and gen-session users). Mic audio never reaches the server: the app sends only derived numbers, and unknown body keys are rejected (422).
 
-- `GET` -> `{"profile": null | {...}}` (an invalid stored profile is treated as unset).
-- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; 404 `not_found` if the user has no doc; 422 on an inconsistent body.
-- `DELETE` -> 204.
+- `GET` -> `{"profile": null | {...}, "mic": null | {...}, "latest_session": null | {...}}` (an invalid stored profile is treated as unset). `profile` is the saved profile (what recommendations use). `mic` is the last mic-test result, kept as `voice_profile_mic` beside a session result (so it survives a session saving over it). `latest_session` is the newest session result (by the session's `updated_at`) resting on at least one counting attempt with range evidence, saved or not, in the `GET /api/voice/history` `result` shape; Me shows it next to `mic`.
+- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; a `method: mic` profile is also kept as the mic result. 404 `not_found` if the user has no doc; 422 on an inconsistent body.
+- `DELETE` -> 204; clears the profile and the kept mic result.
 
 ```json
 {"low_midi": 40, "high_midi": 69, "comfort_low": 45, "comfort_high": 64, "voice_type": "baritone", "voice_type_between": "tenor",
@@ -2206,7 +2206,11 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
 
-`suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
+Every call (finish, refetch, an abandoned session) stores the result as the session's `result_summary` (the `GET /api/voice/history` `result`, with `evidence_attempts` and `computed_at`). `suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
+
+### POST /api/voice/sessions/{session_id}/adopt
+
+"Use this result": saves the session's result as your voice profile (`method: session`) even at low confidence, and marks the session's result `profile_saved: true`. Returns the saved profile (the `GET /api/my/voice` `profile` shape). Your mic result stays as `mic`. Gated like the other session endpoints. Errors: `404 session_not_found` (unknown, or another user's), `409 no_evidence` (no counting attempt with range evidence, so there is nothing to save), `404 user_not_found` (no profile doc).
 
 ### GET /api/voice/history
 

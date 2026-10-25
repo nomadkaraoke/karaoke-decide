@@ -156,6 +156,14 @@ class AttemptNotFoundError(VoiceSessionError):
     status_code, detail = 404, "attempt_not_found"
 
 
+class NoEvidenceError(VoiceSessionError):
+    status_code, detail = 409, "no_evidence"
+
+
+class ProfileUserNotFoundError(VoiceSessionError):
+    status_code, detail = 404, "user_not_found"
+
+
 class VoiceStoreProvider(Protocol):
     def require(self) -> VoiceReader: ...
 
@@ -598,6 +606,21 @@ def build_history(
             )
         )
     return VoiceHistoryOut(sessions=out)
+
+
+async def latest_session_summary(fs: FirestoreService, user_id: str) -> SessionResultSummaryOut | None:
+    """The newest (by ``updated_at``) of the user's session results that rests on at least one attempt
+    that counts and has range evidence; None when there is none."""
+    sessions = await fs.query_documents(SESSIONS_COLLECTION, filters=[("user_id", "==", user_id)])
+    best: tuple[datetime, SessionResultSummaryOut] | None = None
+    for s in sessions:
+        out = _summary_out(s)
+        if out is None or out.evidence_attempts < 1:
+            continue
+        at = _as_datetime(s.get("updated_at")) or _as_datetime(s.get("created_at")) or _EPOCH
+        if best is None or at > best[0]:
+            best = (at, out)
+    return best[1] if best else None
 
 
 # ---------------------------------------------------------------- service
@@ -1093,6 +1116,30 @@ class VoiceSessionService:
             await self._update(session_id, changes)
         return out, outcome
 
+    # ------------------------------------------------------------ adopt
+
+    async def adopt(self, user: User, session_id: str) -> VoiceProfileOut:
+        """Save the session's result as the voice profile, whatever its confidence (the user chose it
+        over the mic result on Me). 409 ``no_evidence`` when no counting attempt has range evidence."""
+        session = await self._owned(user.id, session_id)
+        attempts = await self._attempts(user.id, session_id)
+        state, _, s = await asyncio.to_thread(summarize, session, attempts)
+        now = datetime.now(UTC)
+        derived = session_profile(s, state.range_attempts, session_id, now)
+        if derived is None:
+            raise NoEvidenceError(session_id)
+        try:
+            saved = await self._profiles.put(user.id, derived)
+        except VoiceProfileUserNotFoundError as e:
+            raise ProfileUserNotFoundError(user.id) from e
+        changes: dict[str, Any] = {"profile_saved": True}
+        if session.get("state") != "active":
+            changes["result_summary"] = summary_out(session_id, state, s, profile_saved=True, now=now).model_dump(
+                mode="json"
+            )
+        await self._update(session_id, changes)
+        return saved
+
     # ------------------------------------------------------------ result
 
     async def result(self, user: User, session_id: str) -> ResultOut:
@@ -1123,10 +1170,16 @@ class VoiceSessionService:
                     a["song_key"],
                     LovedSongOut(song_key=a["song_key"], artist=song.get("artist", ""), title=song.get("title", "")),
                 )
+        stored = summary_out(session_id, state, s, profile_saved=saved, now=datetime.now(UTC))
+        result_summary = {"result_summary": stored.model_dump(mode="json")}
         if finishing:
-            await self._update(session_id, {"state": "done", "done_reason": done_reason, "profile_saved": saved})
+            await self._update(
+                session_id, {"state": "done", "done_reason": done_reason, "profile_saved": saved, **result_summary}
+            )
         elif was == "done":
-            await self._update(session_id, {"done_reason": done_reason})
+            await self._update(session_id, {"done_reason": done_reason, **result_summary})
+        else:  # abandoned: its result is kept for history, never saved as the profile
+            await self._update(session_id, result_summary)
         return ResultOut(
             voice_type=s.voice_type,
             between=s.between,

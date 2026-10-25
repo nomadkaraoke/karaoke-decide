@@ -12,6 +12,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.services.recs_v2.service import RecSong
+from backend.services.voice_profile_service import VoiceProfileOut
 from karaoke_decide.voice_session.select import ReasonType
 from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ConfidenceLabel, DoneReason, ImproveHint
 
@@ -273,3 +274,12 @@ class AttemptPatchOut(BaseModel):
     # What happened to the saved voice profile: re-derived ("updated"), back to the mic result
     # ("reverted_to_mic"), deleted ("removed"), or untouched (it isn't this session's).
     profile: ProfileOutcome
+
+
+class VoiceProfileResponse(BaseModel):
+    """``GET /api/my/voice``: the saved profile, the last mic-test result kept beside it, and the latest
+    session result with evidence (saved or not), so Me can show both."""
+
+    profile: VoiceProfileOut | None
+    mic: VoiceProfileOut | None = None
+    latest_session: SessionResultSummaryOut | None = None

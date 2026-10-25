@@ -35,6 +35,7 @@ from backend.models.voice_session import (
 )
 from backend.services import voice_recording_service as vrs
 from backend.services.voice_data_store import VoiceDataUnavailable
+from backend.services.voice_profile_service import VoiceProfileOut
 from backend.services.voice_recording_service import RecordingError, VoiceRecordingService
 from backend.services.voice_session_service import VoiceSessionError, active_session_id
 from karaoke_decide.core.models import User
@@ -124,6 +125,12 @@ async def add_attempt(
 @router.get("/sessions/{session_id}/result", response_model=ResultOut)
 async def session_result(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> ResultOut:
     return await _call(service.result(user, session_id))
+
+
+@router.post("/sessions/{session_id}/adopt", response_model=VoiceProfileOut)
+async def adopt_session(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> VoiceProfileOut:
+    """Make this session's result your voice profile, even at low confidence."""
+    return await _call(service.adopt(user, session_id))
 
 
 @router.patch("/attempts/{attempt_id}", response_model=AttemptPatchOut)
