@@ -124,11 +124,12 @@ async def list_karaoke_log(
     night_id: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIST_LIMIT)] = DEFAULT_LIST_LIMIT,
     cursor: Annotated[str | None, Query()] = None,
+    song: Annotated[str | None, Query(max_length=600, description="Library key: only that song's records")] = None,
 ) -> KaraokeLogPage:
     """The user's records, newest ``updated_at`` first; ``next_cursor`` pages on."""
     try:
         entries, next_cursor = await service.list_for_user(
-            user.id, since=since, night_id=night_id, limit=limit, cursor=cursor
+            user.id, since=since, night_id=night_id, limit=limit, cursor=cursor, song=song
         )
     except KaraokeLogError as exc:
         raise _http(exc) from exc

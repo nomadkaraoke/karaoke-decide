@@ -19,6 +19,7 @@ from backend.services.karaoke_log_service import (
     KaraokeLogNotFoundError,
     KaraokeLogService,
     NotOwnerError,
+    library_key,
     log_doc_id,
     unresolved_doc_id,
 )
@@ -518,6 +519,33 @@ async def test_list_for_user_filters_and_pages(svc: KaraokeLogService, fs: Memor
 
     with pytest.raises(KaraokeLogInvalidError):
         await svc.list_for_user(USER, cursor="garbage")
+
+
+@pytest.mark.asyncio
+async def test_list_filter_by_library_key(svc: KaraokeLogService) -> None:
+    for i in range(2):
+        await svc.upsert_user(USER, f"app_{i}", _app_entry(artist="Adele", title="Hello", song_key="adele|hello"))
+        await asyncio.sleep(0.002)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts(artist="Nobody Knows", title="My Song"))
+    await asyncio.sleep(0.002)
+    assert len((await svc.list_for_user(USER))[0]) == 3
+
+    hits, _ = await svc.list_for_user(USER, song="adele|hello")
+    assert [e.id for e in hits] == ["app_1", "app_0"]
+    hits, _ = await svc.list_for_user(USER, song="u:nobody knows|my song")
+    assert [e.id for e in hits] == [KJ_ID]
+    assert (await svc.list_for_user(USER, song="nope|nope")) == ([], None)
+
+    # the filter applies before paging
+    page1, cursor = await svc.list_for_user(USER, song="adele|hello", limit=1)
+    page2, cursor2 = await svc.list_for_user(USER, song="adele|hello", limit=1, cursor=cursor)
+    assert [e.id for e in page1] == ["app_1"] and [e.id for e in page2] == ["app_0"] and cursor2 is None
+
+
+def test_library_key() -> None:
+    assert library_key({"song_key": "adele|hello", "song_key_status": "resolved"}) == "adele|hello"
+    key = library_key({"artist": "Nobody Knows", "title": "My Song", "song_key_status": "unresolved"})
+    assert key == "u:" + make_song_key("Nobody Knows", "My Song")
 
 
 @pytest.mark.asyncio

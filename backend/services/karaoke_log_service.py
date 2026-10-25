@@ -148,6 +148,14 @@ def email_hash(email: str) -> str:
     return hashlib.sha256(email.strip().lower().encode()).hexdigest()
 
 
+def library_key(doc: dict[str, Any]) -> str:
+    """The song's identity in the app's library: its catalog ``song_key`` once resolved,
+    else ``"u:"`` + the normalized artist|title (same as the app's ``songKey``)."""
+    if doc.get("song_key_status") == "resolved" and doc.get("song_key"):
+        return str(doc["song_key"])
+    return "u:" + make_song_key(doc.get("artist") or "", doc.get("title") or "")
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -702,13 +710,15 @@ class KaraokeLogService:
         night_id: str | None = None,
         limit: int = DEFAULT_LIST_LIMIT,
         cursor: str | None = None,
+        song: str | None = None,
     ) -> tuple[list[KaraokeLogEntry], str | None]:
         """The user's records, newest ``updated_at`` first, and the next page's cursor.
 
         Without ``since``: live records only. With ``since`` (a sync pull): everything updated
         after it, deleted records included so the app can drop them. Survey-only placeholders
         (kjbox facts not delivered yet) are never listed. One equality query on ``user_id``
-        (no composite index); filtering and paging happen here."""
+        (no composite index); filtering and paging happen here. ``song`` (a ``library_key``)
+        keeps one song's records, applied before paging."""
         since_dt = _parse_dt(since)
         after = _decode_cursor(cursor) if cursor else None
         limit = max(1, min(int(limit), MAX_LIST_LIMIT))
@@ -718,6 +728,8 @@ class KaraokeLogService:
             if d.get("state") is None:
                 continue
             if night_id is not None and (d.get("night") or {}).get("id") != night_id:
+                continue
+            if song is not None and library_key(d) != song:
                 continue
             updated = _parse_dt(d.get("updated_at")) or datetime.min.replace(tzinfo=UTC)
             if since_dt is not None:
