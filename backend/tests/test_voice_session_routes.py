@@ -854,7 +854,8 @@ def test_get_session_for_resume_is_read_only(make_client: MakeClient, fs: RouteF
     got = client.get(f"/api/voice/sessions/{sid}")
     assert got.status_code == 200, got.text
     assert got.json() == {
-        "session_id": sid, "state": "active", "setup": SETUP, "attempts": 0, "top_p": got.json()["top_p"],
+        "session_id": sid, "state": "active", "setup": {**SETUP, "experience": None, "uses_falsetto": None},
+        "attempts": 0, "top_p": got.json()["top_p"],
         "done_reason": None, "last_offer": None, "profile_saved": False,
     }  # fmt: skip
 
@@ -1564,3 +1565,59 @@ def test_stored_summary_without_falsetto_high_reads_null() -> None:
            "low": 40, "high": 64, "comfort_low": 45, "comfort_high": 58, "attempts": 1, "evidence_attempts": 1,
            "profile_saved": False, "computed_at": "2026-10-25T19:00:00Z"}  # fmt: skip
     assert SessionResultSummaryOut.model_validate(raw).falsetto_high is None
+
+
+# ---------------------------------------------------------------- setup background + live chip reference (C3)
+
+
+def test_setup_accepts_background(client: TestClient, fs: RouteFirestore) -> None:
+    """``experience`` / ``uses_falsetto`` are optional setup answers, stored in ``voice_sessions.setup``, changeable
+    with PATCH, returned on resume, and copied into the session's voice profile. Old setups (without them) work."""
+    sid = _create(client, experience="some", uses_falsetto="yes")
+    setup = fs.cols["voice_sessions"][sid]["setup"]
+    assert (setup["experience"], setup["uses_falsetto"]) == ("some", "yes")
+    assert client.patch(f"/api/voice/sessions/{sid}", json={"uses_falsetto": "sometimes"}).status_code == 204
+    got = client.get(f"/api/voice/sessions/{sid}").json()["setup"]
+    assert (got["experience"], got["uses_falsetto"]) == ("some", "sometimes")
+    for bad in ({"experience": "pro"}, {"uses_falsetto": "always"}):
+        assert client.post("/api/voice/sessions", json={**SETUP, **bad}).status_code == 422, bad
+        assert client.patch(f"/api/voice/sessions/{sid}", json=bad).status_code == 422, bad
+
+    _post_attempt(client, sid, _attempt(_next(client, sid), 0, pitch=CHEST))
+    assert client.get(f"/api/voice/sessions/{sid}/result").json()["profile_saved"] is True
+    profile = fs.cols["decide_users"][EMAIL_HASH]["voice_profile"]
+    assert (profile["method"], profile["experience"], profile["uses_falsetto"]) == ("session", "some", "sometimes")
+
+    old = _create(client)
+    assert client.get(f"/api/voice/sessions/{old}").json()["setup"]["experience"] is None
+
+
+def test_next_song_carries_comfort_estimate(client: TestClient) -> None:
+    """Each offered song carries the chest comfort estimate for the live falsetto chip: the model's (posterior
+    mean, with its SD) until the comfort is measured, then the measured band (as the result shows it)."""
+    sid = _create(client)
+    first = _next(client, sid)["comfort_estimate"]
+    assert first["source"] == "model" and first["low"] <= first["high"] and first["sd_high"] > 0
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    for i in range(2):
+        _post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))
+    song = _next(client, sid)
+    est = song["comfort_estimate"]
+    assert (est["source"], est["low"], est["high"]) == ("measured", 49, 59)
+    assert est["sd_high"] >= 0
+    resumed = client.get(f"/api/voice/sessions/{sid}").json()["last_offer"]
+    assert resumed["song_key"] == song["song_key"] and resumed["comfort_estimate"] == est
+
+
+def test_comfort_estimate_source_profile_on_first_song(client: TestClient, fs: RouteFirestore) -> None:
+    """Before any attempt counts, a prior profile with a comfort band is the reference ("profile", its own
+    numbers); once an attempt counts the session's estimate takes over. An excluded attempt doesn't count."""
+    fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = MIC_PROFILE
+    sid = _create(client)
+    est = _next(client, sid)["comfort_estimate"]
+    assert (est["source"], est["low"], est["high"]) == ("profile", 50, 61)
+    assert est["sd_high"] >= 0
+    out = _post_attempt(client, sid, _attempt(_next(client, sid), 0))
+    assert _next(client, sid)["comfort_estimate"]["source"] == "model"
+    _patch_attempt(client, out["attempt_id"], True)
+    assert _next(client, sid)["comfort_estimate"]["source"] == "profile"

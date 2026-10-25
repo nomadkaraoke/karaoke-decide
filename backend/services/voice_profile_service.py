@@ -28,7 +28,7 @@ FIELD = "voice_profile"
 MIC_FIELD = "voice_profile_mic"  # the last mic-test result, kept beside a session result (Phase 3d batch 1)
 
 VoiceType = Literal["bass", "baritone", "tenor", "alto", "mezzo", "soprano"]
-Experience = Literal["none", "some", "trained"]
+Experience = Literal["none", "some", "trained"]  # also the session setup's answers (models/voice_session.py)
 UsesFalsetto = Literal["yes", "sometimes", "no", "unsure"]
 Midi = Field(ge=24, le=96)
 

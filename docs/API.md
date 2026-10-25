@@ -2147,7 +2147,7 @@ Phase 3d. A guided singing session that finds the singer's voice type and key-fi
 
 ### POST /api/voice/sessions
 
-Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel"}` (`device` optional, max 80). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
+Body `{"posture": "standing|sitting|lying", "warmth": "cold|bit_warm|warm", "record": false, "headphones": true, "device": "Pixel", "experience": "none|some|trained", "uses_falsetto": "yes|sometimes|no|unsure"}` (`device` optional, max 80; `experience` and `uses_falsetto`, the optional "About your singing" answers, since v0.33.0: stored in the setup only when given, read back as `null` otherwise, and copied into the session's voice profile). Abandons the user's other active session. Returns `{"session_id": "...", "state": "active"}`.
 
 ### GET /api/voice/sessions/{session_id}
 
@@ -2174,10 +2174,13 @@ The next song, or the end of the session. Errors: `404 session_not_found`, `409 
 {"kind": "song", "song_key": "artist|title", "artist": "Artist", "title": "Title", "duration_s": 215,
  "reason_type": "explore", "version": {"video_id": "FIXTURE11", "brand_code": "SING", "brand_name": "Sing King", "embeddable": true},
  "alternatives": [], "song_range": {"low": 48, "high": 70, "p10": 52, "p50": 59, "p90": 66},
- "attempt_n": 3, "max_attempts": 12}
+ "attempt_n": 3, "max_attempts": 12,
+ "comfort_estimate": {"low": 49, "high": 59, "sd_high": 1.4, "source": "measured|model|profile"}}
 ```
 
 or `{"kind": "done", "reason": "..."}`. `attempt_n` is the 1-based number an attempt on this song would get, out of `max_attempts` (12). `version.embeddable` is `false` only for the link-out offer (no embeddable version is left): the app opens YouTube instead of embedding. `alternatives` holds at most 2 versions; `song_range` is `null` without data.
+
+`comfort_estimate` (since v0.33.0) is the session's chest comfort band when the song is offered, the reference for the app's live "High note: falsetto?" chip: `measured` once the songs rated comfortable measure it (the band the result would show), else `profile` while no attempt counts yet and the session's prior profile (frozen at setup) has a band (its own `comfort_low`/`comfort_high`), else `model` (the posterior mean, one decimal). `sd_high` is always the model's posterior SD of the comfort top. Excluded attempts don't count. It is stored with the offer, so `GET /api/voice/sessions/{id}` `last_offer` repeats it.
 
 ### POST /api/voice/sessions/{session_id}/skips
 

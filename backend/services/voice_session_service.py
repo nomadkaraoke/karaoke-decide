@@ -68,6 +68,7 @@ from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
     AttemptPatchOut,
+    ComfortEstimateOut,
     HistoryAttemptOut,
     HistoryRecordingOut,
     HistorySessionOut,
@@ -107,11 +108,12 @@ from karaoke_decide.core.models import User
 from karaoke_decide.voice_pool.models import Version
 from karaoke_decide.voice_pool.versions import VersionStats, choose_versions
 from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
+from karaoke_decide.voice_session.comfort import comfort_band
 from karaoke_decide.voice_session.model import Posterior, SongDemand, key_shift_direction
 from karaoke_decide.voice_session.replay import demand_from_doc as _demand
 from karaoke_decide.voice_session.replay import rebuild
 from karaoke_decide.voice_session.select import CandidateSong, SessionState, choose_next, know_weight
-from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, summary
+from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, ResultSummary, check, comfort_sd, summary
 
 logger = logging.getLogger(__name__)
 
@@ -353,6 +355,44 @@ def summary_out(
         profile_saved=profile_saved,
         computed_at=now,
     )
+
+
+_BACKGROUND = ("experience", "uses_falsetto")
+
+
+def _stored_setup(setup: SessionSetup) -> dict[str, Any]:
+    """The setup as stored: the optional singing-background answers only when given (older docs have none)."""
+    return setup.model_dump(exclude={k for k in _BACKGROUND if getattr(setup, k) is None})
+
+
+def _prior_comfort(session: dict[str, Any]) -> tuple[int, int] | None:
+    """The comfort band of the session's prior profile (frozen at setup), or None without a valid one."""
+    raw = session.get("prior_profile")
+    if not raw:
+        return None
+    try:
+        p = VoiceProfileOut.model_validate(raw)
+    except ValidationError:
+        return None  # _prior already logged it
+    return p.comfort_low, p.comfort_high
+
+
+def comfort_estimate(session: dict[str, Any], state: SessionState) -> ComfortEstimateOut:
+    """The chest comfort reference for the app's live falsetto chip, as the session stands.
+
+    The measured band once the songs rated comfortable measure it (``comfort.comfort_band``, as ``summary`` shows
+    it); else, before any attempt counts, the prior profile's own band ("profile"); else the posterior mean
+    ("model"). ``sd_high`` is the model's posterior SD of the comfort top in every case."""
+    sd_high = round(comfort_sd(state)[1], 2)
+    f_lo, f_hi = state.posterior.full_estimate()
+    band = comfort_band(state.evidence, (round(f_lo), round(f_hi)))
+    if band is not None:
+        return ComfortEstimateOut(low=band[0], high=band[1], sd_high=sd_high, source="measured")
+    prior = _prior_comfort(session)
+    if not state.evidence and prior is not None:
+        return ComfortEstimateOut(low=prior[0], high=prior[1], sd_high=sd_high, source="profile")
+    c_lo, c_hi = state.posterior.comfort_estimate()
+    return ComfortEstimateOut(low=round(c_lo, 1), high=round(c_hi, 1), sd_high=sd_high, source="model")
 
 
 def _ever_warm(session: dict[str, Any], attempts: Sequence[dict[str, Any]]) -> bool:
@@ -657,7 +697,7 @@ class VoiceSessionService:
             session_id,
             {
                 "user_id": user.id,
-                "setup": setup.model_dump(),
+                "setup": _stored_setup(setup),
                 "state": "active",
                 "created_at": now,
                 "updated_at": now,
@@ -730,7 +770,13 @@ class VoiceSessionService:
             last = session.get("last_offer") or {}
             reason = last.get("reason_type") if last.get("song_key") == pending else "explore"
             offer = await self._offer(
-                session_id, index[pending], reason or "explore", skips, link_out_ok=True, attempt_n=state.attempts + 1
+                session_id,
+                index[pending],
+                reason or "explore",
+                skips,
+                link_out_ok=True,
+                attempt_n=state.attempts + 1,
+                comfort=comfort_estimate(session, state),
             )
             assert offer is not None  # link_out_ok always offers
             return offer
@@ -748,6 +794,7 @@ class VoiceSessionService:
                 skips,
                 link_out_ok=attempt == MAX_REPICKS,
                 attempt_n=state.attempts + 1,
+                comfort=comfort_estimate(session, state),
             )
             if offer is not None:
                 return offer
@@ -767,6 +814,7 @@ class VoiceSessionService:
         *,
         link_out_ok: bool,
         attempt_n: int,
+        comfort: ComfortEstimateOut | None = None,
     ) -> NextSongOut | None:
         """The song with its best playable version (live stats), a link-out offer, or None (no version)."""
         stats = await self._version_stats(e.versions)
@@ -787,6 +835,7 @@ class VoiceSessionService:
             alternatives=[_version_out(v) for v in playable[1 : 1 + ALTERNATIVES]],
             song_range=SongRangeOut(low=d.low, high=d.high, p10=d.p10, p50=d.p50, p90=d.p90),
             attempt_n=attempt_n,
+            comfort_estimate=comfort,
         )
         last_offer = {
             "song_key": e.song_key,

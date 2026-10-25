@@ -108,7 +108,8 @@ def check(state: SessionState) -> DoneReason | None:
     return None
 
 
-def _comfort_sd(state: SessionState) -> tuple[float, float]:
+def comfort_sd(state: SessionState) -> tuple[float, float]:
+    """The posterior SD of the model's comfort estimate (low, high): how unsure the type-mean band still is."""
     probs = state.posterior.probs()
     mean_lo, mean_hi = state.posterior.comfort_estimate()
     var_lo = sum(p * (comfort(h)[0] - mean_lo) ** 2 for h, p in probs.items())
@@ -136,7 +137,7 @@ def summary(
     if label == "medium":
         between = pair[1] if pair[0] == voice_type else pair[0]
 
-    sd_lo, sd_hi = _comfort_sd(state)
+    sd_lo, sd_hi = comfort_sd(state)
     hint: ImproveHint | None = None
     # SessionState carries the current warmth only; warmth never steps down in the app, so "not warm now"
     # stands in for "never warm".

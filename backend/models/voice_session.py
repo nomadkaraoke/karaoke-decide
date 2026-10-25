@@ -12,7 +12,7 @@ from typing import Literal, Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from backend.services.recs_v2.service import RecSong
-from backend.services.voice_profile_service import VoiceProfileOut
+from backend.services.voice_profile_service import Experience, UsesFalsetto, VoiceProfileOut
 from karaoke_decide.voice_session.select import ReasonType
 from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ComfortSource, ConfidenceLabel, DoneReason, ImproveHint
 
@@ -35,6 +35,10 @@ class SessionSetup(_Request):
     record: bool
     headphones: bool
     device: str | None = Field(default=None, max_length=80)
+    # Optional "About your singing" answers (since v0.33.0): stored in the setup, copied into the session profile;
+    # the app's live falsetto chip uses ``uses_falsetto`` for its offset.
+    experience: Experience | None = None
+    uses_falsetto: UsesFalsetto | None = None
 
 
 class SessionPatch(_Request):
@@ -45,6 +49,8 @@ class SessionPatch(_Request):
     record: bool | None = None
     headphones: bool | None = None
     device: str | None = Field(default=None, max_length=80)
+    experience: Experience | None = None
+    uses_falsetto: UsesFalsetto | None = None
 
 
 class SessionCreated(BaseModel):
@@ -68,6 +74,19 @@ class SongRangeOut(BaseModel):
     p90: float
 
 
+class ComfortEstimateOut(BaseModel):
+    """The session's chest comfort estimate when the song is offered (the live falsetto chip's reference).
+
+    ``source``: "measured" (from the songs rated comfortable, as the result shows it), "model" (the posterior
+    mean) or "profile" (no attempt counts yet: the prior profile's own band). ``sd_high`` is always the model's
+    posterior SD of the comfort top, so the app can tell a settled model estimate from a guess."""
+
+    low: float
+    high: float
+    sd_high: float
+    source: Literal["measured", "model", "profile"]
+
+
 class NextSongOut(BaseModel):
     kind: Literal["song"] = "song"
     song_key: str
@@ -80,6 +99,7 @@ class NextSongOut(BaseModel):
     song_range: SongRangeOut | None
     attempt_n: int  # the 1-based number an attempt on this song would get
     max_attempts: int = MAX_ATTEMPTS
+    comfort_estimate: ComfortEstimateOut | None = None  # since v0.33.0
 
 
 class NextDoneOut(BaseModel):
