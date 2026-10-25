@@ -1143,6 +1143,7 @@ class VoiceSessionService:
             high=s.full[1],
             comfort_low=s.comfort[0],
             comfort_high=s.comfort[1],
+            comfort_source=s.comfort_source,
             attempts=state.attempts,
             partial=done_reason != "confident",
             improve_hint=s.improve_hint,

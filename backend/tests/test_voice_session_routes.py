@@ -538,6 +538,23 @@ def test_result_type_from_profile_prior_and_loved(client: TestClient, fs: RouteF
     assert len(res["suited"]) <= 15
 
 
+def test_result_reports_measured_comfort_source(client: TestClient) -> None:
+    """With two or more songs rated comfortable and easy, sung with usable pitch, the result's comfort is what was
+    sung (voiced-seconds-weighted p10/p90) and says so; quiz-only sessions keep the model's estimate."""
+    sung = {"voiced_s": 60, "held_count": 20, "held_low": 49, "held_high": 59, "p10": 50, "p50": 54, "p90": 58}
+    sid = _create(client)
+    for i in range(3):
+        _post_attempt(client, sid, _attempt(_next(client, sid), i, pitch=sung))
+    res = client.get(f"/api/voice/sessions/{sid}/result").json()
+    assert res["comfort_source"] == "measured"
+    assert (res["comfort_low"], res["comfort_high"]) == (50, 58)
+
+    quiz_only = _create(client)
+    for i in range(3):
+        _post_attempt(client, quiz_only, _attempt(_next(client, quiz_only), i))
+    assert client.get(f"/api/voice/sessions/{quiz_only}/result").json()["comfort_source"] == "model"
+
+
 def test_from_profile_reads_voice_profile_out_register() -> None:
     """3c's VoiceProfileOut keeps the register on ``register_`` with values lower/middle/higher."""
     base = {
