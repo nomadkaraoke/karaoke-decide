@@ -9,15 +9,18 @@ MAX_ATTEMPTS attempts; the caller sets 'no_candidates' when choose_next returns 
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from karaoke_decide.voice_session.model import VOICE_TYPES, comfort
+from karaoke_decide.voice_session.comfort import measured_comfort
+from karaoke_decide.voice_session.model import VOICE_TYPES, Evidence, comfort
 from karaoke_decide.voice_session.select import SessionState
 
 DoneReason = Literal["confident", "tired", "max_attempts", "no_candidates"]
 ConfidenceLabel = Literal["low", "medium", "high"]
 ImproveHint = Literal["sing_higher_warm", "sing_lower", "more_songs"]
+ComfortSource = Literal["measured", "model"]
 
 MAX_ATTEMPTS = 12
 TOP_THRESHOLD = 0.75
@@ -41,6 +44,7 @@ class ResultSummary:
     comfort: tuple[int, int]
     full: tuple[int, int]
     improve_hint: ImproveHint | None
+    comfort_source: ComfortSource = "model"  # "measured": from the songs rated comfortable (comfort.py)
 
 
 def _top(marg: dict[str, float]) -> tuple[str, float]:
@@ -98,11 +102,15 @@ def _comfort_sd(state: SessionState) -> tuple[float, float]:
     return math.sqrt(var_lo), math.sqrt(var_hi)
 
 
-def summary(state: SessionState, done_reason: DoneReason | None = None) -> ResultSummary:
+def summary(
+    state: SessionState, done_reason: DoneReason | None = None, evidence: Sequence[Evidence] | None = None
+) -> ResultSummary:
     """The result shown to the user (valid mid-session too, e.g. on Finish).
 
     ``done_reason`` is how the session ended when the caller knows it (e.g. 'no_candidates', which check()
     can't see); otherwise check(state) decides whether "more songs" is still a useful hint.
+    Comfort is measured from the songs rated comfortable (``evidence``, default ``state.evidence``) when there
+    are enough of them, rounded and clamped inside the full-range estimate; else the posterior mean.
     """
     post = state.posterior
     marg = post.type_marginal()
@@ -124,15 +132,24 @@ def summary(state: SessionState, done_reason: DoneReason | None = None) -> Resul
     elif (done_reason or check(state)) is None:
         hint = "more_songs"
 
-    c_lo, c_hi = post.comfort_estimate()
-    f_lo, f_hi = post.full_estimate()
+    f_lo, f_hi = round(post.full_estimate()[0]), round(post.full_estimate()[1])
+    measured = measured_comfort(state.evidence if evidence is None else evidence)
+    source: ComfortSource = "model"
+    if measured is not None:
+        source = "measured"
+        lo = min(max(round(measured[0]), f_lo), f_hi)
+        comfort_band = (lo, min(max(round(measured[1]), lo), f_hi))
+    else:
+        c_lo, c_hi = post.comfort_estimate()
+        comfort_band = (round(c_lo), round(c_hi))
     return ResultSummary(
         voice_type=voice_type,
         between=between,
         top_p=top_p,
         pair_p=pair_p,
         confidence_label=label,
-        comfort=(round(c_lo), round(c_hi)),
-        full=(round(f_lo), round(f_hi)),
+        comfort=comfort_band,
+        full=(f_lo, f_hi),
         improve_hint=hint,
+        comfort_source=source,
     )

@@ -80,13 +80,15 @@ def test_rebuild_matches_service_state_fields() -> None:
     assert ours.comfort_history == pytest.approx(theirs.comfort_history)
 
 
-def test_andrew_replay_reproduces_live_result() -> None:
-    """The live result was "Probably Baritone", low confidence, 46-70, comfortable 51-65."""
-    last = replay.replay_fixture(_fixture())[-1]
+def test_andrew_replay_measures_comfort_from_comfortable_songs() -> None:
+    """The live result (v0.31) was "Probably Baritone", low confidence, 46-70, comfortable 51-65: the model's
+    type-mean band (docs/VOICE-SESSION-TUNING.md). Since D1 comfort comes from what he sang on songs 1 and 4,
+    the ones rated comfortable and easy (song 2 he barely knew, song 3 was a stretch with falsetto)."""
+    trace = replay.replay_fixture(_fixture())
+    assert [s.comfort_source for s in trace] == ["model", "model", "model", "measured"]
+    last = trace[-1]
     assert last.voice_type == "baritone"
-    assert last.confidence_label == "low"
-    assert last.full == (46, 70)
-    assert last.comfort == (51, 65)
+    assert last.comfort == (50, 58)
 
 
 def test_replay_needs_a_demand_or_an_override() -> None:

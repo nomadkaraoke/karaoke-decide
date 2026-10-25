@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from backend.services.recs_v2.service import RecSong
 from backend.services.voice_profile_service import VoiceProfileOut
 from karaoke_decide.voice_session.select import ReasonType
-from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ConfidenceLabel, DoneReason, ImproveHint
+from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, ComfortSource, ConfidenceLabel, DoneReason, ImproveHint
 
 Posture = Literal["standing", "sitting", "lying"]
 Warmth = Literal["cold", "bit_warm", "warm"]
@@ -173,6 +173,8 @@ class ResultOut(BaseModel):
     high: int
     comfort_low: int
     comfort_high: int
+    # "measured": from the songs rated comfortable and easy, with usable pitch; "model": the voice model's estimate.
+    comfort_source: ComfortSource = "model"
     attempts: int
     partial: bool
     improve_hint: ImproveHint | None

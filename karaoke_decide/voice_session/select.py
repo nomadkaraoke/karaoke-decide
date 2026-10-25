@@ -17,6 +17,7 @@ from typing import Literal
 from karaoke_decide.voice_session.model import (
     HYPOTHESES,
     VOICE_TYPES,
+    Evidence,
     Hyp,
     Position,
     Posterior,
@@ -69,6 +70,7 @@ class SessionState:
 
     ``comfort_history`` holds ``posterior.comfort_estimate()`` before the first attempt and after each one.
     ``range_attempts`` counts attempts whose answers carry range evidence.
+    ``evidence`` holds each counted attempt's evidence, in order (for the measured comfort).
     """
 
     posterior: Posterior
@@ -79,6 +81,7 @@ class SessionState:
     done_keys: set[str] = field(default_factory=set)
     recent_strata: list[str] = field(default_factory=list)
     comfort_history: list[tuple[float, float]] = field(default_factory=list)
+    evidence: list[Evidence] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

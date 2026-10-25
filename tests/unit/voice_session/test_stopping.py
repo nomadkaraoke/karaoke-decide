@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from karaoke_decide.voice_session import stopping
-from karaoke_decide.voice_session.model import Posterior
+from karaoke_decide.voice_session.model import PitchSummary, Posterior
 from karaoke_decide.voice_session.select import SessionState
 
-from .builders import posterior
+from .builders import ctx, evidence, posterior, quiz, song
 
 STABLE = [(53.0, 67.0), (53.5, 67.2), (53.0, 67.0)]
 
@@ -130,3 +130,28 @@ def test_no_candidates_end() -> None:
     assert cold.improve_hint == "sing_higher_warm"
     warm = stopping.summary(_state(Posterior.uniform(), attempts=2), done_reason="no_candidates")
     assert warm.improve_hint == "sing_lower"
+
+
+def _comfortable_sung(p10: float, p90: float, voiced_s: float = 90.0):  # type: ignore[no-untyped-def]
+    pitch = PitchSummary(voiced_s=voiced_s, held_count=20, held_low=p10 - 1, held_high=p90 + 1, p10=p10,
+                         p50=(p10 + p90) / 2, p90=p90)  # fmt: skip
+    return evidence(song(p10, p90), quiz(position="comfortable", difficulty="easy"), ctx(headphones=True), pitch=pitch)
+
+
+def test_summary_uses_measured_and_clamps_to_full() -> None:
+    bari = posterior({("baritone", 0): 1.0})  # comfort 50-64, full 45-69
+    model = stopping.summary(_state(bari))
+    assert (model.comfort, model.comfort_source) == ((50, 64), "model")
+    measured = stopping.summary(_state(bari, evidence=[_comfortable_sung(50.4, 57.6), _comfortable_sung(50.2, 58.2)]))
+    assert measured.comfort_source == "measured"
+    assert measured.comfort == (50, 58)
+    # Clamped inside the full-range estimate.
+    low = stopping.summary(_state(bari, evidence=[_comfortable_sung(40, 50), _comfortable_sung(41, 51)]))
+    assert low.comfort == (45, 50)
+    high = stopping.summary(_state(bari, evidence=[_comfortable_sung(66, 74), _comfortable_sung(66, 75)]))
+    assert high.comfort == (66, 69)
+    # An explicit evidence list overrides the state's.
+    assert stopping.summary(_state(bari), evidence=[_comfortable_sung(50, 58), _comfortable_sung(50, 58)]).comfort == (
+        50,
+        58,
+    )

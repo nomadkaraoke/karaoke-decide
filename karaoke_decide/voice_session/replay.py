@@ -105,6 +105,7 @@ def rebuild(
             stopped = bool(a.get("stopped_early"))
             ev = Evidence(demand_from_doc(song["demand"]), quiz, ctx, pitch, stopped_early=stopped)
             state.posterior = state.posterior.update(ev)
+            state.evidence.append(ev)  # excluded attempts never reach the measured comfort
             state.range_attempts += int(has_range_evidence(quiz, pitch))
             state.tired_count += int(quiz.voice_now == "tired")
             state.comfort_history.append(state.posterior.comfort_estimate())

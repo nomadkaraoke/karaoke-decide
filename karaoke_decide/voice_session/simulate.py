@@ -274,7 +274,9 @@ def simulate(
         )
         ctx = Context(posture="standing", warmth=state.warmth, headphones=pitch == "headphones")
         sung = sim_pitch(rng, true_h, cand.demand, pitch)
-        state.posterior = state.posterior.update(Evidence(cand.demand, quiz, ctx, sung, stopped_early=False))
+        ev = Evidence(cand.demand, quiz, ctx, sung, stopped_early=False)
+        state.posterior = state.posterior.update(ev)
+        state.evidence.append(ev)
         state.attempts += 1
         state.range_attempts += 1
         state.done_keys.add(cand.song_key)

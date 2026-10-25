@@ -17,10 +17,12 @@ from pydantic import ValidationError
 
 from backend.api.deps import get_recommendation_service_v2_dep
 from backend.main import app
+from backend.models.voice_session import ResultOut
 from backend.services import voice_session_service as vss
 from backend.services.recs_v2.service import RecVoice
 from backend.services.song_feedback_service import loved_doc_id
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
+from backend.services.voice_session_outputs import session_profile
 from backend.tests.test_karaoke_log_routes import RouteFirestore
 from backend.tests.test_voice_session_routes import (  # noqa: F401  (pytest fixtures)
     EMAIL_HASH,
@@ -45,6 +47,7 @@ from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import UserSong
 from karaoke_decide.voice_session.model import Hyp, Posterior, centre
 from karaoke_decide.voice_session.simulate import answer
+from karaoke_decide.voice_session.stopping import summary
 from karaoke_decide.voice_session.weights import MIC_BIAS
 
 PROFILE_BASE: dict[str, Any] = {
@@ -256,6 +259,31 @@ def test_session_profile_prior_weights() -> None:
     ).type_marginal()
     assert self_["baritone"] / self_["soprano"] == pytest.approx(3.0)
     assert mic.type_marginal()["baritone"] > Posterior.uniform().type_marginal()["baritone"]
+
+
+def test_session_profile_saves_measured_comfort() -> None:
+    """The saved session profile carries the comfort measured from the songs rated comfortable (D1)."""
+    pitch = {"voiced_s": 90.0, "held_count": 20.0, "held_low": 49.0, "held_high": 59.0,
+             "p10": 50.0, "p50": 54.0, "p90": 58.0}  # fmt: skip
+    demand = {"low": 48.0, "high": 60.0, "p10": 50.0, "p50": 54.0, "p90": 58.0}
+    quiz = {"feel": "fine", "position": "comfortable", "difficulty": "easy", "knew": "well"}
+    docs = [
+        {"n": n, "song_key": f"k{n}", "quiz": quiz, "pitch": pitch, "stopped_early": False,
+         "context": {"posture": "standing", "warmth": "warm", "headphones": True}, "song": {"demand": demand}}
+        for n in (1, 2, 3)
+    ]  # fmt: skip
+    state = vss.rebuild_state({"id": "s", "setup": {"warmth": "warm"}, "prior_profile": None}, docs)
+    s = summary(state)
+    assert s.comfort_source == "measured"
+    assert s.comfort == (50, 58)
+    profile = session_profile(s, state.range_attempts, "s", datetime(2026, 10, 25, tzinfo=UTC))
+    assert profile is not None
+    assert (profile.comfort_low, profile.comfort_high) == (50, 58)
+
+
+def test_result_models_default_comfort_source_to_model() -> None:
+    """Old clients and stored summaries without the field read as the model's estimate."""
+    assert ResultOut.model_fields["comfort_source"].default == "model"
 
 
 # ---------------------------------------------------------------- per-song labels
