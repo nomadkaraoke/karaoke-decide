@@ -51,7 +51,7 @@ def test_fixture_is_numbers_only() -> None:
     fx = _fixture()
     assert set(fx) >= {"prior_profile", "attempts"}
     text = FIXTURE.read_text()
-    for banned in ("radiohead", "abba", "foo fighters", "everlong", "@", "06116d77"):
+    for banned in ("radiohead", "abba", "foo fighters", "everlong", "@", "06116d77", "pixel"):
         assert banned not in text.lower()
     for a in fx["attempts"]:
         assert set(a) == _ATTEMPT_KEYS

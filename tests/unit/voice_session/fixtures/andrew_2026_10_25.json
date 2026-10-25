@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "notes": [
-    "Andrew's first real voice session, 2026-10-25 (Pixel). Hand-built from the session data; numbers only.",
+    "Andrew's first real voice session, 2026-10-25. Exported read-only from Firestore by scripts/voice/export_session_fixture.py; numbers only.",
     "song_key is sha1(song_key)[:10]; no titles, artists, user or session ids.",
-    "demand is the voice.db analysis (run 20261025-122002) for each song, as the attempt's song snapshot stores it.",
+    "demand is each attempt's stored song snapshot demand (the voice.db analysis the session offered from).",
     "prior_profile comfort 42-67 is the old stretched mic band (pre nomad-mobile #20); the corrected 11-key band would be ~50-60.",
     "Attempt 3: every note at MIDI 69 was falsetto (Andrew confirmed); held_high/p90 here still include them (unfiltered).",
     "One 'dont_know' skip in the session is not listed: skips never move the posterior.",

@@ -6,7 +6,7 @@ For each prior (self_register / uniform / mic) and pitch mode (none / headphones
 row reports, after k songs, the share whose top voice type is exact, exact-or-adjacent, and who had
 already stopped confident. Every combination restarts from the same seed, so rows are reproducible alone.
 
-  poetry run python scripts/voice/sim_report.py                 # seed 20261025, n 300 (a few minutes)
+  poetry run python scripts/voice/sim_report.py                 # seed 20261025, n 300 (about 35 s)
   poetry run python scripts/voice/sim_report.py --n 60 --priors mic --pitches headphones
 """
 
