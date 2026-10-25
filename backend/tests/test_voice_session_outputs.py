@@ -43,8 +43,9 @@ from backend.tests.test_voice_session_routes import (  # noqa: F401  (pytest fix
 )
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import UserSong
-from karaoke_decide.voice_session.model import Hyp, Posterior
+from karaoke_decide.voice_session.model import Hyp, Posterior, centre
 from karaoke_decide.voice_session.simulate import answer
+from karaoke_decide.voice_session.weights import MIC_BIAS
 
 PROFILE_BASE: dict[str, Any] = {
     "low_midi": 41, "high_midi": 69, "comfort_low": 46, "comfort_high": 64, "voice_type": "baritone",
@@ -236,19 +237,25 @@ def _session_profile(confidence: str) -> VoiceProfileOut:
 
 
 def test_session_profile_prior_weights() -> None:
-    mic = Posterior.from_profile(VoiceProfileOut.model_validate(PROFILE_BASE)).type_marginal()
+    """Measured profiles (mic, session) seed a range-shaped prior on their comfort band (46-64, centre 55);
+    the mic's is moved up by its bias, a session's is not, whatever its confidence. Self reports keep type weights."""
+
+    def peak(post: Posterior) -> set[float]:
+        probs = post.probs()
+        top = max(probs.values())
+        return {centre(h) for h, p in probs.items() if p == pytest.approx(top)}
+
+    mic = Posterior.from_profile(VoiceProfileOut.model_validate(PROFILE_BASE))
+    assert peak(mic) == {55.0 + MIC_BIAS["mic"]}
+    sessions = [Posterior.from_profile(_session_profile(c)) for c in ("high", "medium", "low")]
+    for post in sessions:
+        assert peak(post) == {55.0}
+        assert post.log_p == pytest.approx(sessions[0].log_p)
     self_ = Posterior.from_profile(
         VoiceProfileOut.model_validate({**PROFILE_BASE, "method": "self", "confidence": "low"})
     ).type_marginal()
-    uniform = Posterior.uniform().type_marginal()
-    for confidence in ("high", "medium"):
-        marg = Posterior.from_profile(_session_profile(confidence)).type_marginal()
-        assert marg == pytest.approx(mic)
-    low = Posterior.from_profile(_session_profile("low")).type_marginal()
-    assert low == pytest.approx(self_)
-    assert low["baritone"] > uniform["baritone"]
-    assert mic["baritone"] / mic["soprano"] == pytest.approx(4.0)
-    assert low["baritone"] / low["soprano"] == pytest.approx(3.0)
+    assert self_["baritone"] / self_["soprano"] == pytest.approx(3.0)
+    assert mic.type_marginal()["baritone"] > Posterior.uniform().type_marginal()["baritone"]
 
 
 # ---------------------------------------------------------------- per-song labels

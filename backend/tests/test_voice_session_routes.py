@@ -523,8 +523,9 @@ def test_result_with_zero_attempts_is_partial(client: TestClient, fs: RouteFires
 
 
 def test_result_type_from_profile_prior_and_loved(client: TestClient, fs: RouteFirestore) -> None:
+    # A mic profile's prior is centred on its comfort band (E3): a soprano band (centre 71.5, read 1 low).
     fs.cols["decide_users"][EMAIL_HASH]["voice_profile"] = {
-        "low_midi": 52, "high_midi": 81, "comfort_low": 57, "comfort_high": 76, "voice_type": "soprano",
+        "low_midi": 59, "high_midi": 84, "comfort_low": 64, "comfort_high": 79, "voice_type": "soprano",
         "voice_type_between": None, "register": None, "confidence": "high", "method": "mic",
         "measured_at": "2026-10-20T10:00:00Z", "updated_at": "2026-10-20T10:00:00Z",
     }  # fmt: skip
@@ -547,7 +548,10 @@ def test_from_profile_reads_voice_profile_out_register() -> None:
     lower = Posterior.from_profile(VoiceProfileOut.model_validate({**base, "register": "lower"})).type_marginal()
     higher = Posterior.from_profile(VoiceProfileOut.model_validate({**base, "register": "higher"})).type_marginal()
     assert lower["bass"] > lower["soprano"] and higher["soprano"] > higher["bass"]
-    mic = VoiceProfileOut.model_validate({**base, "voice_type": "tenor", "method": "mic", "confidence": "high"})
+    # A mic profile is read through its comfort band (centre 59, +1 mic bias = tenor's centre 60), not its name.
+    mic = VoiceProfileOut.model_validate(
+        {**base, "voice_type": "tenor", "method": "mic", "confidence": "high", "comfort_low": 54, "comfort_high": 64}
+    )
     marg = Posterior.from_profile(mic).type_marginal()
     assert max(marg, key=lambda t: marg[t]) == "tenor"
 
