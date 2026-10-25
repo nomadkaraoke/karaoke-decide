@@ -181,19 +181,27 @@ async def create_playlist(
     user: CurrentUser,
     playlist_service: PlaylistServiceDep,
     store: CatalogDep,
+    request: Request,
 ) -> PlaylistResponse:
     """Create a new playlist.
 
     Creates an empty playlist with the given name and optional description.
     Songs can be added using the POST /playlists/{id}/songs endpoint.
     """
-    playlist = await playlist_service.create_playlist(
-        user_id=user.id,
-        name=request_body.name,
-        description=request_body.description,
-        playlist_id=request_body.id,
-        items=request_body.items,
-    )
+    locale = get_locale_from_request(request)
+    try:
+        playlist = await playlist_service.create_playlist(
+            user_id=user.id,
+            name=request_body.name,
+            description=request_body.description,
+            playlist_id=request_body.id,
+            items=request_body.items,
+        )
+    except PlaylistAccessDeniedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=t(locale, "playlists.accessDenied"),
+        )
 
     return (await _responses([playlist], store))[0]
 
@@ -373,6 +381,8 @@ async def add_song_to_playlist(
             user_id=user.id,
             song_id=request_body.song_id,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     except PlaylistNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.services.playlist_service import (
+    MAX_ITEMS,
     PlaylistAccessDeniedError,
     PlaylistItemIn,
     PlaylistService,
@@ -168,3 +169,54 @@ async def test_warming_catalog_falls_back_to_song_id(fs: MemoryFirestore) -> Non
     _legacy(fs, [LOUD])
     pl = await _svc(fs).get_playlist(PL_ID, USER)
     assert pl.items[0].title == LOUD
+
+
+@pytest.mark.asyncio
+async def test_update_playlist_bumps_rev(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    pl = await svc.update_playlist(PL_ID, USER, name="Renamed")
+    assert pl.rev == 1
+    assert fs.cols["playlists"][PL_ID]["rev"] == 1
+
+
+@pytest.mark.asyncio
+async def test_add_song_unnamed_stores_empty_names_but_shows_id(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)  # no catalog: cannot name anything
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    pl = await svc.add_song_to_playlist(PL_ID, USER, "mystery|key")
+    stored = fs.cols["playlists"][PL_ID]["items"][0]
+    assert stored["artist"] == "" and stored["title"] == ""
+    assert (pl.items[0].artist, pl.items[0].title) == ("mystery|key", "mystery|key")
+    assert pl.rev == 1
+
+
+@pytest.mark.asyncio
+async def test_empty_stored_names_repaired_on_read(fs: MemoryFirestore, tmp_path: Path) -> None:
+    await _svc(fs).create_playlist(USER, "Set", playlist_id=PL_ID)
+    await _svc(fs).add_song_to_playlist(PL_ID, USER, LOUD)  # warming: empty names stored
+    assert fs.cols["playlists"][PL_ID]["items"][0]["title"] == ""
+    pl = await _svc(fs, tmp_path).get_playlist(PL_ID, USER)
+    assert (pl.items[0].artist, pl.items[0].title) == ("The Lanterns", "Paper Harbour")
+
+
+@pytest.mark.asyncio
+async def test_add_and_remove_use_transactions_and_bump_rev(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    before = fs.transactions
+    await svc.add_song_to_playlist(PL_ID, USER, LOUD)
+    pl = await svc.remove_song_from_playlist(PL_ID, USER, LOUD)
+    assert fs.transactions == before + 2
+    assert pl.rev == 2 and pl.items == []
+
+
+@pytest.mark.asyncio
+async def test_add_song_limit(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    await svc.replace_items(
+        PL_ID, USER, [PlaylistItemIn(song_key=f"a|{n}", artist="a", title=str(n)) for n in range(MAX_ITEMS)], None
+    )
+    with pytest.raises(ValueError):
+        await svc.add_song_to_playlist(PL_ID, USER, "new|song")

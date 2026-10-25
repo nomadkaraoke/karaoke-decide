@@ -1,5 +1,6 @@
 """Tests for playlist routes."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -355,6 +356,25 @@ class TestPlaylistServiceUnit:
         """Create playlist service with mocked dependencies."""
         return PlaylistService(mock_backend_settings, mock_firestore_service)
 
+    @staticmethod
+    def _txn(mock_firestore_service: MagicMock) -> list[tuple[str, str, dict]]:
+        """Give the mock a run_transaction that reads get_document and records txn.set writes."""
+        writes: list[tuple[str, str, dict]] = []
+
+        class Txn:
+            async def get(self, col: str, doc_id: str) -> dict | None:
+                doc: dict | None = await mock_firestore_service.get_document(col, doc_id)
+                return doc
+
+            def set(self, col: str, doc_id: str, data: dict) -> None:
+                writes.append((col, doc_id, data))
+
+        async def run(fn: Any) -> Any:
+            return await fn(Txn())
+
+        mock_firestore_service.run_transaction = run
+        return writes
+
     @pytest.mark.asyncio
     async def test_create_playlist(
         self,
@@ -424,10 +444,12 @@ class TestPlaylistServiceUnit:
             "updated_at": "2024-01-01T00:00:00+00:00",
         }
 
+        writes = self._txn(mock_firestore_service)
+
         result = await playlist_service.add_song_to_playlist("playlist-1", "user-123", "song-1")
 
-        # Should not update since song already exists
-        mock_firestore_service.update_document.assert_not_called()
+        # Should not write since song already exists
+        assert writes == []
         assert result.song_count == 2
 
     @pytest.mark.asyncio
@@ -448,9 +470,12 @@ class TestPlaylistServiceUnit:
             "updated_at": "2024-01-01T00:00:00+00:00",
         }
 
+        writes = self._txn(mock_firestore_service)
+
         result = await playlist_service.add_song_to_playlist("playlist-1", "user-123", "song-2")
 
-        mock_firestore_service.update_document.assert_called_once()
+        assert len(writes) == 1
+        assert writes[0][2]["rev"] == 1
         assert result.song_count == 2
         assert "song-2" in result.song_ids
 
@@ -472,9 +497,11 @@ class TestPlaylistServiceUnit:
             "updated_at": "2024-01-01T00:00:00+00:00",
         }
 
+        writes = self._txn(mock_firestore_service)
+
         result = await playlist_service.remove_song_from_playlist("playlist-1", "user-123", "song-1")
 
-        mock_firestore_service.update_document.assert_called_once()
+        assert len(writes) == 1
         assert result.song_count == 1
         assert "song-1" not in result.song_ids
 
@@ -541,3 +568,33 @@ class TestOrderedItems:
         assert response.status_code == 201
         kwargs = mock_playlist_service.create_playlist.call_args.kwargs
         assert kwargs["playlist_id"] == "pl_abcdef123456" and len(kwargs["items"]) == 1
+
+
+class TestFixRound1:
+    """Review fixes: create 403, add 422 on a full list."""
+
+    def test_create_with_other_users_id_is_403(
+        self,
+        playlist_client: TestClient,
+        mock_playlist_service: MagicMock,
+    ) -> None:
+        mock_playlist_service.create_playlist.side_effect = PlaylistAccessDeniedError()
+        response = playlist_client.post(
+            "/api/playlists",
+            headers={"Authorization": "Bearer test-token"},
+            json={"id": "pl_abcdef123456", "name": "X"},
+        )
+        assert response.status_code == 403
+
+    def test_add_song_to_full_playlist_is_422(
+        self,
+        playlist_client: TestClient,
+        mock_playlist_service: MagicMock,
+    ) -> None:
+        mock_playlist_service.add_song_to_playlist.side_effect = ValueError("at most 500 items")
+        response = playlist_client.post(
+            "/api/playlists/playlist-1/songs",
+            headers={"Authorization": "Bearer test-token"},
+            json={"song_id": "a|b"},
+        )
+        assert response.status_code == 422

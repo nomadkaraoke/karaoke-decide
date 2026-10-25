@@ -32,6 +32,7 @@ from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLLECTION, log_doc_id
 from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
+from backend.services.playlist_service import PlaylistService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
 from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
@@ -51,7 +52,7 @@ USER_OWNED = (
     HIDDEN_COLLECTION,
     LOG_COLLECTION,
     UNRESOLVED_COLLECTION,
-    "playlists",  # doc id == the playlist's own ``id`` field
+    PlaylistService.PLAYLISTS_COLLECTION,  # doc id == the playlist's own ``id`` field
 )
 
 FirestoreDep = Annotated[FirestoreService, Depends(get_firestore)]

@@ -8,6 +8,7 @@ import asyncio
 import logging
 import sqlite3
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -115,7 +116,16 @@ class PlaylistService:
 
     @staticmethod
     def _legacy_keys(docs: list[dict[str, Any]]) -> list[str]:
-        return [str(k) for d in docs if d.get("items") is None for k in d.get("song_ids") or []]
+        """Song keys whose names need a catalog lookup: ``song_ids`` of legacy docs, nameless stored items."""
+        keys: list[str] = []
+        for d in docs:
+            if d.get("items") is None:
+                keys.extend(str(k) for k in d.get("song_ids") or [])
+            else:
+                keys.extend(
+                    e["song_key"] for e in d["items"] if e.get("song_key") and not (e.get("artist") and e.get("title"))
+                )
+        return keys
 
     @staticmethod
     def _stored_item(item: PlaylistItem) -> dict[str, Any]:
@@ -128,26 +138,47 @@ class PlaylistService:
         }
 
     @staticmethod
-    def _items_from_doc(doc: dict[str, Any], titles: dict[str, tuple[str, str]]) -> list[PlaylistItem]:
-        """Stored ``items``, or (legacy docs) ``song_ids`` upgraded with catalog titles / the id as fallback."""
+    def _items_from_doc(
+        doc: dict[str, Any], titles: dict[str, tuple[str, str]], fallback: bool = True
+    ) -> list[PlaylistItem]:
+        """Items of a doc (legacy ``song_ids`` docs are upgraded in memory).
+
+        Empty names are filled from the catalog ``titles``; if the catalog cannot name the song,
+        ``fallback`` shows the song key (display only: persisting paths pass ``fallback=False`` so
+        an id is never stored as a title).
+        """
+
+        def named(song_key: str | None, artist: str, title: str) -> tuple[str, str]:
+            if song_key and not (artist and title):
+                known = titles.get(song_key)
+                if known:
+                    return known
+                if fallback:
+                    return artist or song_key, title or song_key
+            return artist, title
+
         if doc.get("items") is not None:
-            return [
-                PlaylistItem(
-                    item_id=e["item_id"],
-                    song_key=e.get("song_key") or None,
-                    artist=e.get("artist") or "",
-                    title=e.get("title") or "",
-                    added_at=datetime.fromisoformat(e["added_at"]),
+            out: list[PlaylistItem] = []
+            for e in doc["items"]:
+                song_key = e.get("song_key") or None
+                artist, title = named(song_key, e.get("artist") or "", e.get("title") or "")
+                out.append(
+                    PlaylistItem(
+                        item_id=e["item_id"],
+                        song_key=song_key,
+                        artist=artist,
+                        title=title,
+                        added_at=datetime.fromisoformat(e["added_at"]),
+                    )
                 )
-                for e in doc["items"]
-            ]
+            return out
         added = datetime.fromisoformat(doc.get("updated_at") or doc["created_at"])
-        out = []
+        legacy: list[PlaylistItem] = []
         for n, sid in enumerate(doc.get("song_ids") or []):
             sid = str(sid)
-            artist, title = titles.get(sid, (sid, sid))
-            out.append(PlaylistItem(item_id=f"legacy-{n}", song_key=sid, artist=artist, title=title, added_at=added))
-        return out
+            artist, title = named(sid, "", "")
+            legacy.append(PlaylistItem(item_id=f"legacy-{n}", song_key=sid, artist=artist, title=title, added_at=added))
+        return legacy
 
     @staticmethod
     def _build_items(items_in: list[PlaylistItemIn], existing: list[PlaylistItem], now: datetime) -> list[PlaylistItem]:
@@ -248,7 +279,7 @@ class PlaylistService:
                 raise PlaylistNotFoundError(f"Playlist {playlist_id} not found")
             if cur.get("user_id") != user_id:
                 raise PlaylistAccessDeniedError("Access denied to this playlist")
-            built = self._build_items(items, self._items_from_doc(cur, titles), now)
+            built = self._build_items(items, self._items_from_doc(cur, titles, fallback=False), now)
             new = self._with_items({"id": playlist_id, **cur}, built, now)
             txn.set(self.PLAYLISTS_COLLECTION, playlist_id, new)
             return new, built
@@ -355,7 +386,7 @@ class PlaylistService:
         playlist = await self.get_playlist(playlist_id, user_id)
 
         now = datetime.now(UTC)
-        update_data: dict = {"updated_at": now.isoformat()}
+        update_data: dict = {"updated_at": now.isoformat(), "rev": playlist.rev + 1}
 
         if name is not None:
             update_data["name"] = name
@@ -379,7 +410,7 @@ class PlaylistService:
             created_at=playlist.created_at,
             updated_at=now,
             items=playlist.items,
-            rev=playlist.rev,
+            rev=playlist.rev + 1,
         )
 
     async def delete_playlist(
@@ -425,48 +456,49 @@ class PlaylistService:
             PlaylistNotFoundError: If playlist doesn't exist.
             PlaylistAccessDeniedError: If user doesn't own the playlist.
         """
-        playlist = await self.get_playlist(playlist_id, user_id)
-
-        # Don't add duplicates
-        if song_id in playlist.song_ids:
-            return playlist
-
-        titles = await self._titles([song_id])
-        artist, title = titles.get(song_id, (song_id, song_id))
+        pre = await self.firestore.get_document(self.PLAYLISTS_COLLECTION, playlist_id)
+        keys = (self._legacy_keys([pre]) if pre else []) + [song_id]
+        titles = await self._titles(keys)
         now = datetime.now(UTC)
-        new_items = playlist.items + [
-            PlaylistItem(
+
+        def build(items: list[PlaylistItem]) -> list[PlaylistItem] | None:
+            if any(i.song_key == song_id for i in items):  # no duplicates
+                return None
+            if len(items) >= MAX_ITEMS:
+                raise ValueError(f"at most {MAX_ITEMS} items")
+            artist, title = titles.get(song_id, ("", ""))  # never persist the id as a title
+            new = PlaylistItem(
                 item_id=f"it_{uuid.uuid4().hex[:16]}", song_key=song_id, artist=artist, title=title, added_at=now
             )
-        ]
-        return await self._write_items(playlist, new_items, now)
+            return [*items, new]
 
-    async def _write_items(self, playlist: PlaylistInfo, items: list[PlaylistItem], now: datetime) -> PlaylistInfo:
-        song_ids = [i.song_key for i in items if i.song_key]
-        rev = playlist.rev + 1
-        await self.firestore.update_document(
-            self.PLAYLISTS_COLLECTION,
-            playlist.id,
-            {
-                "items": [self._stored_item(i) for i in items],
-                "song_ids": song_ids,
-                "song_count": len(items),
-                "rev": rev,
-                "updated_at": now.isoformat(),
-            },
-        )
-        return PlaylistInfo(
-            id=playlist.id,
-            user_id=playlist.user_id,
-            name=playlist.name,
-            description=playlist.description,
-            song_ids=song_ids,
-            song_count=len(items),
-            created_at=playlist.created_at,
-            updated_at=now,
-            items=items,
-            rev=rev,
-        )
+        return await self._mutate_items(playlist_id, user_id, titles, now, build)
+
+    async def _mutate_items(
+        self,
+        playlist_id: str,
+        user_id: str,
+        titles: dict[str, tuple[str, str]],
+        now: datetime,
+        build: Callable[[list[PlaylistItem]], list[PlaylistItem] | None],
+    ) -> PlaylistInfo:
+        """Transactional read-modify-write of the items (``build`` returns None for no change)."""
+
+        async def body(txn: Any) -> dict[str, Any]:
+            cur = await txn.get(self.PLAYLISTS_COLLECTION, playlist_id)
+            if cur is None:
+                raise PlaylistNotFoundError(f"Playlist {playlist_id} not found")
+            if cur.get("user_id") != user_id:
+                raise PlaylistAccessDeniedError("Access denied to this playlist")
+            doc = {"id": playlist_id, **cur}
+            new_items = build(self._items_from_doc(doc, titles, fallback=False))
+            if new_items is None:
+                return doc
+            new = self._with_items(doc, new_items, now)
+            txn.set(self.PLAYLISTS_COLLECTION, playlist_id, new)
+            return new
+
+        return await self._doc_to_playlist(await self.firestore.run_transaction(body))
 
     async def remove_song_from_playlist(
         self,
@@ -476,26 +508,18 @@ class PlaylistService:
     ) -> PlaylistInfo:
         """Remove a song from a playlist.
 
-        Args:
-            playlist_id: Playlist ID.
-            user_id: User ID for access check.
-            song_id: Song ID to remove.
-
-        Returns:
-            Updated playlist info.
-
         Raises:
             PlaylistNotFoundError: If playlist doesn't exist.
             PlaylistAccessDeniedError: If user doesn't own the playlist.
         """
-        playlist = await self.get_playlist(playlist_id, user_id)
+        pre = await self.firestore.get_document(self.PLAYLISTS_COLLECTION, playlist_id)
+        titles = await self._titles(self._legacy_keys([pre])) if pre else {}
 
-        if song_id not in playlist.song_ids:
-            return playlist
+        def build(items: list[PlaylistItem]) -> list[PlaylistItem] | None:
+            kept = [i for i in items if i.song_key != song_id]
+            return kept if len(kept) != len(items) else None
 
-        now = datetime.now(UTC)
-        new_items = [i for i in playlist.items if i.song_key != song_id]
-        return await self._write_items(playlist, new_items, now)
+        return await self._mutate_items(playlist_id, user_id, titles, datetime.now(UTC), build)
 
     async def _doc_to_playlist(self, doc: dict) -> PlaylistInfo:
         """Firestore doc -> PlaylistInfo. Legacy docs (``song_ids`` only) get ``items`` in memory."""
