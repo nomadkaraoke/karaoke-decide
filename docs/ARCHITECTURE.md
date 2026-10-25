@@ -333,13 +333,26 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   3. undo what sessions wrote to `user_songs`: delete rows whose only source is `voice_session`; on any other
      row strip the `session_*` fields and remove `"voice_session"` from `sources` (and from `source`, replaced
      by the first remaining source).
-
   4. delete the user's `playlists` documents (setlists, per `user_id`), and the user's `karaoke_log`,
      `user_songs`, `user_karaoke_unresolved` rows. Playlists are user data for this registry;
      `POST /api/test/profile/reset` already clears them (now including `playlists` and `karaoke_log`).
 
-  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) is the template
-  for steps 1-3; the profile reset (`POST /api/test/profile/reset`) is the template for step 4. Any new store of user audio or voice data must be added to both.
+  `erase_voice_data(fs, bucket, user_id)` in `backend/services/user_deletion.py` does steps 1-3; account
+  deletion and the test API's `POST /api/test/voice/reset` both call it. `delete_all_user_data` does step 4
+  through the registry below. Any new store of user audio or voice
+  data must be added there.
+- **User-data registry (Phase 6)**: `backend/services/user_deletion.py` holds `USER_DATA_STORES` (every per-user
+  collection and how a user's docs are found: `user_id_field`, `doc_id_user_id`, `doc_id_email_hash`,
+  `email_field`) and `NOT_USER_DATA` (global collections, or ones keyed by something that isn't the user, each
+  with its reason). `delete_all_user_data(fs, bucket, email)` looks the profile up at
+  `decide_users/{sha256(lowercase email)}` without creating it, runs `erase_voice_data`, deletes the user's docs
+  in every registry store, and deletes `decide_users` last, so a retry after a part-way failure still finds the
+  user; it returns counts per collection (`{}` for an unknown email) and is idempotent. **Rule: every Firestore
+  collection decide's code names must be in one of the two.** `backend/tests/test_user_data_registry_guard.py`
+  parses `backend/` and `karaoke_decide/` (collection constants, FirestoreService calls, `collection=` keywords,
+  transaction calls) and fails on any collection in neither. gen's `sessions` and `gen_users` are not decide's:
+  gen deletes them itself, sessions last. decide keeps no import payloads in GCS (exports are parsed in the
+  request); voice recordings are its only per-user objects.
 
 ## Security Considerations
 
