@@ -16,6 +16,7 @@ from karaoke_decide.vocal_range.notes import VOICE_TYPES
 from karaoke_decide.voice_session.weights import (
     EPS_DIFFICULTY,
     EPS_POSITION,
+    HELD_HIGH_FALSETTO_P,
     MIC_BIAS,
     OCTAVE_PRIOR,
     PRIOR_FLOOR,
@@ -238,12 +239,21 @@ def likelihood_difficulty(h: Hyp, song: SongDemand, answer: Difficulty, octave: 
 def likelihood_pitch(h: Hyp, pitch: PitchSummary | None) -> float:
     """Held notes are achieved notes: they bound the full range and are never a "miss".
 
-    Returns 1.0 (no information) when the pitch summary is absent or too thin to use.
+    The top bound keeps a floor of HELD_HIGH_FALSETTO_P: a held top far above the range may be one falsetto note
+    the app didn't label, so it can't rule a type out on its own. Returns 1.0 (no information) when the pitch
+    summary is absent or too thin to use.
     """
     if pitch is None or not usable_pitch(pitch):
         return 1.0
     f_lo, f_hi = full(h)
-    return _sigmoid((f_hi - pitch.held_high + 1) / 1.0) * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
+    top = (1 - HELD_HIGH_FALSETTO_P) * _sigmoid((f_hi - pitch.held_high + 1) / 1.0) + HELD_HIGH_FALSETTO_P
+    return top * _sigmoid((pitch.held_low - f_lo + 1) / 1.0)
+
+
+def tessitura_applies(ev: Evidence) -> bool:
+    """Tessitura counts only for a song rated comfortable and not a stretch, with usable pitch (as the measured
+    comfort, ``comfort.counts_for_comfort``): a stretch reached past the comfortable band."""
+    return ev.quiz.position == "comfortable" and ev.quiz.difficulty in (None, "easy") and usable_pitch(ev.pitch)
 
 
 def likelihood_tessitura(h: Hyp, pitch: PitchSummary | None, position: Position, octave: int | None) -> float:
@@ -384,7 +394,7 @@ class Posterior:
         w_quiz = evidence_weight(ev, "quiz")
         use_pitch = usable_pitch(ev.pitch)
         w_pitch = evidence_weight(ev, "pitch") if use_pitch else 0.0
-        w_tess = evidence_weight(ev, "tessitura") if use_pitch and ev.quiz.position == "comfortable" else 0.0
+        w_tess = evidence_weight(ev, "tessitura") if tessitura_applies(ev) else 0.0
         new: dict[Hyp, float] = {}
         for h, lp in self.log_p.items():
             ll = math.log(likelihood_position(h, ev.song, ev.quiz.position, octave))

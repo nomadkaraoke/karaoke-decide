@@ -20,6 +20,9 @@ W_PITCH_OPEN = 1.0
 W_TESSITURA = 1.0
 TESS_TEMP = 1.0
 TESS_SD = 3.0
+# A held top above a hypothesis's full range may be a falsetto note the app didn't catch (the sim leaks one into
+# 30% of songs; Andrew's song 3): the upper bound of model.likelihood_pitch never drops below this.
+HELD_HIGH_FALSETTO_P = 0.3
 K_KNEW: dict[str | None, float] = {"well": 1.0, "partly": 0.7, "barely": 0.3, None: 0.8}
 K_WARM_MISS = {"cold": 0.5, "bit_warm": 0.8, "warm": 1.0}
 K_TIRED_MISS = 0.5

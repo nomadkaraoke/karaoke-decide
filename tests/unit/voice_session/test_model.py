@@ -23,8 +23,10 @@ from karaoke_decide.voice_session.model import (
     likelihood_tessitura,
     likely_octave,
     sung_octave,
+    tessitura_applies,
 )
 from karaoke_decide.voice_session.weights import (
+    HELD_HIGH_FALSETTO_P,
     MIC_BIAS,
     OCTAVE_PRIOR,
     PRIOR_FLOOR,
@@ -212,7 +214,8 @@ def test_difficulty_likelihood_is_a_distribution_with_floor() -> None:
 
 def test_held_note_above_type_range_penalises_type() -> None:
     pitch = PitchSummary(voiced_s=40, held_count=5, held_low=60, held_high=74, p10=61, p50=67, p90=72)
-    assert likelihood_pitch(("bass", 0), pitch) < 1e-3
+    # A held top far above the range keeps HELD_HIGH_FALSETTO_P: it may be a falsetto note the app missed.
+    assert likelihood_pitch(("bass", 0), pitch) == pytest.approx(HELD_HIGH_FALSETTO_P, abs=1e-3)
     assert likelihood_pitch(("tenor", 0), pitch) < 0.5  # full top 72, held 74
     assert likelihood_pitch(("alto", 0), pitch) > 0.9  # full 53-77 covers 60-74
     post = Posterior.uniform().update(
@@ -494,3 +497,37 @@ def test_self_prior_unchanged() -> None:
     assert with_band.log_p == pytest.approx(without.log_p)
     marg = Posterior.from_profile(Profile(method="mic", voice_type="tenor")).type_marginal()
     assert marg["tenor"] / marg["bass"] == pytest.approx(4.0)
+
+
+def test_held_high_above_range_is_robust_to_a_missed_falsetto_note() -> None:
+    """One falsetto note in held_high can't rule a type out: the top bound keeps a floor, the bottom doesn't."""
+    assert HELD_HIGH_FALSETTO_P == 0.3
+    leak = PitchSummary(voiced_s=90, held_count=20, held_low=49, held_high=72, p10=50, p50=55, p90=59)
+    assert likelihood_pitch(("baritone", 0), leak) >= HELD_HIGH_FALSETTO_P
+    assert likelihood_pitch(("baritone", 0), leak) < likelihood_pitch(("tenor", 0), leak)
+    low = PitchSummary(voiced_s=90, held_count=20, held_low=40, held_high=55, p10=42, p50=48, p90=53)
+    assert likelihood_pitch(("tenor", 0), low) < 0.01  # full bottom 48: held 40 is a real chest note
+
+
+def test_tessitura_only_from_comfortable_easy_songs() -> None:
+    """A "comfortable but a stretch" song reached past the comfortable band (Andrew's falsetto song), so its sung
+    percentiles don't count as tessitura, the same rule as the measured comfort."""
+    s = song(56, 69)
+    pitch = _sung(56, 60.5, 69)
+    base = Posterior.uniform()
+    stretch = base.update(evidence(s, quiz(position="comfortable", difficulty="stretch"), ctx(headphones=True), pitch))
+    o = sung_octave(s, pitch)
+    expected = {
+        h: math.log(likelihood_position(h, s, "comfortable", o))
+        + math.log(likelihood_difficulty(h, s, "stretch", o))
+        + W_PITCH_HEADPHONES * math.log(likelihood_pitch(h, pitch))
+        for h in HYPOTHESES
+    }
+    ref = ("baritone", 0)
+    for h in HYPOTHESES:
+        assert stretch.log_p[h] - stretch.log_p[ref] == pytest.approx(expected[h] - expected[ref], abs=1e-9)
+    for difficulty in ("easy", None):
+        q = quiz(position="comfortable", difficulty=difficulty)
+        assert tessitura_applies(evidence(s, q, ctx(headphones=True), pitch))
+    assert not tessitura_applies(evidence(s, quiz(position="comfortable", difficulty="stretch"), pitch=pitch))
+    assert not tessitura_applies(evidence(s, quiz(position="too_high", difficulty="easy"), pitch=pitch))

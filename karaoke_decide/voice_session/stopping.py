@@ -1,9 +1,11 @@
-"""Stopping rule and result summary (spec §10a).
+"""Stopping rule and result summary (spec §10a, tuned in §10c / Phase 3d batch 1).
 
 Done when the top voice type reaches TOP_THRESHOLD (or an adjacent pair PAIR_THRESHOLD, reported as
-"between X and Y"), both comfortable bounds moved at most STABLE_SEMITONES over the last 2 attempts, and
-at least MIN_RANGE_ATTEMPTS attempts carried range evidence. Also done after "Getting tired" twice or
-MAX_ATTEMPTS attempts; the caller sets 'no_candidates' when choose_next returns None.
+"between X and Y"; within MEDIUM_LEAN_UNTIL songs the top type must also lead with MEDIUM_MIN_TOP), the comfortable
+range has settled (both bounds of the model's estimate moved at most STABLE_SEMITONES over the last 2 attempts,
+or the comfort is measured from the songs rated comfortable, ``comfort.measured_comfort``), and at least
+MIN_RANGE_ATTEMPTS attempts carried range evidence. Also done after "Getting tired" twice or MAX_ATTEMPTS
+attempts; the caller sets 'no_candidates' when choose_next returns None.
 """
 
 from __future__ import annotations
@@ -30,6 +32,11 @@ MIN_RANGE_ATTEMPTS = 3
 TIRED_LIMIT = 2
 STABLE_WINDOW = 3  # estimates before and after each of the last 2 attempts
 HINT_SD = 2.0
+# Early "between X and Y" stops need X to lead: adjacent types share ranges at the ends of their shifts
+# (baritone+2 is tenor−1), so a near 50/50 pair is often the wrong type. After MEDIUM_LEAN_UNTIL songs a settled
+# pair is the honest answer and stops.
+MEDIUM_MIN_TOP = 0.7
+MEDIUM_LEAN_UNTIL = 5
 
 _TYPES = list(VOICE_TYPES)
 
@@ -66,21 +73,25 @@ def _stable(history: list[tuple[float, float]]) -> bool:
 
 
 def _enough_evidence(state: SessionState) -> bool:
-    """Enough attempts with range evidence, and the comfortable range has settled."""
-    return state.range_attempts >= MIN_RANGE_ATTEMPTS and _stable(state.comfort_history)
+    """Enough attempts with range evidence, and the comfortable range has settled: the model's estimate is
+    stable, or the comfort shown is measured from the songs rated comfortable (it doesn't move with the type)."""
+    if state.range_attempts < MIN_RANGE_ATTEMPTS:
+        return False
+    return _stable(state.comfort_history) or measured_comfort(state.evidence) is not None
 
 
-def _posterior_label(marg: dict[str, float]) -> ConfidenceLabel:
-    if _top(marg)[1] >= TOP_THRESHOLD:
+def _posterior_label(marg: dict[str, float], attempts: int) -> ConfidenceLabel:
+    top = _top(marg)[1]
+    if top >= TOP_THRESHOLD:
         return "high"
-    if _best_pair(marg)[1] >= PAIR_THRESHOLD:
+    if _best_pair(marg)[1] >= PAIR_THRESHOLD and (attempts > MEDIUM_LEAN_UNTIL or top >= MEDIUM_MIN_TOP):
         return "medium"
     return "low"
 
 
 def _label(state: SessionState) -> ConfidenceLabel:
     """Posterior confidence, capped at 'low' until the evidence gates of the confident stop are met."""
-    return _posterior_label(state.posterior.type_marginal()) if _enough_evidence(state) else "low"
+    return _posterior_label(state.posterior.type_marginal(), state.attempts) if _enough_evidence(state) else "low"
 
 
 def check(state: SessionState) -> DoneReason | None:

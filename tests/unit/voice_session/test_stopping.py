@@ -48,13 +48,44 @@ def test_stop_confident_top_075_and_stable() -> None:
 
 
 def test_stop_pair_085_reports_between() -> None:
-    state = _state(posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1}))
+    # After MEDIUM_LEAN_UNTIL songs a settled adjacent pair is enough (early on it also needs a lean: see below).
+    state = _state(
+        posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1}),
+        attempts=stopping.MEDIUM_LEAN_UNTIL + 1,
+    )
     assert stopping.check(state) == "confident"
     s = stopping.summary(state)
     assert s.voice_type == "baritone"
     assert s.between == "tenor"
     assert s.confidence_label == "medium"
     assert abs(s.pair_p - 0.9) < 1e-6
+
+
+def test_early_medium_needs_a_clear_lean() -> None:
+    """Within MEDIUM_LEAN_UNTIL songs, "between X and Y" stops only when X leads with MEDIUM_MIN_TOP: a near 50/50
+    pair is where a type is most often wrong (adjacent types share ranges at the ends of their shifts)."""
+    assert (stopping.MEDIUM_MIN_TOP, stopping.MEDIUM_LEAN_UNTIL) == (0.7, 5)
+    split = posterior({("baritone", 0): 0.5, ("tenor", 0): 0.4, ("bass", 0): 0.1})
+    for attempts in (3, 4, 5):
+        assert stopping.check(_state(split, attempts=attempts)) is None
+        assert stopping.summary(_state(split, attempts=attempts)).confidence_label == "low"
+    lean = posterior({("baritone", 0): 0.72, ("tenor", 0): 0.2, ("bass", 0): 0.08})
+    assert stopping.check(_state(lean, attempts=3)) == "confident"
+    s = stopping.summary(_state(lean, attempts=3))
+    assert (s.confidence_label, s.between) == ("medium", "tenor")
+
+
+def test_measured_comfort_settles_the_range() -> None:
+    """A comfort measured from comfortable songs is what the result shows, so the model's moving estimate
+    (comfort_history) no longer holds the label at "low"."""
+    sure = posterior({("baritone", 0): 0.9, ("tenor", 0): 0.1})
+    moved = [(48.0, 62.0), (51.0, 65.0), (50.7, 64.7)]
+    assert stopping.check(_state(sure, comfort_history=moved)) is None
+    measured = [_comfortable_sung(50, 58), _comfortable_sung(50.5, 58.5)]
+    assert stopping.check(_state(sure, comfort_history=moved, evidence=measured)) == "confident"
+    assert stopping.summary(_state(sure, comfort_history=moved, evidence=measured)).confidence_label == "high"
+    # Still needs MIN_RANGE_ATTEMPTS attempts with range evidence.
+    assert stopping.check(_state(sure, comfort_history=moved, evidence=measured, range_attempts=2)) is None
 
 
 def test_non_adjacent_pair_is_not_confident() -> None:
