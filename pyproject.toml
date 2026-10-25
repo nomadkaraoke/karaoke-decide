@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "karaoke-decide"
-version = "0.30.0"
+version = "0.31.0"
 description = "Help people discover and choose the perfect karaoke songs based on their music listening history"
 authors = ["Andrew Beveridge <andrew@beveridge.uk>"]
 readme = "README.md"

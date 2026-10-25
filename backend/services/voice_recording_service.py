@@ -24,14 +24,16 @@ from typing import IO, Any
 
 from backend.services.firestore_service import FirestoreService
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from backend.services.voice_session_service import RECORDINGS_COLLECTION as RECORDINGS_COLLECTION  # re-export
 
 logger = logging.getLogger(__name__)
 
-RECORDINGS_COLLECTION = "voice_recordings"
 PURGES_COLLECTION = "voice_recording_purges"
 RECORDINGS_PREFIX = "voice-recordings/"
 MAX_BYTES = 20 * 1024 * 1024
 CONTENT_TYPES = {"audio/mp4": "m4a", "audio/wav": "wav"}
+DELETED_MARKER = "recording_deleted_at"  # on voice_attempts: the owner deleted this attempt's recording
+AUDIO_CHUNK = 256 * 1024  # streamed playback reads the object this much at a time
 _COPY = 1024 * 1024
 
 
@@ -66,14 +68,80 @@ class RecordingsDeletedError(RecordingError):
     status_code, detail = 409, "recordings_deleted"
 
 
+class RecordingDeletedError(RecordingError):
+    """The user deleted this attempt's recording ("Delete this recording"); a queued or in-flight
+    upload of it is refused, or undoes itself, so it can't come back."""
+
+    status_code, detail = 409, "recording_deleted"
+
+
 class EmptyRecordingError(RecordingError):
     status_code, detail = 422, "empty_recording"
+
+
+class RecordingNotFoundError(RecordingError):
+    """Not the user's recording, no such recording, or its object is gone: always 404 (never 403)."""
+
+    status_code, detail = 404, "recording_not_found"
+
+
+class RecordingObjectMissingError(Exception):
+    """The recording's object is not in the bucket."""
 
 
 def user_prefix(user_id: str) -> str:
     if not user_id or "/" in user_id or ".." in user_id:
         raise ValueError("invalid user id")
     return f"{RECORDINGS_PREFIX}{user_id}/"
+
+
+def _is_not_found(exc: BaseException) -> bool:
+    return isinstance(exc, FileNotFoundError) or getattr(exc, "code", None) == 404
+
+
+def recording_object_name(gcs_path: str, bucket_name: str) -> str | None:
+    """The object name inside the recordings bucket, or None for anything outside it
+    (another bucket, outside ``voice-recordings/``, or a ``..`` segment)."""
+    if gcs_path.startswith("gs://"):
+        bucket, _, name = gcs_path[len("gs://") :].partition("/")
+        if bucket != bucket_name:
+            return None
+    else:
+        name = gcs_path
+    if not name.startswith(RECORDINGS_PREFIX) or ".." in name.split("/"):
+        return None
+    return name
+
+
+async def open_recording(bucket: Any, name: str) -> Iterator[bytes]:
+    """The object's bytes in ``AUDIO_CHUNK`` pieces. The first chunk is read here, so a missing object
+    raises :class:`RecordingObjectMissingError` before any response starts; the rest stream lazily."""
+    blob = bucket.blob(name)
+
+    def first_chunk() -> tuple[Any, bytes]:
+        f = blob.open("rb")
+        try:
+            return f, f.read(AUDIO_CHUNK)
+        except BaseException:
+            f.close()
+            raise
+
+    try:
+        src, head = await asyncio.to_thread(first_chunk)
+    except Exception as exc:
+        if _is_not_found(exc):
+            raise RecordingObjectMissingError(name) from exc
+        raise
+
+    def chunks() -> Iterator[bytes]:
+        try:
+            yield head
+            while chunk := src.read(AUDIO_CHUNK):
+                yield chunk
+        finally:
+            src.close()
+
+    return chunks()
 
 
 # ---------------------------------------------------------------- local-dir bucket (local stack)
@@ -157,6 +225,9 @@ class VoiceRecordingService:
         attempt = await self._fs.get_document(ATTEMPTS_COLLECTION, f"{session_id}:{attempt_n}")
         if not attempt or attempt.get("user_id") != user_id or attempt.get("session_id") != session_id:
             raise AttemptNotFoundError(f"{session_id}:{attempt_n}")
+        if attempt.get(DELETED_MARKER):
+            logger.warning("voice upload refused: recording %s:%s was deleted by its owner", session_id, attempt_n)
+            raise RecordingDeletedError(f"{session_id}:{attempt_n}")
 
         size = await asyncio.to_thread(_measure, file)  # streams in chunks; raises when over the cap
         if size == 0:
@@ -214,15 +285,69 @@ class VoiceRecordingService:
         # delete-all withdraws consent before it lists objects, so consent gone now means our put may have been missed.
         current = await self._fs.get_document(SESSIONS_COLLECTION, session_id) or {}
         withdrawn = (current.get("setup") or {}).get("record") is not True
-        if withdrawn or (purged_at is not None and purged_at >= started):
+        # A delete-one of this very recording marks the attempt first, so the marker now means it ran mid-flight.
+        deleted_one = bool((await self._fs.get_document(ATTEMPTS_COLLECTION, attempt_id) or {}).get(DELETED_MARKER))
+        purged = withdrawn or (purged_at is not None and purged_at >= started)
+        if purged or deleted_one:
             try:
                 await asyncio.to_thread(self._delete_blob, name)
                 await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)
                 await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": None})
-            except Exception:  # never a 500: the user's next delete-all sweeps what is left
-                logger.warning("could not fully undo recording %s after a delete-all", recording_id, exc_info=True)
-            raise RecordingsDeletedError(recording_id)
+            except Exception:  # never a 500: the user's next delete sweeps what is left
+                logger.warning("could not fully undo recording %s after a delete", recording_id, exc_info=True)
+            if purged:
+                raise RecordingsDeletedError(recording_id)
+            logger.warning("voice upload undone: recording %s was deleted by its owner mid-upload", recording_id)
+            raise RecordingDeletedError(recording_id)
         return recording_id
+
+    async def delete_one(self, user_id: str, recording_id: str) -> None:
+        """Erase one of the user's recordings: object (real erasure), doc and attempt link. Idempotent.
+
+        Order: mark the attempt (``recording_deleted_at``) first, so an upload of it that is queued or in
+        flight is refused or undoes itself (see ``upload``); then the object, the doc, the attempt's
+        ``recording_id``. Consent for the session's other takes stays. A repeat delete finds the marker
+        and succeeds; anything that isn't the user's is RecordingNotFoundError (404, never 403)."""
+        doc = await self._fs.get_document(RECORDINGS_COLLECTION, recording_id)
+        if doc is None:
+            attempt = await self._fs.get_document(ATTEMPTS_COLLECTION, recording_id)
+            if attempt and attempt.get("user_id") == user_id and attempt.get(DELETED_MARKER):
+                return  # already deleted
+            raise RecordingNotFoundError(recording_id)
+        if doc.get("user_id") != user_id:
+            raise RecordingNotFoundError(recording_id)
+        attempt_id = f"{doc.get('session_id')}:{doc.get('attempt_n')}"
+        attempt = await self._fs.get_document(ATTEMPTS_COLLECTION, attempt_id) or {}
+        owned_attempt = attempt.get("user_id") == user_id
+        if owned_attempt:
+            await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {DELETED_MARKER: datetime.now(UTC)})
+        name = recording_object_name(str(doc.get("gcs_path") or ""), str(getattr(self._bucket, "name", "") or ""))
+        if name is not None and name.startswith(user_prefix(user_id)):
+            await asyncio.to_thread(self._delete_blob, name)
+        else:
+            logger.warning("voice_recordings/%s has a gcs_path outside its owner's prefix; object left", recording_id)
+        await self._fs.delete_document(RECORDINGS_COLLECTION, recording_id)
+        if owned_attempt:
+            await self._fs.update_document(ATTEMPTS_COLLECTION, attempt_id, {"recording_id": None})
+
+    async def open_own(self, user_id: str, recording_id: str, bucket_name: str) -> tuple[str, Iterator[bytes]]:
+        """(content type, audio chunks) of one of the user's own recordings; RecordingNotFoundError otherwise.
+
+        A stored ``gcs_path`` outside ``voice-recordings/<user_id>/`` is never served (WARNING: the doc is
+        inconsistent); a missing object is a 404 too (WARNING: the doc outlived its object)."""
+        doc = await self._fs.get_document(RECORDINGS_COLLECTION, recording_id)
+        if not doc or doc.get("user_id") != user_id or not doc.get("gcs_path"):
+            raise RecordingNotFoundError(recording_id)
+        name = recording_object_name(str(doc["gcs_path"]), bucket_name)
+        if name is None or not name.startswith(user_prefix(user_id)):
+            logger.warning("voice_recordings/%s has a gcs_path outside its owner's prefix; not served", recording_id)
+            raise RecordingNotFoundError(recording_id)
+        try:
+            chunks = await open_recording(self._bucket, name)
+        except RecordingObjectMissingError as exc:
+            logger.warning("voice_recordings/%s: recording object already gone", recording_id)
+            raise RecordingNotFoundError(recording_id) from exc
+        return str(doc.get("content_type") or "application/octet-stream"), chunks
 
     async def count(self, user_id: str) -> int:
         docs = await self._fs.query_documents(RECORDINGS_COLLECTION, filters=[("user_id", "==", user_id)])
@@ -271,7 +396,7 @@ class VoiceRecordingService:
         try:
             self._bucket.blob(name).delete()
         except Exception as exc:
-            if isinstance(exc, FileNotFoundError) or getattr(exc, "code", None) == 404:
+            if _is_not_found(exc):
                 logger.info("recording object already gone: %s", name)
                 return
             raise

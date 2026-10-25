@@ -272,3 +272,48 @@ async def test_deletes_that_dont_land_raise_instead_of_looping(
     monkeypatch.setattr(fs, "batch_delete", no_op)
     with pytest.raises(RuntimeError, match="keep coming back"):
         await delete_all_user_data(_db(fs), bucket, EMAIL_A)
+
+
+async def test_erase_voice_data_removes_recording_deleted_marker(fs: FakeFirestore, bucket: LocalBucket) -> None:
+    """ "Delete this recording" leaves a marker on the attempt; erasing voice data takes it with the attempt."""
+    _seed_voice(fs, bucket, USER_A)
+    fs.cols["voice_attempts"]["s1:2"] = {
+        "user_id": USER_A, "session_id": "s1", "n": 2, "recording_id": None,
+        "recording_deleted_at": "2026-10-25T20:00:00+00:00",
+    }  # fmt: skip
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+
+    assert list(fs.cols["voice_attempts"]) == ["sx:1"]
+    assert not [d for d in fs.cols["voice_attempts"].values() if "recording_deleted_at" in d]
+
+
+async def test_account_deletion_erases_mic_copy_and_summaries(fs: FakeFirestore, bucket: LocalBucket) -> None:
+    """The kept mic result lives on decide_users and session results on voice_sessions: both go."""
+    _seed_user(fs, USER_A, EMAIL_A)
+    _seed_voice(fs, bucket, USER_A)
+    profile = {"voice_type": "bass", "method": "mic", "low_midi": 40, "high_midi": 64}
+    fs.cols["decide_users"][_hash(EMAIL_A)].update({"voice_profile": profile, "voice_profile_mic": profile})
+    fs.cols["voice_sessions"]["s1"]["result_summary"] = {"session_id": "s1", "voice_type": "baritone"}
+
+    await delete_all_user_data(_db(fs), bucket, EMAIL_A)
+
+    assert _hash(EMAIL_A) not in fs.cols["decide_users"]
+    assert not [d for d in fs.cols["decide_users"].values() if "voice_profile_mic" in d]
+    assert not [d for d in fs.cols["voice_sessions"].values() if d.get("user_id") == USER_A]
+    assert "s1" not in fs.cols["voice_sessions"]
+
+
+async def test_erase_voice_data_removes_exclusion_and_displacement_markers(
+    fs: FakeFirestore, bucket: LocalBucket
+) -> None:
+    _seed_voice(fs, bucket, USER_A)
+    fs.cols["voice_attempts"]["s1:1"].update({"excluded": True, "excluded_at": "2026-10-25T20:00:00+00:00"})
+    fs.cols["voice_sessions"]["s1"]["profile_displaced_by_exclusion"] = True
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+
+    assert list(fs.cols["voice_attempts"]) == ["sx:1"]
+    assert not [d for d in fs.cols["voice_attempts"].values() if "excluded" in d or "excluded_at" in d]
+    assert list(fs.cols["voice_sessions"]) == ["sx"]
+    assert not [d for d in fs.cols["voice_sessions"].values() if "profile_displaced_by_exclusion" in d]

@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable, Coroutine
 from typing import Annotated, Any, TypeVar
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import Message
@@ -19,6 +20,8 @@ from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
+    AttemptPatchIn,
+    AttemptPatchOut,
     NextDoneOut,
     NextSongOut,
     ResultOut,
@@ -28,9 +31,11 @@ from backend.models.voice_session import (
     SessionSetup,
     SkipIn,
     VoiceFlagsOut,
+    VoiceHistoryOut,
 )
 from backend.services import voice_recording_service as vrs
 from backend.services.voice_data_store import VoiceDataUnavailable
+from backend.services.voice_profile_service import VoiceProfileOut
 from backend.services.voice_recording_service import RecordingError, VoiceRecordingService
 from backend.services.voice_session_service import VoiceSessionError, active_session_id
 from karaoke_decide.core.models import User
@@ -75,6 +80,12 @@ async def flags(
     )
 
 
+@router.get("/history", response_model=VoiceHistoryOut)
+async def history(user: CurrentUser, service: VoiceSessionServiceDep) -> VoiceHistoryOut:
+    """Your sessions, songs and recordings, newest first. Open even when the session flag is off."""
+    return await _call(service.history(user))
+
+
 @router.post("/sessions", response_model=SessionCreated)
 async def create_session(body: SessionSetup, user: SessionUser, service: VoiceSessionServiceDep) -> SessionCreated:
     return await _call(service.create(user, body))
@@ -114,6 +125,20 @@ async def add_attempt(
 @router.get("/sessions/{session_id}/result", response_model=ResultOut)
 async def session_result(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> ResultOut:
     return await _call(service.result(user, session_id))
+
+
+@router.post("/sessions/{session_id}/adopt", response_model=VoiceProfileOut)
+async def adopt_session(session_id: str, user: SessionUser, service: VoiceSessionServiceDep) -> VoiceProfileOut:
+    """Make this session's result your voice profile, even at low confidence."""
+    return await _call(service.adopt(user, session_id))
+
+
+@router.patch("/attempts/{attempt_id}", response_model=AttemptPatchOut)
+async def patch_attempt(
+    attempt_id: str, body: AttemptPatchIn, user: CurrentUser, service: VoiceSessionServiceDep
+) -> AttemptPatchOut:
+    """ "Don't count this one" (``excluded: true``) or count it again. Open even when the session flag is off."""
+    return await _call(service.set_excluded(user, attempt_id, body.excluded))
 
 
 # ---------------------------------------------------------------- recordings (private, consent-gated)
@@ -211,6 +236,29 @@ async def upload_recording(
 @recordings_router.delete("/recordings", response_model=RecordingsDeleted)
 async def delete_recordings(user: CurrentUser, service: RecordingServiceDep) -> RecordingsDeleted:
     return RecordingsDeleted(deleted=await service.delete_all_for_user(user.id))
+
+
+@recordings_router.delete("/recordings/{recording_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_recording(recording_id: str, user: CurrentUser, service: RecordingServiceDep) -> Response:
+    """Delete one of your recordings (object, doc, attempt link). Idempotent; not yours: 404."""
+    try:
+        await service.delete_one(user.id, recording_id)
+    except RecordingError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@recordings_router.get("/recordings/{recording_id}/audio")
+async def recording_audio(
+    recording_id: str, user: CurrentUser, settings: Settings, service: RecordingServiceDep
+) -> StreamingResponse:
+    """Stream one of your own recordings with its stored content type (no Range: the app downloads, then
+    plays). Another user's recording, a missing one or a missing object: 404 ``recording_not_found``."""
+    try:
+        content_type, chunks = await service.open_own(user.id, recording_id, settings.voice_recordings_bucket)
+    except RecordingError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    return StreamingResponse(chunks, media_type=content_type)
 
 
 @recordings_router.get("/recordings/count", response_model=RecordingsCount)

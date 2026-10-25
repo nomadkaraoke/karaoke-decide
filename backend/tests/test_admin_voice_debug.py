@@ -28,6 +28,7 @@ from backend.config import BackendSettings
 from backend.main import app
 from backend.services.auth_service import AuthService
 from backend.services.voice_data_store import VoiceDataStore
+from backend.services.voice_recording_service import recording_object_name
 from backend.tests.test_karaoke_log_service import MemoryFirestore
 from karaoke_decide.core.models import User
 from karaoke_decide.voice_pool import fixtures
@@ -353,3 +354,17 @@ def test_admin_audio_refuses_paths_outside_recordings(
     bucket.objects[gcs_path.split("/", 3)[-1]] = b"must not be served"
     fs.cols["voice_recordings"] = {"bad": {"gcs_path": gcs_path, "content_type": "audio/mp4"}}
     assert client.get("/api/admin/voice/recordings/bad/audio", headers=_tok()).status_code == 404
+
+
+def test_admin_audio_unchanged(client: TestClient, fs: MemoryFirestore) -> None:
+    """The admin stream shares the user route's helpers (voice_recording_service) and still serves any user's
+    recording, gs:// or plain, chunk by chunk."""
+    assert recording_object_name(REC_PATH, "b") == REC_PATH
+    assert recording_object_name(f"gs://b/{REC_PATH}", "b") == REC_PATH
+    assert recording_object_name(f"gs://other/{REC_PATH}", "b") is None
+    assert recording_object_name("voice-recordings/u/../x", "b") is None
+    fs.cols["voice_recordings"] = {
+        REC_ID: {"user_id": "someone_else", "gcs_path": REC_PATH, "content_type": "audio/mp4"}
+    }
+    res = client.get(f"/api/admin/voice/recordings/{REC_ID}/audio", headers=_tok())
+    assert res.status_code == 200 and res.content == AUDIO

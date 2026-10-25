@@ -164,6 +164,7 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `POST /api/test/profile/reset` | `{email}` → 204; deletes the user's decide data |
 | `POST /api/test/profile/seed` | `{email, artists:[{name,affinity}], genres, decades, energy, quiz_completed, loved:[song_key], hidden:[song_key]}` → creates/overwrites the quiz profile and song feedback |
 | `GET /api/test/profile?email=` | Reads the profile back |
+| `POST /api/test/voice/seed-history` | `{email, sessions: [{state, result_summary?, attempts: [{song_key, artist, title, quiz, pitch?, recording, excluded?}]}]}` → `{user_id, sessions: [{session_id, attempt_ids, recording_ids}]}`. Replaces the user's voice history (oldest session first); `recording: true` stores a short synthetic WAV that `GET /api/voice/recordings/{id}/audio` plays (docs/TESTING.md § Voice session) |
 | `POST /api/test/karaoke-log/seed` | `{email, entries: [{id: "app_…", ...app patch}]}` → `{user_id, count}`. Writes app karaoke-log entries through `KaraokeLogService.upsert_user` (counts and survey placeholders as a real app write); creates the user if needed. Non-`app_` ids → 400 `invalid`. |
 | `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log and the user's playlists. |
 | `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
@@ -434,9 +435,9 @@ Get details for a specific song.
 
 The singer's voice profile, stored on their `decide_users` doc (auth required; verified, guest and gen-session users). Mic audio never reaches the server: the app sends only derived numbers, and unknown body keys are rejected (422).
 
-- `GET` -> `{"profile": null | {...}}` (an invalid stored profile is treated as unset).
-- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; 404 `not_found` if the user has no doc; 422 on an inconsistent body.
-- `DELETE` -> 204.
+- `GET` -> `{"profile": null | {...}, "mic": null | {...}, "latest_session": null | {...}}` (an invalid stored profile is treated as unset). `profile` is the saved profile (what recommendations use). `mic` is the last mic-test result, kept as `voice_profile_mic` beside a session result (so it survives a session saving over it). `latest_session` is the newest session result (by when the session started, `created_at`) resting on at least one counting attempt with range evidence, saved or not, in the `GET /api/voice/history` `result` shape; Me shows it next to `mic`.
+- `PUT` replaces the profile (last save wins) and returns it with `updated_at`; a `method: mic` profile is also kept as the mic result. 404 `not_found` if the user has no doc; 422 on an inconsistent body.
+- `DELETE` -> 204; clears the profile and the kept mic result.
 
 ```json
 {"low_midi": 40, "high_midi": 69, "comfort_low": 45, "comfort_high": 64, "voice_type": "baritone", "voice_type_between": "tenor",
@@ -2206,15 +2207,56 @@ Works in any session state (no attempts yet: the prior, `partial: true`). On an 
  "suited": [], "loved": [{"song_key": "artist|title", "artist": "Artist", "title": "Title"}]}
 ```
 
-`suited` is up to 15 songs in the recommendations v2 shape; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
+Every call (finish, refetch, an abandoned session) stores the result as the session's `result_summary` (the `GET /api/voice/history` `result`, with `evidence_attempts` and `computed_at`). `suited` is up to 15 songs in the recommendations v2 shape, ranked by your taste (recommendations v2 `sort=best` with `singable=true`, so songs by artists you know and love come first) and topped up from `sort=fit` when taste gives fewer than 5; `loved` the songs marked "Love it" in this session. `done_reason` (`confident|tired|max_attempts|no_candidates`, or `null` when the singer finished early) is why the session ended. `method: session` profiles are written only here: `PUT /api/my/voice` rejects them (`422`).
+
+### POST /api/voice/sessions/{session_id}/adopt
+
+"Use this result": saves the session's result as your voice profile (`method: session`) even at low confidence, and marks the session's result `profile_saved: true`. Returns the saved profile (the `GET /api/my/voice` `profile` shape). Your mic result stays as `mic`. Gated like the other session endpoints. Errors: `404 session_not_found` (unknown, or another user's), `409 no_evidence` (no counting attempt with range evidence, so there is nothing to save), `404 user_not_found` (no profile doc).
+
+### GET /api/voice/history
+
+Your voice data, for "Your recordings" on Me: the signed-in user's sessions that have at least one sung song, newest first, at most 20. Open to every signed-in user, even with the session flag off.
+
+```json
+{"sessions": [{"session_id": "abc123", "created_at": "2026-10-25T19:00:00Z", "state": "done",
+  "result": {"session_id": "abc123", "voice_type": "baritone", "between": null, "confidence_label": "low", "top_p": 0.5,
+             "low": 45, "high": 69, "comfort_low": 50, "comfort_high": 61, "attempts": 4, "evidence_attempts": 4,
+             "profile_saved": false, "computed_at": "2026-10-25T19:40:00Z"},
+  "attempts": [{"attempt_id": "abc123:1", "n": 1, "song_key": "artist|title", "artist": "Artist", "title": "Title",
+                "sung_at": "2026-10-25T19:08:00Z", "feel": "loved", "position": "comfortable", "excluded": false,
+                "recording": {"recording_id": "abc123:1", "duration_s": 180.5, "content_type": "audio/mp4", "bytes": 48000},
+                "falsetto_notes": 0}]}]}
+```
+
+`result` is the session's result as last computed (`null` before the first `GET .../result`). `recording` is `null` when nothing was recorded, the recording was deleted, or the upload hasn't arrived yet (the app shows its own queued takes as "Uploading…"). `excluded` is "Don't count this one" (`PATCH /api/voice/attempts/{attempt_id}`).
+
+### PATCH /api/voice/attempts/{attempt_id}
+
+"Don't count this one". Body `{"excluded": true}` (or `false` to count it again; unknown keys `422`). The attempt stays in the history and its song is still never offered again in that session, but it leaves the voice model: it no longer moves the result, counts as range evidence or as a "tired" answer. The session's result is then recomputed (stored as its `result` for a finished session; an active session's next `GET .../next` and `GET .../sessions/{id}` use it at once), and if your saved voice profile came from this session it is re-derived:
+
+```json
+{"attempt_id": "abc123:2", "excluded": true,
+ "result": {"session_id": "abc123", "voice_type": "baritone", "...": "...", "evidence_attempts": 1, "profile_saved": true},
+ "profile": "updated"}
+```
+
+`profile`: `updated` (saved again from the attempts that still count, whatever its confidence), `reverted_to_mic` (no evidence left: your last mic-test result is your profile again), `removed` (no evidence left and no mic result), or `unchanged` (the saved profile isn't this session's). Counting the attempt again after `reverted_to_mic` / `removed` saves the session's profile again (`updated`), unless you have chosen another profile since. A mic result saved before v0.31.0 (no kept copy yet) is copied aside the first time a session or adopt saves over it, so it is never lost. Song feedback (`user_songs`) is untouched. Open to every signed-in user, even with the session flag off. Errors: `404 attempt_not_found` (unknown, or another user's).
 
 ### POST /api/voice/recordings
 
-Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.
+Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `409 recording_deleted` (the user deleted this take's recording; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.
 
 ### DELETE /api/voice/recordings
 
 Erases every recording of the signed-in user (objects, documents, attempt links) and withdraws recording consent (`setup.record = false`) on all their sessions, so an upload queued before the delete is refused with `403 recording_not_consented`; the user re-consents with `PATCH` (`{"record": true}`). Idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
+
+### DELETE /api/voice/recordings/{recording_id}
+
+Deletes one of your recordings for good: the stored object (real erasure), its document and the attempt's link. `204`, and a repeat call is `204` too. Another user's recording or an unknown id: `404 recording_not_found`. Consent for the session's other takes is unchanged. Afterwards an upload of that take is refused with `409 recording_deleted` (drop it from the queue), and an upload that was already in flight undoes itself and gets the same 409. Open to every signed-in user, even with the session flag off.
+
+### GET /api/voice/recordings/{recording_id}/audio
+
+Streams one of your own recordings with its stored content type (`audio/mp4` or `audio/wav`). No Range support: the app downloads the file, then plays it. Open to every signed-in user, even with the session flag off. `404 recording_not_found` when the recording doesn't exist, belongs to someone else (never `403`), or its object is gone; a stored path outside your own `voice-recordings/<user_id>/` prefix is also a 404 (logged as a WARNING). Admin playback (`/api/admin/voice/recordings/{id}/audio`) is unchanged.
 
 ### GET /api/voice/recordings/count
 
@@ -2224,7 +2266,7 @@ Erases every recording of the signed-in user (objects, documents, attempt links)
 
 The app queues recordings and uploads them in the background. For each queued upload:
 
-- **Drop it** on `403 recording_not_consented`, `409 recordings_deleted`, or `404 attempt_not_found`: the server will never take it.
+- **Drop it** on `403 recording_not_consented`, `409 recordings_deleted`, `409 recording_deleted`, or `404 attempt_not_found`: the server will never take it.
 - **Keep it** (retry later) on `5xx` and on network errors.
 - **Before calling `DELETE /api/voice/recordings`, clear the queue**, so nothing recorded before the delete is sent after it. (The server also refuses such uploads, since the delete withdraws consent, but the app should not rely on that.)
 

@@ -8,11 +8,16 @@ doc is ``decide_users/{sha256(lowercase email)}`` (via ``AuthService.resolve_gen
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import io
+import math
+import struct
+import uuid
+import wave
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from backend.api.deps import (
     get_auth_service_dep,
@@ -26,6 +31,7 @@ from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
 from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
+from backend.models.voice_session import PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportIngestService
@@ -42,7 +48,7 @@ from backend.services.playlist_service import PlaylistService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 from backend.services.user_deletion import erase_voice_data
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
-from backend.services.voice_recording_service import RECORDINGS_COLLECTION
+from backend.services.voice_recording_service import RECORDINGS_COLLECTION, user_prefix
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
 
 router = APIRouter()
@@ -158,9 +164,9 @@ async def seed_voice(body: VoiceSeedBody, fs: FirestoreDep, auth: AuthDep) -> Re
     """Set the user's voice profile (validated like PUT /api/my/voice) on their profile doc."""
     await auth.resolve_gen_user(body.email)
     profile = VoiceProfileOut(**body.profile.model_dump(by_alias=True), updated_at=datetime.now(UTC))
-    await fs.update_document(
-        USERS, auth._hash_email(body.email.lower()), {"voice_profile": profile.model_dump(mode="json", by_alias=True)}
-    )
+    stored = profile.model_dump(mode="json", by_alias=True)
+    fields = {"voice_profile": stored, **({"voice_profile_mic": stored} if profile.method == "mic" else {})}
+    await fs.update_document(USERS, auth._hash_email(body.email.lower()), fields)  # as VoiceProfileService.put
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -215,6 +221,167 @@ async def reset_voice(
     if user_id:
         await erase_voice_data(fs, bucket, user_id)  # the Phase 3d contract, shared with account deletion
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class SeedDemand(BaseModel):
+    low: float = 48
+    high: float = 64
+    p10: float = 50
+    p50: float = 55
+    p90: float = 60
+
+
+class SeedAttempt(BaseModel):
+    song_key: str
+    artist: str
+    title: str
+    quiz: QuizIn
+    pitch: PitchSummaryIn | None = None
+    recording: bool = False
+    excluded: bool = False
+    demand: SeedDemand = Field(default_factory=SeedDemand)
+
+
+class SeedSession(BaseModel):
+    state: SessionStateName = "done"
+    # SessionResultSummaryOut without session_id / computed_at (filled in here).
+    result_summary: dict[str, Any] | None = None
+    attempts: list[SeedAttempt] = Field(default_factory=list, max_length=12)
+
+
+class VoiceHistorySeedBody(BaseModel):
+    email: str
+    sessions: list[SeedSession] = Field(default_factory=list, max_length=25)
+
+
+SEED_WAV_SECONDS = 0.5
+_SEED_WAV_RATE = 8000
+
+
+def synthetic_wav(seconds: float = SEED_WAV_SECONDS, hz: float = 440.0) -> bytes:
+    """A short mono 16-bit sine tone (no real audio ever goes into test data)."""
+    frames = int(seconds * _SEED_WAV_RATE)
+    pcm = b"".join(
+        struct.pack("<h", int(8000 * math.sin(2 * math.pi * hz * i / _SEED_WAV_RATE))) for i in range(frames)
+    )
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(_SEED_WAV_RATE)
+        w.writeframes(pcm)
+    return out.getvalue()
+
+
+@router.post("/voice/seed-history")
+async def seed_voice_history(
+    body: VoiceHistorySeedBody,
+    fs: FirestoreDep,
+    auth: AuthDep,
+    bucket: Annotated[Any, Depends(get_recordings_bucket)],
+) -> dict[str, Any]:
+    """Replace the user's voice history (``erase_voice_data`` first) with the given sessions, in order
+    (the first is the oldest), for Maestro's "Your recordings" flows. Attempts are stored as a real session
+    stores them (outputs already applied, so a later ``GET .../result`` writes no ``user_songs``); an attempt
+    with ``recording: true`` also gets a short synthetic WAV in the recordings bucket (local dir) and its
+    ``voice_recordings`` doc, so ``GET /api/voice/recordings/{id}/audio`` plays it."""
+    user = await auth.resolve_gen_user(body.email)
+    await erase_voice_data(fs, bucket, user.id)
+    now = datetime.now(UTC)
+    out = []
+    for i, seed in enumerate(body.sessions):
+        sid = uuid.uuid4().hex
+        created = now - timedelta(hours=len(body.sessions) - i)
+        attempt_ids: list[str] = []
+        recording_ids: list[str] = []
+        for n, a in enumerate(seed.attempts, start=1):
+            attempt_id = f"{sid}:{n}"
+            started = created + timedelta(minutes=5 * n)
+            recording_id = None
+            if a.recording:
+                wav = synthetic_wav()
+                name = f"{user_prefix(user.id)}{sid}/{n}.wav"
+                bucket.blob(name).upload_from_file(io.BytesIO(wav), content_type="audio/wav")
+                recording_id = attempt_id
+                await fs.set_document(
+                    RECORDINGS_COLLECTION,
+                    recording_id,
+                    {
+                        "user_id": user.id,
+                        "session_id": sid,
+                        "attempt_n": n,
+                        "gcs_path": name,
+                        "content_type": "audio/wav",
+                        "bytes": len(wav),
+                        "duration_s": SEED_WAV_SECONDS,
+                        "created_at": started + timedelta(minutes=3),
+                    },
+                )
+                recording_ids.append(recording_id)
+            await fs.set_document(
+                ATTEMPTS_COLLECTION,
+                attempt_id,
+                {
+                    "user_id": user.id,
+                    "session_id": sid,
+                    "n": n,
+                    "song_key": a.song_key,
+                    "video_id": f"seed{n}",
+                    "quiz": a.quiz.model_dump(),
+                    "context": {"posture": "standing", "warmth": "warm", "headphones": True, "device": "Maestro"},
+                    "pitch": a.pitch.model_dump() if a.pitch else None,
+                    "stopped_early": False,
+                    "started_at": started,
+                    "ended_at": started + timedelta(minutes=3),
+                    "recording_id": recording_id,
+                    "song": {
+                        "artist": a.artist,
+                        "title": a.title,
+                        "artist_key": a.artist.lower(),
+                        "stratum": "",
+                        "demand": a.demand.model_dump(),
+                    },
+                    "outputs_applied": True,
+                    "excluded": a.excluded,
+                    "excluded_at": started if a.excluded else None,
+                },
+            )
+            attempt_ids.append(attempt_id)
+        summary = None
+        if seed.result_summary is not None:
+            try:
+                summary = SessionResultSummaryOut.model_validate(
+                    {"computed_at": created + timedelta(minutes=40), **seed.result_summary, "session_id": sid}
+                ).model_dump(mode="json")
+            except ValidationError as exc:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid result_summary") from exc
+        await fs.set_document(
+            SESSIONS_COLLECTION,
+            sid,
+            {
+                "user_id": user.id,
+                "setup": {
+                    "posture": "standing",
+                    "warmth": "warm",
+                    "record": any(a.recording for a in seed.attempts),
+                    "headphones": True,
+                    "device": "Maestro",
+                },  # fmt: skip
+                "state": seed.state,
+                "created_at": created,
+                "updated_at": created + timedelta(minutes=40),
+                "tired_count": 0,
+                "skips": [],
+                "prior_profile": None,
+                "pending_song_key": None,
+                "last_offer": None,
+                "done_reason": None,
+                "profile_saved": bool(summary and summary["profile_saved"]),
+                "result_summary": summary,
+            },
+        )
+        out.append({"session_id": sid, "attempt_ids": attempt_ids, "recording_ids": recording_ids})
+    return {"user_id": user.id, "sessions": out}
 
 
 @router.get("/profile")
