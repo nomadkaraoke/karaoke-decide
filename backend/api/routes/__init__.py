@@ -11,6 +11,7 @@ from backend.api.routes.internal import router as internal_router
 from backend.api.routes.karaoke_log import partner_router as kjbox_partner_router
 from backend.api.routes.karaoke_log import router as karaoke_log_router
 from backend.api.routes.known_songs import router as known_songs_router
+from backend.api.routes.library import router as library_router
 from backend.api.routes.my_data import router as my_data_router
 from backend.api.routes.my_songs import router as my_songs_router
 from backend.api.routes.playlists import router as playlists_router
@@ -34,6 +35,7 @@ router.include_router(my_data_router, prefix="/my/data", tags=["my-data"])
 router.include_router(playlists_router, prefix="/playlists", tags=["playlists"])
 router.include_router(known_songs_router, prefix="/known-songs", tags=["known-songs"])
 router.include_router(karaoke_log_router, prefix="/my/karaoke-log", tags=["karaoke-log"])
+router.include_router(library_router, prefix="/my/library", tags=["library"])
 router.include_router(kjbox_partner_router, prefix="/partner/kjbox/karaoke-log", tags=["partner"])
 router.include_router(voice_router, prefix="/my", tags=["voice"])
 router.include_router(voice_session_router, prefix="/voice", tags=["voice-session"])

@@ -12,12 +12,12 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
+from backend.services.catalog_facets import availability_flags
 from backend.services.recs_v2.context import UserContextV2
 from backend.services.recs_v2.filters import HAS_KARAOKE_SQL, RecFilters, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
 from karaoke_decide.catalog.reader import CatalogReader, song_range_from_row
-from karaoke_decide.song_search.library_filter import library_clause
 from karaoke_decide.vocal_range.fit import FitResult, SongVocalRange
 from karaoke_decide.vocal_range.tsv import SongRange
 
@@ -137,26 +137,7 @@ class _Gatherer:
 
     def availability(self) -> dict[str, tuple[bool, bool, bool]]:
         """``song_key -> (community, commercial, karafun)`` for songs with a karaoke version."""
-        out: dict[str, tuple[bool, bool, bool]] = {}
-        keys = list(self.rows)
-        if not self.has_av:
-            return {k: (False, True, False) for k in keys if self.rows[k]["in_kn"]}
-        community_sql, community_params = library_clause("community", "x.song_key", schema="av")
-        karafun_sql, karafun_params = library_clause("karafun", "x.song_key", schema="av")
-        for chunk in _chunks(keys):
-            sql = f"""
-                SELECT x.song_key,
-                    {community_sql},
-                    EXISTS (SELECT 1 FROM av.versions v WHERE v.song_key = x.song_key AND v.kind = 'commercial'),
-                    {karafun_sql}
-                FROM av.songs x WHERE x.song_key IN ({_marks(len(chunk))})
-            """
-            for r in self.conn.execute(sql, (*community_params, *karafun_params, *chunk)):
-                out[r[0]] = (bool(r[1]), bool(r[2]), bool(r[3]))
-        for k in keys:  # in KN but under another spelling than availability.db's: commercial only
-            if k not in out and self.rows[k]["in_kn"]:
-                out[k] = (False, True, False)
-        return out
+        return availability_flags(self.conn, self.has_av, {k: bool(r["in_kn"]) for k, r in self.rows.items()})
 
 
 def similar_artists(reader: CatalogReader, ctx: UserContextV2, seeds: Sequence[str]) -> dict[str, tuple[str, float]]:
