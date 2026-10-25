@@ -1161,8 +1161,9 @@ def test_get_voice_returns_mic_and_latest_session(
     assert client.put("/api/my/voice", json=MIC_PROFILE_IN).status_code == 200
     older = _saved_session(client, monkeypatch)
     newer = _saved_session(client, monkeypatch, k=1)
-    fs.cols["voice_sessions"][older]["updated_at"] = T0  # touch order decides "latest", not creation
-    fs.cols["voice_sessions"][newer]["updated_at"] = T0 + timedelta(hours=1)
+    fs.cols["voice_sessions"][older]["created_at"] = T0  # creation order decides "latest"
+    fs.cols["voice_sessions"][newer]["created_at"] = T0 + timedelta(hours=1)
+    fs.cols["voice_sessions"][older]["updated_at"] = T0 + timedelta(hours=2)  # re-fetched later: still not latest
     got = client.get("/api/my/voice").json()
     assert got["profile"]["method"] == "session" and got["profile"]["session_id"] == newer
     assert got["mic"]["method"] == "mic" and got["mic"]["voice_type"] == "bass"

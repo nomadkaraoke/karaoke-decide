@@ -435,7 +435,7 @@ Get details for a specific song.
 
 The singer's voice profile, stored on their `decide_users` doc (auth required; verified, guest and gen-session users). Mic audio never reaches the server: the app sends only derived numbers, and unknown body keys are rejected (422).
 
-- `GET` -> `{"profile": null | {...}, "mic": null | {...}, "latest_session": null | {...}}` (an invalid stored profile is treated as unset). `profile` is the saved profile (what recommendations use). `mic` is the last mic-test result, kept as `voice_profile_mic` beside a session result (so it survives a session saving over it). `latest_session` is the newest session result (by the session's `updated_at`) resting on at least one counting attempt with range evidence, saved or not, in the `GET /api/voice/history` `result` shape; Me shows it next to `mic`.
+- `GET` -> `{"profile": null | {...}, "mic": null | {...}, "latest_session": null | {...}}` (an invalid stored profile is treated as unset). `profile` is the saved profile (what recommendations use). `mic` is the last mic-test result, kept as `voice_profile_mic` beside a session result (so it survives a session saving over it). `latest_session` is the newest session result (by when the session started, `created_at`) resting on at least one counting attempt with range evidence, saved or not, in the `GET /api/voice/history` `result` shape; Me shows it next to `mic`.
 - `PUT` replaces the profile (last save wins) and returns it with `updated_at`; a `method: mic` profile is also kept as the mic result. 404 `not_found` if the user has no doc; 422 on an inconsistent body.
 - `DELETE` -> 204; clears the profile and the kept mic result.
 

@@ -612,15 +612,17 @@ def build_history(
 
 
 async def latest_session_summary(fs: FirestoreService, user_id: str) -> SessionResultSummaryOut | None:
-    """The newest (by ``updated_at``) of the user's session results that rests on at least one attempt
-    that counts and has range evidence; None when there is none."""
+    """The newest (by ``created_at``) of the user's session results that rests on at least one attempt
+    that counts and has range evidence; None when there is none. Creation order, not ``updated_at``:
+    re-fetching an old session's result, excluding an attempt or adopting touches ``updated_at``, and
+    must not make an older session the "latest" one on Me."""
     sessions = await fs.query_documents(SESSIONS_COLLECTION, filters=[("user_id", "==", user_id)])
     best: tuple[datetime, SessionResultSummaryOut] | None = None
     for s in sessions:
         out = _summary_out(s)
         if out is None or out.evidence_attempts < 1:
             continue
-        at = _as_datetime(s.get("updated_at")) or _as_datetime(s.get("created_at")) or _EPOCH
+        at = _as_datetime(s.get("created_at")) or _EPOCH
         if best is None or at > best[0]:
             best = (at, out)
     return best[1] if best else None
