@@ -150,18 +150,16 @@ class PlaylistService:
     ) -> list[PlaylistItem]:
         """Items of a doc (legacy ``song_ids`` docs are upgraded in memory).
 
-        Empty names are filled from the catalog ``titles``; if the catalog cannot name the song,
-        ``fallback`` shows the song key (display only: persisting paths pass ``fallback=False`` so
-        an id is never stored as a title).
+        With ``fallback`` empty names are filled from the catalog ``titles`` (real names only). If the
+        catalog cannot name the song they stay empty: an id is never substituted for a name, so clients
+        display ``song_key`` themselves. Persisting paths pass ``fallback=False``.
         """
 
         def named(song_key: str | None, artist: str, title: str) -> tuple[str, str]:
             if song_key and not (artist and title):
-                known = titles.get(song_key)
+                known = titles.get(song_key) if fallback else None
                 if known:
                     return known
-                if fallback:
-                    return artist or song_key, title or song_key
             return artist, title
 
         if doc.get("items") is not None:

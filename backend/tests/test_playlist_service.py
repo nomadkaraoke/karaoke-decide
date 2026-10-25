@@ -157,7 +157,7 @@ async def test_legacy_doc_upgraded_on_read(fs: MemoryFirestore, tmp_path: Path) 
     pl = await _svc(fs, tmp_path).get_playlist(PL_ID, USER)
     assert [(i.song_key, i.artist, i.title) for i in pl.items] == [
         (LOUD, "The Lanterns", "Paper Harbour"),
-        ("mystery|key", "mystery|key", "mystery|key"),
+        ("mystery|key", "", ""),
     ]
     assert "items" not in fs.cols["playlists"][PL_ID]  # in memory only
 
@@ -182,10 +182,10 @@ async def test_legacy_remove_song_keeps_items_in_sync(fs: MemoryFirestore, tmp_p
 
 
 @pytest.mark.asyncio
-async def test_warming_catalog_falls_back_to_song_id(fs: MemoryFirestore) -> None:
+async def test_warming_catalog_leaves_names_empty(fs: MemoryFirestore) -> None:
     _legacy(fs, [LOUD])
     pl = await _svc(fs).get_playlist(PL_ID, USER)
-    assert pl.items[0].title == LOUD
+    assert (pl.items[0].song_key, pl.items[0].artist, pl.items[0].title) == (LOUD, "", "")
 
 
 @pytest.mark.asyncio
@@ -198,13 +198,13 @@ async def test_update_playlist_bumps_rev(fs: MemoryFirestore) -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_song_unnamed_stores_empty_names_but_shows_id(fs: MemoryFirestore) -> None:
+async def test_add_song_unnamed_stores_and_returns_empty_names(fs: MemoryFirestore) -> None:
     svc = _svc(fs)  # no catalog: cannot name anything
     await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
     pl = await svc.add_song_to_playlist(PL_ID, USER, "mystery|key")
     stored = fs.cols["playlists"][PL_ID]["items"][0]
     assert stored["artist"] == "" and stored["title"] == ""
-    assert (pl.items[0].artist, pl.items[0].title) == ("mystery|key", "mystery|key")
+    assert (pl.items[0].song_key, pl.items[0].artist, pl.items[0].title) == ("mystery|key", "", "")
     assert pl.rev == 1
 
 
