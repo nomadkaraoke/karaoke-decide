@@ -9,6 +9,12 @@ measured comfort centre = true centre + N(MIC_BIAS_MEAN, MIC_BIAS_SD), saved as 
 the 3c centre rule). Pitch (``SimPitch``): "none", or an on-device summary at the sung octave with headphones
 (σ 0.7) or an open mic (σ 1.5), including a falsetto note leaking into ``held_high`` with FALSETTO_LEAK_P.
 Each run keeps a ``trace``: the result after every attempt, so a population can be scored at k songs.
+
+Answer styles (``AnswerStyle``): "model" answers from the model's own likelihoods (the original sim; the existing
+gates use it). "realistic" is what real singers do (Andrew answered "comfortable" 4/4 on songs that reached past
+his comfortable band): a song whose sung body (p10..p90 at the sung octave) stays inside the singer's FULL chest
+range is answered "comfortable" with REALISTIC_COMFORT_P, otherwise (and for every song that leaves the full
+range) the model-likelihood answer. Difficulty is always the model-likelihood answer. The E5 gates use it.
 """
 
 from __future__ import annotations
@@ -42,6 +48,7 @@ from karaoke_decide.voice_session.weights import EPS_DIFFICULTY, EPS_POSITION
 
 SimPrior = Literal["self_register", "uniform", "mic"]
 SimPitch = Literal["none", "headphones", "open"]
+AnswerStyle = Literal["model", "realistic"]
 
 _POSITIONS: tuple[Position, ...] = ("too_low", "comfortable", "too_high", "both_ends")
 _DIFFICULTIES: tuple[Difficulty, ...] = ("easy", "stretch", "couldnt")
@@ -61,6 +68,8 @@ HELD_MARGIN = 1.0  # held notes reach 1 semitone past the sung p10/p90
 VOICED_S = (60.0, 180.0)
 FALSETTO_LEAK_P = 0.3
 FALSETTO_ABOVE = 3  # a leaked falsetto note sits this far above the chest (full) top
+# Realistic singers: P("comfortable") for a song whose p10..p90 (at the sung octave) is inside the full range.
+REALISTIC_COMFORT_P = 0.8
 
 
 @dataclass(frozen=True)
@@ -181,13 +190,22 @@ def _sample(rng: random.Random, options: tuple[str, ...], model_p: list[float], 
     return rng.choices(options, weights=clean)[0]
 
 
-def answer(rng: random.Random, true_h: Hyp, song: SongDemand, noise: float) -> tuple[Position, Difficulty]:
-    """A simulated singer's (position, difficulty) answers for one song (sung at likely_octave)."""
+def answer(
+    rng: random.Random, true_h: Hyp, song: SongDemand, noise: float, style: AnswerStyle = "model"
+) -> tuple[Position, Difficulty]:
+    """A simulated singer's (position, difficulty) answers for one song (sung at likely_octave).
+
+    "model": both sampled from the model's likelihoods. "realistic": the same, except that a song whose p10..p90
+    stays inside the full range is answered "comfortable" with REALISTIC_COMFORT_P (one extra draw, only then)."""
     o = likely_octave(true_h, song)
     pos_p = [likelihood_position(true_h, song, a, o) for a in _POSITIONS]
     diff_p = [likelihood_difficulty(true_h, song, a, o) for a in _DIFFICULTIES]
     position = _sample(rng, _POSITIONS, pos_p, EPS_POSITION, noise)
     difficulty = _sample(rng, _DIFFICULTIES, diff_p, EPS_DIFFICULTY, noise)
+    if style == "realistic":
+        f_lo, f_hi = full(true_h)
+        if f_lo <= song.p10 + o and song.p90 + o <= f_hi and rng.random() < REALISTIC_COMFORT_P:
+            position = "comfortable"
     return position, difficulty  # type: ignore[return-value]
 
 
@@ -235,6 +253,7 @@ def simulate(
     prior: SimPrior = "self_register",
     pitch: SimPitch = "none",
     budget: int | None = None,
+    answer_style: AnswerStyle = "model",
 ) -> SimResult:
     """Run one session; warmth_path[i] is the singer's warmth at attempt i (the last value persists).
 
@@ -259,7 +278,7 @@ def simulate(
             done = "no_candidates"
             break
         cand = by_key[pick.song_key]
-        position, difficulty = answer(rng, true_h, cand.demand, noise)
+        position, difficulty = answer(rng, true_h, cand.demand, noise, answer_style)
         quiz = Quiz(
             feel="fine",
             position=position,
@@ -300,10 +319,13 @@ class PopulationStats:
     exact_at: dict[int, float] = field(default_factory=dict)
     adjacent_at: dict[int, float] = field(default_factory=dict)
     confident_within: dict[int, float] = field(default_factory=dict)
+    # Stopped 'confident' (medium / high) within k songs with the wrong exact type.
+    confidently_wrong_within: dict[int, float] = field(default_factory=dict)
 
     def describe(self) -> str:
         at = " ".join(
             f"exact@{k}={self.exact_at[k]:.0%}/adj@{k}={self.adjacent_at[k]:.0%}/conf≤{k}={self.confident_within[k]:.0%}"
+            f"/wrong≤{k}={self.confidently_wrong_within.get(k, 0.0):.0%}"
             for k in sorted(self.exact_at)
         )
         return (
@@ -321,6 +343,7 @@ def run_population(
     *,
     pitch: SimPitch = "none",
     budget: int | None = None,
+    answer_style: AnswerStyle = "model",
 ) -> PopulationStats:
     """n_users singers cycling over every type × shift; a fresh synthetic pool for each cycle."""
     results: list[tuple[Hyp, SimResult]] = []
@@ -329,7 +352,7 @@ def run_population(
         if i % len(HYPOTHESES) == 0:
             pool = synthetic_pool(rng, pool_size)
         h = HYPOTHESES[i % len(HYPOTHESES)]
-        results.append((h, simulate(h, pool, rng, prior=prior, pitch=pitch, budget=budget)))
+        results.append((h, simulate(h, pool, rng, prior=prior, pitch=pitch, budget=budget, answer_style=answer_style)))
 
     def rate(ok: list[bool]) -> float:
         return sum(ok) / len(ok)
@@ -347,4 +370,10 @@ def run_population(
         exact_at={k: rate([distance(h, r.at(k)) == 0 for h, r in results]) for k in KS},
         adjacent_at={k: rate([distance(h, r.at(k)) <= 1 for h, r in results]) for k in KS},
         confident_within={k: rate([r.done_reason == "confident" and r.attempts <= k for _, r in results]) for k in KS},
+        confidently_wrong_within={
+            k: rate(
+                [r.done_reason == "confident" and r.attempts <= k and distance(h, r.summary) > 0 for h, r in results]
+            )
+            for k in KS
+        },
     )

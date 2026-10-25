@@ -140,6 +140,10 @@ def test_missing_demand_exports_null() -> None:
 def test_sim_report_prints_prior_pitch_k_table(capsys: pytest.CaptureFixture[str]) -> None:
     assert sim_report.main(["--n", "6", "--priors", "mic", "--pitches", "open"]) == 0
     out = capsys.readouterr().out
-    assert "| prior | pitch | k | exact | adjacent | confident |" in out
-    for k in (3, 4, 5, 10):
-        assert f"| mic | open | {k} |" in out
+    assert "| answers | prior | pitch | k | exact | adjacent | confident | confidently wrong |" in out
+    for style in ("realistic", "model"):
+        for k in (3, 4, 5, 10):
+            assert f"| {style} | mic | open | {k} |" in out
+    assert sim_report.main(["--n", "3", "--priors", "uniform", "--pitches", "none", "--styles", "model"]) == 0
+    out = capsys.readouterr().out
+    assert "| model | uniform | none | 5 |" in out and "| realistic |" not in out

@@ -9,6 +9,8 @@ import pytest
 from karaoke_decide.voice_session.model import HYPOTHESES, VOICE_TYPES, full, usable_pitch
 from karaoke_decide.voice_session.simulate import (
     KS,
+    REALISTIC_COMFORT_P,
+    answer,
     mic_profile,
     run_population,
     sim_pitch,
@@ -141,3 +143,45 @@ def test_simulated_pitch_respects_singer_range() -> None:
             assert p.held_high == f_hi + 3  # a falsetto note leaked
             leaks += 1
     assert 0.2 <= leaks / 500 <= 0.4
+
+
+# ---------------------------------------------------------------- realistic singers (E5)
+
+
+def test_realistic_answers_say_comfortable_inside_full_range() -> None:
+    """Real singers call a song comfortable when it stays inside their full chest range (Andrew: 4/4)."""
+    h = ("baritone", 0)  # full 45-69, comfort 50-64
+    inside = song(47, 67)  # past the comfortable band, inside the full range
+    rng = random.Random(14)
+    real = [answer(rng, h, inside, 0.0, style="realistic")[0] for _ in range(2000)]
+    rng = random.Random(14)
+    model = [answer(rng, h, inside, 0.0)[0] for _ in range(2000)]
+    share = real.count("comfortable") / 2000
+    assert share >= REALISTIC_COMFORT_P - 0.03  # 0.8 of the draws, plus the rare model "comfortable"
+    assert share > model.count("comfortable") / 2000 + 0.5
+    # Clearly outside the full range: the model-likelihood answer, draw for draw.
+    outside = song(50, 74)  # 24 semitones: wider than the full range at any octave
+    rng_a, rng_b = random.Random(15), random.Random(15)
+    for _ in range(200):
+        assert answer(rng_a, h, outside, 0.15, style="realistic") == answer(rng_b, h, outside, 0.15)
+
+
+def test_model_style_is_the_default() -> None:
+    pool = synthetic_pool(random.Random(16), n=300)
+    a = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones")
+    b = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones", answer_style="model")
+    assert a == b
+    c = simulate(("mezzo", 1), pool, random.Random(17), prior="mic", pitch="headphones", answer_style="realistic")
+    assert len(c.trace) == c.attempts
+
+
+def test_confidently_wrong_within_k() -> None:
+    stats = run_population(random.Random(18), n_users=30, prior="mic", pitch="headphones", answer_style="realistic")
+    assert set(stats.confidently_wrong_within) == set(KS)
+    for k in KS:
+        wrong = [
+            r.done_reason == "confident" and r.attempts <= k and r.summary.voice_type != h[0] for h, r in stats.results
+        ]
+        assert stats.confidently_wrong_within[k] == pytest.approx(sum(wrong) / 30)
+        assert stats.confidently_wrong_within[k] <= stats.confident_within[k]
+    assert "wrong≤5" in stats.describe()
