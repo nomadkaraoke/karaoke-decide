@@ -22,7 +22,6 @@ from backend.api.deps import (
     get_music_service_service_dep,
     get_settings,
 )
-from backend.api.routes.admin_voice import LABELS_COLLECTION as VOICE_LABELS
 from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
 from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
@@ -41,9 +40,9 @@ from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
 from backend.services.playlist_service import PlaylistService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
+from backend.services.user_deletion import erase_voice_data
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
-from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
-from backend.services.voice_session_outputs import SESSION_SOURCE
+from backend.services.voice_recording_service import RECORDINGS_COLLECTION
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
 
 router = APIRouter()
@@ -211,34 +210,10 @@ async def reset_voice(
     bucket: Annotated[Any, Depends(get_recordings_bucket)],
 ) -> Response:
     """Delete the user's voice sessions, attempts, imported labels, recordings (objects too) and purge marker, and
-    undo what sessions wrote to ``user_songs`` (rows made only by a session go; on any other row
-    the ``session_*`` labels and the ``voice_session`` source are removed). Unknown emails: no-op."""
+    undo what sessions wrote to ``user_songs`` (``user_deletion.erase_voice_data``). Unknown emails: no-op."""
     user_id = await _user_id_of(fs, auth, body.email)
-    if not user_id:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    by_user = [("user_id", "==", user_id)]
-    await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
-    await fs.delete_document(PURGES_COLLECTION, user_id)  # delete_all writes this marker; a fresh run may upload
-    for collection in (ATTEMPTS_COLLECTION, SESSIONS_COLLECTION, VOICE_LABELS):
-        docs = await fs.query_documents(collection, filters=by_user, limit=10000)
-        await fs.batch_delete(collection, [d["id"] for d in docs])
-
-    rows = await fs.query_documents(USER_SONGS_COLLECTION, filters=by_user, limit=10000)
-    deletes: list[str] = []
-    for row in rows:
-        sources = list(row.get("sources") or ([row["source"]] if row.get("source") else []))
-        if SESSION_SOURCE not in sources and row.get("source") != SESSION_SOURCE:
-            continue
-        rest = [x for x in sources if x != SESSION_SOURCE]
-        if not rest:
-            deletes.append(row["id"])
-            continue
-        kept = {k: v for k, v in row.items() if k != "id" and not k.startswith("session_")}
-        kept["sources"] = rest
-        if kept.get("source") == SESSION_SOURCE:
-            kept["source"] = rest[0]
-        await fs.set_document(USER_SONGS_COLLECTION, row["id"], kept)
-    await fs.batch_delete(USER_SONGS_COLLECTION, deletes)
+    if user_id:
+        await erase_voice_data(fs, bucket, user_id)  # the Phase 3d contract, shared with account deletion
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

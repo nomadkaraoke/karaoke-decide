@@ -95,10 +95,19 @@ class FakeFirestore:
         rows = [
             {"id": i, **d}
             for i, d in self.cols.get(col, {}).items()
-            if all(d.get(f) == v for f, _op, v in filters or [])
+            if all(_matches(d, f, op, v) for f, op, v in filters or [])
         ]
         rows = rows[offset or 0 :]
         return rows[:limit] if limit else rows
+
+    async def count_documents(self, col: str, filters: list[tuple[str, str, Any]] | None = None) -> int:
+        return len(await self.query_documents(col, filters=filters))
+
+
+def _matches(doc: dict[str, Any], field: str, op: str, value: Any) -> bool:
+    if op == "array_contains":
+        return value in (doc.get(field) or [])
+    return bool(doc.get(field) == value)
 
 
 def _app_with(monkeypatch: pytest.MonkeyPatch, *, flag: bool, environment: str) -> TestClient:

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # decide-kjbox-secret). Empty disables the partner routes (503). Use ``kjbox_secret``.
     decide_kjbox_secret: str = ""
 
+    # gen -> decide partner secret (env DECIDE_GEN_PARTNER_SECRET; Secret Manager
+    # decide-gen-partner-secret, owned by karaoke-gen's Pulumi). Sent as X-Partner-Secret on
+    # DELETE /api/partner/gen/users. Empty disables that route (503). Use ``gen_partner_secret``.
+    decide_gen_partner_secret: str = ""
+
     # Static admin tokens for scripts (env ADMIN_TOKENS, comma-separated; sent as X-Admin-Token).
     admin_tokens: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
@@ -155,6 +160,11 @@ class Settings(BaseSettings):
         if not secret and self.decide_test_api and not self.is_production:
             return LOCAL_STACK_KJBOX_SECRET
         return secret
+
+    @property
+    def gen_partner_secret(self) -> str:
+        """The effective gen partner secret (empty: gen's partner routes answer 503)."""
+        return self.decide_gen_partner_secret.strip()
 
     @property
     def is_emulated(self) -> bool:

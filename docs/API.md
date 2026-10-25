@@ -143,6 +143,10 @@ decide's usual shape: `{"detail": "<code>"}` (FastAPI's own 422 body for schema 
 | 503 | `partner_disabled` | partner routes: secret unset on decide | **Yes** |
 | 5xx | (other) | any (Firestore errors) | **Yes** |
 
+### Partner: gen account deletion (`DELETE /api/partner/gen/users`)
+
+Server to server from gen's account deletion. Body `{"email": str}`, header `X-Partner-Secret` = `DECIDE_GEN_PARTNER_SECRET` (`hmac.compare_digest`): missing or wrong → 401 `partner_auth`; unset on the server → 503 `partner_disabled`. Runs `delete_all_user_data` (every per-user store, voice recordings included) and returns `200 {"deleted": {collection: count}}`; an unknown or already-deleted email returns `{"deleted": {}}` (idempotent, so gen can retry).
+
 ### GET /api/quiz/progress
 
 Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when there is none.
