@@ -272,3 +272,17 @@ async def test_deletes_that_dont_land_raise_instead_of_looping(
     monkeypatch.setattr(fs, "batch_delete", no_op)
     with pytest.raises(RuntimeError, match="keep coming back"):
         await delete_all_user_data(_db(fs), bucket, EMAIL_A)
+
+
+async def test_erase_voice_data_removes_recording_deleted_marker(fs: FakeFirestore, bucket: LocalBucket) -> None:
+    """ "Delete this recording" leaves a marker on the attempt; erasing voice data takes it with the attempt."""
+    _seed_voice(fs, bucket, USER_A)
+    fs.cols["voice_attempts"]["s1:2"] = {
+        "user_id": USER_A, "session_id": "s1", "n": 2, "recording_id": None,
+        "recording_deleted_at": "2026-10-25T20:00:00+00:00",
+    }  # fmt: skip
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+
+    assert list(fs.cols["voice_attempts"]) == ["sx:1"]
+    assert not [d for d in fs.cols["voice_attempts"].values() if "recording_deleted_at" in d]

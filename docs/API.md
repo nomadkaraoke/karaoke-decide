@@ -2227,11 +2227,15 @@ Your voice data, for "Your recordings" on Me: the signed-in user's sessions that
 
 ### POST /api/voice/recordings
 
-Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.
+Private, consent-gated audio of one attempt (multipart form: `file`, `session_id`, `attempt_n` 1-12, `duration_s`, optional `device`; other fields `422 unknown_form_fields`). Audio is `audio/mp4` or `audio/wav`, at most 20 MiB. Returns `201 {"recording_id": "..."}`. Errors: `403 voice_session_disabled`, `403 recording_not_consented` (the session setup had `record: false`), `403 session_forbidden` (not the user's session), `404 attempt_not_found`, `409 recordings_deleted` (the user deleted their recordings while this upload ran; nothing was kept), `409 recording_deleted` (the user deleted this take's recording; nothing was kept), `413 recording_too_large` (checked before the whole body is read), `415 unsupported_media_type`, `422 empty_recording` or form validation.
 
 ### DELETE /api/voice/recordings
 
 Erases every recording of the signed-in user (objects, documents, attempt links) and withdraws recording consent (`setup.record = false`) on all their sessions, so an upload queued before the delete is refused with `403 recording_not_consented`; the user re-consents with `PATCH` (`{"record": true}`). Idempotent. Returns `{"deleted": 2}`. Open to every signed-in user, even with the session flag off.
+
+### DELETE /api/voice/recordings/{recording_id}
+
+Deletes one of your recordings for good: the stored object (real erasure), its document and the attempt's link. `204`, and a repeat call is `204` too. Another user's recording or an unknown id: `404 recording_not_found`. Consent for the session's other takes is unchanged. Afterwards an upload of that take is refused with `409 recording_deleted` (drop it from the queue), and an upload that was already in flight undoes itself and gets the same 409. Open to every signed-in user, even with the session flag off.
 
 ### GET /api/voice/recordings/{recording_id}/audio
 
@@ -2245,7 +2249,7 @@ Streams one of your own recordings with its stored content type (`audio/mp4` or 
 
 The app queues recordings and uploads them in the background. For each queued upload:
 
-- **Drop it** on `403 recording_not_consented`, `409 recordings_deleted`, or `404 attempt_not_found`: the server will never take it.
+- **Drop it** on `403 recording_not_consented`, `409 recordings_deleted`, `409 recording_deleted`, or `404 attempt_not_found`: the server will never take it.
 - **Keep it** (retry later) on `5xx` and on network errors.
 - **Before calling `DELETE /api/voice/recordings`, clear the queue**, so nothing recorded before the delete is sent after it. (The server also refuses such uploads, since the delete withdraws consent, but the app should not rely on that.)
 

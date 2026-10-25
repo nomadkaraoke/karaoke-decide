@@ -221,6 +221,16 @@ async def delete_recordings(user: CurrentUser, service: RecordingServiceDep) -> 
     return RecordingsDeleted(deleted=await service.delete_all_for_user(user.id))
 
 
+@recordings_router.delete("/recordings/{recording_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_recording(recording_id: str, user: CurrentUser, service: RecordingServiceDep) -> Response:
+    """Delete one of your recordings (object, doc, attempt link). Idempotent; not yours: 404."""
+    try:
+        await service.delete_one(user.id, recording_id)
+    except RecordingError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @recordings_router.get("/recordings/{recording_id}/audio")
 async def recording_audio(
     recording_id: str, user: CurrentUser, settings: Settings, service: RecordingServiceDep

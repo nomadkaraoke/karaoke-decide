@@ -325,6 +325,13 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   user's attempts, returns the number erased, and is idempotent (a second call returns 0). An upload in flight
   that finds a newer purge marker undoes its own object, doc and link and returns 409 (an undo that fails is
   logged as a WARNING and still returns 409; the next delete-all sweeps what is left).
+- **Delete one recording**: `DELETE /api/voice/recordings/{recording_id}` calls
+  `VoiceRecordingService.delete_one(user_id, recording_id)`: it first sets `voice_attempts/{id}.recording_deleted_at`
+  (the marker), then deletes the object (real erasure, a missing object is fine), the `voice_recordings` doc and the
+  attempt's `recording_id`. Consent for the session's other takes stays. A repeat call finds the marker and returns
+  204; another user's recording is 404. An upload of that attempt is refused with `409 recording_deleted`, and one
+  already in flight re-checks the marker after its write and undoes itself, so a retry can't bring it back. The
+  marker lives on the attempt doc, so `erase_voice_data` removes it with the attempt.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);

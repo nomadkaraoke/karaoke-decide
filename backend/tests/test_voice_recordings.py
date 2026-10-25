@@ -615,3 +615,83 @@ def test_path_outside_user_prefix_is_404_and_warns(
         res = _audio(make_client(), "s1:1")
     assert res.status_code == 404 and res.json() == {"detail": "recording_not_found"}
     assert [r.levelname for r in caplog.records if "outside" in r.getMessage()] == ["WARNING"]
+
+
+# ---------------------------------------------------------------- delete one recording (Phase 3d batch 1, Task A3)
+
+
+def test_delete_one_erases_object_doc_and_link(make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket) -> None:
+    _seed(fs)
+    c = make_client(admin=False)  # open even with the session flag off
+    up = make_client()
+    rid = _post(up, n=1).json()["recording_id"]
+    _post(up, n=2)
+    r = c.delete(f"/api/voice/recordings/{rid}")
+    assert r.status_code == 204, r.text
+    assert sorted(bucket.objects) == [f"voice-recordings/{USER}/s1/2.m4a"]
+    assert sorted(fs.cols["voice_recordings"]) == ["s1:2"]
+    attempt = fs.cols["voice_attempts"]["s1:1"]
+    assert attempt["recording_id"] is None and isinstance(attempt["recording_deleted_at"], datetime)
+    assert fs.cols["voice_attempts"]["s1:2"]["recording_id"] == "s1:2"
+    assert fs.cols["voice_sessions"]["s1"]["setup"]["record"] is True  # consent stays for the other takes
+    assert _audio(c, rid).status_code == 404
+
+
+def test_delete_one_other_user_404(make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket) -> None:
+    _seed(fs)
+    rid = _post(make_client()).json()["recording_id"]
+    r = make_client(user_id=OTHER).delete(f"/api/voice/recordings/{rid}")
+    assert r.status_code == 404 and r.json() == {"detail": "recording_not_found"}
+    assert len(bucket.objects) == 1 and "s1:1" in fs.cols["voice_recordings"]
+    assert "recording_deleted_at" not in fs.cols["voice_attempts"]["s1:1"]
+    assert make_client().delete("/api/voice/recordings/s1:9").status_code == 404
+
+
+def test_delete_one_is_idempotent(make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket) -> None:
+    _seed(fs)
+    c = make_client()
+    rid = _post(c).json()["recording_id"]
+    assert c.delete(f"/api/voice/recordings/{rid}").status_code == 204
+    assert c.delete(f"/api/voice/recordings/{rid}").status_code == 204  # the attempt's marker says it was ours
+    assert make_client(user_id=OTHER).delete(f"/api/voice/recordings/{rid}").status_code == 404
+    assert bucket.objects == {}
+
+
+def test_upload_after_delete_one_is_409_recording_deleted(
+    make_client: MakeClient, fs: RouteFirestore, bucket: FakeBucket
+) -> None:
+    _seed(fs)
+    c = make_client()
+    rid = _post(c).json()["recording_id"]
+    assert c.delete(f"/api/voice/recordings/{rid}").status_code == 204
+    r = _post(c)  # the app's queued retry of the same take
+    assert r.status_code == 409 and r.json() == {"detail": "recording_deleted"}
+    assert bucket.objects == {} and fs.cols["voice_recordings"] == {}
+    assert _post(c, n=2).status_code == 201  # other takes still upload
+
+
+@pytest.mark.asyncio
+async def test_upload_in_flight_during_delete_one_undoes_itself(bucket: FakeBucket) -> None:
+    rfs = RacingFirestore()
+    _seed(rfs)
+    svc = VoiceRecordingService(rfs, bucket)  # type: ignore[arg-type]
+
+    async def upload() -> str:
+        return await svc.upload(
+            USER,
+            session_id="s1",
+            attempt_n=1,
+            duration_s=1.0,
+            device=None,
+            content_type="audio/mp4",
+            file=io.BytesIO(AUDIO),
+        )
+
+    await upload()  # the first upload landed; the app retries it (it never saw the 201) ...
+    rfs.hook = lambda: svc.delete_one(USER, "s1:1")  # ... and the user deletes it while the retry is in flight
+    with pytest.raises(vrs.RecordingDeletedError) as exc:
+        await upload()
+    assert exc.value.status_code == 409 and exc.value.detail == "recording_deleted"
+    assert bucket.objects == {}
+    assert rfs.cols["voice_recordings"] == {}
+    assert rfs.cols["voice_attempts"]["s1:1"]["recording_id"] is None
