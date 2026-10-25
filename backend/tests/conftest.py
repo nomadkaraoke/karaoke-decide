@@ -461,6 +461,7 @@ def mock_playlist_service(sample_playlists: list[PlaylistInfo]) -> MagicMock:
     mock.delete_playlist = AsyncMock(return_value=None)
     mock.add_song_to_playlist = AsyncMock(return_value=sample_playlists[0])
     mock.remove_song_from_playlist = AsyncMock(return_value=sample_playlists[0])
+    mock.replace_items = AsyncMock(return_value=sample_playlists[0])
     return mock
 
 

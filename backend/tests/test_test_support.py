@@ -424,3 +424,13 @@ def test_voice_reset_mixed_row_whose_source_is_voice_session(
     c.post("/api/test/voice/reset", json={"email": EMAIL})
     mixed = fs.cols["user_songs"][f"{user_id}:mixed"]
     assert mixed["source"] == "spotify_export" and mixed["sources"] == ["spotify_export"]
+
+
+def test_reset_clears_playlists(client: TestClient, fs: FakeFirestore) -> None:
+    user_id = client.post("/api/test/profile/seed", json=SEED).json()["user_id"]
+    fs.cols.setdefault("playlists", {})["pl_mine12345"] = {"id": "pl_mine12345", "user_id": user_id, "items": []}
+    fs.cols["playlists"]["pl_other1234"] = {"id": "pl_other1234", "user_id": "someone_else"}
+
+    assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
+
+    assert list(fs.cols["playlists"]) == ["pl_other1234"]

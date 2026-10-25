@@ -477,3 +477,67 @@ class TestPlaylistServiceUnit:
         mock_firestore_service.update_document.assert_called_once()
         assert result.song_count == 1
         assert "song-1" not in result.song_ids
+
+
+class TestOrderedItems:
+    """Setlist items on the routes."""
+
+    def test_delete_song_with_slash_key(
+        self,
+        playlist_client: TestClient,
+        mock_playlist_service: MagicMock,
+    ) -> None:
+        response = playlist_client.delete(
+            "/api/playlists/playlist-1/songs/ac%2Fdc|tnt",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        assert response.status_code == 204
+        assert mock_playlist_service.remove_song_from_playlist.call_args.kwargs["song_id"] == "ac/dc|tnt"
+
+    def test_put_items_returns_items_and_rev(
+        self,
+        playlist_client: TestClient,
+        mock_playlist_service: MagicMock,
+    ) -> None:
+        response = playlist_client.put(
+            "/api/playlists/playlist-1/items",
+            headers={"Authorization": "Bearer test-token"},
+            json={"items": [{"song_key": None, "artist": "A", "title": "T"}], "base_rev": 3},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["rev"] == 0 and body["items"] == []
+        assert "user_id" not in body
+        kwargs = mock_playlist_service.replace_items.call_args.kwargs
+        assert kwargs["base_rev"] == 3 and kwargs["items"][0].title == "T"
+
+    def test_put_items_limit(self, playlist_client: TestClient) -> None:
+        items = [{"song_key": None, "artist": "a", "title": str(n)} for n in range(501)]
+        response = playlist_client.put(
+            "/api/playlists/playlist-1/items",
+            headers={"Authorization": "Bearer test-token"},
+            json={"items": items, "base_rev": None},
+        )
+        assert response.status_code == 422
+
+    def test_create_rejects_bad_client_id(self, playlist_client: TestClient) -> None:
+        response = playlist_client.post(
+            "/api/playlists",
+            headers={"Authorization": "Bearer test-token"},
+            json={"id": "nope", "name": "X"},
+        )
+        assert response.status_code == 422
+
+    def test_create_passes_id_and_items(
+        self,
+        playlist_client: TestClient,
+        mock_playlist_service: MagicMock,
+    ) -> None:
+        response = playlist_client.post(
+            "/api/playlists",
+            headers={"Authorization": "Bearer test-token"},
+            json={"id": "pl_abcdef123456", "name": "X", "items": [{"artist": "A", "title": "T"}]},
+        )
+        assert response.status_code == 201
+        kwargs = mock_playlist_service.create_playlist.call_args.kwargs
+        assert kwargs["playlist_id"] == "pl_abcdef123456" and len(kwargs["items"]) == 1

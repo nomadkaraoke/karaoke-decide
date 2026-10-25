@@ -45,7 +45,14 @@ USERS = AuthService.USERS_COLLECTION
 ARTISTS_COLLECTION = "user_artists"
 QUIZ_PROGRESS_COLLECTION = "quiz_progress"
 # Every per-user collection keyed by a user_id field, cleared by reset and by seed.
-USER_OWNED = (USER_SONGS_COLLECTION, ARTISTS_COLLECTION, HIDDEN_COLLECTION, LOG_COLLECTION, UNRESOLVED_COLLECTION)
+USER_OWNED = (
+    USER_SONGS_COLLECTION,
+    ARTISTS_COLLECTION,
+    HIDDEN_COLLECTION,
+    LOG_COLLECTION,
+    UNRESOLVED_COLLECTION,
+    "playlists",  # doc id == the playlist's own ``id`` field
+)
 
 FirestoreDep = Annotated[FirestoreService, Depends(get_firestore)]
 AuthDep = Annotated[AuthService, Depends(get_auth_service_dep)]
