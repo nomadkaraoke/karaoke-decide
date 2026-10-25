@@ -812,7 +812,9 @@
       "checkingAuth": "Проверка аутентификации..."
     },
     "sourceBadge": {
-      "screenshot": "Скриншот"
+      "screenshot": "Скриншот",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

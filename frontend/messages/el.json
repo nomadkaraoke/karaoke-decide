@@ -812,7 +812,9 @@
       "checkingAuth": "Έλεγχος ταυτοποίησης..."
     },
     "sourceBadge": {
-      "screenshot": "Στιγμιότυπο οθόνης"
+      "screenshot": "Στιγμιότυπο οθόνης",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

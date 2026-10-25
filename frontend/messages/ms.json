@@ -812,7 +812,9 @@
       "checkingAuth": "Memeriksa pengesahan..."
     },
     "sourceBadge": {
-      "screenshot": "Tangkapan Skrin"
+      "screenshot": "Tangkapan Skrin",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

@@ -812,7 +812,9 @@
       "checkingAuth": "Tarkistetaan todennusta..."
     },
     "sourceBadge": {
-      "screenshot": "Kuvankaappaus"
+      "screenshot": "Kuvankaappaus",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

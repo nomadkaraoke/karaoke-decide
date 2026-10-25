@@ -812,7 +812,9 @@
       "checkingAuth": "جاري التحقق من المصادقة..."
     },
     "sourceBadge": {
-      "screenshot": "لقطة شاشة"
+      "screenshot": "لقطة شاشة",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

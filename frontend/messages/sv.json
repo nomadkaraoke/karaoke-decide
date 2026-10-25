@@ -812,7 +812,9 @@
       "checkingAuth": "Kontrollerar autentisering..."
     },
     "sourceBadge": {
-      "screenshot": "Skärmdump"
+      "screenshot": "Skärmdump",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

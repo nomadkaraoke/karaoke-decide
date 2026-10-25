@@ -812,7 +812,9 @@
       "checkingAuth": "Authentifizierung wird überprüft..."
     },
     "sourceBadge": {
-      "screenshot": "Screenshot"
+      "screenshot": "Screenshot",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

@@ -812,7 +812,9 @@
       "checkingAuth": "Provjera autentifikacije..."
     },
     "sourceBadge": {
-      "screenshot": "Snimka zaslona"
+      "screenshot": "Snimka zaslona",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

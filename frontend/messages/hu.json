@@ -812,7 +812,9 @@
       "checkingAuth": "Hitelesítés ellenőrzése..."
     },
     "sourceBadge": {
-      "screenshot": "Képernyőkép"
+      "screenshot": "Képernyőkép",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

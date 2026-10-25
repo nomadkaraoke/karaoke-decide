@@ -812,7 +812,9 @@
       "checkingAuth": "ऑथेंटिकेशन चेक किया जा रहा है..."
     },
     "sourceBadge": {
-      "screenshot": "स्क्रीनशॉट"
+      "screenshot": "स्क्रीनशॉट",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

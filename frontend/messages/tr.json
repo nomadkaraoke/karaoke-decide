@@ -812,7 +812,9 @@
       "checkingAuth": "Kimlik doğrulama kontrol ediliyor..."
     },
     "sourceBadge": {
-      "screenshot": "Ekran Görüntüsü"
+      "screenshot": "Ekran Görüntüsü",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

@@ -812,7 +812,9 @@
       "checkingAuth": "Comprobando autenticación..."
     },
     "sourceBadge": {
-      "screenshot": "Captura de pantalla"
+      "screenshot": "Captura de pantalla",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

@@ -812,7 +812,9 @@
       "checkingAuth": "Se verifică autentificarea..."
     },
     "sourceBadge": {
-      "screenshot": "Captură de ecran"
+      "screenshot": "Captură de ecran",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

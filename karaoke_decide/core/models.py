@@ -126,6 +126,7 @@ class UserSong(BaseModel):
         "enjoy_singing",
         "manual",
         "voice_session",
+        "karaoke_log",
     ] = "spotify"
 
     # From listening history

@@ -812,7 +812,9 @@
       "checkingAuth": "인증 확인 중..."
     },
     "sourceBadge": {
-      "screenshot": "스크린샷"
+      "screenshot": "스크린샷",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {

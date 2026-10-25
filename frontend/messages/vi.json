@@ -812,7 +812,9 @@
       "checkingAuth": "Đang kiểm tra xác thực..."
     },
     "sourceBadge": {
-      "screenshot": "Ảnh chụp màn hình"
+      "screenshot": "Ảnh chụp màn hình",
+      "karaokeLog": "Sung at karaoke",
+      "manual": "Added by you"
     }
   },
   "common": {
