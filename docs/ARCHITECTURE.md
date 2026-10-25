@@ -432,7 +432,7 @@ gcloud run deploy SERVICE_NAME \
 | `spotipy-client-secret` | `SPOTIFY_CLIENT_SECRET` | Spotify OAuth |
 | `lastfm-api-key` | `LASTFM_API_KEY` | Last.fm API access |
 | `postmark-server-token` | `POSTMARK_SERVER_TOKEN` | Email delivery |
-| `decide-gen-partner-secret` | `DECIDE_GEN_PARTNER_SECRET` | Search service only: gen catalog-resolve partner auth (secret owned by karaoke-gen's Pulumi) |
+| `decide-gen-partner-secret` | `DECIDE_GEN_PARTNER_SECRET` | Search service (gen catalog-resolve partner auth) and the main API (`DELETE /api/partner/gen/users`, gen's account deletion; `X-Partner-Secret`). Secret owned by karaoke-gen's Pulumi; main API mounts it via Pulumi and CI `--set-secrets` |
 | `gemini-api-key` | `GEMINI_API_KEY` | Screenshot import (AI Studio key; the screenshot card hides without it) |
 | `metabrainz-client-id` / `metabrainz-client-secret` | `METABRAINZ_CLIENT_ID` / `METABRAINZ_CLIENT_SECRET` | ListenBrainz connect via MetaBrainz OAuth (also mounted on the `lb-poll` job) |
 | `decide-token-key` | `DECIDE_TOKEN_KEY` | Fernet key for service tokens at rest (also on `lb-poll`) |

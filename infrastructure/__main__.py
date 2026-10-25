@@ -385,6 +385,15 @@ cloud_run_service = gcp.cloudrunv2.Service(
                         },
                     },
                     {
+                        "name": "DECIDE_GEN_PARTNER_SECRET",
+                        "value_source": {
+                            "secret_key_ref": {
+                                "secret": "decide-gen-partner-secret",
+                                "version": "latest",
+                            }
+                        },
+                    },
+                    {
                         "name": "DECIDE_KJBOX_SECRET",
                         "value_source": {
                             "secret_key_ref": {
@@ -550,6 +559,9 @@ REQUIRED_SECRETS = [
     "decide-token-key",
     # Phase 3d: karaoke-gen's admin token list (gen's Pulumi owns the secret; decide only reads it).
     "admin-tokens",
+    # Phase 6: gen's account deletion calls DELETE /api/partner/gen/users with this secret (same secret the
+    # search service reads; the resource is owned by karaoke-gen's Pulumi).
+    "decide-gen-partner-secret",
     # decide-kjbox-secret's grant is decide_kjbox_secret_access (above the service).
 ]
 
