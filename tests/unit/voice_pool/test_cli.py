@@ -293,3 +293,15 @@ def test_load_catalog_only_reads_local_catalog(no_bq, catalog_db: Path, monkeypa
     get_backend_settings.cache_clear()
     with pytest.raises(CatalogLoadError):
         load_catalog_only(get_backend_settings())
+
+
+def test_load_catalog_only_wraps_an_unreadable_catalog(no_bq, tmp_path: Path, monkeypatch):
+    """A corrupt catalog.db is CatalogLoadError, so the fetch run keeps those songs queued instead of crashing."""
+    from backend.services import catalog_store
+    from backend.services.catalog_store import CatalogLoadError, load_catalog_only
+
+    bad = tmp_path / "catalog.db"
+    bad.write_bytes(b"not a sqlite database")
+    monkeypatch.setattr(catalog_store.CatalogStore, "_fetch_catalog", staticmethod(lambda *a: (bad, None)))
+    with pytest.raises(CatalogLoadError, match="could not be opened"):
+        load_catalog_only(get_backend_settings(), client=object())

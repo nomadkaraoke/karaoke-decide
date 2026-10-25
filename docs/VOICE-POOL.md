@@ -14,7 +14,7 @@ section of `infrastructure/__main__.py`. Pipeline diagram:
 | Piece | What | Where |
 |-------|------|-------|
 | `voice-pool-select` | Cloud Run job, on demand (main image, 2 CPU / 4 GiB, 1 h). Picks the pool, probes YouTube embeddability, queues songs. | us-central1, SA `voice-pool` |
-| `voice-pool-fetch` | Cloud Run job, hourly at :07 UTC from scheduler `voice-pool-fetch-hourly` (main image, 1 CPU / 1 GiB, 3900 s). Resolves missing Spotify ids (catalog.db + BigQuery), downloads songs through flacfetch, hands batches to separation, starts analyse. | us-central1, SA `voice-pool` |
+| `voice-pool-fetch` | Cloud Run job, hourly at :07 UTC from scheduler `voice-pool-fetch-hourly` (main image, 1 CPU / 2 GiB, 3900 s). Resolves missing Spotify ids (catalog.db + BigQuery), downloads songs through flacfetch, hands batches to separation, starts analyse. | us-central1, SA `voice-pool` |
 | `voice-pool-separate-job` | karaoke-gen's GPU job (1 x L4, `parallelism=1`, 1 h per task). Owned by gen's Pulumi. | us-east4 |
 | `voice-pool-analyse` | Cloud Run job, started by fetch (`karaoke-decide-vocal` image, 4 CPU / 8 GiB, 6 h, 1 task). Computes markers, then publishes voice.db. | us-central1, SA `voice-pool` |
 | Queue | Firestore `voice_pool_fetch/{pool_id}`; status `queued → downloading → fetched → separating → separated → analysed` (or `failed`) | |

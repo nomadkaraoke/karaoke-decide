@@ -30,6 +30,14 @@ def _load() -> Any:
 requeue = _load()
 
 
+def fake_requeue(db: FakeDb, doc_id: str, ts: Any) -> bool:
+    """The transactional re-check against the fake (no transactions in FakeDb)."""
+    if not requeue._still_unresolved(db.cols[FETCH].get(doc_id)):
+        return False
+    db.collection(FETCH).document(doc_id).update({"status": "queued", "error": None, "updated_at": ts})
+    return True
+
+
 @pytest.fixture
 def db() -> FakeDb:
     return FakeDb({
@@ -56,7 +64,7 @@ def test_dry_run_lists_and_writes_nothing(db, capsys) -> None:
 
 
 def test_apply_requeues_only_no_spotify_id_failures(db, capsys) -> None:
-    assert requeue.main(["--apply"], db=db) == 0
+    assert requeue.main(["--apply"], db=db, requeue_one=fake_requeue) == 0
     docs = db.cols[FETCH]
     for pid in ("sheet1", "sheet2"):
         d = docs[pid]
@@ -74,3 +82,11 @@ def test_a_mode_flag_is_required(db) -> None:
     with pytest.raises(SystemExit):
         requeue.main(["--dry-run", "--apply"], db=db)
     assert db.updates == []
+
+
+def test_apply_skips_a_doc_that_moved_on_since_the_plan(db) -> None:
+    changes = requeue.plan(db)
+    db.cols[FETCH]["sheet1"].update(status="downloading", error=None)  # the fetch job claimed it meanwhile
+    assert requeue.apply(db, changes, "TS", fake_requeue) == 1
+    assert db.cols[FETCH]["sheet1"]["status"] == "downloading"
+    assert db.cols[FETCH]["sheet2"]["status"] == "queued"
