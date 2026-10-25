@@ -155,31 +155,21 @@ function PlaylistsContent() {
 
     try {
       setRemovingSongId(item.item_id);
-      let updated: Playlist;
-      if (item.song_key) {
-        await api.playlists.removeSong(selectedPlaylist.id, item.song_key);
-        updated = {
-          ...selectedPlaylist,
-          items: selectedPlaylist.items.filter((i) => i.item_id !== item.item_id),
-          song_ids: selectedPlaylist.song_ids.filter((id) => id !== item.song_key),
-          song_count: selectedPlaylist.song_count - 1,
-        };
-      } else {
-        // Uncatalogued entries have no song key, so rewrite the ordered list without it.
-        const remaining = selectedPlaylist.items.filter(
-          (i) => i.item_id !== item.item_id
-        );
-        updated = await api.playlists.putItems(
-          selectedPlaylist.id,
-          remaining.map((i) => ({
-            item_id: i.item_id,
-            song_key: i.song_key,
-            artist: i.artist,
-            title: i.title,
-          })),
-          selectedPlaylist.rev
-        );
-      }
+      // Drop only the chosen item (duplicates of a song keep their own entries) and
+      // take the server's response as the new state.
+      const remaining = selectedPlaylist.items.filter(
+        (i) => i.item_id !== item.item_id
+      );
+      const updated = await api.playlists.putItems(
+        selectedPlaylist.id,
+        remaining.map((i) => ({
+          item_id: i.item_id,
+          song_key: i.song_key,
+          artist: i.artist,
+          title: i.title,
+        })),
+        selectedPlaylist.rev
+      );
       setSelectedPlaylist(updated);
       setPlaylists((prev) =>
         prev.map((p) => (p.id === updated.id ? updated : p))

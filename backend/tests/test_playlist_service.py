@@ -192,9 +192,22 @@ async def test_warming_catalog_leaves_names_empty(fs: MemoryFirestore) -> None:
 async def test_update_playlist_bumps_rev(fs: MemoryFirestore) -> None:
     svc = _svc(fs)
     await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    before = fs.transactions
     pl = await svc.update_playlist(PL_ID, USER, name="Renamed")
+    assert fs.transactions == before + 1  # rev comes from the transactional read
     assert pl.rev == 1
     assert fs.cols["playlists"][PL_ID]["rev"] == 1
+    pl = await svc.update_playlist(PL_ID, USER, description="d")
+    assert pl.rev == 2 and pl.name == "Renamed" and pl.description == "d"
+
+
+@pytest.mark.asyncio
+async def test_update_playlist_denied_for_other_user(fs: MemoryFirestore) -> None:
+    svc = _svc(fs)
+    await svc.create_playlist(USER, "Set", playlist_id=PL_ID)
+    with pytest.raises(PlaylistAccessDeniedError):
+        await svc.update_playlist(PL_ID, OTHER, name="x")
+    assert fs.cols["playlists"][PL_ID]["rev"] == 0
 
 
 @pytest.mark.asyncio

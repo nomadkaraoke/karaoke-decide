@@ -336,10 +336,10 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
 
   4. delete the user's `playlists` documents (setlists, per `user_id`), and the user's `karaoke_log`,
      `user_songs`, `user_karaoke_unresolved` rows. Playlists are user data for this registry;
-     `POST /api/test/profile/reset` already clears them and is the template.
+     `POST /api/test/profile/reset` already clears them (now including `playlists` and `karaoke_log`).
 
-  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) does exactly
-  this and is the template. Any new store of user audio or voice data must be added to both.
+  The test API's `POST /api/test/voice/reset` (`backend/api/routes/test_support.py::reset_voice`) is the template
+  for steps 1-3; the profile reset (`POST /api/test/profile/reset`) is the template for step 4. Any new store of user audio or voice data must be added to both.
 
 ## Security Considerations
 

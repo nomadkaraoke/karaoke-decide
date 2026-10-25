@@ -387,36 +387,23 @@ class PlaylistService:
             PlaylistNotFoundError: If playlist doesn't exist.
             PlaylistAccessDeniedError: If user doesn't own the playlist.
         """
-        # Get existing to verify ownership
-        playlist = await self.get_playlist(playlist_id, user_id)
-
         now = datetime.now(UTC)
-        update_data: dict = {"updated_at": now.isoformat(), "rev": playlist.rev + 1}
 
-        if name is not None:
-            update_data["name"] = name
-        if description is not None:
-            update_data["description"] = description
+        async def body(txn: Any) -> dict[str, Any]:
+            cur = await txn.get(self.PLAYLISTS_COLLECTION, playlist_id)
+            if cur is None:
+                raise PlaylistNotFoundError(f"Playlist {playlist_id} not found")
+            if cur.get("user_id") != user_id:
+                raise PlaylistAccessDeniedError("Access denied to this playlist")
+            new = {**cur, "updated_at": now.isoformat(), "rev": int(cur.get("rev") or 0) + 1}
+            if name is not None:
+                new["name"] = name
+            if description is not None:
+                new["description"] = description
+            txn.set(self.PLAYLISTS_COLLECTION, playlist_id, new)
+            return {"id": playlist_id, **new}
 
-        await self.firestore.update_document(
-            self.PLAYLISTS_COLLECTION,
-            playlist_id,
-            update_data,
-        )
-
-        # Return updated playlist
-        return PlaylistInfo(
-            id=playlist.id,
-            user_id=playlist.user_id,
-            name=name if name is not None else playlist.name,
-            description=description if description is not None else playlist.description,
-            song_ids=playlist.song_ids,
-            song_count=playlist.song_count,
-            created_at=playlist.created_at,
-            updated_at=now,
-            items=playlist.items,
-            rev=playlist.rev + 1,
-        )
+        return await self._doc_to_playlist(await self.firestore.run_transaction(body))
 
     async def delete_playlist(
         self,
