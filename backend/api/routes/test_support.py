@@ -31,7 +31,7 @@ from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
 from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
-from backend.models.voice_session import PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
+from backend.models.voice_session import NoteLabelIn, PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportIngestService
@@ -237,6 +237,7 @@ class SeedAttempt(BaseModel):
     title: str
     quiz: QuizIn
     pitch: PitchSummaryIn | None = None
+    note_labels: list[NoteLabelIn] = Field(default_factory=list, max_length=40)  # falsetto labels (v0.33.0)
     recording: bool = False
     excluded: bool = False
     demand: SeedDemand = Field(default_factory=SeedDemand)
@@ -330,6 +331,8 @@ async def seed_voice_history(
                     "quiz": a.quiz.model_dump(),
                     "context": {"posture": "standing", "warmth": "warm", "headphones": True, "device": "Maestro"},
                     "pitch": a.pitch.model_dump() if a.pitch else None,
+                    "pitch_all": None,
+                    "note_labels": [n.model_dump() for n in a.note_labels],
                     "stopped_early": False,
                     "started_at": started,
                     "ended_at": started + timedelta(minutes=3),
