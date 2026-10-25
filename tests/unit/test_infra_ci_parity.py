@@ -567,7 +567,7 @@ def test_song_index_build_reads_vocal_range_by_name() -> None:
 VOICE_POOL_JOBS = {
     # resource name: (job name, args, cpu, memory, timeout, image repo)
     "voice-pool-select-job": ("voice-pool-select", ["select"], "2", "4Gi", "3600s", "karaoke-decide"),
-    "voice-pool-fetch-job": ("voice-pool-fetch", ["fetch"], "1", "1Gi", "3900s", "karaoke-decide"),
+    "voice-pool-fetch-job": ("voice-pool-fetch", ["fetch"], "1", "2Gi", "3900s", "karaoke-decide"),
     "voice-pool-analyse-job": ("voice-pool-analyse", ["analyse"], "4", "8Gi", "21600s", "karaoke-decide-vocal"),
 }
 
