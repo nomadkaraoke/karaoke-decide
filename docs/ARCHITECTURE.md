@@ -346,7 +346,8 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   `email_field`) and `NOT_USER_DATA` (global collections, or ones keyed by something that isn't the user, each
   with its reason). `delete_all_user_data(fs, bucket, email)` looks the profile up at
   `decide_users/{sha256(lowercase email)}` without creating it, runs `erase_voice_data`, deletes the user's docs
-  in every registry store, and deletes `decide_users` last, so a retry after a part-way failure still finds the
+  in every registry store page by page (`PAGE_SIZE`, re-querying until a query comes back empty, so no query cap
+  leaves rows behind), and deletes `decide_users` last, so a retry after a part-way failure still finds the
   user; it returns counts per collection (`{}` for an unknown email) and is idempotent. **Rule: every Firestore
   collection decide's code names must be in one of the two.** `backend/tests/test_user_data_registry_guard.py`
   parses `backend/` and `karaoke_decide/` (collection constants, FirestoreService calls, `collection=` keywords,

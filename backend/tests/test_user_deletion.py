@@ -204,7 +204,7 @@ def test_no_store_uses_the_unsupported_prefix_match() -> None:
 async def test_prefix_match_raises_rather_than_skipping(fs: FakeFirestore) -> None:
     store = UserDataStore("anything", "doc_id_prefix")
     with pytest.raises(NotImplementedError):
-        await user_deletion._doc_ids(_db(fs), store, USER_A, EMAIL_A)
+        await user_deletion._page_ids(_db(fs), store, USER_A, EMAIL_A)
 
 
 def test_decide_users_is_last() -> None:
@@ -216,3 +216,59 @@ def test_voice_labels_name_matches_admin_voice() -> None:
     from backend.api.routes.admin_voice import LABELS_COLLECTION
 
     assert user_deletion.VOICE_LABELS_COLLECTION == LABELS_COLLECTION
+
+
+async def test_more_rows_than_a_page_are_all_deleted(
+    fs: FakeFirestore, bucket: LocalBucket, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No query cap: a big import (user_songs past the page size) and big voice stores go in full."""
+    monkeypatch.setattr(user_deletion, "PAGE_SIZE", 3)
+    _seed_user(fs, USER_A, EMAIL_A)
+    _seed_user(fs, USER_B, EMAIL_B)
+    for i in range(10):
+        fs.cols["user_songs"][f"{USER_A}:s{i}"] = {"user_id": USER_A, "source": "spotify_export"}
+        fs.cols["user_songs"][f"{USER_A}:v{i}"] = {"user_id": USER_A, "sources": ["voice_session"]}
+        fs.cols["voice_sessions"][f"s{i}"] = {"user_id": USER_A}
+        fs.cols["voice_attempts"][f"s{i}:1"] = {"user_id": USER_A}
+        fs.cols["magic_links"][f"t{i}"] = {"email": EMAIL_A.lower()}
+
+    counts = await delete_all_user_data(_db(fs), bucket, EMAIL_A)
+
+    assert counts["user_songs"] == 21 and counts["voice_sessions"] == 11 and counts["voice_attempts"] == 11
+    assert counts["magic_links"] == 11
+    assert not [d for col in fs.cols.values() for d in col.values() if d.get("user_id") == USER_A]
+    assert not [d for d in fs.cols["magic_links"].values() if d.get("email") == EMAIL_A.lower()]
+    assert f"{USER_B}:x" in fs.cols["user_songs"]
+
+
+async def test_erase_voice_data_strips_more_rows_than_a_page(
+    fs: FakeFirestore, bucket: LocalBucket, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(user_deletion, "PAGE_SIZE", 2)
+    fs.cols["user_songs"] = {
+        **{
+            f"{USER_A}:m{i}": {"user_id": USER_A, "sources": ["quiz", "voice_session"], "session_feel": "ok"}
+            for i in range(5)
+        },
+        **{f"{USER_A}:o{i}": {"user_id": USER_A, "source": "voice_session"} for i in range(5)},  # no sources list
+        **{f"{USER_A}:p{i}": {"user_id": USER_A, "source": "quiz", "sources": ["quiz"]} for i in range(5)},
+    }
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+
+    songs = fs.cols["user_songs"]
+    assert sorted(songs) == sorted([f"{USER_A}:m{i}" for i in range(5)] + [f"{USER_A}:p{i}" for i in range(5)])
+    assert all(songs[f"{USER_A}:m{i}"] == {"user_id": USER_A, "sources": ["quiz"]} for i in range(5))
+
+
+async def test_deletes_that_dont_land_raise_instead_of_looping(
+    fs: FakeFirestore, bucket: LocalBucket, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _seed_user(fs, USER_A, EMAIL_A)
+
+    async def no_op(col: str, ids: list[str]) -> None:
+        return None
+
+    monkeypatch.setattr(fs, "batch_delete", no_op)
+    with pytest.raises(RuntimeError, match="keep coming back"):
+        await delete_all_user_data(_db(fs), bucket, EMAIL_A)

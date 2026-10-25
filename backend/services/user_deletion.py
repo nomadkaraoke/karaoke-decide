@@ -16,12 +16,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
-from backend.services.import_ingest_service import EXPORT_ARTISTS_COLLECTION, IMPORTS_COLLECTION
+from backend.services.import_ingest_service import (
+    EXPORT_ARTISTS_COLLECTION,
+    IMPORTS_COLLECTION,
+    USER_ARTISTS_COLLECTION,
+)
 from backend.services.karaoke_log_service import LOG_COLLECTION, UNRESOLVED_COLLECTION
 from backend.services.listenbrainz_service import ListenBrainzService
 from backend.services.music_service_service import MusicServiceService
@@ -42,7 +47,7 @@ USERS_COLLECTION = AuthService.USERS_COLLECTION
 VOICE_LABELS_COLLECTION = "voice_labels"  # admin_voice.LABELS_COLLECTION (not imported: routes → services only)
 SYNC_JOBS_COLLECTION = "sync_jobs"
 QUIZ_PROGRESS_COLLECTION = "quiz_progress"
-QUERY_LIMIT = 10000
+PAGE_SIZE = 500  # docs per query; deletes repeat until a query comes back empty
 
 
 @dataclass(frozen=True)
@@ -70,7 +75,7 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     UserDataStore(PURGES_COLLECTION, "doc_id_user_id"),  # voice_recording_purges/{user_id} marker
     # Listening and taste data.
     UserDataStore(USER_SONGS_COLLECTION, "user_id_field"),  # user_songs/{user_id}:{song_id}, user_id field
-    UserDataStore("user_artists", "user_id_field"),  # user_artists/{user_id}:{artist}, user_id field
+    UserDataStore(USER_ARTISTS_COLLECTION, "user_id_field"),  # user_artists/{user_id}:{artist}, user_id field
     UserDataStore(HIDDEN_COLLECTION, "user_id_field"),  # user_hidden_songs/{user_id}:{digest}, user_id field
     UserDataStore(IMPORTS_COLLECTION, "user_id_field"),  # user_imports/{user_id}:{source} status docs, user_id field
     UserDataStore(EXPORT_ARTISTS_COLLECTION, "user_id_field"),  # export artist aggregates, user_id field
@@ -104,10 +109,71 @@ NOT_USER_DATA: frozenset[str] = frozenset(
     }
 )
 
+# Stores erase_voice_data deletes from (fully or in part), so they are counted before it runs.
+VOICE_ERASED = frozenset(
+    {
+        RECORDINGS_COLLECTION,
+        SESSIONS_COLLECTION,
+        ATTEMPTS_COLLECTION,
+        VOICE_LABELS_COLLECTION,
+        PURGES_COLLECTION,
+        USER_SONGS_COLLECTION,
+    }
+)
+
 
 def email_hash(email: str) -> str:
     """``decide_users`` doc id: sha256 of the lowercase email (``AuthService._hash_email``)."""
     return hashlib.sha256(email.lower().encode()).hexdigest()
+
+
+async def _delete_pages(fs: FirestoreService, collection: str, next_page: Callable[[], Awaitable[list[str]]]) -> int:
+    """Delete ``next_page()``'s ids until it comes back empty. Returns how many were deleted.
+
+    No query is capped: a user with more rows than a page (a big export import) is erased in full.
+    A page that repeats the previous one means deletes aren't landing: raise rather than loop.
+    """
+    deleted, previous = 0, None
+    while ids := await next_page():
+        if ids == previous:
+            raise RuntimeError(f"{collection}: deleted docs keep coming back")
+        await fs.batch_delete(collection, ids)
+        deleted += len(ids)
+        previous = ids
+    return deleted
+
+
+async def _query_page(
+    fs: FirestoreService, collection: str, filters: list[tuple[str, str, Any]]
+) -> list[dict[str, Any]]:
+    return await fs.query_documents(collection, filters=filters, limit=PAGE_SIZE)
+
+
+async def _strip_session_rows(fs: FirestoreService, user_id: str, filters: list[tuple[str, str, Any]]) -> None:
+    """Undo what voice sessions wrote to the user's ``user_songs`` rows matching ``filters``, page by page.
+
+    Each row stops matching once handled (deleted, or ``voice_session`` gone from ``sources`` and
+    ``source``), so re-querying until empty terminates.
+    """
+    previous: list[str] | None = None
+    while rows := await _query_page(fs, USER_SONGS_COLLECTION, [("user_id", "==", user_id), *filters]):
+        ids = [str(r["id"]) for r in rows]
+        if ids == previous:
+            raise RuntimeError(f"{USER_SONGS_COLLECTION}: voice session rows keep coming back")
+        previous = ids
+        deletes: list[str] = []
+        for row in rows:
+            sources = list(row.get("sources") or ([row["source"]] if row.get("source") else []))
+            rest = [x for x in sources if x != SESSION_SOURCE]
+            if not rest:
+                deletes.append(row["id"])
+                continue
+            kept = {k: v for k, v in row.items() if k != "id" and not k.startswith("session_")}
+            kept["sources"] = rest
+            if kept.get("source") == SESSION_SOURCE:
+                kept["source"] = rest[0]
+            await fs.set_document(USER_SONGS_COLLECTION, row["id"], kept)
+        await fs.batch_delete(USER_SONGS_COLLECTION, deletes)
 
 
 async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> None:
@@ -116,48 +182,43 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
     Recordings (objects, docs, attempt links) via ``VoiceRecordingService.delete_all_for_user``,
     then the purge marker, sessions, attempts and imported labels, then undo what sessions wrote
     to ``user_songs``: rows made only by a session go; on any other row the ``session_*`` fields
-    and the ``voice_session`` source are removed. Idempotent.
+    and the ``voice_session`` source are removed. Idempotent; nothing is capped.
     """
     by_user = [("user_id", "==", user_id)]
     await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
     await fs.delete_document(PURGES_COLLECTION, user_id)  # delete_all writes this marker; a fresh run may upload
     for collection in (ATTEMPTS_COLLECTION, SESSIONS_COLLECTION, VOICE_LABELS_COLLECTION):
-        docs = await fs.query_documents(collection, filters=by_user, limit=QUERY_LIMIT)
-        await fs.batch_delete(collection, [d["id"] for d in docs])
 
-    rows = await fs.query_documents(USER_SONGS_COLLECTION, filters=by_user, limit=QUERY_LIMIT)
-    deletes: list[str] = []
-    for row in rows:
-        sources = list(row.get("sources") or ([row["source"]] if row.get("source") else []))
-        if SESSION_SOURCE not in sources and row.get("source") != SESSION_SOURCE:
-            continue
-        rest = [x for x in sources if x != SESSION_SOURCE]
-        if not rest:
-            deletes.append(row["id"])
-            continue
-        kept = {k: v for k, v in row.items() if k != "id" and not k.startswith("session_")}
-        kept["sources"] = rest
-        if kept.get("source") == SESSION_SOURCE:
-            kept["source"] = rest[0]
-        await fs.set_document(USER_SONGS_COLLECTION, row["id"], kept)
-    await fs.batch_delete(USER_SONGS_COLLECTION, deletes)
+        async def page(collection: str = collection) -> list[str]:
+            return [str(d["id"]) for d in await _query_page(fs, collection, by_user)]
+
+        await _delete_pages(fs, collection, page)
+
+    await _strip_session_rows(fs, user_id, [("sources", "array_contains", SESSION_SOURCE)])
+    await _strip_session_rows(fs, user_id, [("source", "==", SESSION_SOURCE)])  # rows with no ``sources`` list
 
 
-async def _doc_ids(fs: FirestoreService, store: UserDataStore, user_id: str | None, email: str) -> list[str]:
+async def _page_ids(fs: FirestoreService, store: UserDataStore, user_id: str | None, email: str) -> list[str]:
+    """The next page (at most ``PAGE_SIZE``) of the user's doc ids in ``store``."""
     if store.match == "doc_id_email_hash":
         doc_id = email_hash(email)
         return [doc_id] if await fs.get_document(store.collection, doc_id) is not None else []
     if store.match == "email_field":
-        docs = await fs.query_documents(store.collection, filters=[(store.field, "==", email)], limit=QUERY_LIMIT)
-        return [str(d["id"]) for d in docs]
+        return [str(d["id"]) for d in await _query_page(fs, store.collection, [(store.field, "==", email)])]
     if not user_id:
         return []
     if store.match == "doc_id_user_id":
         return [user_id] if await fs.get_document(store.collection, user_id) is not None else []
     if store.match == "user_id_field":
-        docs = await fs.query_documents(store.collection, filters=[(store.field, "==", user_id)], limit=QUERY_LIMIT)
-        return [str(d["id"]) for d in docs]
+        return [str(d["id"]) for d in await _query_page(fs, store.collection, [(store.field, "==", user_id)])]
     raise NotImplementedError(f"{store.collection}: match {store.match!r} needs an id-prefix query in FirestoreService")
+
+
+async def _count(fs: FirestoreService, store: UserDataStore, user_id: str) -> int:
+    """How many docs the user has in ``store`` (an aggregation, so uncapped and cheap)."""
+    if store.match == "doc_id_user_id":
+        return int(await fs.get_document(store.collection, user_id) is not None)
+    return await fs.count_documents(store.collection, filters=[(store.field, "==", user_id)])
 
 
 async def delete_all_user_data(fs: FirestoreService, bucket: Any, email: str) -> dict[str, int]:
@@ -165,21 +226,28 @@ async def delete_all_user_data(fs: FirestoreService, bucket: Any, email: str) ->
 
     Looks the profile up at ``decide_users/{sha256(email)}`` without creating it. An unknown email
     has nothing user-keyed to erase; only email-keyed stores are swept, and the result is ``{}``
-    when they hold nothing. Idempotent: a second call finds nothing and returns zeros (or ``{}``).
+    when they hold nothing. Idempotent: a second call finds nothing and returns ``{}``. Every store
+    is deleted page by page until a query comes back empty, so nothing past a page is left behind.
     """
     email = email.strip().lower()
     profile = await fs.get_document(USERS_COLLECTION, email_hash(email))
     user_id = str(profile["user_id"]) if profile and profile.get("user_id") else None
 
-    found = {s.collection: set(await _doc_ids(fs, s, user_id, email)) for s in USER_DATA_STORES}
+    counts: dict[str, int] = {}
     if user_id:
+        # Counted before erase_voice_data, which deletes these itself (and session-only user_songs rows).
+        for store in USER_DATA_STORES:
+            if store.collection in VOICE_ERASED:
+                counts[store.collection] = await _count(fs, store, user_id)
         await erase_voice_data(fs, bucket, user_id)
     for store in USER_DATA_STORES:  # registry order: decide_users is last
-        ids = await _doc_ids(fs, store, user_id, email)  # again: catches docs written since the count
-        await fs.batch_delete(store.collection, ids)
-        found[store.collection] |= set(ids)
 
-    counts = {c: len(ids) for c, ids in found.items()}
+        async def page(store: UserDataStore = store) -> list[str]:
+            return await _page_ids(fs, store, user_id, email)
+
+        swept = await _delete_pages(fs, store.collection, page)
+        counts[store.collection] = max(counts.get(store.collection, 0), swept)
+
     if profile is None:
         counts = {c: n for c, n in counts.items() if n}
     logger.info("Deleted decide user data for user %s: %s", user_id or "(no profile)", counts)
