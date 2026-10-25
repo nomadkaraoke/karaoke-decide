@@ -13,6 +13,7 @@ from karaoke_decide.voice_session.model import (
     PitchSummary,
     Posterior,
     SongDemand,
+    centre,
     comfort,
     full,
     key_shift_direction,
@@ -23,7 +24,15 @@ from karaoke_decide.voice_session.model import (
     likely_octave,
     sung_octave,
 )
-from karaoke_decide.voice_session.weights import OCTAVE_PRIOR, TEMP, W_PITCH_HEADPHONES, W_TESSITURA
+from karaoke_decide.voice_session.weights import (
+    MIC_BIAS,
+    OCTAVE_PRIOR,
+    PRIOR_FLOOR,
+    PRIOR_SD,
+    TEMP,
+    W_PITCH_HEADPHONES,
+    W_TESSITURA,
+)
 
 from .builders import ctx, evidence, quiz, song
 
@@ -35,6 +44,8 @@ class Profile:
     voice_type_between: str | None = None
     register: str | None = None
     confidence: str | None = None
+    comfort_low: int | None = None
+    comfort_high: int | None = None
 
 
 def _top_type(post: Posterior) -> str:
@@ -426,3 +437,60 @@ def test_posterior_stays_valid_with_extreme_pitch() -> None:
         for _ in range(20):
             post = post.update(evidence(song(55, 65), quiz(position="comfortable"), ctx(headphones=True), p))
             _assert_valid(post)
+
+
+# ---------------------------------------------------------------- range-shaped prior (E3)
+
+
+def test_mic_prior_peaks_at_shifted_centre() -> None:
+    """A mic reading reads low: the prior peaks MIC_BIAS above the measured comfort centre."""
+    assert MIC_BIAS["mic"] == 1.0 and MIC_BIAS["session"] == 0.0
+    mic = Posterior.from_profile(Profile(method="mic", voice_type="bass", comfort_low=50, comfort_high=60)).probs()
+    peak = max(mic.values())
+    assert {h for h, p in mic.items() if p == pytest.approx(peak)} == {h for h in HYPOTHESES if centre(h) == 56}
+    session = Posterior.from_profile(
+        Profile(method="session", voice_type="baritone", confidence="medium", comfort_low=50, comfort_high=60)
+    ).probs()
+    s_peak = max(session.values())
+    assert {h for h, p in session.items() if p == pytest.approx(s_peak)} == {h for h in HYPOTHESES if centre(h) == 55}
+    # The weight falls off as a Gaussian of PRIOR_SD over the hypothesis centres, on top of the floor.
+    h_far = ("tenor", 2)  # centre 62: 6 above 56
+    w = PRIOR_FLOOR + (1 - PRIOR_FLOOR) * math.exp(-(6**2) / (2 * PRIOR_SD**2))
+    assert mic[h_far] / peak == pytest.approx(w)
+
+
+def test_mic_prior_ignores_the_named_type_when_comfort_is_known() -> None:
+    """A low mic reading names bass for a baritone; the range-shaped prior doesn't hand bass 4x."""
+    marg = Posterior.from_profile(
+        Profile(method="mic", voice_type="bass", comfort_low=49, comfort_high=59)
+    ).type_marginal()
+    assert marg["baritone"] > marg["bass"]
+
+
+def test_mic_prior_never_below_floor() -> None:
+    for c_lo in (30, 45, 55, 70, 90):
+        probs = Posterior.from_profile(
+            Profile(method="mic", voice_type="tenor", comfort_low=c_lo, comfort_high=c_lo + 10)
+        ).probs()
+        assert min(probs.values()) / max(probs.values()) >= PRIOR_FLOOR - 1e-12
+
+
+def test_wrong_mic_type_recoverable_in_3_songs() -> None:
+    """A baritone whose mic test read bass (comfort 46-56) is baritone after 3 comfortable songs sung with pitch."""
+    post = Posterior.from_profile(Profile(method="mic", voice_type="bass", comfort_low=46, comfort_high=56))
+    for p10, p90 in ((51, 61), (53, 63), (50, 62)):
+        p50 = (p10 + p90) / 2
+        pitch = PitchSummary(voiced_s=90, held_count=20, held_low=p10 - 1, held_high=p90 + 1, p10=p10, p50=p50, p90=p90)
+        post = post.update(evidence(song(p10, p90), quiz(position="comfortable", difficulty="easy"),
+                                    ctx(headphones=True), pitch=pitch))  # fmt: skip
+    _assert_valid(post)
+    assert _top_type(post) == "baritone"
+
+
+def test_self_prior_unchanged() -> None:
+    """Self reports (even with a comfort band) and comfort-less mic profiles keep the type weights."""
+    with_band = Posterior.from_profile(Profile(method="self", voice_type="bass", comfort_low=50, comfort_high=60))
+    without = Posterior.from_profile(Profile(method="self", voice_type="bass"))
+    assert with_band.log_p == pytest.approx(without.log_p)
+    marg = Posterior.from_profile(Profile(method="mic", voice_type="tenor")).type_marginal()
+    assert marg["tenor"] / marg["bass"] == pytest.approx(4.0)

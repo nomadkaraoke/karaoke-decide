@@ -16,7 +16,10 @@ from karaoke_decide.vocal_range.notes import VOICE_TYPES
 from karaoke_decide.voice_session.weights import (
     EPS_DIFFICULTY,
     EPS_POSITION,
+    MIC_BIAS,
     OCTAVE_PRIOR,
+    PRIOR_FLOOR,
+    PRIOR_SD,
     TEMP,
     TESS_SD,
     TESS_TEMP,
@@ -125,6 +128,8 @@ class VoiceProfileLike(Protocol):
 
     @property
     def voice_type_between(self) -> str | None: ...  # the adjacent type when reported "between"
+
+    # Optional: the measured comfortable band (``comfort_low`` / ``comfort_high``, MIDI), read with getattr.
 
 
 def _sigmoid(x: float) -> float:
@@ -309,6 +314,25 @@ def _profile_register(profile: VoiceProfileLike) -> str | None:
     return None
 
 
+def _profile_comfort_centre(profile: VoiceProfileLike) -> float | None:
+    """The middle of a measured (mic / session) profile's comfortable band, or None."""
+    if profile.method not in MIC_BIAS:
+        return None
+    lo, hi = getattr(profile, "comfort_low", None), getattr(profile, "comfort_high", None)
+    if not isinstance(lo, int | float) or not isinstance(hi, int | float) or hi < lo:
+        return None
+    return (lo + hi) / 2
+
+
+def _range_prior(profile_centre: float, bias: float) -> dict[Hyp, float]:
+    """Weights over HYPOTHESES centred on the bias-corrected measured comfort centre, never below PRIOR_FLOOR."""
+    target = profile_centre + bias
+    return {
+        h: PRIOR_FLOOR + (1 - PRIOR_FLOOR) * math.exp(-((centre(h) - target) ** 2) / (2 * PRIOR_SD**2))
+        for h in HYPOTHESES
+    }
+
+
 def _type_prior(profile: VoiceProfileLike | None) -> dict[str, float]:
     types = list(VOICE_TYPES)
     weights = dict.fromkeys(types, 1.0)
@@ -344,7 +368,14 @@ class Posterior:
 
     @classmethod
     def from_profile(cls, profile: VoiceProfileLike | None) -> Posterior:
-        """Prior from a stored voice profile; shifts are uniform within each type."""
+        """Prior from a stored voice profile.
+
+        A mic or session profile with a comfortable band gives a range-shaped prior (``_range_prior``) over
+        type × shift, centred on the band (mic readings moved up by MIC_BIAS) and floored; its named type is
+        not used. Otherwise type weights (``_type_prior``) with shifts uniform within each type."""
+        if profile is not None and (pc := _profile_comfort_centre(profile)) is not None:
+            rw = _range_prior(pc, MIC_BIAS[profile.method])
+            return cls(_normalised({h: math.log(w) for h, w in rw.items()}))
         tw = _type_prior(profile)
         return cls(_normalised({h: math.log(tw[h[0]]) for h in HYPOTHESES}))
 

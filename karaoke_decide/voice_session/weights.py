@@ -29,6 +29,13 @@ K_EARLY_MISS = 0.7
 EPS_POSITION = 0.15
 EPS_DIFFICULTY = 0.2
 TEMP = 1.5
+# Range-shaped prior from a measured profile (model.from_profile, method mic / session with a comfort band):
+# w(h) = PRIOR_FLOOR + (1 − PRIOR_FLOOR)·exp(−(centre(h) − (profile centre + MIC_BIAS))² / (2·PRIOR_SD²)).
+# The mic test reads low on average (Andrew's Pixel: bass from a baritone), so its centre is moved up; the floor
+# keeps a wrong reading recoverable within a few songs.
+PRIOR_FLOOR = 0.25
+PRIOR_SD = 3.0
+MIC_BIAS: dict[str, float] = {"mic": 1.0, "session": 0.0}
 # Base lean over the octave a singer used when no pitch tells us (own octave most likely); model.py
 # multiplies it by how well the song fits each hypothesis at that octave.
 OCTAVE_PRIOR: dict[int, float] = {0: 0.6, -12: 0.2, 12: 0.2}
