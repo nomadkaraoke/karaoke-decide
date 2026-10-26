@@ -23,7 +23,11 @@
 # LOCAL_STACK_KJBOX_SECRET (local-stack-secret: kjbox's karaoke-log partner secret, sent as
 # X-Kjbox-Secret; the caller's DECIDE_KJBOX_SECRET is ignored),
 # SEARCH_LOCAL_PUBLIC_URL (http://127.0.0.1:$SEARCH_PORT; http://10.0.2.2:... for Android),
-# DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`).
+# DECIDE_LOCAL_PUBLIC_URL (likewise for the main API, used by `env`),
+# LOCAL_STACK_PROJECT (the Firestore project on the shared emulator, default test-project: must match the gen
+# local stack this one validates sessions against) and LOCAL_STACK_STATE_DIR (fixtures, pids, logs, recordings;
+# default .local-stack). Several stacks on one machine (the mobile app's parallel E2E lanes) each get their own
+# ports, project and state dir, beside a gen stack with the same project.
 # The api always runs with DECIDE_FAKE_EXTERNALS=1 and DECIDE_INLINE_TASKS=1, the fake URLs on
 # http://127.0.0.1:$DECIDE_LOCAL_PORT/fake/... (docs/TESTING.md § "Local stack: fakes").
 # The api also gets the voice session (docs/TESTING.md § "Voice session"): VOICE_LOCAL_DIR=.local-stack/voice
@@ -34,7 +38,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-STATE_DIR="$PROJECT_ROOT/.local-stack"
+STATE_DIR="${LOCAL_STACK_STATE_DIR:-$PROJECT_ROOT/.local-stack}"
 INDEX_DIR="$STATE_DIR/song-index"
 CATALOG_DIR="$STATE_DIR/catalog"
 VOICE_DIR="$STATE_DIR/voice"
@@ -204,7 +208,7 @@ up_api() {
     echo "Starting api on :$API_PORT"
     (
         cd "$PROJECT_ROOT"
-        export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GOOGLE_CLOUD_PROJECT=test-project
+        export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GOOGLE_CLOUD_PROJECT="${LOCAL_STACK_PROJECT:-test-project}"
         export ENVIRONMENT=development JWT_SECRET=local-stack-jwt
         export DECIDE_TEST_API=1 BIGQUERY_DISABLED=1
         export CATALOG_LOCAL_DIR="$CATALOG_DIR" SONG_INDEX_LOCAL_DIR="$INDEX_DIR"
