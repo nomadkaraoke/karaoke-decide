@@ -361,7 +361,7 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   3. undo what sessions wrote to `user_songs`: delete rows whose only source is `voice_session`; on any other
      row strip the `session_*` fields and remove `"voice_session"` from `sources` (and from `source`, replaced
      by the first remaining source); and remove the user's id from every `voice_version_stats.not_embeddable_by`
-     (the global `embeddable` verdict on the video stays).
+     and `not_embeddable_by_guests` list (the global `embeddable` verdict on the video stays).
   4. delete the user's `playlists` documents (setlists, per `user_id`), and the user's `karaoke_log`,
      `user_songs`, `user_karaoke_unresolved` rows. Playlists are user data for this registry;
      `POST /api/test/profile/reset` already clears them (now including `playlists` and `karaoke_log`).
