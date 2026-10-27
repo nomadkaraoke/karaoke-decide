@@ -85,9 +85,18 @@ def _analysis(key: str, centre: float, n: int) -> dict[str, Any]:
     }
 
 
+def _songs() -> list[SongRow]:
+    return sorted((s for s in catalog_fixtures._rows().songs if s.in_kn), key=lambda s: s.song_key)
+
+
+def pooled_song_keys() -> set[str]:
+    """The song keys ``build`` puts in the fixture voice.db."""
+    return {s.song_key for s, _ in _assign(_songs())}
+
+
 def build(dest: Path) -> Path:
     """Write ``<dest>/voice.db`` (see module doc) and return its path."""
-    songs = sorted((s for s in catalog_fixtures._rows().songs if s.in_kn), key=lambda s: s.song_key)
+    songs = _songs()
     centres = {t: (lo + hi) / 2 for t, (lo, hi) in VOICE_TYPES.items()}
     pool: list[dict[str, Any]] = []
     analysis: list[dict[str, Any]] = []
