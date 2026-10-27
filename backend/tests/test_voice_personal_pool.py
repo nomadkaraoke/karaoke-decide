@@ -101,9 +101,14 @@ def make_client(
     voice_store: VoiceDataStore,
     catalog_reader: CatalogReader,  # noqa: F811
 ) -> Iterator[MakeClient]:
-    def make(*, admin: bool = False, open_: bool = True, user_id: str = USER_ID, guest: bool = False) -> TestClient:
+    def make(
+        *, admin: bool = False, open_: bool = True, user_id: str = USER_ID, guest: bool = False, budget: float = 20.0
+    ) -> TestClient:
         settings = BackendSettings(
-            environment="development", google_cloud_project="test-project", voice_session_open=open_
+            environment="development",
+            google_cloud_project="test-project",
+            voice_session_open=open_,
+            voice_monthly_budget_usd=budget,
         )
         user = User(id=user_id, email=None if guest else EMAIL, is_admin=admin, is_guest=guest)
         app.dependency_overrides[get_settings] = lambda: settings
@@ -350,16 +355,61 @@ def test_cap_trims_to_remaining(client: TestClient, fs: RouteFirestore) -> None:
 
 
 def test_budget_guard_pauses(client: TestClient, fs: RouteFirestore, caplog: pytest.LogCaptureFixture) -> None:
-    fs.col(BUDGET)[_month()] = {"month": _month(), "est_cost_usd": 19.9, "songs": 737, "batches": 40,
-                                "alerted_80": True}  # fmt: skip
+    fs.col(BUDGET)[_month()] = {
+        "month": _month(),
+        "est_cost_usd": 19.98,
+        "songs": 740,
+        "batches": 40,
+        "alerted_80": True,
+    }  # fmt: skip  (0.02 left: not one song fits)
     r = client.post(URL)
     assert r.status_code == 503 and r.json() == {"detail": {"reason": "budget_paused"}}
-    assert fs.col(BUDGET)[_month()]["est_cost_usd"] == 19.9 and not fs.cols.get(BATCHES)
+    assert fs.col(BUDGET)[_month()]["est_cost_usd"] == 19.98 and not fs.cols.get(BATCHES)
     assert not fs.cols.get(FETCH_COLLECTION)
     assert any(r.levelno == logging.WARNING and "budget" in r.getMessage() for r in caplog.records)
     assert not any(r.levelno >= logging.ERROR for r in caplog.records)
     fs.col(BUDGET)[_month()]["est_cost_usd"] = 19.7  # 8 songs (0.216) fit again
-    assert client.post(URL).status_code == 201
+    r = client.post(URL)
+    assert r.status_code == 201 and len(r.json()["songs"]) == 8
+
+
+def test_budget_trims_to_what_fits(client: TestClient, fs: RouteFirestore, caplog: pytest.LogCaptureFixture) -> None:
+    """0.10 left at 0.027 a song: the request is trimmed to 3 songs, as the cap trims."""
+    caplog.set_level(logging.INFO)
+    fs.col(BUDGET)[_month()] = {"month": _month(), "est_cost_usd": 19.9, "songs": 737, "batches": 40,
+                                "alerted_80": True, "alerted_80_budget": 20.0}  # fmt: skip
+    r = client.post(URL)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["songs"] == KEYS[:3] and body["est_cost_usd"] == pytest.approx(3 * 0.027)
+    assert fs.col(BATCHES)[body["batch_id"]]["song_keys"] == KEYS[:3]
+    assert sorted(fs.col(FETCH_COLLECTION)) == sorted(pool_id(k) for k in KEYS[:3])
+    month = fs.col(BUDGET)[_month()]
+    assert month["est_cost_usd"] == pytest.approx(19.981) and month["songs"] == 740
+    assert any("trimmed to 3 of 8" in r.getMessage() for r in caplog.records)
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+    assert client.post(URL).status_code == 503  # now nothing fits
+
+
+def test_free_songs_go_in_when_the_budget_is_used_up(
+    client: TestClient, fs: RouteFirestore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A song a concurrent batch queued meanwhile costs nothing: it still joins a batch when no new song fits."""
+    fs.col(BUDGET)[_month()] = {"month": _month(), "est_cost_usd": 20.0, "songs": 740, "batches": 40}
+    real = fs.get_many
+
+    async def stale_get_many(collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+        out = await real(collection, ids)
+        if collection == FETCH_COLLECTION:
+            fs.col(FETCH_COLLECTION)[pool_id(KEYS[0])] = {"song_key": KEYS[0], "source": "personal",
+                                                          "status": "queued", "batch_ids": ["other"]}  # fmt: skip
+        return out
+
+    monkeypatch.setattr(fs, "get_many", stale_get_many)
+    r = client.post(URL)
+    assert r.status_code == 201 and r.json()["songs"] == [KEYS[0]] and r.json()["est_cost_usd"] == 0
+    assert fs.col(FETCH_COLLECTION)[pool_id(KEYS[0])]["batch_ids"] == ["other", r.json()["batch_id"]]
+    assert len(fs.col(FETCH_COLLECTION)) == 1 and fs.col(BUDGET)[_month()]["est_cost_usd"] == 20.0
 
 
 def test_admin_cap_exempt_budget_not(make_client: MakeClient, fs: RouteFirestore) -> None:
@@ -378,9 +428,24 @@ def test_budget_alert_once_at_80pct(
     assert len(errors) == 1
     msg = errors[0].getMessage()
     assert "81%" in msg and "$20.00" in msg and "$16.12" in msg and "VOICE_MONTHLY_BUDGET_USD" in msg
-    assert fs.col(BUDGET)[_month()]["alerted_80"] is True
+    assert fs.col(BUDGET)[_month()]["alerted_80"] is True and fs.col(BUDGET)[_month()]["alerted_80_budget"] == 20.0
     fs.cols.pop(FETCH_COLLECTION)  # the other user's songs are the same ones: free them again
     assert make_client(user_id=OTHER_ID).post(URL).status_code == 201
+    assert len([r for r in caplog.records if r.levelno >= logging.ERROR]) == 1
+
+
+def test_budget_alert_rearms_on_a_budget_raise(
+    make_client: MakeClient, fs: RouteFirestore, caplog: pytest.LogCaptureFixture
+) -> None:
+    fs.col(BUDGET)[_month()] = {"month": _month(), "est_cost_usd": 23.9, "songs": 885, "batches": 44,
+                                "alerted_80": True, "alerted_80_budget": 20.0}  # fmt: skip
+    assert make_client(budget=20.0, user_id=OTHER_ID).post(URL).status_code == 503  # over the old budget
+    assert make_client(budget=30.0).post(URL).status_code == 201  # 24.116 >= 80% of the raised 30
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1 and "$30.00" in errors[0].getMessage()
+    assert fs.col(BUDGET)[_month()]["alerted_80_budget"] == 30.0
+    fs.cols.pop(FETCH_COLLECTION)
+    assert make_client(budget=30.0, user_id=OTHER_ID).post(URL).status_code == 201  # same budget: no repeat
     assert len([r for r in caplog.records if r.levelno >= logging.ERROR]) == 1
 
 
@@ -450,5 +515,13 @@ def test_admin_costs(make_client: MakeClient, fs: RouteFirestore) -> None:
         "shared_songs_analysed": 3,
         "est_cost_per_song_usd": 0.027,
     }
+    fs.col(BUDGET)[_month()]["est_cost_usd"] = 19.97  # one song (0.027) still fits
+    assert make_client(admin=True).get("/api/admin/voice/costs").json()["paused"] is False
     fs.col(BUDGET)[_month()]["est_cost_usd"] = 19.99
     assert make_client(admin=True).get("/api/admin/voice/costs").json()["paused"] is True
+
+
+def test_songs_that_fit() -> None:
+    assert vps.songs_that_fit(19.9, 20.0, 0.027) == 3
+    assert vps.songs_that_fit(20.0 - 0.027 * 2, 20.0, 0.027) == 2  # exact fits despite float error
+    assert vps.songs_that_fit(20.5, 20.0, 0.027) == 0

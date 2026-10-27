@@ -12,10 +12,12 @@ docs, voice.db and BigQuery rows carry ``source = 'personal'`` and a batch id, n
 * Cap: ``voice_personal_cap`` songs per user per rolling ``voice_personal_window_days`` (admins exempt). A request
   is trimmed to what is left; nothing left is 429 ``cap`` with ``next_allowed_at``.
 * Budget: ``voice_personal_budget/{YYYY-MM}`` (UTC) = ``{month, est_cost_usd, songs, batches, alerted_80,
-  updated_at}``, the month's estimated personal spend. One transaction reads it, checks the batch fits
-  ``voice_monthly_budget_usd`` (else 503 ``budget_paused``, a WARNING) and writes the batch, the queue docs and
-  the new total, so concurrent requests can't both slip under the budget. The first request each month that takes
-  the total to ``BUDGET_ALERT_FRACTION`` of the budget logs ONE ERROR (the month doc's ``alerted_80``).
+  alerted_80_budget, updated_at}``, the month's estimated personal spend. One transaction reads it, trims the
+  not-yet-queued picks to what ``voice_monthly_budget_usd`` can still take (none fit and nothing free: 503
+  ``budget_paused``, a WARNING) and writes the batch, the queue docs and the new total, so concurrent requests
+  can't both slip past the budget. The first request each month that takes the total to
+  ``BUDGET_ALERT_FRACTION`` of the budget logs ONE ERROR (``alerted_80``); ``alerted_80_budget`` is the budget it
+  fired for, so raising the budget re-arms it.
 
 Firestore:
 
@@ -31,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -142,6 +145,21 @@ def _as_utc(value: Any) -> datetime | None:
         except ValueError:
             return None
     return None
+
+
+def songs_that_fit(spent: float, budget_usd: float, per_song: float) -> int:
+    """How many more songs this month's budget can take (0: paused)."""
+    if per_song <= 0:
+        return 1_000_000
+    return max(0, math.floor((budget_usd - spent) / per_song + 1e-9))
+
+
+def _alerted_budget(month_doc: dict[str, Any], budget_usd: float) -> float | None:
+    """The budget the month's 80% alert fired for (None: not yet). A raised budget re-arms the alert."""
+    if not month_doc.get("alerted_80"):
+        return None
+    value = month_doc.get("alerted_80_budget")
+    return float(value) if isinstance(value, int | float) else budget_usd
 
 
 def _paid(gen_user: dict[str, Any] | None) -> bool:
@@ -384,20 +402,31 @@ class VoicePoolService:
         known_batches = {str(b["id"]) for b in batches}
         per_song, budget_usd = s.voice_est_cost_per_song_usd, s.voice_monthly_budget_usd
 
-        async def create(txn: Any) -> tuple[float, float, bool]:
+        async def create(txn: Any) -> tuple[list[str], float, float, bool]:
             budget = await txn.get(BUDGET_COLLECTION, month) or {}
             last = await txn.get(LAST_BATCH_COLLECTION, user.id)
             existing = [await txn.get(FETCH_COLLECTION, pool_id(k)) for k, _, _ in picks]
             if last is not None and str(last.get("last_batch_id")) not in known_batches:
                 raise _StaleError
-            new = [c for c, doc in zip(picks, existing, strict=True) if doc is None]
-            cost = round(len(new) * per_song, 6)
             spent = float(budget.get("est_cost_usd") or 0.0)
-            if spent + cost > budget_usd + 1e-9:
+            # Songs not yet queued are trimmed to what the budget can still take (as the cap trims); songs a
+            # concurrent batch queued meanwhile are free (batch id appended) and always go in.
+            fits = songs_that_fit(spent, budget_usd, per_song)
+            kept: list[tuple[tuple[str, str, str], dict[str, Any] | None]] = []
+            new = 0
+            for pick, doc in zip(picks, existing, strict=True):
+                if doc is None:
+                    if new >= fits:
+                        continue
+                    new += 1
+                kept.append((pick, doc))
+            if not kept:
                 raise BudgetPausedError(spent)
+            cost = round(new * per_song, 6)
             total = round(spent + cost, 6)
-            crossed = not budget.get("alerted_80") and total >= BUDGET_ALERT_FRACTION * budget_usd
-            for (key, artist, title), doc in zip(picks, existing, strict=True):
+            alerted_for = _alerted_budget(budget, budget_usd)
+            crossed = total >= BUDGET_ALERT_FRACTION * budget_usd and (alerted_for is None or budget_usd > alerted_for)
+            for (key, artist, title), doc in kept:
                 if doc is None:
                     item = {"song_key": key, "artist": artist, "title": title, "source": "personal"}
                     txn.set(FETCH_COLLECTION, pool_id(key), queue_doc({**item, "batch_ids": [batch_id]}, now))
@@ -412,9 +441,10 @@ class VoicePoolService:
                 {
                     "month": month,
                     "est_cost_usd": total,
-                    "songs": int(budget.get("songs") or 0) + len(new),
+                    "songs": int(budget.get("songs") or 0) + new,
                     "batches": int(budget.get("batches") or 0) + 1,
-                    "alerted_80": bool(budget.get("alerted_80")) or crossed,
+                    "alerted_80": alerted_for is not None or crossed,
+                    "alerted_80_budget": budget_usd if crossed else alerted_for,
                     "updated_at": now,
                 },
             )
@@ -423,17 +453,17 @@ class VoicePoolService:
                 batch_id,
                 {
                     "user_id": user.id,
-                    "song_keys": [k for k, _, _ in picks],
+                    "song_keys": [k for (k, _, _), _ in kept],
                     "requested_at": now,
                     "est_cost_usd": cost,
                     "month": month,
                 },
             )
             txn.set(LAST_BATCH_COLLECTION, user.id, {"last_batch_id": batch_id, "updated_at": now})
-            return cost, total, crossed
+            return [k for (k, _, _), _ in kept], cost, total, crossed
 
         try:
-            cost, total, crossed = await self._fs.run_transaction(create)
+            keys, cost, total, crossed = await self._fs.run_transaction(create)
         except BudgetPausedError as e:
             logger.warning(
                 "Voice personal pool: a %d-song request refused, the $%.2f monthly budget for %s is used up "
@@ -446,7 +476,12 @@ class VoicePoolService:
                 "Raise VOICE_MONTHLY_BUDGET_USD or wait for %s.",
                 round(100 * total / budget_usd), budget_usd, total, _next_month(month),
             )  # fmt: skip
-        return PersonalBatchCreated(batch_id=batch_id, songs=[k for k, _, _ in picks], est_cost_usd=cost)
+        if len(keys) < len(picks):
+            logger.info(
+                "Voice personal pool: %s's request trimmed to %d of %d songs by the %s budget", user.id, len(keys),
+                len(picks), month,
+            )  # fmt: skip
+        return PersonalBatchCreated(batch_id=batch_id, songs=keys, est_cost_usd=cost)
 
 
 async def voice_costs(firestore: FirestoreService, settings: BackendSettings) -> VoiceCostsOut:
@@ -467,7 +502,7 @@ async def voice_costs(firestore: FirestoreService, settings: BackendSettings) ->
         personal_songs=int((budget or {}).get("songs") or 0),
         est_cost_usd=round(spent, 4),
         budget_usd=budget_usd,
-        paused=spent + per_song > budget_usd + 1e-9,
+        paused=songs_that_fit(spent, budget_usd, per_song) == 0,
         shared_songs_analysed=shared + sheet,
         est_cost_per_song_usd=per_song,
     )
