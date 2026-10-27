@@ -147,6 +147,24 @@ async def test_voice_contract(fs: FakeFirestore, bucket: LocalBucket) -> None:
     assert counts["voice_recordings"] == 1 and counts["voice_sessions"] == 1 and counts["user_songs"] == 3
 
 
+async def test_erase_voice_data_removes_not_embeddable_reports(fs: FakeFirestore, bucket: LocalBucket) -> None:
+    """The user's id leaves every version's ``not_embeddable_by``; the version and its global verdict stay."""
+    fs.cols["voice_version_stats"] = {
+        "v1": {"plays": 2, "not_embeddable_by": [USER_A]},
+        "v2": {"not_embeddable_by": [USER_B, USER_A], "embeddable": False},
+        "v3": {"not_embeddable_by": [USER_B]},
+    }
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+    await erase_voice_data(_db(fs), bucket, USER_A)  # idempotent
+
+    assert fs.cols["voice_version_stats"] == {
+        "v1": {"plays": 2, "not_embeddable_by": []},
+        "v2": {"not_embeddable_by": [USER_B], "embeddable": False},
+        "v3": {"not_embeddable_by": [USER_B]},
+    }
+
+
 async def test_erase_voice_data_strips_session_fields_from_mixed_rows(fs: FakeFirestore, bucket: LocalBucket) -> None:
     """The 3d template (used by POST /api/test/voice/reset): mixed rows survive without session data."""
     _seed_voice(fs, bucket, USER_A)

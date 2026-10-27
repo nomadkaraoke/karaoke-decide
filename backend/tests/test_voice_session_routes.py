@@ -332,7 +332,7 @@ def test_not_embeddable_skip_marks_version_and_offers_alternative(
         assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
 
     skip(f"FIXTURE{n}")
-    assert fs.cols["voice_version_stats"][f"FIXTURE{n}"]["embeddable"] is False
+    assert fs.cols["voice_version_stats"][f"FIXTURE{n}"] == {"not_embeddable_by": [USER_ID]}  # one user: theirs only
     again = _next(client, sid)
     assert again["song_key"] == key and again["reason_type"] == song["reason_type"]
     assert again["version"] == {
@@ -387,6 +387,90 @@ def test_single_version_not_embeddable_goes_to_link_out_then_moves_on(client: Te
     assert link_out["song_key"] == song["song_key"] and link_out["version"]["embeddable"] is False
     assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
     assert _next(client, sid)["song_key"] != song["song_key"]
+
+
+def _report_first_version(client: TestClient) -> tuple[str, str]:
+    """A new session, its first song's first version reported not_embeddable. Returns (song_key, n)."""
+    sid = _create(client)
+    song = _next(client, sid)
+    key, video_id = song["song_key"], song["version"]["video_id"]
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": video_id}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    return key, video_id.removeprefix("FIXTURE")
+
+
+def _offered_version(client: TestClient, fs: RouteFirestore, song_key: str) -> str:
+    """The version a new session of the client's user offers for ``song_key`` (pending, so it is picked)."""
+    sid = _create(client)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = song_key
+    song = _next(client, sid)
+    assert song["song_key"] == song_key
+    return str(song["version"]["video_id"])
+
+
+def test_single_not_embeddable_report_is_user_scoped(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """One user's report hides the version from that user only (their session, then their later ones)."""
+    a = make_client(store=voice_store_alts)
+    key, n = _report_first_version(a)
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+    b = make_client(store=voice_store_alts, user_id=OTHER_ID)
+    assert _offered_version(b, fs, key) == f"FIXTURE{n}"
+    a = make_client(store=voice_store_alts)
+    assert _offered_version(a, fs, key) == f"ALT{n}a"
+
+
+def test_second_distinct_user_marks_globally(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    key, n = _report_first_version(make_client(store=voice_store_alts))
+    b = make_client(store=voice_store_alts, user_id=OTHER_ID)
+    sid = _create(b)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    assert _next(b, sid)["version"]["video_id"] == f"FIXTURE{n}"
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": f"FIXTURE{n}"}
+    assert b.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID, OTHER_ID] and stats["embeddable"] is False
+    third = make_client(store=voice_store_alts, user_id="user_voice_third")
+    assert _offered_version(third, fs, key) == f"ALT{n}a"
+
+
+def test_repeat_report_same_user_counts_once(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """A retried skip, or the same user reporting again in a later session, is still one report."""
+    client = make_client(store=voice_store_alts)
+    key, n = _report_first_version(client)
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": f"FIXTURE{n}"}
+    sid = _create(client)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    _next(client, sid)
+    for _ in range(2):
+        assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+
+
+def test_not_embeddable_report_keeps_the_version_counters(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """The report is merged into the stats doc: attempt counters already there are kept."""
+    client = make_client(store=voice_store_alts)
+    sid = _create(client)
+    song = _next(client, sid)
+    video_id = song["version"]["video_id"]
+    fs.cols["voice_version_stats"] = {video_id: {"plays": 3, "good": 2, "embeddable": True}}
+    body = {"song_key": song["song_key"], "reason": "not_embeddable", "video_id": video_id}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    assert fs.cols["voice_version_stats"][video_id] == {
+        "plays": 3,
+        "good": 2,
+        "embeddable": True,
+        "not_embeddable_by": [USER_ID],
+    }
 
 
 # ---------------------------------------------------------------- attempts
@@ -800,7 +884,7 @@ def test_skips_of_offered_song_survive_voice_db_swap(
         skip["done"] is True
         and skip["artist_key"] == fs.cols["voice_sessions"][sid]["last_offer"]["song"]["artist_key"]
     )
-    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["embeddable"] is False
+    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["not_embeddable_by"] == [USER_ID]
     dk = {"song_key": song["song_key"], "reason": "dont_know"}
     assert client.post(f"/api/voice/sessions/{sid}/skips", json=dk).status_code == 204
     bad = {"song_key": "nobody|nothing", "reason": "dont_know"}

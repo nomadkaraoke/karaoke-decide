@@ -28,7 +28,10 @@ Session-state mapping onto C2's ``SessionState``:
 * An attempt marked ``excluded`` ("Don't count this one", ``set_excluded``) still counts in ``attempts``
   and done songs but leaves the posterior, ``range_attempts``, ``tired_count`` and ``comfort_history``.
 * Done songs = attempted songs, plus "dont_know" / "something_else" skips, plus a "not_embeddable"
-  skip once the song has no version left to try (see ``skip``). "no_candidates" is set here, when
+  skip once the song has no version left to try (see ``skip``). A "not_embeddable" skip also records
+  the user in ``voice_version_stats/{video_id}.not_embeddable_by``: the version is then unplayable for
+  that user in every session, and for everyone (``embeddable = false``) once
+  ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it. "no_candidates" is set here, when
   ``choose_next`` finds nothing; Finish is the client calling ``result``.
 
 Outputs (Task C5, ``voice_session_outputs``): each attempt, once, in one transaction guarded by the
@@ -44,7 +47,8 @@ so ranked by taste, topped up from ``sort=fit``) for the saved profile, or the u
 ``result`` also stores the summary as ``result_summary`` (Me and the history read it).
 
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
-(``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
+(``embeddable`` from the app's reports, and ``not_embeddable_by`` for the reporting user) overrides them,
+read live for the picked song. A song with no
 embeddable version is offered once more as a link-out (``version.embeddable = false``).
 
 CPU work (pool index, posterior rebuild, candidate scoring) runs in ``asyncio.to_thread``.
@@ -125,6 +129,7 @@ SUITED_MIN_TASTE = 5  # fewer taste-ranked songs than this: top up from sort=fit
 HISTORY_LIMIT = 20  # sessions in GET /api/voice/history, newest first
 ALTERNATIVES = 2
 MAX_REPICKS = 5  # picks whose versions all turned out unembeddable (live stats) before offering a link-out
+NOT_EMBEDDABLE_GLOBAL_REPORTS = 2  # distinct users reporting a version unplayable before it is hidden for everyone
 _CREATE_RETRIES = 3
 
 
@@ -265,12 +270,33 @@ def _version_out(v: Version, *, embeddable: bool = True) -> VersionOut:
     return VersionOut(video_id=v.video_id, brand_code=v.brand_code, brand_name=v.brand_name, embeddable=embeddable)
 
 
-def _stats_from_doc(doc: dict[str, Any]) -> VersionStats:
+def _reporters(doc: dict[str, Any] | None) -> list[str]:
+    """The users who reported this version not embeddable (``not_embeddable_by``), in report order."""
+    raw = (doc or {}).get("not_embeddable_by")
+    return [str(u) for u in raw] if isinstance(raw, list) else []
+
+
+def _with_report(doc: dict[str, Any] | None, user_id: str) -> dict[str, Any] | None:
+    """The stats doc with ``user_id``'s not_embeddable report added (None: already reported). The global
+    ``embeddable = false`` is set once ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it."""
+    out = {k: v for k, v in (doc or {}).items() if k != "id"}
+    by = _reporters(out)
+    if user_id in by:
+        return None
+    out["not_embeddable_by"] = [*by, user_id]
+    if len(out["not_embeddable_by"]) >= NOT_EMBEDDABLE_GLOBAL_REPORTS:
+        out["embeddable"] = False
+    return out
+
+
+def _stats_from_doc(doc: dict[str, Any], user_id: str) -> VersionStats:
+    """The version's stats as ``user_id`` sees them: unembeddable when they reported it themselves."""
+
     def num(k: str) -> int:
         v = doc.get(k)
         return int(v) if isinstance(v, int | float) and not isinstance(v, bool) else 0
 
-    emb = doc.get("embeddable")
+    emb = False if user_id in _reporters(doc) else doc.get("embeddable")
     return VersionStats(
         good=num("good"),
         not_great=num("not_great"),
@@ -650,9 +676,21 @@ class VoiceSessionService:
         reader = self._voice.require()  # VoiceDataUnavailable -> 503 warming_up
         return await asyncio.to_thread(pool_index, reader)
 
-    async def _version_stats(self, versions: Sequence[Version]) -> dict[str, VersionStats]:
+    async def _version_stats(self, versions: Sequence[Version], user_id: str) -> dict[str, VersionStats]:
+        """Live stats of ``versions`` for ``user_id`` (their own not_embeddable reports count as verdicts)."""
         docs = await asyncio.gather(*(self._fs.get_document(VERSION_STATS_COLLECTION, v.video_id) for v in versions))
-        return {v.video_id: _stats_from_doc(d) for v, d in zip(versions, docs, strict=True) if d}
+        return {v.video_id: _stats_from_doc(d, user_id) for v, d in zip(versions, docs, strict=True) if d}
+
+    async def _report_not_embeddable(self, user_id: str, video_id: str) -> None:
+        """Add ``user_id`` to the version's ``not_embeddable_by`` (once), in a transaction so concurrent
+        reports from two users both count."""
+
+        async def report(txn: Any) -> None:
+            new = _with_report(await txn.get(VERSION_STATS_COLLECTION, video_id), user_id)
+            if new is not None:
+                txn.set(VERSION_STATS_COLLECTION, video_id, new)
+
+        await self._fs.run_transaction(report)
 
     async def _context(self, user_id: str) -> UserContextV2:
         """3a's user context; without catalog.db only the hidden songs are known."""
@@ -770,6 +808,7 @@ class VoiceSessionService:
             last = session.get("last_offer") or {}
             reason = last.get("reason_type") if last.get("song_key") == pending else "explore"
             offer = await self._offer(
+                user.id,
                 session_id,
                 index[pending],
                 reason or "explore",
@@ -788,6 +827,7 @@ class VoiceSessionService:
             if pick is None:
                 return await self._done(session_id, "no_candidates")
             offer = await self._offer(
+                user.id,
                 session_id,
                 index[pick.song_key],
                 pick.reason_type,
@@ -807,6 +847,7 @@ class VoiceSessionService:
 
     async def _offer(
         self,
+        user_id: str,
         session_id: str,
         e: PoolEntry,
         reason_type: Any,
@@ -816,8 +857,9 @@ class VoiceSessionService:
         attempt_n: int,
         comfort: ComfortEstimateOut | None = None,
     ) -> NextSongOut | None:
-        """The song with its best playable version (live stats), a link-out offer, or None (no version)."""
-        stats = await self._version_stats(e.versions)
+        """The song with its best playable version (live stats, as the user sees them), a link-out offer,
+        or None (no version)."""
+        stats = await self._version_stats(e.versions, user_id)
         ordered = choose_versions(list(e.versions), stats)
         playable = _playable(ordered, stats, _session_unplayable(skips, e.song_key))
         if not playable and not link_out_ok:
@@ -853,9 +895,13 @@ class VoiceSessionService:
     async def skip(self, user: User, session_id: str, body: SkipIn) -> None:
         """Record a skip. "dont_know" / "something_else" finish the song for this session.
 
-        "not_embeddable" marks ``voice_version_stats/{video_id}.embeddable = false`` and keeps the song
-        (the next call offers its next version) while a playable version is left; with none left the song
-        is offered once more as a link-out, and a "not_embeddable" skip of that link-out finishes it.
+        "not_embeddable" adds the user to ``voice_version_stats/{video_id}.not_embeddable_by`` (once per
+        user: retries and repeat reports count once), which hides the version from that user in this and
+        later sessions; only when ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users (admins too) have reported
+        it is ``embeddable = false`` set, hiding it from everyone. One user, malicious or on a flaky network,
+        can't remove a version for all. The song is kept (the next call offers its next version) while a
+        playable version is left; with none left the song is offered once more as a link-out, and a
+        "not_embeddable" skip of that link-out finishes it.
         """
         session = await self._active(user.id, session_id)
         index = await self._index()
@@ -873,9 +919,9 @@ class VoiceSessionService:
         artist_key = e.artist_key if known and e is not None else str((snap or {}).get("artist_key") or "")
         stats: dict[str, VersionStats] = {}
         if ne:
-            await self._fs.set_document(VERSION_STATS_COLLECTION, str(body.video_id), {"embeddable": False}, merge=True)
+            await self._report_not_embeddable(user.id, str(body.video_id))
             if known and e is not None:
-                stats = await self._version_stats(e.versions)
+                stats = await self._version_stats(e.versions, user.id)
 
         async def record(txn: Any) -> None:
             session = await txn.get(SESSIONS_COLLECTION, session_id)
