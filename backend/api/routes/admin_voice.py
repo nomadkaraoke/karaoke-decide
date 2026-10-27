@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from backend.api.deps import AdminAccess, AuthServiceDep, FirestoreServiceDep, Settings, get_voice_store
 from backend.config import BackendSettings
+from backend.models.voice_personal_pool import VoiceCostsOut
 from backend.services import catalog_store
 from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
 from backend.services.recs_v2.service import voice_range
@@ -30,6 +31,7 @@ from backend.services.voice_data_store import (
     VoiceDataUnavailable,
     VoiceReader,
 )
+from backend.services.voice_pool_service import voice_costs
 from backend.services.voice_profile_service import VoiceProfileService
 from backend.services.voice_recording_service import (
     LocalBucket,
@@ -367,6 +369,15 @@ async def user_songs(
         return out
 
     return await asyncio.to_thread(build)
+
+
+# ---------------------------------------------------------------- personal pool costs
+
+
+@router.get("/costs", response_model=VoiceCostsOut)
+async def costs(_access: AdminAccess, firestore: FirestoreServiceDep, settings: Settings) -> VoiceCostsOut:
+    """This month's estimated personal-pool spend against ``voice_monthly_budget_usd``, and the shared pool."""
+    return await voice_costs(firestore, settings)
 
 
 # ---------------------------------------------------------------- agreement (sign-off gate)

@@ -347,6 +347,12 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   profile (`decide_users.voice_profile`, `voice_profile_mic`), `falsetto_high`, `falsetto_low`, `experience` and
   `uses_falsetto` are cleared with the profile by `DELETE /api/my/voice` and go with the `decide_users` doc on
   account deletion. Asserted in `backend/tests/test_user_deletion.py`.
+- **Personal voice pool (Phase 3d Part F, `backend/services/voice_pool_service.py`)**: `voice_personal_batches`
+  (`user_id`, the batch's song keys, requested_at, estimated cost, month) and the `voice_personal_users/{user_id}`
+  last-batch pointer are user data (registry, `user_id_field` / `doc_id_user_id`). `voice_personal_budget/{YYYY-MM}`
+  holds only the month's totals (`NOT_USER_DATA`). The songs a batch queues go into the global
+  `voice_pool_fetch` queue (and from there voice.db / BigQuery) with `source = personal` and the random batch id,
+  never the user id; they stay in the shared pool after the user is deleted.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);

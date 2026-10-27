@@ -35,6 +35,9 @@ from backend.services.quiz_service import QuizService
 from backend.services.screenshot_import_service import RATE_COLLECTION as SCREENSHOT_IMPORTS
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION
 from backend.services.sync_service import SyncService
+from backend.services.voice_pool_service import BATCHES_COLLECTION as PERSONAL_BATCHES
+from backend.services.voice_pool_service import BUDGET_COLLECTION as PERSONAL_BUDGET
+from backend.services.voice_pool_service import LAST_BATCH_COLLECTION as PERSONAL_LAST_BATCH
 from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
 from backend.services.voice_session_outputs import SESSION_SOURCE
 from backend.services.voice_session_service import (
@@ -81,6 +84,8 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     UserDataStore(ATTEMPTS_COLLECTION, "user_id_field"),  # voice_attempts/{session}:{n}, user_id field
     UserDataStore(VOICE_LABELS_COLLECTION, "user_id_field"),  # imported sheet labels, user_id field
     UserDataStore(PURGES_COLLECTION, "doc_id_user_id"),  # voice_recording_purges/{user_id} marker
+    UserDataStore(PERSONAL_BATCHES, "user_id_field"),  # voice_personal_batches/{batch_id}, user_id field
+    UserDataStore(PERSONAL_LAST_BATCH, "doc_id_user_id"),  # voice_personal_users/{user_id}: last batch pointer
     # Listening and taste data.
     UserDataStore(USER_SONGS_COLLECTION, "user_id_field"),  # user_songs/{user_id}:{song_id}, user_id field
     UserDataStore(USER_ARTISTS_COLLECTION, "user_id_field"),  # user_artists/{user_id}:{artist}, user_id field
@@ -116,6 +121,8 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         # Global per-version stats keyed by video id. Its ``not_embeddable_by`` / ``not_embeddable_by_guests`` list
         # user ids: erase_voice_data removes the user from them (the doc and any global ``embeddable`` verdict stay).
         VERSION_STATS_COLLECTION,
+        # voice_personal_budget/{YYYY-MM}: the month's estimated personal-pool spend (totals only, no user).
+        PERSONAL_BUDGET,
     }
 )
 

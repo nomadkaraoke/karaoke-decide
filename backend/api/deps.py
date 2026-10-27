@@ -28,6 +28,7 @@ from backend.services.song_feedback_service import SongFeedbackService
 from backend.services.sync_service import SyncService, get_sync_service
 from backend.services.user_data_service import UserDataService, get_user_data_service
 from backend.services.voice_data_store import VoiceDataStore, get_voice_data_store
+from backend.services.voice_pool_service import VoicePoolService
 from backend.services.voice_profile_service import VoiceProfileService
 from backend.services.voice_session_service import VoiceSessionService
 from karaoke_decide.core.models import User
@@ -345,6 +346,16 @@ async def get_voice_session_service(
     return VoiceSessionService(firestore, voice, catalog, feedback, VoiceProfileService(firestore), recs)
 
 
+async def get_voice_pool_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    voice: Annotated[VoiceDataStore, Depends(get_voice_store)],
+    catalog: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
+    feedback: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
+    settings: Annotated[BackendSettings, Depends(get_settings)],
+) -> VoicePoolService:
+    return VoicePoolService(firestore, voice, catalog, feedback, settings)
+
+
 _bigquery_catalog_instance: BigQueryCatalogService | None = None
 
 
@@ -395,3 +406,4 @@ ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_inges
 VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]
 VoiceDataStoreDep = Annotated[VoiceDataStore, Depends(get_voice_store)]
 VoiceSessionServiceDep = Annotated[VoiceSessionService, Depends(get_voice_session_service)]
+VoicePoolServiceDep = Annotated[VoicePoolService, Depends(get_voice_pool_service)]

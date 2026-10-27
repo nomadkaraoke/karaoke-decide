@@ -2283,6 +2283,50 @@ The app queues recordings and uploads them in the background. For each queued up
 - **Keep it** (retry later) on `5xx` and on network errors.
 - **Before calling `DELETE /api/voice/recordings`, clear the queue**, so nothing recorded before the delete is sent after it. (The server also refuses such uploads, since the delete withdraws consent, but the app should not rely on that.)
 
+### Personal pool ("analyse my music")
+
+Behind the session gate (`403 voice_session_disabled` while `VOICE_SESSION_OPEN` is off, unless admin). An eligible user asks for up to 20 of their best-known songs (by taste weight, then playcount) to be fetched and analysed; personal songs are downloaded only once no shared-pool song is waiting, so they typically land overnight. Analysed songs join the shared pool for everyone; the pool rows carry `source = personal`, never the user.
+
+- **Eligible** (`reason`): `admin`; `paid` (the gen account has `total_spent > 0` or a `purchase` credit transaction); `history` (≥ 1,000 listens summed over `user_songs.playcount`, or ≥ 200 songs played at least once); otherwise `not_eligible`. Guests are never eligible.
+- **Picks**: known songs with a community karaoke version, not hidden or marked "would not sing", not already in voice.db and not already in the fetch queue (any source, any status).
+- **Cap**: 20 songs per user per rolling 30 days (`VOICE_PERSONAL_CAP`, `VOICE_PERSONAL_WINDOW_DAYS`); a request is trimmed to what is left. Admins are exempt.
+- **Budget**: a global monthly (UTC) budget on the estimated spend, `VOICE_MONTHLY_BUDGET_USD` (20.0) at `VOICE_EST_COST_PER_SONG_USD` (0.027) per newly queued song. Admins are not exempt.
+
+#### GET /api/voice/personal-pool
+
+```json
+{
+  "eligible": true,
+  "reason": "paid | history | admin | not_eligible",
+  "listens": 1320,
+  "songs_with_plays": 8,
+  "next_allowed_at": "2026-11-20T19:04:11.123456Z" | null,
+  "cap": 20,
+  "used": 20,
+  "batches": [
+    {"batch_id": "4f1c…", "requested_at": "2026-10-21T19:04:11.123456Z", "total": 20, "ready": 12, "status": "queued | running | done"}
+  ]
+}
+```
+
+`used` is the songs requested in the last 30 days. `next_allowed_at` is set only while nothing is left (when enough of the oldest batches leave the window for one more song); always `null` for admins. `batches` are newest first. `ready` counts songs analysed and present in the voice.db the API has loaded (the session can offer them). `status`: `done` once every song is analysed or failed, `running` once any is past queued, else `queued`.
+
+#### POST /api/voice/personal-pool
+
+No body. `201` → `{"batch_id": "4f1c…", "songs": ["abba|dancing queen", "…"], "est_cost_usd": 0.54}`. `songs` are the batch's song keys; `est_cost_usd` covers the songs this request newly queued (a song another batch queued a moment earlier is shared, not charged again).
+
+Refusals (`detail` is an object):
+
+| Status | `detail` | Meaning |
+|---|---|---|
+| `403` | `{"reason": "not_eligible"}` | See eligibility above |
+| `429` | `{"reason": "cap", "next_allowed_at": "2026-11-20T19:04:11.123456+00:00"}` | No songs left in the window |
+| `409` | `{"reason": "nothing_to_add"}` | No known song qualifies |
+| `409` | `{"reason": "concurrent_request"}` | Another request of yours kept committing first; retry |
+| `503` | `{"reason": "budget_paused"}` | This month's budget can't take the batch; resumes next month |
+
+`403 voice_session_disabled` and `503 warming_up` (catalog not loaded) keep their plain-string `detail`.
+
 ### Admin voice (`/api/admin/voice/*`)
 
 Admin session or `X-Admin-Token` (otherwise `403`).
@@ -2291,6 +2335,7 @@ Admin session or `X-Admin-Token` (otherwise `403`).
 - `GET /api/admin/voice/coverage` -> `{"run", "songs", "analysed", "per_stratum_dimension": {dim: {value: {songs, analysed}}}, "queue": {status: n}, "budget": {...} | null}` (`budget` is flacfetch's Spotify budget, `null` when unavailable).
 - `GET /api/admin/voice/users/{email}/songs` -> every song the user labelled or attempted: `[{"song_key", "artist", "title", "markers", "label": {"good","tags","notes"} | null, "attempts": [{"session_id","at","quiz","context","pitch","recording_id"}], "prediction": {"good","p"} | null}]` (`prediction` is the good/no prediction from `karaoke_decide/voice_session/predict.py`; `null` without a voice profile or an analysis row). `404 user_not_found`.
 - `GET /api/admin/voice/agreement?email=` -> the prediction vs the user's yes/no labels on held-out songs (labelled yes/no, analysed, never attempted in a session): `{"n", "agree", "rate", "confusion": {"tp","fp","tn","fn"}, "ready_for_signoff", "per_marker": {feature: {"agree","disagree"}}, "weights", "skipped_no_profile", "skipped_no_range", "rows": [{"song_key","artist","title","label","features","p","pred"}]}`. `ready_for_signoff` = `n >= 30 and rate >= 0.80` (Andrew's OK is still required). `per_marker` is the mean `w·x` per feature over agreeing vs disagreeing rows. `scripts/voice/agreement.py` prints it and replays exported rows offline with trial `--weights`. `404 user_not_found`, `503 warming_up` without voice.db.
+- `GET /api/admin/voice/costs` -> `{"month": "2026-10", "personal_batches", "personal_songs", "est_cost_usd", "budget_usd", "paused", "shared_songs_analysed", "est_cost_per_song_usd"}`: this UTC month's personal-pool batches, newly queued songs and estimated spend; `paused` when one more song would exceed `budget_usd`; `shared_songs_analysed` counts analysed shared + sheet songs (all time).
 - `GET /api/admin/voice/recordings/{recording_id}/audio` streams the private recording with its stored content type. `404 recording_not_found`.
 
 ---
