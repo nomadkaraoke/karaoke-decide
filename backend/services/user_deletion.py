@@ -37,7 +37,7 @@ from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS
 from backend.services.sync_service import SyncService
 from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
 from backend.services.voice_session_outputs import SESSION_SOURCE
-from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from backend.services.voice_session_service import ACTIVE_COLLECTION, ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
 from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     # Voice (Phase 3d contract): erased by erase_voice_data first; listed so they are counted and swept.
     UserDataStore(RECORDINGS_COLLECTION, "user_id_field"),  # voice_recordings/{session}:{n}, user_id field
     UserDataStore(SESSIONS_COLLECTION, "user_id_field"),  # voice_sessions/{session_id}, user_id field
+    UserDataStore(ACTIVE_COLLECTION, "doc_id_user_id"),  # voice_session_active/{user_id}: active session pointer
     UserDataStore(ATTEMPTS_COLLECTION, "user_id_field"),  # voice_attempts/{session}:{n}, user_id field
     UserDataStore(VOICE_LABELS_COLLECTION, "user_id_field"),  # imported sheet labels, user_id field
     UserDataStore(PURGES_COLLECTION, "doc_id_user_id"),  # voice_recording_purges/{user_id} marker
@@ -117,6 +118,7 @@ VOICE_ERASED = frozenset(
     {
         RECORDINGS_COLLECTION,
         SESSIONS_COLLECTION,
+        ACTIVE_COLLECTION,
         ATTEMPTS_COLLECTION,
         VOICE_LABELS_COLLECTION,
         PURGES_COLLECTION,
@@ -183,7 +185,7 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
     """Erase the user's voice data (the Phase 3d contract, docs/ARCHITECTURE.md § Personal data).
 
     Recordings (objects, docs, attempt links) via ``VoiceRecordingService.delete_all_for_user``,
-    then the purge marker, sessions, attempts and imported labels, then undo what sessions wrote
+    then the purge marker, the active-session pointer, sessions, attempts and imported labels, then undo what sessions wrote
     to ``user_songs``: rows made only by a session go; on any other row the ``session_*`` fields
     and the ``voice_session`` source are removed. Last, the user's id leaves every version's
     ``not_embeddable_by``. Idempotent; nothing is capped.
@@ -191,6 +193,7 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
     by_user = [("user_id", "==", user_id)]
     await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
     await fs.delete_document(PURGES_COLLECTION, user_id)  # delete_all writes this marker; a fresh run may upload
+    await fs.delete_document(ACTIVE_COLLECTION, user_id)  # the active-session pointer (sessions go next)
     for collection in (ATTEMPTS_COLLECTION, SESSIONS_COLLECTION, VOICE_LABELS_COLLECTION):
 
         async def page(collection: str = collection) -> list[str]:

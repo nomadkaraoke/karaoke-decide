@@ -9,6 +9,9 @@ Firestore:
   ``{song_key, reason_type, link_out, video_ids, song, offer}``: ``video_ids`` the offered versions, ``song``
   the attempt snapshot of the song and ``offer`` the ``NextSongOut`` sent. An attempt or skip of the offered
   song and version is accepted from that snapshot even when a new voice.db no longer has them (hot swap).
+* ``voice_session_active/{user_id}`` = ``{session_id, updated_at}``: the user's active session. ``create``
+  moves it in the transaction that writes the new session, so concurrent creates commit one after another,
+  then abandons every other active session of the user (see ``create``).
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
   pitch, pitch_all, note_labels, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the
   setup at attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
@@ -122,6 +125,7 @@ from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, Resu
 logger = logging.getLogger(__name__)
 
 SESSIONS_COLLECTION = "voice_sessions"
+ACTIVE_COLLECTION = "voice_session_active"  # voice_session_active/{user_id}: the user's active session
 ATTEMPTS_COLLECTION = "voice_attempts"
 RECORDINGS_COLLECTION = "voice_recordings"  # owned by voice_recording_service; here so history can join it
 SUITED_LIMIT = 15
@@ -721,33 +725,62 @@ class VoiceSessionService:
     # ------------------------------------------------------------ setup
 
     async def create(self, user: User, setup: SessionSetup) -> SessionCreated:
-        """A new active session; the user's other active sessions become ``abandoned``."""
+        """A new active session; the user's other active sessions become ``abandoned``.
+
+        One transaction reads the user's ``voice_session_active`` pointer, writes the session and points
+        the pointer at it: two concurrent creates conflict on the pointer, so they commit one after the
+        other and the pointer ends on the last. Then ``_abandon_superseded`` abandons the rest. After N
+        concurrent creates exactly one session (the pointer's) is active."""
         now = datetime.now(UTC)
-        active = await self._fs.query_documents(
-            SESSIONS_COLLECTION, filters=[("user_id", "==", user.id), ("state", "==", "active")]
-        )
-        for d in active:
-            await self._fs.update_document(SESSIONS_COLLECTION, d["id"], {"state": "abandoned", "updated_at": now})
         profile = await self._profiles.get(user.id)
         session_id = uuid.uuid4().hex
-        await self._fs.set_document(
-            SESSIONS_COLLECTION,
-            session_id,
-            {
-                "user_id": user.id,
-                "setup": _stored_setup(setup),
-                "state": "active",
-                "created_at": now,
-                "updated_at": now,
-                "tired_count": 0,
-                "skips": [],
-                "prior_profile": profile.model_dump(mode="json", by_alias=True) if profile else None,
-                "pending_song_key": None,
-                "last_offer": None,
-                "done_reason": None,
-            },
-        )
+        doc = {
+            "user_id": user.id,
+            "setup": _stored_setup(setup),
+            "state": "active",
+            "created_at": now,
+            "updated_at": now,
+            "tired_count": 0,
+            "skips": [],
+            "prior_profile": profile.model_dump(mode="json", by_alias=True) if profile else None,
+            "pending_song_key": None,
+            "last_offer": None,
+            "done_reason": None,
+        }
+
+        async def claim(txn: Any) -> None:
+            await txn.get(ACTIVE_COLLECTION, user.id)  # read: concurrent claims conflict and are serialised
+            txn.set(SESSIONS_COLLECTION, session_id, doc)
+            txn.set(ACTIVE_COLLECTION, user.id, {"session_id": session_id, "updated_at": now})
+
+        await self._fs.run_transaction(claim)
+        await self._abandon_superseded(user.id)
         return SessionCreated(session_id=session_id, state="active")
+
+    async def _abandon_superseded(self, user_id: str) -> None:
+        """Abandon every active session of the user except the one the pointer holds.
+
+        The query runs before the pointer is read: every session it finds was committed together with a
+        pointer move to it, so a pointer read afterwards is that session or a newer one, and a session that
+        is not the pointer's has been superseded for good (never the winner of a race still in flight).
+        Sessions active from before the pointer existed are swept the same way. Each is abandoned in a
+        transaction, only while still active (a session finished meanwhile stays done)."""
+        active = await self._fs.query_documents(
+            SESSIONS_COLLECTION, filters=[("user_id", "==", user_id), ("state", "==", "active")]
+        )
+        pointer = await self._fs.get_document(ACTIVE_COLLECTION, user_id)
+        current = (pointer or {}).get("session_id")
+        for d in active:
+            if d["id"] == current:
+                continue
+
+            async def abandon(txn: Any, sid: str = str(d["id"])) -> None:
+                session = await txn.get(SESSIONS_COLLECTION, sid)
+                if session and session.get("state") == "active":
+                    rest = {k: v for k, v in session.items() if k != "id"}
+                    txn.set(SESSIONS_COLLECTION, sid, {**rest, "state": "abandoned", "updated_at": datetime.now(UTC)})
+
+            await self._fs.run_transaction(abandon)
 
     async def patch(self, user: User, session_id: str, patch: SessionPatch) -> None:
         session = await self._active(user.id, session_id)

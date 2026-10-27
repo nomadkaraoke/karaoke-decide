@@ -5,6 +5,7 @@ Fixture voice.db (Task A7), fixture catalog.db + availability.db, in-memory Fire
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import dataclasses
 import hashlib
@@ -32,12 +33,12 @@ from backend.api.deps import (
 )
 from backend.config import BackendSettings
 from backend.main import app
-from backend.models.voice_session import SessionResultSummaryOut
+from backend.models.voice_session import SessionResultSummaryOut, SessionSetup
 from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.recs_v2.service import RecSection, RecSong
 from backend.services.voice_data_store import VoiceDataStore
-from backend.services.voice_profile_service import VoiceProfileOut
+from backend.services.voice_profile_service import VoiceProfileOut, VoiceProfileService
 from backend.tests.test_karaoke_log_routes import RouteFirestore
 from karaoke_decide.catalog import fixtures as catalog_fixtures
 from karaoke_decide.catalog.reader import CatalogReader
@@ -258,6 +259,83 @@ def test_create_abandons_previous(client: TestClient, fs: RouteFirestore) -> Non
     assert sessions[second]["tired_count"] == 0 and sessions[second]["skips"] == []
     # an abandoned session takes no more songs
     assert client.get(f"/api/voice/sessions/{first}/next").status_code == 409
+
+
+class InterleavingFirestore(RouteFirestore):
+    """RouteFirestore that yields to the event loop before every call and before a transaction commits,
+    so concurrent requests interleave as they would against Firestore (no conflict detection)."""
+
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        await asyncio.sleep(0)
+        return await super().get_document(collection, doc_id)
+
+    async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
+        await asyncio.sleep(0)
+        await super().set_document(collection, doc_id, data, merge=merge)
+
+    async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        await asyncio.sleep(0)
+        await super().update_document(collection, doc_id, data)
+
+    async def query_documents(self, collection: str, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        await asyncio.sleep(0)
+        return await super().query_documents(collection, *args, **kwargs)
+
+    async def run_transaction(self, fn: Any) -> Any:
+        async def interleaved(txn: Any) -> Any:
+            await asyncio.sleep(0)
+            out = await fn(txn)
+            await asyncio.sleep(0)
+            return out
+
+        return await super().run_transaction(interleaved)
+
+
+def _service(fs: RouteFirestore, voice_store: VoiceDataStore) -> vss.VoiceSessionService:
+    return vss.VoiceSessionService(
+        fs,  # type: ignore[arg-type]
+        voice_store,
+        FakeCatalogStore(None),
+        FakeHidden(),
+        VoiceProfileService(fs),  # type: ignore[arg-type]
+        recs=None,  # type: ignore[arg-type]  # create() never ranks songs
+    )
+
+
+def _active(fs: RouteFirestore, user_id: str = USER_ID) -> list[str]:
+    return sorted(k for k, d in fs.cols["voice_sessions"].items() if d["user_id"] == user_id and d["state"] == "active")
+
+
+async def test_concurrent_creates_leave_one_active(voice_store: VoiceDataStore) -> None:
+    """Two (or more) POST /api/voice/sessions at once: exactly one session stays active, the last one committed."""
+    fs = InterleavingFirestore()
+    fs.cols["decide_users"] = {EMAIL_HASH: {"user_id": USER_ID, "email": EMAIL, "is_guest": False}}
+    service, user = _service(fs, voice_store), User(id=USER_ID, email=EMAIL)
+    for n in (2, 3):
+        created = await asyncio.gather(*(service.create(user, SessionSetup.model_validate(SETUP)) for _ in range(n)))
+        ids = {c.session_id for c in created}
+        pointer = fs.cols["voice_session_active"][USER_ID]["session_id"]
+        assert pointer in ids and _active(fs) == [pointer]
+        assert all(fs.cols["voice_sessions"][i]["state"] == "abandoned" for i in ids - {pointer})
+
+
+def test_create_sweeps_stray_active_sessions(client: TestClient, fs: RouteFirestore) -> None:
+    """Active sessions left behind (from before the pointer, or a lost race) are abandoned by the next create;
+    another user's active session is not touched."""
+    for sid, user_id in (("stray1", USER_ID), ("stray2", USER_ID), ("theirs", OTHER_ID)):
+        _seed_session(fs, sid, user_id=user_id, attempts=0, state="active")
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "stray2", "updated_at": T0}}
+    sid = _create(client)
+    assert _active(fs) == [sid]
+    assert fs.cols["voice_sessions"]["stray1"]["state"] == fs.cols["voice_sessions"]["stray2"]["state"] == "abandoned"
+    assert _active(fs, OTHER_ID) == ["theirs"]
+    assert fs.cols["voice_session_active"][USER_ID]["session_id"] == sid
+
+
+def test_create_does_not_abandon_a_finished_session(client: TestClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "old", attempts=0, state="done")
+    _create(client)
+    assert fs.cols["voice_sessions"]["old"]["state"] == "done"
 
 
 def test_patch_updates_setup(client: TestClient, fs: RouteFirestore) -> None:
