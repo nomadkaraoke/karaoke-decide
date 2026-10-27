@@ -5,7 +5,7 @@ An eligible user asks for up to ``voice_personal_cap`` of their best-known songs
 docs, voice.db and BigQuery rows carry ``source = 'personal'`` and a batch id, never the user.
 
 * Eligible: admins; gen buyers (``gen_users/{email}``, else a query on ``email``: ``total_spent > 0`` or a
-  ``credit_transactions[].reason == "purchase"``); or rich history (sum of ``user_songs.playcount`` >=
+  a purchase in ``credit_transactions``: ``PAID_REASONS``); or rich history (sum of ``user_songs.playcount`` >=
   ``HISTORY_LISTENS`` or >= ``HISTORY_SONGS`` rows played at least once). Guests never (throwaway accounts).
 * Picks (``pick_personal_songs``): the user's known songs by weight, then playcount, with a community version
   (availability.db), not hidden or "would not sing", not in voice.db and not in the fetch queue (any status).
@@ -162,13 +162,18 @@ def _alerted_budget(month_doc: dict[str, Any], budget_usd: float) -> float | Non
     return float(value) if isinstance(value, int | float) else budget_usd
 
 
+# gen's credit_transactions reasons for money in: Stripe checkout, in-app purchase (which adds no
+# total_spent), and "purchase" from older docs.
+PAID_REASONS = frozenset({"stripe_purchase", "iap_purchase", "purchase"})
+
+
 def _paid(gen_user: dict[str, Any] | None) -> bool:
     if not gen_user:
         return False
     if (w.to_int(gen_user.get("total_spent")) or 0) > 0:
         return True
     txns = gen_user.get("credit_transactions")
-    return isinstance(txns, list) and any(isinstance(t, dict) and t.get("reason") == "purchase" for t in txns)
+    return isinstance(txns, list) and any(isinstance(t, dict) and t.get("reason") in PAID_REASONS for t in txns)
 
 
 def eligibility_from(user: User, gen_user: dict[str, Any] | None, songs: Sequence[dict[str, Any]]) -> EligibilityOut:

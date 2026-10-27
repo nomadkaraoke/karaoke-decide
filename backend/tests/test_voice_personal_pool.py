@@ -186,6 +186,14 @@ def test_eligible_paid_by_purchase_txn(client: TestClient, fs: RouteFirestore) -
     assert client.get(URL).json()["reason"] == "paid"
 
 
+@pytest.mark.parametrize("reason", ["stripe_purchase", "iap_purchase"])
+def test_eligible_paid_by_gen_purchase_reasons(client: TestClient, fs: RouteFirestore, reason: str) -> None:
+    """gen's real reasons: an in-app purchase adds no total_spent, so its transaction alone must count."""
+    _set_plays(fs, [1])
+    _gen_user(fs, "legacyhash", total_spent=0, credit_transactions=[{"reason": reason, "amount": 5}])
+    assert client.get(URL).json()["reason"] == "paid"
+
+
 def test_eligible_by_history_counts() -> None:
     user = User(id=USER_ID, email=EMAIL)
 

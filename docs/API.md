@@ -2287,7 +2287,7 @@ The app queues recordings and uploads them in the background. For each queued up
 
 Behind the session gate (`403 voice_session_disabled` while `VOICE_SESSION_OPEN` is off, unless admin). An eligible user asks for up to 20 of their best-known songs (by taste weight, then playcount) to be fetched and analysed; personal songs are downloaded only once no shared-pool song is waiting, so they typically land overnight. Analysed songs join the shared pool for everyone; the pool rows carry `source = personal`, never the user.
 
-- **Eligible** (`reason`): `admin`; `paid` (the gen account has `total_spent > 0` or a `purchase` credit transaction); `history` (≥ 1,000 listens summed over `user_songs.playcount`, or ≥ 200 songs played at least once); otherwise `not_eligible`. Guests are never eligible.
+- **Eligible** (`reason`): `admin`; `paid` (the gen account has `total_spent > 0` or a purchase credit transaction: `stripe_purchase`, `iap_purchase` or legacy `purchase`); `history` (≥ 1,000 listens summed over `user_songs.playcount`, or ≥ 200 songs played at least once); otherwise `not_eligible`. Guests are never eligible.
 - **Picks**: known songs with a community karaoke version, not hidden or marked "would not sing", not already in voice.db and not already in the fetch queue (any source, any status).
 - **Cap**: 20 songs per user per rolling 30 days (`VOICE_PERSONAL_CAP`, `VOICE_PERSONAL_WINDOW_DAYS`); a request is trimmed to what is left. Admins are exempt.
 - **Budget**: a global monthly (UTC) budget on the estimated spend, `VOICE_MONTHLY_BUDGET_USD` (20.0) at `VOICE_EST_COST_PER_SONG_USD` (0.027) per newly queued song. A request is trimmed to the songs the budget can still take; admins are not exempt.
