@@ -25,6 +25,7 @@ from backend.api.deps import (
     get_settings,
     get_voice_store,
 )
+from backend.api.routes.test_support import PERSONAL_SEED_SONGS, personal_seed_candidates, personal_seed_rows
 from backend.config import BackendSettings
 from backend.main import app
 from backend.services import voice_pool_service as vps
@@ -186,6 +187,14 @@ def test_eligible_paid_by_purchase_txn(client: TestClient, fs: RouteFirestore) -
     assert client.get(URL).json()["reason"] == "paid"
 
 
+@pytest.mark.parametrize("reason", ["stripe_purchase", "iap_purchase"])
+def test_eligible_paid_by_gen_purchase_reasons(client: TestClient, fs: RouteFirestore, reason: str) -> None:
+    """gen's real reasons: an in-app purchase adds no total_spent, so its transaction alone must count."""
+    _set_plays(fs, [1])
+    _gen_user(fs, "legacyhash", total_spent=0, credit_transactions=[{"reason": reason, "amount": 5}])
+    assert client.get(URL).json()["reason"] == "paid"
+
+
 def test_eligible_by_history_counts() -> None:
     user = User(id=USER_ID, email=EMAIL)
 
@@ -268,6 +277,36 @@ def test_request_queues_personal_songs(client: TestClient, fs: RouteFirestore) -
     assert (month["songs"], month["batches"], month["alerted_80"]) == (8, 1, False)
     assert month["est_cost_usd"] == pytest.approx(0.216)
     assert fs.col(LAST)[USER_ID]["last_batch_id"] == body["batch_id"]
+
+
+@pytest.fixture(scope="module")
+def full_voice_store(tmp_path_factory: pytest.TempPathFactory) -> Iterator[VoiceDataStore]:
+    """The untouched fixture voice.db, as the local stack loads it."""
+    store = _store(fixtures.build(tmp_path_factory.mktemp("personal_full")))
+    yield store
+    store.close()
+
+
+def test_local_stack_seed_is_pickable(
+    make_client: MakeClient,
+    fs: RouteFirestore,
+    full_voice_store: VoiceDataStore,
+    catalog_reader: CatalogReader,  # noqa: F811
+) -> None:
+    """``/api/test/voice/personal-seed``'s songs on the real fixtures (catalog, availability, voice.db): eligible by
+    history, and a request queues them (Maestro's voice-session-5 relies on it)."""
+    picks = personal_seed_candidates(catalog_reader, full_voice_store.require())[:PERSONAL_SEED_SONGS]
+    assert picks, "the fixtures have no personal-pool candidates"
+    assert not {k for k, _, _ in picks} & fixtures.pooled_song_keys()
+    fs.cols["user_songs"] = personal_seed_rows(USER_ID, picks, datetime.now(UTC))
+    client = make_client()
+    app.dependency_overrides[get_voice_store] = lambda: full_voice_store
+
+    status = client.get(URL).json()
+    assert (status["eligible"], status["reason"]) == (True, "history")
+    r = client.post(URL)
+    assert r.status_code == 201, r.text
+    assert set(r.json()["songs"]) == {k for k, _, _ in picks}
 
 
 def test_shared_row_has_no_user_id(client: TestClient, fs: RouteFirestore, catalog_reader: CatalogReader) -> None:  # noqa: F811

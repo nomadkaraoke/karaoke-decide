@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,14 +13,18 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import main
-from backend.api.deps import get_catalog_store_dep, get_current_user, get_firestore
+from backend.api.deps import get_catalog_store_dep, get_current_user, get_firestore, get_voice_store
 from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
+from backend.services.voice_data_store import VoiceDataUnavailable
+from backend.services.voice_pool_service import HISTORY_LISTENS
 from backend.services.voice_recording_service import LocalBucket, user_prefix
 from backend.tests.recs_v2.conftest import catalog_dir, reader  # noqa: F401  (fixtures)
 from backend.tests.recs_v2.test_personas import _rock_artists
+from karaoke_decide.catalog import fixtures as catalog_fixtures
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
+from karaoke_decide.voice_pool import fixtures as voice_fixtures
 
 EMAIL = "Maestro@Example.com"
 EMAIL_HASH = hashlib.sha256(EMAIL.lower().encode()).hexdigest()
@@ -543,3 +548,93 @@ def test_seed_history_creates_playable_recording(
     assert c.post("/api/test/voice/seed-history", json={"email": EMAIL, "sessions": []}).status_code == 200
     assert c.get("/api/voice/history").json() == {"sessions": []}
     assert list(bucket.list_blobs()) == []
+
+
+# ---------------------------------------------------------------------------------------------
+# Personal pool: /api/test/voice/reset clears it, /api/test/voice/personal-seed
+# ---------------------------------------------------------------------------------------------
+
+
+def test_voice_reset_clears_the_personal_pool(voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore) -> None:
+    c, _ = voice_client
+    user_id = c.post("/api/test/profile/seed", json=SEED).json()["user_id"]
+    month = datetime.now(UTC).strftime("%Y-%m")
+    fs.cols["voice_personal_batches"] = {"b1": {"user_id": user_id}, "bx": {"user_id": "someone_else"}}
+    fs.cols["voice_personal_users"] = {user_id: {"last_batch_id": "b1"}, "someone_else": {"last_batch_id": "bx"}}
+    fs.cols["voice_pool_fetch"] = {
+        "p1": {"source": "personal", "batch_ids": ["b1"]},
+        "p2": {"source": "personal", "batch_ids": ["bx"]},  # another run's: it would block this run's picks
+        "s1": {"source": "shared"},
+    }
+    fs.cols["voice_personal_budget"] = {month: {"est_cost_usd": 0.5}, "2020-01": {"est_cost_usd": 1.0}}
+
+    assert c.post("/api/test/voice/reset", json={"email": EMAIL}).status_code == 204
+
+    assert list(fs.cols["voice_personal_batches"]) == ["bx"]
+    assert list(fs.cols["voice_personal_users"]) == ["someone_else"]
+    assert list(fs.cols["voice_pool_fetch"]) == ["s1"]
+    assert list(fs.cols["voice_personal_budget"]) == ["2020-01"]
+
+
+class _CommunityReader:
+    """A catalog reader whose community songs are ``keys`` (the pool's rule, faked)."""
+
+    def __init__(self, keys: set[str]) -> None:
+        self.keys = keys
+
+    def community_songs(self, song_keys: list[str]) -> dict[str, tuple[str, str]]:
+        return {k: (k.split("|")[0].title(), k.split("|")[1].title()) for k in song_keys if k in self.keys}
+
+
+class _Store:
+    def __init__(self, catalog: Any) -> None:
+        self._reader = catalog
+
+    def require(self) -> Any:
+        return self._reader
+
+
+class _NoVoice:
+    def require(self) -> Any:
+        raise VoiceDataUnavailable("not loaded")
+
+
+def _personal_seed_client(c: TestClient, community: set[str]) -> None:
+    c.app.dependency_overrides[get_catalog_store_dep] = lambda: _Store(_CommunityReader(community))  # type: ignore[attr-defined]
+    c.app.dependency_overrides[get_voice_store] = lambda: _NoVoice()  # type: ignore[attr-defined]
+
+
+def test_personal_seed_writes_eligible_history(voice_client: tuple[TestClient, LocalBucket], fs: FakeFirestore) -> None:
+    c, _ = voice_client
+    free = sorted({s.song_key for s in catalog_fixtures._rows().songs} - voice_fixtures.pooled_song_keys())
+    community = set(free[:3]) | set(voice_fixtures.pooled_song_keys())  # pooled songs never come back
+    _personal_seed_client(c, community)
+    user_id = c.post("/api/test/profile/seed", json=SEED).json()["user_id"]
+    fs.cols["user_songs"][f"{user_id}:mine"] = {"user_id": user_id, "source": "quiz"}
+
+    body = c.post("/api/test/voice/personal-seed", json={"email": EMAIL}).json()
+    assert body["user_id"] == user_id
+    assert body["songs"] == free[:3]
+    assert body["listens"] >= HISTORY_LISTENS
+    rows = [d for d in fs.cols["user_songs"].values() if d.get("source") == "lastfm"]
+    assert sorted(r["song_key"] for r in rows) == free[:3]
+    assert sum(r["playcount"] for r in rows) == body["listens"]
+
+    # Again: the seed rows are replaced, not doubled; the user's other rows stay.
+    c.post("/api/test/voice/personal-seed", json={"email": EMAIL})
+    assert len([d for d in fs.cols["user_songs"].values() if d.get("source") == "lastfm"]) == 3
+    assert f"{user_id}:mine" in fs.cols["user_songs"]
+
+
+def test_personal_seed_409_without_candidates(voice_client: tuple[TestClient, LocalBucket]) -> None:
+    c, _ = voice_client
+    _personal_seed_client(c, set())
+    r = c.post("/api/test/voice/personal-seed", json={"email": EMAIL})
+    assert r.status_code == 409
+    assert r.json()["detail"] == "no_personal_candidates"
+
+
+def test_personal_seed_not_mounted_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    for flag, env in ((False, "development"), (True, "production")):
+        c = _app_with(monkeypatch, flag=flag, environment=env)
+        assert c.post("/api/test/voice/personal-seed", json={"email": EMAIL}).status_code == 404

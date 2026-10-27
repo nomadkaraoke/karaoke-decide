@@ -21,11 +21,13 @@ from pydantic import BaseModel, Field, ValidationError
 
 from backend.api.deps import (
     get_auth_service_dep,
+    get_catalog_store_dep,
     get_firestore,
     get_import_ingest_service_dep,
     get_karaoke_log_service,
     get_music_service_service_dep,
     get_settings,
+    get_voice_store,
 )
 from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.config import BackendSettings
@@ -47,9 +49,17 @@ from backend.services.music_service_service import MusicServiceService
 from backend.services.playlist_service import PlaylistService
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
 from backend.services.user_deletion import erase_voice_data
+from backend.services.voice_data_store import VoiceDataStore, VoiceDataUnavailable
+from backend.services.voice_pool_service import BATCHES_COLLECTION as PERSONAL_BATCHES
+from backend.services.voice_pool_service import BUDGET_COLLECTION as PERSONAL_BUDGET
+from backend.services.voice_pool_service import HISTORY_LISTENS, month_key
+from backend.services.voice_pool_service import LAST_BATCH_COLLECTION as PERSONAL_LAST_BATCH
 from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileOut
 from backend.services.voice_recording_service import RECORDINGS_COLLECTION, user_prefix
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from karaoke_decide.catalog import fixtures as catalog_fixtures
+from karaoke_decide.voice_pool import fixtures as voice_fixtures
+from karaoke_decide.voice_pool.queue import FETCH_COLLECTION
 
 router = APIRouter()
 
@@ -216,11 +226,95 @@ async def reset_voice(
     bucket: Annotated[Any, Depends(get_recordings_bucket)],
 ) -> Response:
     """Delete the user's voice sessions, attempts, imported labels, recordings (objects too) and purge marker, and
-    undo what sessions wrote to ``user_songs`` (``user_deletion.erase_voice_data``). Unknown emails: no-op."""
+    undo what sessions wrote to ``user_songs`` (``user_deletion.erase_voice_data``). Also resets the personal pool
+    (``_reset_personal_pool``), which a run on a shared stack would otherwise inherit. Unknown emails: the
+    personal pool's global docs are still reset."""
     user_id = await _user_id_of(fs, auth, body.email)
     if user_id:
         await erase_voice_data(fs, bucket, user_id)  # the Phase 3d contract, shared with account deletion
+    await _reset_personal_pool(fs, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def _reset_personal_pool(fs: FirestoreService, user_id: str | None) -> None:
+    """The user's ``voice_personal_batches`` and ``voice_personal_users`` pointer, then (global, test stack only)
+    every ``voice_pool_fetch`` doc with ``source == 'personal'`` (any user's: a queued song is skipped by every later
+    request, so one run's batch would make the next run's ``nothing_to_add``) and this month's budget doc."""
+    if user_id:
+        batches = await fs.query_documents(PERSONAL_BATCHES, filters=[("user_id", "==", user_id)], limit=10000)
+        await fs.batch_delete(PERSONAL_BATCHES, [str(d["id"]) for d in batches])
+        await fs.delete_document(PERSONAL_LAST_BATCH, user_id)
+    queued = await fs.query_documents(FETCH_COLLECTION, filters=[("source", "==", "personal")], limit=10000)
+    await fs.batch_delete(FETCH_COLLECTION, [str(d["id"]) for d in queued])
+    await fs.delete_document(PERSONAL_BUDGET, month_key(datetime.now(UTC)))
+
+
+PERSONAL_SEED_SONGS = 8
+
+
+def personal_seed_candidates(catalog: Any, voice: Any) -> list[tuple[str, str, str]]:
+    """``(song_key, artist, title)`` the personal pool would pick on the local stack: fixture catalog songs
+    (``catalog.fixtures``) that the fixture voice.db (``voice_pool.fixtures``) doesn't hold, with a community version
+    that has a YouTube id in the loaded availability.db (``CatalogReader.community_songs``, the pool's own rule), and
+    not in the loaded voice.db either (``voice`` None: not loaded). Sorted by key, so every run seeds the same."""
+    pooled = voice_fixtures.pooled_song_keys()
+    keys = sorted({s.song_key for s in catalog_fixtures._rows().songs} - pooled)
+    community = catalog.community_songs(keys)
+    return [(k, *community[k]) for k in keys if k in community and (voice is None or voice.song(k) is None)]
+
+
+def personal_seed_prefix(user_id: str) -> str:
+    return f"{user_id}:personal-seed:"
+
+
+def personal_seed_rows(user_id: str, picks: list[tuple[str, str, str]], now: datetime) -> dict[str, dict[str, Any]]:
+    """The seed's ``user_songs`` docs by id: one per pick (source ``lastfm``), the playcounts adding up to at least
+    ``HISTORY_LISTENS`` (eligible by history)."""
+    plays = math.ceil(HISTORY_LISTENS / max(1, len(picks))) + 1
+    return {
+        f"{personal_seed_prefix(user_id)}{i}": {
+            "user_id": user_id,
+            "song_key": key,
+            "artist": artist,
+            "title": title,
+            "source": "lastfm",
+            "sources": ["lastfm"],
+            "playcount": plays,
+            "created_at": now,
+            "updated_at": now,
+        }
+        for i, (key, artist, title) in enumerate(picks)
+    }
+
+
+@router.post("/voice/personal-seed")
+async def seed_personal_pool(
+    body: EmailBody,
+    fs: FirestoreDep,
+    auth: AuthDep,
+    catalog: Annotated[Any, Depends(get_catalog_store_dep)],
+    voice: Annotated[VoiceDataStore, Depends(get_voice_store)],
+) -> dict[str, Any]:
+    """Make the user eligible for the personal pool by history, with songs it can pick (Maestro's "Analyse my
+    music" flow): ``PERSONAL_SEED_SONGS`` of ``personal_seed_candidates`` as ``user_songs`` (source ``lastfm``) whose
+    playcounts add up to at least ``HISTORY_LISTENS``. Replaces the user's earlier seed rows; 409
+    ``no_personal_candidates`` when the stack has none (no availability.db)."""
+    user = await auth.resolve_gen_user(body.email)
+    try:
+        voice_reader = voice.require()
+    except VoiceDataUnavailable:
+        voice_reader = None
+    picks = personal_seed_candidates(catalog.require(), voice_reader)[:PERSONAL_SEED_SONGS]
+    if not picks:
+        raise HTTPException(status.HTTP_409_CONFLICT, "no_personal_candidates")
+    prefix = personal_seed_prefix(user.id)
+    old = await fs.query_documents(USER_SONGS_COLLECTION, filters=[("user_id", "==", user.id)], limit=10000)
+    await fs.batch_delete(USER_SONGS_COLLECTION, [str(d["id"]) for d in old if str(d["id"]).startswith(prefix)])
+    rows = personal_seed_rows(user.id, picks, datetime.now(UTC))
+    for doc_id, row in rows.items():
+        await fs.set_document(USER_SONGS_COLLECTION, doc_id, row)
+    listens = sum(int(r["playcount"]) for r in rows.values())
+    return {"user_id": user.id, "songs": [k for k, _, _ in picks], "listens": listens}
 
 
 class SeedDemand(BaseModel):
