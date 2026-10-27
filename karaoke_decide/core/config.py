@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     # Private user recordings (voice-recordings/<user_id>/<session_id>/<n>.<ext>).
     voice_recordings_bucket: str = "nomadkaraoke-voice-recordings"
     voice_recordings_local_dir: str = ""  # a directory instead of the bucket (local stack, tests)
+    # Personal voice pool ("analyse my music", backend/services/voice_pool_service.py): songs per user per
+    # rolling window (admins exempt), and a global monthly budget on the estimated GPU + analysis spend
+    # (env VOICE_MONTHLY_BUDGET_USD; ~$0.027 per song measured).
+    voice_personal_cap: int = 20
+    voice_personal_window_days: int = 30
+    voice_monthly_budget_usd: float = 20.0
+    voice_est_cost_per_song_usd: float = 0.027
     # Make every BigQuery client construction fail (local stack / tests: no GCP).
     bigquery_disabled: bool = False
 

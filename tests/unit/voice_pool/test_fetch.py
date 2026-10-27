@@ -246,9 +246,11 @@ class FakeResolver:
         return {k: self.tracks[k] for k in song_keys if k in self.tracks}
 
 
-async def test_missing_spotify_ids_are_resolved_and_submitted(fs, ff, runner, gcs, clock, caplog):
+@pytest.mark.parametrize(("source", "priority"), [("andrew_sheet", 0), ("personal", 2)])
+async def test_missing_spotify_ids_are_resolved_and_submitted(fs, ff, runner, gcs, clock, caplog, source, priority):
+    """Andrew's sheet and personal pools enqueue without a Spotify track: the job resolves it."""
     caplog.set_level(logging.INFO)
-    a, b = await seed(fs, 2, prefix="sheet", spotify_id=None, duration_ms=None, source="andrew_sheet", priority=0)
+    a, b = await seed(fs, 2, prefix="sheet", spotify_id=None, duration_ms=None, source=source, priority=priority)
     resolver = FakeResolver({"sheet|000": ("spA", 181_000), "sheet|001": ("spB", 240_400)})
     out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
     assert resolver.calls == [["sheet|000", "sheet|001"]]  # one batched lookup per run
@@ -257,8 +259,39 @@ async def test_missing_spotify_ids_are_resolved_and_submitted(fs, ff, runner, gc
     for pid, sid, dur in ((a, "spA", 181_000), (b, "spB", 240_400)):
         d = fs.cols[FETCH][pid]
         assert (d["status"], d["spotify_id"], d["duration_ms"], d["error"]) == ("downloading", sid, dur, None)
-        assert d["source"] == "andrew_sheet" and d["priority"] == 0
+        assert d["source"] == source and d["priority"] == priority
     assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+
+
+async def test_personal_waits_for_shared(fs, ff, runner, gcs, clock):
+    """Personal-pool songs go only once no shared / sheet song is still queued."""
+    (shared,) = await seed(fs, 1, prefix="shared")
+    (mine,) = await seed(fs, 1, prefix="mine", source="personal", priority=2)
+    # The shared song's download is rejected (back to queued): the personal one waits for the next run.
+    ff.downloads = [(422, {"detail": [{"msg": "expected_duration_s too large"}]})]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 0 and statuses(fs) == {shared: "queued", mine: "queued"}
+    # Next run: the shared song is submitted first, then the personal one in the same run.
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 2 and [s["source_id"] for s in ff.started] == ["sp000000", "sp000000"]
+    assert statuses(fs) == {shared: "downloading", mine: "downloading"}
+
+
+async def test_personal_waits_for_a_shared_song_held_unresolved(fs, ff, runner, gcs, clock):
+    """A shared song held queued (Spotify lookup unavailable this run) still holds the personal songs back."""
+    (held,) = await seed(fs, 1, prefix="sheet", spotify_id=None, duration_ms=None, source="andrew_sheet", priority=0)
+    (mine,) = await seed(fs, 1, prefix="mine", source="personal", priority=2)
+    resolver = FakeResolver(error=fetch.SpotifyResolveUnavailableError("catalog.db not loaded"))
+    out = await go(fs, ff, runner, gcs, clock, resolve=resolver)
+    assert out["submitted"] == 0 and statuses(fs) == {held: "queued", mine: "queued"}
+
+
+async def test_personal_goes_when_shared_songs_failed_for_good(fs, ff, runner, gcs, clock):
+    (gone,) = await seed(fs, 1, prefix="shared", attempts=2)  # its third failed attempt: failed
+    (mine,) = await seed(fs, 1, prefix="mine", source="personal", priority=2)
+    ff.downloads = [(422, {"detail": [{"msg": "expected_duration_s too large"}]})]
+    out = await go(fs, ff, runner, gcs, clock)
+    assert out["submitted"] == 1 and statuses(fs) == {gone: "failed", mine: "downloading"}
 
 
 async def test_unresolvable_items_fail_with_one_aggregated_warning(fs, ff, runner, gcs, clock, caplog):

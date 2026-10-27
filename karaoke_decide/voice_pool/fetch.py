@@ -11,7 +11,8 @@ One run (``run_fetch``):
    doc. Songs still without one (or with a duration flacfetch can't take) are marked ``failed``
    with ONE aggregated WARNING per run. When the lookup itself is unavailable (catalog not loaded,
    BigQuery transient) they stay ``queued`` for the next run.
-   Submit queued songs, best ``(priority, added_at)`` first, while the run has time left and
+   Submit queued songs, best ``(priority, added_at)`` first (personal-pool songs only once no
+   shared / sheet song is still queued), while the run has time left and
    flacfetch's Spotify budget allows a batch download; ``uniform(45, 180)`` s between
    submissions (``rng`` is seeded from the run id). Each song is claimed transactionally first
    (overlapping executions skip it); a 400 / 422 for one song is that song's failed attempt. When flacfetch says "not now" (budget
@@ -86,6 +87,7 @@ Now = Callable[[], float]
 # ``resolve(song_keys)`` -> ``{song_key: (spotify_id, duration_ms)}`` for the keys it can resolve.
 Resolver = Callable[[list[str]], dict[str, tuple[str | None, int | None]]]
 NO_SPOTIFY_ID = "no spotify id"
+PERSONAL = "personal"  # queue source of personal-pool songs: they wait for the shared pool (submit_downloads)
 
 
 class SpotifyResolveUnavailableError(RuntimeError):
@@ -113,7 +115,8 @@ async def _update(fs: Any, pid: str, data: dict[str, Any], now: Now) -> None:
     await fs.update_document(FETCH, pid, {**data, "updated_at": _stamp(now)})
 
 
-async def _retry_or_fail(fs: Any, doc: dict[str, Any], error: str, now: Now) -> None:
+async def _retry_or_fail(fs: Any, doc: dict[str, Any], error: str, now: Now) -> str:
+    """Count a failed download attempt; returns the new status (``queued`` again, or ``failed`` at the limit)."""
     attempts = int(doc.get("attempts") or 0) + 1
     status = "failed" if attempts >= MAX_ATTEMPTS else "queued"
     logger.warning(
@@ -126,6 +129,7 @@ async def _retry_or_fail(fs: Any, doc: dict[str, Any], error: str, now: Now) -> 
         {"status": status, "attempts": attempts, "flacfetch_id": None, "download_started_at": None, "error": error},
         now,
     )
+    return status
 
 
 def _uploaded_audio(gcs: Any, pid: str) -> str | None:
@@ -277,15 +281,24 @@ async def submit_downloads(
     rng: random.Random,
     sleep: Sleep,
     now: Now,
+    waiting: set[str] | None = None,
 ) -> tuple[int, str | None]:
     """Step 2c: submit the fetchable queued ``docs`` in order; returns ``(submitted, why_stopped)``
     (None: queue drained or deadline).
 
     Each song is claimed (``queued`` -> ``downloading``, transactionally) before flacfetch is
     asked, so overlapping executions never submit it twice; a refusal or outage puts it back.
+    Personal-pool songs wait for the shared pool: one is submitted only when no ``shared`` /
+    ``andrew_sheet`` song is still queued, neither in ``docs`` (one sent back after a rejected
+    attempt) nor in ``waiting`` (ids of such songs held out of ``docs``, e.g. unresolved this run).
     """
     submitted = 0
+    shared_queued = set(waiting or ()) | {d["id"] for d in docs if d.get("source") != PERSONAL}
     for doc in docs:
+        personal = doc.get("source") == PERSONAL
+        if personal and shared_queued:
+            logger.info("voice pool: %d shared songs still queued; personal songs wait", len(shared_queued))
+            break  # docs are in priority order: the rest are personal too
         if submitted:
             await sleep(rng.uniform(*SPACING_S))
         while True:
@@ -293,12 +306,14 @@ async def submit_downloads(
                 return submitted, None
             if not await claim(fs, doc["id"], now):
                 logger.info("voice pool: %s was taken by another run; skipping", doc["id"])
+                shared_queued.discard(doc["id"])
                 break
             try:
                 started = _start(ff, doc)
             except FlacfetchRejectedError as e:
                 logger.warning("voice pool: %s (%s): %s", doc["id"], doc.get("song_key"), e)
-                await _retry_or_fail(fs, doc, str(e), now)
+                if await _retry_or_fail(fs, doc, str(e), now) == "failed":
+                    shared_queued.discard(doc["id"])
                 break
             except Exception as e:
                 await _update(fs, doc["id"], {"status": "queued", "flacfetch_id": None}, now)
@@ -311,6 +326,7 @@ async def submit_downloads(
                     fs, doc["id"], {"flacfetch_id": started, "download_started_at": _stamp(now), "error": None}, now
                 )
                 submitted += 1
+                shared_queued.discard(doc["id"])
                 break
             await _update(fs, doc["id"], {"status": "queued", "flacfetch_id": None}, now)
             wait = max(float(started.retry_after_s), MIN_WAIT_S)
@@ -465,8 +481,9 @@ async def run_fetch(
         queued = await queue.next_queued(fs, QUEUE_SCAN)
         resolved, held = await resolve_missing(fs, queued, resolve, now)
         fetchable, unresolved = await fail_unfetchable(fs, [d for d in queued if d["id"] not in held], run, now)
+        waiting = {d["id"] for d in queued if d["id"] in held and d.get("source") != PERSONAL}
         submitted, refused_code = await submit_downloads(
-            fs, ff, fetchable, deadline=deadline, rng=rng, sleep=sleep, now=now
+            fs, ff, fetchable, deadline=deadline, rng=rng, sleep=sleep, now=now, waiting=waiting
         )
     errors: list[Exception] = []
     separated, requeued = await collect_separations(fs, gcs, runner, now, errors)

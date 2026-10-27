@@ -14,14 +14,15 @@ from typing import Any
 
 from karaoke_decide.voice_pool.models import pool_id
 
-__all__ = ["FETCH_COLLECTION", "PRIORITY", "STATUSES", "enqueue", "next_queued", "pool_id"]
+__all__ = ["FETCH_COLLECTION", "PRIORITY", "STATUSES", "enqueue", "next_queued", "pool_id", "queue_doc"]
 
 FETCH_COLLECTION = "voice_pool_fetch"
 STATUSES = ("queued", "downloading", "fetched", "separating", "separated", "analysed", "failed")
 PRIORITY = {"andrew_sheet": 0, "shared": 1, "personal": 2}
 
 
-def _doc(item: dict[str, Any], now: datetime) -> dict[str, Any]:
+def queue_doc(item: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """The new queue doc for ``item`` (see ``enqueue``); ``batch_ids`` from the item (personal batches)."""
     return {
         "song_key": item["song_key"],
         "artist": item["artist"],
@@ -30,7 +31,7 @@ def _doc(item: dict[str, Any], now: datetime) -> dict[str, Any]:
         "duration_ms": item.get("duration_ms"),
         "source": item["source"],
         "priority": PRIORITY[item["source"]],
-        "batch_ids": [],
+        "batch_ids": list(item.get("batch_ids") or []),
         "status": "queued",
         "attempts": 0,
         "flacfetch_id": None,
@@ -50,11 +51,12 @@ async def enqueue(fs: Any, items: Iterable[dict[str, Any]]) -> int:
     """Queue songs for fetch; a doc that already exists is left alone. Returns the number added.
 
     Each item: ``song_key``, ``artist``, ``title``, ``source`` and optionally ``spotify_id``,
-    ``duration_ms``, ``stratum``, ``versions_embeddable``. Create-if-absent, so concurrent enqueues of one song add it once.
+    ``duration_ms``, ``stratum``, ``versions_embeddable``, ``batch_ids``. Create-if-absent, so concurrent
+    enqueues of one song add it once.
     """
     added = 0
     for item in items:
-        if await fs.create_document(FETCH_COLLECTION, pool_id(item["song_key"]), _doc(item, datetime.now(UTC))):
+        if await fs.create_document(FETCH_COLLECTION, pool_id(item["song_key"]), queue_doc(item, datetime.now(UTC))):
             added += 1
     return added
 

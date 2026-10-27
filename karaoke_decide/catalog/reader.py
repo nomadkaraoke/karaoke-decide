@@ -232,6 +232,26 @@ class CatalogReader:
                 out.setdefault(r[0], []).append(int(r[1]))
         return out
 
+    def community_songs(self, song_keys: Sequence[str]) -> dict[str, tuple[str, str]]:
+        """``{song_key: (artist, title)}`` for the catalog.db songs among ``song_keys`` with a community
+        version that has a YouTube id in availability.db (the voice pool's rule); {} without availability."""
+        if not self.has_availability:
+            return {}
+        keys = list(dict.fromkeys(song_keys))
+        out: dict[str, tuple[str, str]] = {}
+        for chunk in _chunks(keys):
+            rows = self.conn().execute(
+                f"""
+                SELECT s.song_key, s.artist, s.title FROM songs s
+                WHERE s.song_key IN ({_marks(len(chunk))}) AND EXISTS (
+                    SELECT 1 FROM av.versions v
+                    WHERE v.song_key = s.song_key AND v.kind = 'community' AND v.youtube_url IS NOT NULL)
+                """,
+                tuple(chunk),
+            )
+            out.update((r[0], (r[1] or "", r[2] or "")) for r in rows)
+        return out
+
     def has_karaoke_key(self, song_key: str) -> bool:
         """Whether ``song_key`` has a karaoke version: it is in ``availability.db`` or is a
         catalog.db song that came from KaraokeNerds (the two sources spell some titles differently)."""

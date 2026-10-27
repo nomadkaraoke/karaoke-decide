@@ -35,9 +35,19 @@ from backend.services.quiz_service import QuizService
 from backend.services.screenshot_import_service import RATE_COLLECTION as SCREENSHOT_IMPORTS
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION
 from backend.services.sync_service import SyncService
+from backend.services.voice_pool_service import BATCHES_COLLECTION as PERSONAL_BATCHES
+from backend.services.voice_pool_service import BUDGET_COLLECTION as PERSONAL_BUDGET
+from backend.services.voice_pool_service import LAST_BATCH_COLLECTION as PERSONAL_LAST_BATCH
 from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
 from backend.services.voice_session_outputs import SESSION_SOURCE
-from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from backend.services.voice_session_service import (
+    ACTIVE_COLLECTION,
+    ATTEMPTS_COLLECTION,
+    GUEST_REPORTERS_FIELD,
+    REPORTERS_FIELD,
+    SESSIONS_COLLECTION,
+)
+from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
 
 logger = logging.getLogger(__name__)
 
@@ -70,9 +80,12 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     # Voice (Phase 3d contract): erased by erase_voice_data first; listed so they are counted and swept.
     UserDataStore(RECORDINGS_COLLECTION, "user_id_field"),  # voice_recordings/{session}:{n}, user_id field
     UserDataStore(SESSIONS_COLLECTION, "user_id_field"),  # voice_sessions/{session_id}, user_id field
+    UserDataStore(ACTIVE_COLLECTION, "doc_id_user_id"),  # voice_session_active/{user_id}: active session pointer
     UserDataStore(ATTEMPTS_COLLECTION, "user_id_field"),  # voice_attempts/{session}:{n}, user_id field
     UserDataStore(VOICE_LABELS_COLLECTION, "user_id_field"),  # imported sheet labels, user_id field
     UserDataStore(PURGES_COLLECTION, "doc_id_user_id"),  # voice_recording_purges/{user_id} marker
+    UserDataStore(PERSONAL_BATCHES, "user_id_field"),  # voice_personal_batches/{batch_id}, user_id field
+    UserDataStore(PERSONAL_LAST_BATCH, "doc_id_user_id"),  # voice_personal_users/{user_id}: last batch pointer
     # Listening and taste data.
     UserDataStore(USER_SONGS_COLLECTION, "user_id_field"),  # user_songs/{user_id}:{song_id}, user_id field
     UserDataStore(USER_ARTISTS_COLLECTION, "user_id_field"),  # user_artists/{user_id}:{artist}, user_id field
@@ -105,7 +118,11 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         QuizService.LASTFM_USERS_COLLECTION,  # lastfm_users: imported public Last.fm dataset, no decide user link
         "jobs",  # gen's jobs, read by the vocal range ETL
         "voice_pool_fetch",  # global voice-pool fetch queue (songs, no user)
-        "voice_version_stats",  # global per-version analysis stats
+        # Global per-version stats keyed by video id. Its ``not_embeddable_by`` / ``not_embeddable_by_guests`` list
+        # user ids: erase_voice_data removes the user from them (the doc and any global ``embeddable`` verdict stay).
+        VERSION_STATS_COLLECTION,
+        # voice_personal_budget/{YYYY-MM}: the month's estimated personal-pool spend (totals only, no user).
+        PERSONAL_BUDGET,
     }
 )
 
@@ -114,6 +131,7 @@ VOICE_ERASED = frozenset(
     {
         RECORDINGS_COLLECTION,
         SESSIONS_COLLECTION,
+        ACTIVE_COLLECTION,
         ATTEMPTS_COLLECTION,
         VOICE_LABELS_COLLECTION,
         PURGES_COLLECTION,
@@ -180,13 +198,15 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
     """Erase the user's voice data (the Phase 3d contract, docs/ARCHITECTURE.md § Personal data).
 
     Recordings (objects, docs, attempt links) via ``VoiceRecordingService.delete_all_for_user``,
-    then the purge marker, sessions, attempts and imported labels, then undo what sessions wrote
+    then the purge marker, the active-session pointer, sessions, attempts and imported labels, then undo what sessions wrote
     to ``user_songs``: rows made only by a session go; on any other row the ``session_*`` fields
-    and the ``voice_session`` source are removed. Idempotent; nothing is capped.
+    and the ``voice_session`` source are removed. Last, the user's id leaves every version's
+    ``not_embeddable_by`` / ``not_embeddable_by_guests``. Idempotent; nothing is capped.
     """
     by_user = [("user_id", "==", user_id)]
     await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
     await fs.delete_document(PURGES_COLLECTION, user_id)  # delete_all writes this marker; a fresh run may upload
+    await fs.delete_document(ACTIVE_COLLECTION, user_id)  # the active-session pointer (sessions go next)
     for collection in (ATTEMPTS_COLLECTION, SESSIONS_COLLECTION, VOICE_LABELS_COLLECTION):
 
         async def page(collection: str = collection) -> list[str]:
@@ -196,6 +216,37 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
 
     await _strip_session_rows(fs, user_id, [("sources", "array_contains", SESSION_SOURCE)])
     await _strip_session_rows(fs, user_id, [("source", "==", SESSION_SOURCE)])  # rows with no ``sources`` list
+    for field in (REPORTERS_FIELD, GUEST_REPORTERS_FIELD):
+        await _strip_not_embeddable_reports(fs, user_id, field)
+
+
+async def _strip_not_embeddable_reports(fs: FirestoreService, user_id: str, field: str) -> None:
+    """Remove the user from every ``voice_version_stats`` doc's ``field`` reporter list, page by page.
+
+    One transaction per doc, so a concurrent report by another user is not lost. A global
+    ``embeddable = false`` the user's report helped set stays: it is a verdict on the video, not user data.
+    """
+    by_user = [(field, "array_contains", user_id)]
+    previous: list[str] | None = None
+    while docs := await _query_page(fs, VERSION_STATS_COLLECTION, by_user):
+        ids = [str(d["id"]) for d in docs]
+        if ids == previous:
+            raise RuntimeError(f"{VERSION_STATS_COLLECTION}: not_embeddable reports keep coming back")
+        previous = ids
+        for video_id in ids:
+
+            async def strip(txn: Any, video_id: str = video_id) -> None:
+                doc = await txn.get(VERSION_STATS_COLLECTION, video_id)
+                if doc is None or user_id not in (doc.get(field) or []):
+                    return
+                by = [u for u in doc[field] if u != user_id]
+                txn.set(
+                    VERSION_STATS_COLLECTION,
+                    video_id,
+                    {**{k: v for k, v in doc.items() if k != "id"}, field: by},
+                )
+
+            await fs.run_transaction(strip)
 
 
 async def _page_ids(fs: FirestoreService, store: UserDataStore, user_id: str | None, email: str) -> list[str]:

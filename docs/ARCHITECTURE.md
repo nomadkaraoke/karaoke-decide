@@ -347,14 +347,21 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   profile (`decide_users.voice_profile`, `voice_profile_mic`), `falsetto_high`, `falsetto_low`, `experience` and
   `uses_falsetto` are cleared with the profile by `DELETE /api/my/voice` and go with the `decide_users` doc on
   account deletion. Asserted in `backend/tests/test_user_deletion.py`.
+- **Personal voice pool (Phase 3d Part F, `backend/services/voice_pool_service.py`)**: `voice_personal_batches`
+  (`user_id`, the batch's song keys, requested_at, estimated cost, month) and the `voice_personal_users/{user_id}`
+  last-batch pointer are user data (registry, `user_id_field` / `doc_id_user_id`). `voice_personal_budget/{YYYY-MM}`
+  holds only the month's totals (`NOT_USER_DATA`). The songs a batch queues go into the global
+  `voice_pool_fetch` queue (and from there voice.db / BigQuery) with `source = personal` and the random batch id,
+  never the user id; they stay in the shared pool after the user is deleted.
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);
-  2. delete the user's `voice_sessions`, `voice_attempts`, `voice_labels` and their
-     `voice_recording_purges/{user_id}` marker;
+  2. delete the user's `voice_sessions`, `voice_attempts`, `voice_labels`, their
+     `voice_recording_purges/{user_id}` marker and `voice_session_active/{user_id}` pointer;
   3. undo what sessions wrote to `user_songs`: delete rows whose only source is `voice_session`; on any other
      row strip the `session_*` fields and remove `"voice_session"` from `sources` (and from `source`, replaced
-     by the first remaining source).
+     by the first remaining source); and remove the user's id from every `voice_version_stats.not_embeddable_by`
+     and `not_embeddable_by_guests` list (the global `embeddable` verdict on the video stays).
   4. delete the user's `playlists` documents (setlists, per `user_id`), and the user's `karaoke_log`,
      `user_songs`, `user_karaoke_unresolved` rows. Playlists are user data for this registry;
      `POST /api/test/profile/reset` already clears them (now including `playlists` and `karaoke_log`).

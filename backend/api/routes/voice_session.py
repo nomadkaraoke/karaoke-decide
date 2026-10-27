@@ -2,6 +2,7 @@
 
 Behind a flag: a session needs ``settings.voice_session_open`` or an admin user, else
 403 ``voice_session_disabled``. Sessions are user-scoped (another user's id is 404).
+The personal pool (``/personal-pool``, ``voice_pool_service``) is behind the same flag.
 """
 
 from __future__ import annotations
@@ -15,8 +16,16 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 from starlette.types import Message
 
-from backend.api.deps import CurrentUser, FirestoreServiceDep, Settings, VoiceDataStoreDep, VoiceSessionServiceDep
+from backend.api.deps import (
+    CurrentUser,
+    FirestoreServiceDep,
+    Settings,
+    VoiceDataStoreDep,
+    VoicePoolServiceDep,
+    VoiceSessionServiceDep,
+)
 from backend.api.routes.admin_voice import get_recordings_bucket
+from backend.models.voice_personal_pool import PersonalBatchCreated, PersonalPoolOut
 from backend.models.voice_session import (
     AttemptIn,
     AttemptOut,
@@ -34,7 +43,9 @@ from backend.models.voice_session import (
     VoiceHistoryOut,
 )
 from backend.services import voice_recording_service as vrs
+from backend.services.catalog_store import CatalogUnavailable
 from backend.services.voice_data_store import VoiceDataUnavailable
+from backend.services.voice_pool_service import PersonalPoolError
 from backend.services.voice_profile_service import VoiceProfileOut
 from backend.services.voice_recording_service import RecordingError, VoiceRecordingService
 from backend.services.voice_session_service import VoiceSessionError, active_session_id
@@ -62,10 +73,12 @@ SessionUser = Annotated[User, Depends(get_session_user)]
 async def _call(work: Awaitable[_T]) -> _T:
     try:
         return await work
-    except VoiceDataUnavailable as e:
+    except (VoiceDataUnavailable, CatalogUnavailable) as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="warming_up") from e
     except VoiceSessionError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail) from e
+    except PersonalPoolError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail()) from e
 
 
 @router.get("/flags", response_model=VoiceFlagsOut)
@@ -139,6 +152,22 @@ async def patch_attempt(
 ) -> AttemptPatchOut:
     """ "Don't count this one" (``excluded: true``) or count it again. Open even when the session flag is off."""
     return await _call(service.set_excluded(user, attempt_id, body.excluded))
+
+
+# ---------------------------------------------------------------- personal pool ("analyse my music")
+
+
+@router.get("/personal-pool", response_model=PersonalPoolOut)
+async def personal_pool(user: SessionUser, service: VoicePoolServiceDep) -> PersonalPoolOut:
+    """Eligibility, the cap (``used`` of ``cap`` songs in the window) and your batches, newest first."""
+    return await _call(service.status(user))
+
+
+@router.post("/personal-pool", response_model=PersonalBatchCreated, status_code=status.HTTP_201_CREATED)
+async def request_personal_pool(user: SessionUser, service: VoicePoolServiceDep) -> PersonalBatchCreated:
+    """Queue up to ``cap`` of your best-known songs for analysis. Refusals: 403 ``not_eligible``, 429 ``cap``
+    (with ``next_allowed_at``), 409 ``nothing_to_add`` / ``concurrent_request``, 503 ``budget_paused``."""
+    return await _call(service.request(user))
 
 
 # ---------------------------------------------------------------- recordings (private, consent-gated)

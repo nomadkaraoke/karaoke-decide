@@ -5,6 +5,7 @@ Fixture voice.db (Task A7), fixture catalog.db + availability.db, in-memory Fire
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import dataclasses
 import hashlib
@@ -32,12 +33,12 @@ from backend.api.deps import (
 )
 from backend.config import BackendSettings
 from backend.main import app
-from backend.models.voice_session import SessionResultSummaryOut
+from backend.models.voice_session import SessionResultSummaryOut, SessionSetup
 from backend.services import voice_session_service as vss
 from backend.services.catalog_store import CatalogUnavailable
 from backend.services.recs_v2.service import RecSection, RecSong
 from backend.services.voice_data_store import VoiceDataStore
-from backend.services.voice_profile_service import VoiceProfileOut
+from backend.services.voice_profile_service import VoiceProfileOut, VoiceProfileService
 from backend.tests.test_karaoke_log_routes import RouteFirestore
 from karaoke_decide.catalog import fixtures as catalog_fixtures
 from karaoke_decide.catalog.reader import CatalogReader
@@ -158,13 +159,16 @@ def make_client(
         open_: bool = False,
         user_id: str = USER_ID,
         store: VoiceDataStore | None = None,
+        guest: bool = False,
     ) -> TestClient:
         settings = BackendSettings(
             environment="development", google_cloud_project="test-project", voice_session_open=open_
         )
         app.dependency_overrides[get_settings] = lambda: settings
         app.dependency_overrides[get_firestore] = lambda: fs
-        app.dependency_overrides[get_current_user] = lambda: User(id=user_id, email=EMAIL, is_admin=admin)
+        app.dependency_overrides[get_current_user] = lambda: User(
+            id=user_id, email=EMAIL, is_admin=admin, is_guest=guest
+        )
         app.dependency_overrides[get_voice_store] = lambda: store or voice_store
         app.dependency_overrides[get_catalog_store_dep] = lambda: FakeCatalogStore(catalog_reader)
         app.dependency_overrides[get_hidden_keys_provider] = lambda: hidden
@@ -260,6 +264,94 @@ def test_create_abandons_previous(client: TestClient, fs: RouteFirestore) -> Non
     assert client.get(f"/api/voice/sessions/{first}/next").status_code == 409
 
 
+class InterleavingFirestore(RouteFirestore):
+    """RouteFirestore that yields to the event loop before every call and before a transaction commits,
+    so concurrent requests interleave as they would against Firestore (no conflict detection)."""
+
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        await asyncio.sleep(0)
+        return await super().get_document(collection, doc_id)
+
+    async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
+        await asyncio.sleep(0)
+        await super().set_document(collection, doc_id, data, merge=merge)
+
+    async def update_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
+        await asyncio.sleep(0)
+        await super().update_document(collection, doc_id, data)
+
+    async def query_documents(self, collection: str, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        await asyncio.sleep(0)
+        return await super().query_documents(collection, *args, **kwargs)
+
+    async def run_transaction(self, fn: Any) -> Any:
+        async def interleaved(txn: Any) -> Any:
+            await asyncio.sleep(0)
+            out = await fn(txn)
+            await asyncio.sleep(0)
+            return out
+
+        return await super().run_transaction(interleaved)
+
+
+def _service(fs: RouteFirestore, voice_store: VoiceDataStore) -> vss.VoiceSessionService:
+    return vss.VoiceSessionService(
+        fs,  # type: ignore[arg-type]
+        voice_store,
+        FakeCatalogStore(None),
+        FakeHidden(),
+        VoiceProfileService(fs),  # type: ignore[arg-type]
+        recs=None,  # type: ignore[arg-type]  # create() never ranks songs
+    )
+
+
+def _active(fs: RouteFirestore, user_id: str = USER_ID) -> list[str]:
+    return sorted(k for k, d in fs.cols["voice_sessions"].items() if d["user_id"] == user_id and d["state"] == "active")
+
+
+async def test_concurrent_creates_leave_one_active(voice_store: VoiceDataStore) -> None:
+    """Two (or more) POST /api/voice/sessions at once: exactly one session stays active, the last one committed."""
+    fs = InterleavingFirestore()
+    fs.cols["decide_users"] = {EMAIL_HASH: {"user_id": USER_ID, "email": EMAIL, "is_guest": False}}
+    service, user = _service(fs, voice_store), User(id=USER_ID, email=EMAIL)
+    for n in (2, 3):
+        created = await asyncio.gather(*(service.create(user, SessionSetup.model_validate(SETUP)) for _ in range(n)))
+        ids = {c.session_id for c in created}
+        pointer = fs.cols["voice_session_active"][USER_ID]["session_id"]
+        assert pointer in ids and _active(fs) == [pointer]
+        assert all(fs.cols["voice_sessions"][i]["state"] == "abandoned" for i in ids - {pointer})
+
+
+def test_create_sweeps_stray_active_sessions(client: TestClient, fs: RouteFirestore) -> None:
+    """Active sessions left behind (from before the pointer, or a lost race) are abandoned by the next create;
+    another user's active session is not touched."""
+    for sid, user_id in (("stray1", USER_ID), ("stray2", USER_ID), ("theirs", OTHER_ID)):
+        _seed_session(fs, sid, user_id=user_id, attempts=0, state="active")
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "stray2", "updated_at": T0}}
+    sid = _create(client)
+    assert _active(fs) == [sid]
+    assert fs.cols["voice_sessions"]["stray1"]["state"] == fs.cols["voice_sessions"]["stray2"]["state"] == "abandoned"
+    assert _active(fs, OTHER_ID) == ["theirs"]
+    assert fs.cols["voice_session_active"][USER_ID]["session_id"] == sid
+
+
+def test_only_the_pointer_session_is_active(client: TestClient, fs: RouteFirestore) -> None:
+    """A session still marked active but superseded (the pointer names another) refuses changes with 409."""
+    for sid in ("superseded", "current"):
+        _seed_session(fs, sid, attempts=0, state="active")
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "current", "updated_at": T0}}
+    r = client.patch("/api/voice/sessions/superseded", json={"warmth": "cold"})
+    assert r.status_code == 409 and r.json() == {"detail": "session_not_active"}
+    assert client.get("/api/voice/sessions/superseded/next").status_code == 409
+    assert client.patch("/api/voice/sessions/current", json={"warmth": "cold"}).status_code == 204
+
+
+def test_create_does_not_abandon_a_finished_session(client: TestClient, fs: RouteFirestore) -> None:
+    _seed_session(fs, "old", attempts=0, state="done")
+    _create(client)
+    assert fs.cols["voice_sessions"]["old"]["state"] == "done"
+
+
 def test_patch_updates_setup(client: TestClient, fs: RouteFirestore) -> None:
     sid = _create(client, warmth="cold")
     assert client.patch(f"/api/voice/sessions/{sid}", json={"warmth": "warm"}).status_code == 204
@@ -332,7 +424,7 @@ def test_not_embeddable_skip_marks_version_and_offers_alternative(
         assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
 
     skip(f"FIXTURE{n}")
-    assert fs.cols["voice_version_stats"][f"FIXTURE{n}"]["embeddable"] is False
+    assert fs.cols["voice_version_stats"][f"FIXTURE{n}"] == {"not_embeddable_by": [USER_ID]}  # one user: theirs only
     again = _next(client, sid)
     assert again["song_key"] == key and again["reason_type"] == song["reason_type"]
     assert again["version"] == {
@@ -387,6 +479,112 @@ def test_single_version_not_embeddable_goes_to_link_out_then_moves_on(client: Te
     assert link_out["song_key"] == song["song_key"] and link_out["version"]["embeddable"] is False
     assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
     assert _next(client, sid)["song_key"] != song["song_key"]
+
+
+def _report_first_version(client: TestClient) -> tuple[str, str]:
+    """A new session, its first song's first version reported not_embeddable. Returns (song_key, n)."""
+    sid = _create(client)
+    song = _next(client, sid)
+    key, video_id = song["song_key"], song["version"]["video_id"]
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": video_id}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    return key, video_id.removeprefix("FIXTURE")
+
+
+def _offered_version(client: TestClient, fs: RouteFirestore, song_key: str) -> str:
+    """The version a new session of the client's user offers for ``song_key`` (pending, so it is picked)."""
+    sid = _create(client)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = song_key
+    song = _next(client, sid)
+    assert song["song_key"] == song_key
+    return str(song["version"]["video_id"])
+
+
+def test_single_not_embeddable_report_is_user_scoped(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """One user's report hides the version from that user only (their session, then their later ones)."""
+    a = make_client(store=voice_store_alts)
+    key, n = _report_first_version(a)
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+    b = make_client(store=voice_store_alts, user_id=OTHER_ID)
+    assert _offered_version(b, fs, key) == f"FIXTURE{n}"
+    a = make_client(store=voice_store_alts)
+    assert _offered_version(a, fs, key) == f"ALT{n}a"
+
+
+def test_second_distinct_user_marks_globally(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    key, n = _report_first_version(make_client(store=voice_store_alts))
+    b = make_client(store=voice_store_alts, user_id=OTHER_ID)
+    sid = _create(b)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    assert _next(b, sid)["version"]["video_id"] == f"FIXTURE{n}"
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": f"FIXTURE{n}"}
+    assert b.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID, OTHER_ID] and stats["embeddable"] is False
+    third = make_client(store=voice_store_alts, user_id="user_voice_third")
+    assert _offered_version(third, fs, key) == f"ALT{n}a"
+
+
+def test_repeat_report_same_user_counts_once(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """A retried skip, or the same user reporting again in a later session, is still one report."""
+    client = make_client(store=voice_store_alts)
+    key, n = _report_first_version(client)
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": f"FIXTURE{n}"}
+    sid = _create(client)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    _next(client, sid)
+    for _ in range(2):
+        assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+
+
+def test_guest_not_embeddable_reports_never_count(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """Throwaway guest accounts can't hide a version for everyone: their reports are theirs only."""
+    guest = make_client(store=voice_store_alts, user_id="guest_one", guest=True)
+    key, n = _report_first_version(guest)
+    video_id = f"FIXTURE{n}"
+    second = make_client(store=voice_store_alts, user_id="guest_two", guest=True)
+    sid = _create(second)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    assert _next(second, sid)["version"]["video_id"] == video_id
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": video_id}
+    assert second.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    _report_first_version(make_client(store=voice_store_alts))  # one signed-in user: still below the threshold
+    stats = fs.cols["voice_version_stats"][video_id]
+    assert stats["not_embeddable_by_guests"] == ["guest_one", "guest_two"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+    assert _offered_version(make_client(store=voice_store_alts, user_id=OTHER_ID), fs, key) == video_id
+    guest = make_client(store=voice_store_alts, user_id="guest_one", guest=True)
+    assert _offered_version(guest, fs, key) == f"ALT{n}a"  # still hidden for the guest who reported it
+
+
+def test_not_embeddable_report_keeps_the_version_counters(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """The report is merged into the stats doc: attempt counters already there are kept."""
+    client = make_client(store=voice_store_alts)
+    sid = _create(client)
+    song = _next(client, sid)
+    video_id = song["version"]["video_id"]
+    fs.cols["voice_version_stats"] = {video_id: {"plays": 3, "good": 2, "embeddable": True}}
+    body = {"song_key": song["song_key"], "reason": "not_embeddable", "video_id": video_id}
+    assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    assert fs.cols["voice_version_stats"][video_id] == {
+        "plays": 3,
+        "good": 2,
+        "embeddable": True,
+        "not_embeddable_by": [USER_ID],
+    }
 
 
 # ---------------------------------------------------------------- attempts
@@ -800,7 +998,7 @@ def test_skips_of_offered_song_survive_voice_db_swap(
         skip["done"] is True
         and skip["artist_key"] == fs.cols["voice_sessions"][sid]["last_offer"]["song"]["artist_key"]
     )
-    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["embeddable"] is False
+    assert fs.cols["voice_version_stats"][song["version"]["video_id"]]["not_embeddable_by"] == [USER_ID]
     dk = {"song_key": song["song_key"], "reason": "dont_know"}
     assert client.post(f"/api/voice/sessions/{sid}/skips", json=dk).status_code == 204
     bad = {"song_key": "nobody|nothing", "reason": "dont_know"}
@@ -836,6 +1034,18 @@ def test_public_put_rejects_session_method(client: TestClient, fs: RouteFirestor
     assert client.put("/api/my/voice", json=body).status_code == 422
     assert "voice_profile" not in fs.cols["decide_users"][EMAIL_HASH]
     assert client.put("/api/my/voice", json={**body, "method": "mic"}).status_code == 200
+
+
+def test_flags_active_session_follows_the_pointer(client: TestClient, fs: RouteFirestore) -> None:
+    """The pointer's session, even when a stray active session is newer; none once the pointer's has ended.
+    Without a pointer (data from before it) the newest active session."""
+    _seed_session(fs, "current", attempts=0, state="active", created_at=T0)
+    _seed_session(fs, "stray", attempts=0, state="active", created_at=T0 + timedelta(hours=1))
+    assert client.get("/api/voice/flags").json()["active_session_id"] == "stray"  # no pointer: newest
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "current", "updated_at": T0}}
+    assert client.get("/api/voice/flags").json()["active_session_id"] == "current"
+    fs.cols["voice_sessions"]["current"]["state"] = "done"
+    assert client.get("/api/voice/flags").json()["active_session_id"] is None
 
 
 def test_flags_report_active_session(client: TestClient) -> None:

@@ -79,6 +79,7 @@ def _seed_voice(fs: FakeFirestore, bucket: LocalBucket, user_id: str) -> str:
     }
     fs.cols["voice_labels"] = {"l1": {"user_id": user_id, "song_key": "a|b"}, "lx": {"user_id": USER_B}}
     fs.cols["voice_recording_purges"] = {user_id: {"purged_at": "2026-10-01T00:00:00+00:00"}}
+    fs.cols["voice_session_active"] = {user_id: {"session_id": "s1"}, USER_B: {"session_id": "sx"}}
     fs.cols["user_songs"] = {
         f"{user_id}:only": {"user_id": user_id, "source": "voice_session", "sources": ["voice_session"]},
         f"{user_id}:mixed": {
@@ -142,9 +143,30 @@ async def test_voice_contract(fs: FakeFirestore, bucket: LocalBucket) -> None:
     assert list(fs.cols["voice_recordings"]) == ["rx"]
     assert list(fs.cols["voice_labels"]) == ["lx"]
     assert USER_A not in fs.cols["voice_recording_purges"]
+    assert list(fs.cols["voice_session_active"]) == [USER_B]
     assert [b.name for b in bucket.list_blobs()] == [other_object]
     assert list(fs.cols["user_songs"]) == [f"{USER_B}:only"]  # mixed rows go too: the whole account is erased
     assert counts["voice_recordings"] == 1 and counts["voice_sessions"] == 1 and counts["user_songs"] == 3
+
+
+async def test_erase_voice_data_removes_not_embeddable_reports(fs: FakeFirestore, bucket: LocalBucket) -> None:
+    """The user's id leaves every version's ``not_embeddable_by``; the version and its global verdict stay."""
+    fs.cols["voice_version_stats"] = {
+        "v1": {"plays": 2, "not_embeddable_by": [USER_A]},
+        "v2": {"not_embeddable_by": [USER_B, USER_A], "embeddable": False},
+        "v3": {"not_embeddable_by": [USER_B]},
+        "v4": {"not_embeddable_by_guests": [USER_A, USER_B]},
+    }
+
+    await erase_voice_data(_db(fs), bucket, USER_A)
+    await erase_voice_data(_db(fs), bucket, USER_A)  # idempotent
+
+    assert fs.cols["voice_version_stats"] == {
+        "v1": {"plays": 2, "not_embeddable_by": []},
+        "v2": {"not_embeddable_by": [USER_B], "embeddable": False},
+        "v3": {"not_embeddable_by": [USER_B]},
+        "v4": {"not_embeddable_by_guests": [USER_B]},
+    }
 
 
 async def test_erase_voice_data_strips_session_fields_from_mixed_rows(fs: FakeFirestore, bucket: LocalBucket) -> None:
@@ -162,6 +184,7 @@ async def test_erase_voice_data_strips_session_fields_from_mixed_rows(fs: FakeFi
     assert mixed["times_sung"] == 1
     assert f"{USER_B}:only" in songs
     assert list(fs.cols["voice_sessions"]) == ["sx"]
+    assert list(fs.cols["voice_session_active"]) == [USER_B]  # a reset leaves no pointer to a deleted session
 
 
 async def test_unknown_email_noop(fs: FakeFirestore, bucket: LocalBucket) -> None:

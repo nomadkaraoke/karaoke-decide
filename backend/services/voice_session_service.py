@@ -9,6 +9,9 @@ Firestore:
   ``{song_key, reason_type, link_out, video_ids, song, offer}``: ``video_ids`` the offered versions, ``song``
   the attempt snapshot of the song and ``offer`` the ``NextSongOut`` sent. An attempt or skip of the offered
   song and version is accepted from that snapshot even when a new voice.db no longer has them (hot swap).
+* ``voice_session_active/{user_id}`` = ``{session_id, updated_at}``: the user's active session. ``create``
+  moves it in the transaction that writes the new session, so concurrent creates commit one after another,
+  then abandons every other active session of the user (see ``create``).
 * ``voice_attempts/{session_id}:{n}`` = ``{user_id, session_id, n, song_key, video_id, quiz, context,
   pitch, pitch_all, note_labels, stopped_early, started_at, ended_at, recording_id, song}``; ``context`` is the
   setup at attempt time and ``song`` a snapshot of the song (artist, title, artist_key, stratum, demand) so the
@@ -28,7 +31,11 @@ Session-state mapping onto C2's ``SessionState``:
 * An attempt marked ``excluded`` ("Don't count this one", ``set_excluded``) still counts in ``attempts``
   and done songs but leaves the posterior, ``range_attempts``, ``tired_count`` and ``comfort_history``.
 * Done songs = attempted songs, plus "dont_know" / "something_else" skips, plus a "not_embeddable"
-  skip once the song has no version left to try (see ``skip``). "no_candidates" is set here, when
+  skip once the song has no version left to try (see ``skip``). A "not_embeddable" skip also records
+  the user in ``voice_version_stats/{video_id}.not_embeddable_by``: the version is then unplayable for
+  that user in every session, and for everyone (``embeddable = false``) once
+  ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it. A guest's report goes to
+  ``not_embeddable_by_guests`` instead: unplayable for that guest, never counted (throwaway accounts). "no_candidates" is set here, when
   ``choose_next`` finds nothing; Finish is the client calling ``result``.
 
 Outputs (Task C5, ``voice_session_outputs``): each attempt, once, in one transaction guarded by the
@@ -44,7 +51,8 @@ so ranked by taste, topped up from ``sort=fit``) for the saved profile, or the u
 ``result`` also stores the summary as ``result_summary`` (Me and the history read it).
 
 Versions: voice.db carries the selection's oEmbed verdicts; ``voice_version_stats/{video_id}``
-(``embeddable`` reported by the app) overrides them, read live for the picked song. A song with no
+(``embeddable`` from the app's reports, and ``not_embeddable_by`` for the reporting user) overrides them,
+read live for the picked song. A song with no
 embeddable version is offered once more as a link-out (``version.embeddable = false``).
 
 CPU work (pool index, posterior rebuild, candidate scoring) runs in ``asyncio.to_thread``.
@@ -118,6 +126,7 @@ from karaoke_decide.voice_session.stopping import MAX_ATTEMPTS, DoneReason, Resu
 logger = logging.getLogger(__name__)
 
 SESSIONS_COLLECTION = "voice_sessions"
+ACTIVE_COLLECTION = "voice_session_active"  # voice_session_active/{user_id}: the user's active session
 ATTEMPTS_COLLECTION = "voice_attempts"
 RECORDINGS_COLLECTION = "voice_recordings"  # owned by voice_recording_service; here so history can join it
 SUITED_LIMIT = 15
@@ -125,6 +134,9 @@ SUITED_MIN_TASTE = 5  # fewer taste-ranked songs than this: top up from sort=fit
 HISTORY_LIMIT = 20  # sessions in GET /api/voice/history, newest first
 ALTERNATIVES = 2
 MAX_REPICKS = 5  # picks whose versions all turned out unembeddable (live stats) before offering a link-out
+NOT_EMBEDDABLE_GLOBAL_REPORTS = 2  # distinct users reporting a version unplayable before it is hidden for everyone
+REPORTERS_FIELD = "not_embeddable_by"  # voice_version_stats: signed-in reporters (they count toward the threshold)
+GUEST_REPORTERS_FIELD = "not_embeddable_by_guests"  # guest reporters: hidden for them only, never counted
 _CREATE_RETRIES = 3
 
 
@@ -265,12 +277,36 @@ def _version_out(v: Version, *, embeddable: bool = True) -> VersionOut:
     return VersionOut(video_id=v.video_id, brand_code=v.brand_code, brand_name=v.brand_name, embeddable=embeddable)
 
 
-def _stats_from_doc(doc: dict[str, Any]) -> VersionStats:
+def _reporters(doc: dict[str, Any] | None, field: str = REPORTERS_FIELD) -> list[str]:
+    """The users who reported this version not embeddable (``field``), in report order."""
+    raw = (doc or {}).get(field)
+    return [str(u) for u in raw] if isinstance(raw, list) else []
+
+
+def _with_report(doc: dict[str, Any] | None, user_id: str, *, guest: bool = False) -> dict[str, Any] | None:
+    """The stats doc with ``user_id``'s not_embeddable report added (None: already reported). The global
+    ``embeddable = false`` is set once ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct signed-in users have
+    reported it; a guest's report is kept apart (``GUEST_REPORTERS_FIELD``) and never counts."""
+    out = {k: v for k, v in (doc or {}).items() if k != "id"}
+    field = GUEST_REPORTERS_FIELD if guest else REPORTERS_FIELD
+    by = _reporters(out, field)
+    if user_id in by:
+        return None
+    out[field] = [*by, user_id]
+    if not guest and len(out[field]) >= NOT_EMBEDDABLE_GLOBAL_REPORTS:
+        out["embeddable"] = False
+    return out
+
+
+def _stats_from_doc(doc: dict[str, Any], user_id: str) -> VersionStats:
+    """The version's stats as ``user_id`` sees them: unembeddable when they reported it themselves."""
+
     def num(k: str) -> int:
         v = doc.get(k)
         return int(v) if isinstance(v, int | float) and not isinstance(v, bool) else 0
 
-    emb = doc.get("embeddable")
+    mine = user_id in _reporters(doc) or user_id in _reporters(doc, GUEST_REPORTERS_FIELD)
+    emb = False if mine else doc.get("embeddable")
     return VersionStats(
         good=num("good"),
         not_great=num("not_great"),
@@ -503,7 +539,14 @@ def _offered_song(session: dict[str, Any], song_key: str, video_id: str | None) 
 
 
 async def active_session_id(fs: FirestoreService, user_id: str) -> str | None:
-    """The user's active session (the newest, should two ever be active), else None."""
+    """The user's active session: the ``voice_session_active`` pointer's while that session is active
+    (else None). Without a pointer (sessions from before it existed) the newest active session, if any."""
+    pointer = await fs.get_document(ACTIVE_COLLECTION, user_id)
+    if pointer is not None:
+        sid = pointer.get("session_id")
+        doc = await fs.get_document(SESSIONS_COLLECTION, str(sid)) if sid else None
+        ok = doc is not None and doc.get("user_id") == user_id and doc.get("state") == "active"
+        return str(sid) if ok else None
     docs = await fs.query_documents(
         SESSIONS_COLLECTION, filters=[("user_id", "==", user_id), ("state", "==", "active")]
     )
@@ -633,8 +676,13 @@ class VoiceSessionService:
         return doc
 
     async def _active(self, user_id: str, session_id: str) -> dict[str, Any]:
+        """The session, while it is active and (when the user has a pointer) the pointer's session: a session
+        a newer create superseded is not active even before ``_abandon_superseded`` has marked it."""
         doc = await self._owned(user_id, session_id)
         if doc.get("state") != "active":
+            raise SessionNotActiveError(session_id)
+        pointer = await self._fs.get_document(ACTIVE_COLLECTION, user_id)
+        if pointer is not None and pointer.get("session_id") != session_id:
             raise SessionNotActiveError(session_id)
         return doc
 
@@ -650,9 +698,21 @@ class VoiceSessionService:
         reader = self._voice.require()  # VoiceDataUnavailable -> 503 warming_up
         return await asyncio.to_thread(pool_index, reader)
 
-    async def _version_stats(self, versions: Sequence[Version]) -> dict[str, VersionStats]:
+    async def _version_stats(self, versions: Sequence[Version], user_id: str) -> dict[str, VersionStats]:
+        """Live stats of ``versions`` for ``user_id`` (their own not_embeddable reports count as verdicts)."""
         docs = await asyncio.gather(*(self._fs.get_document(VERSION_STATS_COLLECTION, v.video_id) for v in versions))
-        return {v.video_id: _stats_from_doc(d) for v, d in zip(versions, docs, strict=True) if d}
+        return {v.video_id: _stats_from_doc(d, user_id) for v, d in zip(versions, docs, strict=True) if d}
+
+    async def _report_not_embeddable(self, user: User, video_id: str) -> None:
+        """Add the user to the version's ``not_embeddable_by`` (a guest: ``not_embeddable_by_guests``) once,
+        in a transaction so concurrent reports from two users both count."""
+
+        async def report(txn: Any) -> None:
+            new = _with_report(await txn.get(VERSION_STATS_COLLECTION, video_id), user.id, guest=user.is_guest)
+            if new is not None:
+                txn.set(VERSION_STATS_COLLECTION, video_id, new)
+
+        await self._fs.run_transaction(report)
 
     async def _context(self, user_id: str) -> UserContextV2:
         """3a's user context; without catalog.db only the hidden songs are known."""
@@ -683,33 +743,62 @@ class VoiceSessionService:
     # ------------------------------------------------------------ setup
 
     async def create(self, user: User, setup: SessionSetup) -> SessionCreated:
-        """A new active session; the user's other active sessions become ``abandoned``."""
+        """A new active session; the user's other active sessions become ``abandoned``.
+
+        One transaction reads the user's ``voice_session_active`` pointer, writes the session and points
+        the pointer at it: two concurrent creates conflict on the pointer, so they commit one after the
+        other and the pointer ends on the last. Then ``_abandon_superseded`` abandons the rest. After N
+        concurrent creates exactly one session (the pointer's) is active."""
         now = datetime.now(UTC)
-        active = await self._fs.query_documents(
-            SESSIONS_COLLECTION, filters=[("user_id", "==", user.id), ("state", "==", "active")]
-        )
-        for d in active:
-            await self._fs.update_document(SESSIONS_COLLECTION, d["id"], {"state": "abandoned", "updated_at": now})
         profile = await self._profiles.get(user.id)
         session_id = uuid.uuid4().hex
-        await self._fs.set_document(
-            SESSIONS_COLLECTION,
-            session_id,
-            {
-                "user_id": user.id,
-                "setup": _stored_setup(setup),
-                "state": "active",
-                "created_at": now,
-                "updated_at": now,
-                "tired_count": 0,
-                "skips": [],
-                "prior_profile": profile.model_dump(mode="json", by_alias=True) if profile else None,
-                "pending_song_key": None,
-                "last_offer": None,
-                "done_reason": None,
-            },
-        )
+        doc = {
+            "user_id": user.id,
+            "setup": _stored_setup(setup),
+            "state": "active",
+            "created_at": now,
+            "updated_at": now,
+            "tired_count": 0,
+            "skips": [],
+            "prior_profile": profile.model_dump(mode="json", by_alias=True) if profile else None,
+            "pending_song_key": None,
+            "last_offer": None,
+            "done_reason": None,
+        }
+
+        async def claim(txn: Any) -> None:
+            await txn.get(ACTIVE_COLLECTION, user.id)  # read: concurrent claims conflict and are serialised
+            txn.set(SESSIONS_COLLECTION, session_id, doc)
+            txn.set(ACTIVE_COLLECTION, user.id, {"session_id": session_id, "updated_at": now})
+
+        await self._fs.run_transaction(claim)
+        await self._abandon_superseded(user.id)
         return SessionCreated(session_id=session_id, state="active")
+
+    async def _abandon_superseded(self, user_id: str) -> None:
+        """Abandon every active session of the user except the one the pointer holds.
+
+        The query runs before the pointer is read: every session it finds was committed together with a
+        pointer move to it, so a pointer read afterwards is that session or a newer one, and a session that
+        is not the pointer's has been superseded for good (never the winner of a race still in flight).
+        Sessions active from before the pointer existed are swept the same way. Each is abandoned in a
+        transaction, only while still active (a session finished meanwhile stays done)."""
+        active = await self._fs.query_documents(
+            SESSIONS_COLLECTION, filters=[("user_id", "==", user_id), ("state", "==", "active")]
+        )
+        pointer = await self._fs.get_document(ACTIVE_COLLECTION, user_id)
+        current = (pointer or {}).get("session_id")
+        for d in active:
+            if d["id"] == current:
+                continue
+
+            async def abandon(txn: Any, sid: str = str(d["id"])) -> None:
+                session = await txn.get(SESSIONS_COLLECTION, sid)
+                if session and session.get("state") == "active":
+                    rest = {k: v for k, v in session.items() if k != "id"}
+                    txn.set(SESSIONS_COLLECTION, sid, {**rest, "state": "abandoned", "updated_at": datetime.now(UTC)})
+
+            await self._fs.run_transaction(abandon)
 
     async def patch(self, user: User, session_id: str, patch: SessionPatch) -> None:
         session = await self._active(user.id, session_id)
@@ -770,6 +859,7 @@ class VoiceSessionService:
             last = session.get("last_offer") or {}
             reason = last.get("reason_type") if last.get("song_key") == pending else "explore"
             offer = await self._offer(
+                user.id,
                 session_id,
                 index[pending],
                 reason or "explore",
@@ -788,6 +878,7 @@ class VoiceSessionService:
             if pick is None:
                 return await self._done(session_id, "no_candidates")
             offer = await self._offer(
+                user.id,
                 session_id,
                 index[pick.song_key],
                 pick.reason_type,
@@ -807,6 +898,7 @@ class VoiceSessionService:
 
     async def _offer(
         self,
+        user_id: str,
         session_id: str,
         e: PoolEntry,
         reason_type: Any,
@@ -816,8 +908,9 @@ class VoiceSessionService:
         attempt_n: int,
         comfort: ComfortEstimateOut | None = None,
     ) -> NextSongOut | None:
-        """The song with its best playable version (live stats), a link-out offer, or None (no version)."""
-        stats = await self._version_stats(e.versions)
+        """The song with its best playable version (live stats, as the user sees them), a link-out offer,
+        or None (no version)."""
+        stats = await self._version_stats(e.versions, user_id)
         ordered = choose_versions(list(e.versions), stats)
         playable = _playable(ordered, stats, _session_unplayable(skips, e.song_key))
         if not playable and not link_out_ok:
@@ -853,9 +946,14 @@ class VoiceSessionService:
     async def skip(self, user: User, session_id: str, body: SkipIn) -> None:
         """Record a skip. "dont_know" / "something_else" finish the song for this session.
 
-        "not_embeddable" marks ``voice_version_stats/{video_id}.embeddable = false`` and keeps the song
-        (the next call offers its next version) while a playable version is left; with none left the song
-        is offered once more as a link-out, and a "not_embeddable" skip of that link-out finishes it.
+        "not_embeddable" adds the user to ``voice_version_stats/{video_id}.not_embeddable_by`` (once per
+        user: retries and repeat reports count once), which hides the version from that user in this and
+        later sessions; only when ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct signed-in users (admins too) have
+        reported it is ``embeddable = false`` set, hiding it from everyone. A guest's report is stored in
+        ``not_embeddable_by_guests``: it hides the version for that guest only and never counts. One user, malicious or on a flaky network,
+        can't remove a version for all. The song is kept (the next call offers its next version) while a
+        playable version is left; with none left the song is offered once more as a link-out, and a
+        "not_embeddable" skip of that link-out finishes it.
         """
         session = await self._active(user.id, session_id)
         index = await self._index()
@@ -873,9 +971,9 @@ class VoiceSessionService:
         artist_key = e.artist_key if known and e is not None else str((snap or {}).get("artist_key") or "")
         stats: dict[str, VersionStats] = {}
         if ne:
-            await self._fs.set_document(VERSION_STATS_COLLECTION, str(body.video_id), {"embeddable": False}, merge=True)
+            await self._report_not_embeddable(user, str(body.video_id))
             if known and e is not None:
-                stats = await self._version_stats(e.versions)
+                stats = await self._version_stats(e.versions, user.id)
 
         async def record(txn: Any) -> None:
             session = await txn.get(SESSIONS_COLLECTION, session_id)
