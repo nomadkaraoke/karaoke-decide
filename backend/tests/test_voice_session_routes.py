@@ -159,13 +159,16 @@ def make_client(
         open_: bool = False,
         user_id: str = USER_ID,
         store: VoiceDataStore | None = None,
+        guest: bool = False,
     ) -> TestClient:
         settings = BackendSettings(
             environment="development", google_cloud_project="test-project", voice_session_open=open_
         )
         app.dependency_overrides[get_settings] = lambda: settings
         app.dependency_overrides[get_firestore] = lambda: fs
-        app.dependency_overrides[get_current_user] = lambda: User(id=user_id, email=EMAIL, is_admin=admin)
+        app.dependency_overrides[get_current_user] = lambda: User(
+            id=user_id, email=EMAIL, is_admin=admin, is_guest=guest
+        )
         app.dependency_overrides[get_voice_store] = lambda: store or voice_store
         app.dependency_overrides[get_catalog_store_dep] = lambda: FakeCatalogStore(catalog_reader)
         app.dependency_overrides[get_hidden_keys_provider] = lambda: hidden
@@ -330,6 +333,17 @@ def test_create_sweeps_stray_active_sessions(client: TestClient, fs: RouteFirest
     assert fs.cols["voice_sessions"]["stray1"]["state"] == fs.cols["voice_sessions"]["stray2"]["state"] == "abandoned"
     assert _active(fs, OTHER_ID) == ["theirs"]
     assert fs.cols["voice_session_active"][USER_ID]["session_id"] == sid
+
+
+def test_only_the_pointer_session_is_active(client: TestClient, fs: RouteFirestore) -> None:
+    """A session still marked active but superseded (the pointer names another) refuses changes with 409."""
+    for sid in ("superseded", "current"):
+        _seed_session(fs, sid, attempts=0, state="active")
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "current", "updated_at": T0}}
+    r = client.patch("/api/voice/sessions/superseded", json={"warmth": "cold"})
+    assert r.status_code == 409 and r.json() == {"detail": "session_not_active"}
+    assert client.get("/api/voice/sessions/superseded/next").status_code == 409
+    assert client.patch("/api/voice/sessions/current", json={"warmth": "cold"}).status_code == 204
 
 
 def test_create_does_not_abandon_a_finished_session(client: TestClient, fs: RouteFirestore) -> None:
@@ -530,6 +544,28 @@ def test_repeat_report_same_user_counts_once(
         assert client.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
     stats = fs.cols["voice_version_stats"][f"FIXTURE{n}"]
     assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+
+
+def test_guest_not_embeddable_reports_never_count(
+    make_client: MakeClient, fs: RouteFirestore, voice_store_alts: VoiceDataStore
+) -> None:
+    """Throwaway guest accounts can't hide a version for everyone: their reports are theirs only."""
+    guest = make_client(store=voice_store_alts, user_id="guest_one", guest=True)
+    key, n = _report_first_version(guest)
+    video_id = f"FIXTURE{n}"
+    second = make_client(store=voice_store_alts, user_id="guest_two", guest=True)
+    sid = _create(second)
+    fs.cols["voice_sessions"][sid]["pending_song_key"] = key
+    assert _next(second, sid)["version"]["video_id"] == video_id
+    body = {"song_key": key, "reason": "not_embeddable", "video_id": video_id}
+    assert second.post(f"/api/voice/sessions/{sid}/skips", json=body).status_code == 204
+    _report_first_version(make_client(store=voice_store_alts))  # one signed-in user: still below the threshold
+    stats = fs.cols["voice_version_stats"][video_id]
+    assert stats["not_embeddable_by_guests"] == ["guest_one", "guest_two"]
+    assert stats["not_embeddable_by"] == [USER_ID] and stats.get("embeddable") is not False
+    assert _offered_version(make_client(store=voice_store_alts, user_id=OTHER_ID), fs, key) == video_id
+    guest = make_client(store=voice_store_alts, user_id="guest_one", guest=True)
+    assert _offered_version(guest, fs, key) == f"ALT{n}a"  # still hidden for the guest who reported it
 
 
 def test_not_embeddable_report_keeps_the_version_counters(
@@ -998,6 +1034,18 @@ def test_public_put_rejects_session_method(client: TestClient, fs: RouteFirestor
     assert client.put("/api/my/voice", json=body).status_code == 422
     assert "voice_profile" not in fs.cols["decide_users"][EMAIL_HASH]
     assert client.put("/api/my/voice", json={**body, "method": "mic"}).status_code == 200
+
+
+def test_flags_active_session_follows_the_pointer(client: TestClient, fs: RouteFirestore) -> None:
+    """The pointer's session, even when a stray active session is newer; none once the pointer's has ended.
+    Without a pointer (data from before it) the newest active session."""
+    _seed_session(fs, "current", attempts=0, state="active", created_at=T0)
+    _seed_session(fs, "stray", attempts=0, state="active", created_at=T0 + timedelta(hours=1))
+    assert client.get("/api/voice/flags").json()["active_session_id"] == "stray"  # no pointer: newest
+    fs.cols["voice_session_active"] = {USER_ID: {"session_id": "current", "updated_at": T0}}
+    assert client.get("/api/voice/flags").json()["active_session_id"] == "current"
+    fs.cols["voice_sessions"]["current"]["state"] = "done"
+    assert client.get("/api/voice/flags").json()["active_session_id"] is None
 
 
 def test_flags_report_active_session(client: TestClient) -> None:

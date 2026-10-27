@@ -34,7 +34,8 @@ Session-state mapping onto C2's ``SessionState``:
   skip once the song has no version left to try (see ``skip``). A "not_embeddable" skip also records
   the user in ``voice_version_stats/{video_id}.not_embeddable_by``: the version is then unplayable for
   that user in every session, and for everyone (``embeddable = false``) once
-  ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it. "no_candidates" is set here, when
+  ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it. A guest's report goes to
+  ``not_embeddable_by_guests`` instead: unplayable for that guest, never counted (throwaway accounts). "no_candidates" is set here, when
   ``choose_next`` finds nothing; Finish is the client calling ``result``.
 
 Outputs (Task C5, ``voice_session_outputs``): each attempt, once, in one transaction guarded by the
@@ -134,6 +135,8 @@ HISTORY_LIMIT = 20  # sessions in GET /api/voice/history, newest first
 ALTERNATIVES = 2
 MAX_REPICKS = 5  # picks whose versions all turned out unembeddable (live stats) before offering a link-out
 NOT_EMBEDDABLE_GLOBAL_REPORTS = 2  # distinct users reporting a version unplayable before it is hidden for everyone
+REPORTERS_FIELD = "not_embeddable_by"  # voice_version_stats: signed-in reporters (they count toward the threshold)
+GUEST_REPORTERS_FIELD = "not_embeddable_by_guests"  # guest reporters: hidden for them only, never counted
 _CREATE_RETRIES = 3
 
 
@@ -274,21 +277,23 @@ def _version_out(v: Version, *, embeddable: bool = True) -> VersionOut:
     return VersionOut(video_id=v.video_id, brand_code=v.brand_code, brand_name=v.brand_name, embeddable=embeddable)
 
 
-def _reporters(doc: dict[str, Any] | None) -> list[str]:
-    """The users who reported this version not embeddable (``not_embeddable_by``), in report order."""
-    raw = (doc or {}).get("not_embeddable_by")
+def _reporters(doc: dict[str, Any] | None, field: str = REPORTERS_FIELD) -> list[str]:
+    """The users who reported this version not embeddable (``field``), in report order."""
+    raw = (doc or {}).get(field)
     return [str(u) for u in raw] if isinstance(raw, list) else []
 
 
-def _with_report(doc: dict[str, Any] | None, user_id: str) -> dict[str, Any] | None:
+def _with_report(doc: dict[str, Any] | None, user_id: str, *, guest: bool = False) -> dict[str, Any] | None:
     """The stats doc with ``user_id``'s not_embeddable report added (None: already reported). The global
-    ``embeddable = false`` is set once ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users have reported it."""
+    ``embeddable = false`` is set once ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct signed-in users have
+    reported it; a guest's report is kept apart (``GUEST_REPORTERS_FIELD``) and never counts."""
     out = {k: v for k, v in (doc or {}).items() if k != "id"}
-    by = _reporters(out)
+    field = GUEST_REPORTERS_FIELD if guest else REPORTERS_FIELD
+    by = _reporters(out, field)
     if user_id in by:
         return None
-    out["not_embeddable_by"] = [*by, user_id]
-    if len(out["not_embeddable_by"]) >= NOT_EMBEDDABLE_GLOBAL_REPORTS:
+    out[field] = [*by, user_id]
+    if not guest and len(out[field]) >= NOT_EMBEDDABLE_GLOBAL_REPORTS:
         out["embeddable"] = False
     return out
 
@@ -300,7 +305,8 @@ def _stats_from_doc(doc: dict[str, Any], user_id: str) -> VersionStats:
         v = doc.get(k)
         return int(v) if isinstance(v, int | float) and not isinstance(v, bool) else 0
 
-    emb = False if user_id in _reporters(doc) else doc.get("embeddable")
+    mine = user_id in _reporters(doc) or user_id in _reporters(doc, GUEST_REPORTERS_FIELD)
+    emb = False if mine else doc.get("embeddable")
     return VersionStats(
         good=num("good"),
         not_great=num("not_great"),
@@ -533,7 +539,14 @@ def _offered_song(session: dict[str, Any], song_key: str, video_id: str | None) 
 
 
 async def active_session_id(fs: FirestoreService, user_id: str) -> str | None:
-    """The user's active session (the newest, should two ever be active), else None."""
+    """The user's active session: the ``voice_session_active`` pointer's while that session is active
+    (else None). Without a pointer (sessions from before it existed) the newest active session, if any."""
+    pointer = await fs.get_document(ACTIVE_COLLECTION, user_id)
+    if pointer is not None:
+        sid = pointer.get("session_id")
+        doc = await fs.get_document(SESSIONS_COLLECTION, str(sid)) if sid else None
+        ok = doc is not None and doc.get("user_id") == user_id and doc.get("state") == "active"
+        return str(sid) if ok else None
     docs = await fs.query_documents(
         SESSIONS_COLLECTION, filters=[("user_id", "==", user_id), ("state", "==", "active")]
     )
@@ -663,8 +676,13 @@ class VoiceSessionService:
         return doc
 
     async def _active(self, user_id: str, session_id: str) -> dict[str, Any]:
+        """The session, while it is active and (when the user has a pointer) the pointer's session: a session
+        a newer create superseded is not active even before ``_abandon_superseded`` has marked it."""
         doc = await self._owned(user_id, session_id)
         if doc.get("state") != "active":
+            raise SessionNotActiveError(session_id)
+        pointer = await self._fs.get_document(ACTIVE_COLLECTION, user_id)
+        if pointer is not None and pointer.get("session_id") != session_id:
             raise SessionNotActiveError(session_id)
         return doc
 
@@ -685,12 +703,12 @@ class VoiceSessionService:
         docs = await asyncio.gather(*(self._fs.get_document(VERSION_STATS_COLLECTION, v.video_id) for v in versions))
         return {v.video_id: _stats_from_doc(d, user_id) for v, d in zip(versions, docs, strict=True) if d}
 
-    async def _report_not_embeddable(self, user_id: str, video_id: str) -> None:
-        """Add ``user_id`` to the version's ``not_embeddable_by`` (once), in a transaction so concurrent
-        reports from two users both count."""
+    async def _report_not_embeddable(self, user: User, video_id: str) -> None:
+        """Add the user to the version's ``not_embeddable_by`` (a guest: ``not_embeddable_by_guests``) once,
+        in a transaction so concurrent reports from two users both count."""
 
         async def report(txn: Any) -> None:
-            new = _with_report(await txn.get(VERSION_STATS_COLLECTION, video_id), user_id)
+            new = _with_report(await txn.get(VERSION_STATS_COLLECTION, video_id), user.id, guest=user.is_guest)
             if new is not None:
                 txn.set(VERSION_STATS_COLLECTION, video_id, new)
 
@@ -930,8 +948,9 @@ class VoiceSessionService:
 
         "not_embeddable" adds the user to ``voice_version_stats/{video_id}.not_embeddable_by`` (once per
         user: retries and repeat reports count once), which hides the version from that user in this and
-        later sessions; only when ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct users (admins too) have reported
-        it is ``embeddable = false`` set, hiding it from everyone. One user, malicious or on a flaky network,
+        later sessions; only when ``NOT_EMBEDDABLE_GLOBAL_REPORTS`` distinct signed-in users (admins too) have
+        reported it is ``embeddable = false`` set, hiding it from everyone. A guest's report is stored in
+        ``not_embeddable_by_guests``: it hides the version for that guest only and never counts. One user, malicious or on a flaky network,
         can't remove a version for all. The song is kept (the next call offers its next version) while a
         playable version is left; with none left the song is offered once more as a link-out, and a
         "not_embeddable" skip of that link-out finishes it.
@@ -952,7 +971,7 @@ class VoiceSessionService:
         artist_key = e.artist_key if known and e is not None else str((snap or {}).get("artist_key") or "")
         stats: dict[str, VersionStats] = {}
         if ne:
-            await self._report_not_embeddable(user.id, str(body.video_id))
+            await self._report_not_embeddable(user, str(body.video_id))
             if known and e is not None:
                 stats = await self._version_stats(e.versions, user.id)
 

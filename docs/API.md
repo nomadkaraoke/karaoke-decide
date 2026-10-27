@@ -2185,7 +2185,7 @@ or `{"kind": "done", "reason": "..."}`. `attempt_n` is the 1-based number an att
 
 ### POST /api/voice/sessions/{session_id}/skips
 
-Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "video_id": null}`. `not_embeddable` (with `video_id`) marks that version unplayable for this user (in this and later sessions); it becomes unplayable for everyone once 2 distinct users have reported it (`voice_version_stats/{video_id}.not_embeddable_by`). A repeat report by the same user counts once. `204`. A song (and, for `not_embeddable`, a version) that the last `next` offered is accepted even if a new voice.db no longer has it (the offer's snapshot is used, and the song is finished for the session). Errors: `404 session_not_found`, `409 session_not_active`, `422` for an unknown song or version (`unknown_song`, `unknown_version`).
+Body `{"song_key": "...", "reason": "dont_know|something_else|not_embeddable", "video_id": null}`. `not_embeddable` (with `video_id`) marks that version unplayable for this user (in this and later sessions); it becomes unplayable for everyone once 2 distinct users have reported it (`voice_version_stats/{video_id}.not_embeddable_by`). A repeat report by the same user counts once. A guest account's report hides the version for that guest only and never counts toward the 2. `204`. A song (and, for `not_embeddable`, a version) that the last `next` offered is accepted even if a new voice.db no longer has it (the offer's snapshot is used, and the song is finished for the session). Errors: `404 session_not_found`, `409 session_not_active`, `422` for an unknown song or version (`unknown_song`, `unknown_version`).
 
 ### POST /api/voice/sessions/{session_id}/attempts
 

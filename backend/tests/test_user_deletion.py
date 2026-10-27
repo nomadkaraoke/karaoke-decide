@@ -155,6 +155,7 @@ async def test_erase_voice_data_removes_not_embeddable_reports(fs: FakeFirestore
         "v1": {"plays": 2, "not_embeddable_by": [USER_A]},
         "v2": {"not_embeddable_by": [USER_B, USER_A], "embeddable": False},
         "v3": {"not_embeddable_by": [USER_B]},
+        "v4": {"not_embeddable_by_guests": [USER_A, USER_B]},
     }
 
     await erase_voice_data(_db(fs), bucket, USER_A)
@@ -164,6 +165,7 @@ async def test_erase_voice_data_removes_not_embeddable_reports(fs: FakeFirestore
         "v1": {"plays": 2, "not_embeddable_by": []},
         "v2": {"not_embeddable_by": [USER_B], "embeddable": False},
         "v3": {"not_embeddable_by": [USER_B]},
+        "v4": {"not_embeddable_by_guests": [USER_B]},
     }
 
 

@@ -37,7 +37,13 @@ from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS
 from backend.services.sync_service import SyncService
 from backend.services.voice_recording_service import PURGES_COLLECTION, RECORDINGS_COLLECTION, VoiceRecordingService
 from backend.services.voice_session_outputs import SESSION_SOURCE
-from backend.services.voice_session_service import ACTIVE_COLLECTION, ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
+from backend.services.voice_session_service import (
+    ACTIVE_COLLECTION,
+    ATTEMPTS_COLLECTION,
+    GUEST_REPORTERS_FIELD,
+    REPORTERS_FIELD,
+    SESSIONS_COLLECTION,
+)
 from karaoke_decide.voice_pool.voicedb import VERSION_STATS_COLLECTION
 
 logger = logging.getLogger(__name__)
@@ -107,8 +113,8 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         QuizService.LASTFM_USERS_COLLECTION,  # lastfm_users: imported public Last.fm dataset, no decide user link
         "jobs",  # gen's jobs, read by the vocal range ETL
         "voice_pool_fetch",  # global voice-pool fetch queue (songs, no user)
-        # Global per-version stats keyed by video id. Its ``not_embeddable_by`` lists user ids: erase_voice_data
-        # removes the user from it (the doc and any global ``embeddable`` verdict stay).
+        # Global per-version stats keyed by video id. Its ``not_embeddable_by`` / ``not_embeddable_by_guests`` list
+        # user ids: erase_voice_data removes the user from them (the doc and any global ``embeddable`` verdict stay).
         VERSION_STATS_COLLECTION,
     }
 )
@@ -188,7 +194,7 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
     then the purge marker, the active-session pointer, sessions, attempts and imported labels, then undo what sessions wrote
     to ``user_songs``: rows made only by a session go; on any other row the ``session_*`` fields
     and the ``voice_session`` source are removed. Last, the user's id leaves every version's
-    ``not_embeddable_by``. Idempotent; nothing is capped.
+    ``not_embeddable_by`` / ``not_embeddable_by_guests``. Idempotent; nothing is capped.
     """
     by_user = [("user_id", "==", user_id)]
     await VoiceRecordingService(fs, bucket).delete_all_for_user(user_id)  # objects, docs, attempt links
@@ -203,16 +209,17 @@ async def erase_voice_data(fs: FirestoreService, bucket: Any, user_id: str) -> N
 
     await _strip_session_rows(fs, user_id, [("sources", "array_contains", SESSION_SOURCE)])
     await _strip_session_rows(fs, user_id, [("source", "==", SESSION_SOURCE)])  # rows with no ``sources`` list
-    await _strip_not_embeddable_reports(fs, user_id)
+    for field in (REPORTERS_FIELD, GUEST_REPORTERS_FIELD):
+        await _strip_not_embeddable_reports(fs, user_id, field)
 
 
-async def _strip_not_embeddable_reports(fs: FirestoreService, user_id: str) -> None:
-    """Remove the user from every ``voice_version_stats`` doc's ``not_embeddable_by``, page by page.
+async def _strip_not_embeddable_reports(fs: FirestoreService, user_id: str, field: str) -> None:
+    """Remove the user from every ``voice_version_stats`` doc's ``field`` reporter list, page by page.
 
     One transaction per doc, so a concurrent report by another user is not lost. A global
     ``embeddable = false`` the user's report helped set stays: it is a verdict on the video, not user data.
     """
-    by_user = [("not_embeddable_by", "array_contains", user_id)]
+    by_user = [(field, "array_contains", user_id)]
     previous: list[str] | None = None
     while docs := await _query_page(fs, VERSION_STATS_COLLECTION, by_user):
         ids = [str(d["id"]) for d in docs]
@@ -223,13 +230,13 @@ async def _strip_not_embeddable_reports(fs: FirestoreService, user_id: str) -> N
 
             async def strip(txn: Any, video_id: str = video_id) -> None:
                 doc = await txn.get(VERSION_STATS_COLLECTION, video_id)
-                if doc is None or user_id not in (doc.get("not_embeddable_by") or []):
+                if doc is None or user_id not in (doc.get(field) or []):
                     return
-                by = [u for u in doc["not_embeddable_by"] if u != user_id]
+                by = [u for u in doc[field] if u != user_id]
                 txn.set(
                     VERSION_STATS_COLLECTION,
                     video_id,
-                    {**{k: v for k, v in doc.items() if k != "id"}, "not_embeddable_by": by},
+                    {**{k: v for k, v in doc.items() if k != "id"}, field: by},
                 )
 
             await fs.run_transaction(strip)
