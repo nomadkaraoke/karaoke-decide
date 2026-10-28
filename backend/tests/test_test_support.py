@@ -638,3 +638,36 @@ def test_personal_seed_not_mounted_by_default(monkeypatch: pytest.MonkeyPatch) -
     for flag, env in ((False, "development"), (True, "production")):
         c = _app_with(monkeypatch, flag=flag, environment=env)
         assert c.post("/api/test/voice/personal-seed", json={"email": EMAIL}).status_code == 404
+
+
+def test_seed_get_made_lists_fixture_songs_and_reset_clears_dismissals(
+    client: TestClient,
+    fs: FakeFirestore,
+    reader: CatalogReader,  # noqa: F811
+) -> None:
+    class Store:
+        run = "fixture-run"
+
+        def require(self) -> CatalogReader:
+            return reader
+
+    songs = [
+        {"artist": "Fixture Artist 01", "title": "Fixture Song 01-01", "loved": True},
+        {"artist": "Fixture Artist 01", "title": "Fixture Song 01-02", "times_sung": 1},
+    ]
+    r = client.post("/api/test/get-made/seed", json={"email": EMAIL, "songs": songs})
+    assert r.status_code == 200, r.text
+    user_id, keys = r.json()["user_id"], r.json()["keys"]
+    assert keys == ["fixture artist 01|fixture song 01 01", "fixture artist 01|fixture song 01 02"]
+    assert not any(reader.has_karaoke_key(k) for k in keys)
+
+    app = client.app
+    app.dependency_overrides[get_current_user] = lambda: User(id=user_id)  # type: ignore[attr-defined]
+    app.dependency_overrides[get_catalog_store_dep] = lambda: Store()  # type: ignore[attr-defined]
+    got = client.get("/api/my/get-made").json()["items"]
+    assert [(i["key"], i["why"]) for i in got[:2]] == [(keys[0], "saved"), (keys[1], "sung")]
+
+    assert client.post(f"/api/my/get-made/{keys[0]}/dismiss").status_code == 204
+    assert fs.cols["user_make_dismissed"]
+    assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
+    assert not fs.cols["user_make_dismissed"]

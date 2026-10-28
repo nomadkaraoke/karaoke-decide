@@ -22,6 +22,7 @@ from karaoke_decide.song_search.text_normalize import song_key
 
 logger = logging.getLogger(__name__)
 # Ranked top artists: synced services, plus the imports (import_ingest_service) ranked by plays.
+# Also the listening sources that make a ``user_songs`` row "imported" (Get this made).
 _TOP_SOURCES = {
     "spotify",
     "lastfm",
@@ -33,6 +34,9 @@ _TOP_SOURCES = {
     "spotify_playlist",
     "youtube_music",
 }
+
+
+LISTENING_SOURCES = frozenset(_TOP_SOURCES)
 
 
 class HiddenKeysProvider(Protocol):
@@ -143,6 +147,41 @@ def _is_go_to(d: dict[str, Any]) -> bool:
     return feel != "bad" and (feel == "great" or (w.to_int(d.get("times_sung")) or 0) >= 2)
 
 
+def row_kn_keys(reader: CatalogReader, docs: list[dict[str, Any]]) -> dict[int, str]:
+    """catalog.db ``kn_song_map`` keys of the rows' numeric (KaraokeNerds) ``song_id``s, for ``row_key``."""
+    return reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
+
+
+def row_key(reader: CatalogReader, d: dict[str, Any], kn_keys: dict[int, str]) -> tuple[str, bool] | None:
+    """``(key, has_karaoke)`` of one ``user_songs`` row, or None when it has no key.
+
+    The key is the row's KaraokeNerds mapping (``kn_keys`` from ``row_kn_keys``; always a karaoke
+    song), else its stored ``song_key``, else ``song_key(artist, title)``; those have a karaoke
+    version when ``has_karaoke_key`` or ``match_kn`` finds one."""
+    artist, title = d.get("artist") or "", d.get("title") or ""
+    kn_id = _kn_id(d.get("song_id"))
+    key: str | None = kn_keys.get(kn_id) if kn_id is not None else None
+    if key is not None:
+        return key, True
+    stored = d.get("song_key")
+    key = str(stored) if isinstance(stored, str) and stored else None
+    if key is None and artist and title:
+        key = song_key(artist, title)
+    if key is None:
+        return None
+    return key, reader.has_karaoke_key(key) or reader.match_kn(artist, title) is not None
+
+
+def row_weight(d: dict[str, Any]) -> float:
+    """The row's recs weight: the max of its best source, its voice-session label and its karaoke history."""
+    return max(_base_weight(d), w.session_song_weight(d) or 0.0, w.sung_song_weight(d) or 0.0)
+
+
+def row_sources(d: dict[str, Any]) -> list[str]:
+    """The row's ``sources`` (``source`` alone on rows written before the field existed)."""
+    return _row_sources(d)
+
+
 def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     """Map the user's songs to catalog keys: weights, songs with no karaoke version, songs per
     artist key, voice-session "would not sing" and survey "bad" keys, go-tos and key hints.
@@ -157,7 +196,7 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     it in ``survey_no``, out of the known songs (loved or not) and out of its artist's count. A row
     whose only source is ``voice_session`` has no base weight (known only through a label) and counts
     toward its artist only once loved ("Love it", as a manual love does)."""
-    kn_keys = reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
+    kn_keys = row_kn_keys(reader, docs)
     known: dict[str, float] = {}
     no_karaoke: dict[str, tuple[str, str, str]] = {}
     artist_songs: dict[str, set[str]] = {}
@@ -168,17 +207,10 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     own_key_answered: set[str] = set()
     for d in docs:
         artist, title = d.get("artist") or "", d.get("title") or ""
-        kn_id = _kn_id(d.get("song_id"))
-        key: str | None = kn_keys.get(kn_id) if kn_id is not None else None
-        has_karaoke = key is not None
-        if key is None:
-            stored = d.get("song_key")
-            key = str(stored) if isinstance(stored, str) and stored else None
-            if key is None and artist and title:
-                key = song_key(artist, title)
-            if key is None:
-                continue
-            has_karaoke = reader.has_karaoke_key(key) or reader.match_kn(artist, title) is not None
+        keyed = row_key(reader, d, kn_keys)
+        if keyed is None:
+            continue
+        key, has_karaoke = keyed
         if d.get("session_would_sing") == "no":
             session_no.add(key)
         if d.get("sung_feel_latest") == "bad":
@@ -190,7 +222,7 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
         hint = KEY_HINT_SEMITONES.get(str(d.get("sung_key_latest")))
         if hint is not None:
             key_hints[key] = hint
-        weight = max(_base_weight(d), w.session_song_weight(d) or 0.0, w.sung_song_weight(d) or 0.0)
+        weight = row_weight(d)
         if weight > 0:  # a voice_session-only row is known only through a session label
             known[key] = max(known.get(key, 0.0), weight)
             if not has_karaoke:

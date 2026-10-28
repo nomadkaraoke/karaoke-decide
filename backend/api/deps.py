@@ -13,6 +13,7 @@ from backend.services.catalog_lookup import CatalogLookup, get_catalog_lookup
 from backend.services.catalog_store import CatalogStore, get_catalog_store
 from backend.services.firestore_service import FirestoreService
 from backend.services.gen_session import GenSessionError, get_gen_session_validator, is_gen_token
+from backend.services.get_made_service import GetMadeService
 from backend.services.guest_claim_service import GuestClaimService
 from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import KaraokeLogService
@@ -324,6 +325,16 @@ async def get_library_service(
     return LibraryService(firestore, feedback, playlists, store)
 
 
+async def get_get_made_service(
+    firestore: Annotated[FirestoreService, Depends(get_firestore)],
+    store: Annotated[CatalogStore, Depends(get_catalog_store_dep)],
+    recs: Annotated[RecommendationServiceV2, Depends(get_recommendation_service_v2_dep)],
+    hidden: Annotated[HiddenKeysProvider, Depends(get_hidden_keys_provider)],
+) -> GetMadeService:
+    """Get this made: the user's songs with no karaoke version, topped up with recs make_it."""
+    return GetMadeService(firestore, store, recs, hidden)
+
+
 async def get_voice_profile_service(
     firestore: Annotated[FirestoreService, Depends(get_firestore)],
 ) -> VoiceProfileService:
@@ -402,6 +413,7 @@ UserDataServiceDep = Annotated[UserDataService, Depends(get_user_data_service_de
 GuestClaimServiceDep = Annotated[GuestClaimService, Depends(get_guest_claim_service_dep)]
 KaraokeLogServiceDep = Annotated[KaraokeLogService, Depends(get_karaoke_log_service)]
 LibraryServiceDep = Annotated[LibraryService, Depends(get_library_service)]
+GetMadeServiceDep = Annotated[GetMadeService, Depends(get_get_made_service)]
 ImportIngestServiceDep = Annotated[ImportIngestService, Depends(get_import_ingest_service_dep)]
 VoiceProfileServiceDep = Annotated[VoiceProfileService, Depends(get_voice_profile_service)]
 VoiceDataStoreDep = Annotated[VoiceDataStore, Depends(get_voice_store)]

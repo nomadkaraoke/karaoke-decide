@@ -36,6 +36,7 @@ from backend.models.karaoke_log import KaraokeLogEntry
 from backend.models.voice_session import NoteLabelIn, PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
 from backend.services.auth_service import AuthService
 from backend.services.firestore_service import FirestoreService
+from backend.services.get_made_service import DISMISSED_COLLECTION as MAKE_DISMISSED
 from backend.services.import_ingest_service import ImportIngestService
 from backend.services.karaoke_log_service import (
     LOG_COLLECTION,
@@ -47,7 +48,12 @@ from backend.services.karaoke_log_service import (
 from backend.services.listenbrainz_poller import ListenBrainzPoller, PollReport
 from backend.services.music_service_service import MusicServiceService
 from backend.services.playlist_service import PlaylistService
-from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION, SongFeedbackService
+from backend.services.song_feedback_service import (
+    HIDDEN_COLLECTION,
+    USER_SONGS_COLLECTION,
+    SongFeedbackService,
+    loved_doc_id,
+)
 from backend.services.user_deletion import erase_voice_data
 from backend.services.voice_data_store import VoiceDataStore, VoiceDataUnavailable
 from backend.services.voice_pool_service import BATCHES_COLLECTION as PERSONAL_BATCHES
@@ -58,6 +64,7 @@ from backend.services.voice_profile_service import VoiceProfileIn, VoiceProfileO
 from backend.services.voice_recording_service import RECORDINGS_COLLECTION, user_prefix
 from backend.services.voice_session_service import ATTEMPTS_COLLECTION, SESSIONS_COLLECTION
 from karaoke_decide.catalog import fixtures as catalog_fixtures
+from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 from karaoke_decide.voice_pool import fixtures as voice_fixtures
 from karaoke_decide.voice_pool.queue import FETCH_COLLECTION
 
@@ -75,6 +82,7 @@ USER_OWNED = (
     LOG_COLLECTION,
     UNRESOLVED_COLLECTION,
     PlaylistService.PLAYLISTS_COLLECTION,  # doc id == the playlist's own ``id`` field
+    MAKE_DISMISSED,  # Get this made dismissals
 )
 
 FirestoreDep = Annotated[FirestoreService, Depends(get_firestore)]
@@ -529,6 +537,53 @@ async def seed_karaoke_log(
         except KaraokeLogError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.code) from exc
     return {"user_id": user.id, "count": len(body.entries)}
+
+
+class GetMadeSeedSong(BaseModel):
+    artist: str
+    title: str
+    song_key: str | None = None
+    loved: bool = False
+    times_sung: int = Field(default=0, ge=0)
+
+
+class GetMadeSeedBody(BaseModel):
+    email: str
+    songs: list[GetMadeSeedSong]
+
+
+@router.post("/get-made/seed")
+async def seed_get_made(body: GetMadeSeedBody, fs: FirestoreDep, auth: AuthDep) -> dict[str, Any]:
+    """Write ``user_songs`` rows (loved and / or sung) for songs with no karaoke version, so
+    ``GET /api/my/get-made`` lists them. Use the fixture catalog's "Fixture Artist NN / Fixture
+    Song NN-MM" rows (``in_kn = 0``, not in availability.db). Rows are keyed like "Love it" rows
+    (``loved_doc_id``), so a re-seed overwrites the same row; other data is left alone."""
+    user = await auth.resolve_gen_user(body.email)
+    now = datetime.now(UTC).isoformat()
+    keys: list[str] = []
+    for song in body.songs:
+        key = song.song_key or make_song_key(song.artist, song.title)
+        keys.append(key)
+        await fs.set_document(
+            USER_SONGS_COLLECTION,
+            loved_doc_id(user.id, key),
+            {
+                "user_id": user.id,
+                "song_id": key,
+                "song_key": key,
+                "artist": song.artist,
+                "title": song.title,
+                "source": "manual" if song.loved else "karaoke_log",
+                "loved": song.loved,
+                "times_sung": song.times_sung,
+                "last_sung_at": now if song.times_sung else None,
+                "play_count": 0,
+                "is_saved": False,
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+    return {"user_id": user.id, "keys": keys}
 
 
 @router.get("/karaoke-log")
