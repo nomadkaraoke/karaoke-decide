@@ -78,7 +78,7 @@ Catalog-backed, explained recommendations (auth: decide JWT or gen session token
 `sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
 
 ```json
-{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}, "fit": {"bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "notes"}}]}],
+{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}, "fit": {"bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "notes"}, "crowd": null}]}],
  "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000", "voice": {"has_profile": true, "method": "mic"}}
 ```
 
@@ -86,11 +86,11 @@ Vocal fit (needs a voice profile, `PUT /api/my/voice`): each song's `fit` is `{b
 
 Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded. `GET /api/my/recommendations/categorized` (v1) is unchanged and keeps working.
 
-Crowd: each song carries `crowd` (the `SongCrowd` figure below, from one batch read of `song_crowd_stats` for the page) or `null` when the song has no stats or the read failed (logged at WARNING; the page still returns). Within `crowd_pleasers` only, songs whose `crowd_pleaser_share >= 0.5` move to the front (stable). When at least 60% of 5+ singers in the viewer's voice bucket found a song too high (or too low), its in-key fit shifts -2 (or +2) like the user's own key hint; the user's own hint always wins.
+Crowd: each song carries `crowd` (the `SongCrowd` figure below, from one batch read of `song_crowd_stats` for the page) or `null` when the song has no stats or the read failed (logged at WARNING; the page still returns). Within `crowd_pleasers` only, songs whose `crowd_pleaser_share >= 0.5` move to the front (stable). When at least 60% of 5+ singers in the viewer's voice bucket found a song too high (or too low), its in-key fit shifts -2 (or +2) like the user's own key hint; any key answer of the user's own ("right" included) always wins.
 
 ### GET /api/songs/{song_key}/crowd
 
-How other singers found a song's key (auth required; `song_key` percent-encoded). Returns `{singers, comfortable_share, too_high_share, too_low_share, bucket, bucket_singers, bucket_comfortable_share, crowd_pleaser_share}`. Thresholds are applied server-side: the overall fields are `null` below 5 key answers; the bucket fields are `null` unless the viewer's voice type (bass ... soprano) has 5+ answers; `crowd_pleaser_share` is `null` below 5 crowd-pleaser answers. An unknown song returns all `null`.
+How other singers found a song's key (auth required; `song_key` percent-encoded). Returns `{singers, comfortable_share, too_high_share, too_low_share, bucket, bucket_singers, bucket_comfortable_share, crowd_pleaser_share}`. Thresholds are applied server-side: the overall fields are `null` below 5 key answers; the bucket fields are `null` unless the viewer's voice type (bass ... soprano) has 5+ answers; `crowd_pleaser_share` is `null` below 5 crowd-pleaser answers. An unknown song returns all `null`. Stats docs live at `song_crowd_stats/{crowd_doc_id(song_key)}` (sha1 hex, 32 chars) with the `song_key` as a field.
 
 ### Song feedback: /api/my/songs
 

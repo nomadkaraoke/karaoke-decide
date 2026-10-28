@@ -16,6 +16,7 @@ from backend.api.deps import get_catalog_store_dep as get_store_dep
 from backend.api.deps import get_current_user, get_firestore, get_hidden_keys_provider
 from backend.main import app
 from backend.services.catalog_store import CatalogUnavailable
+from backend.services.crowd_stats import crowd_doc_id
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
 
@@ -56,7 +57,8 @@ def _firestore(
         fs.get_many_calls.append((collection, list(ids)))
         if isinstance(crowd, Exception):
             raise crowd
-        return {i: (crowd or {})[i] for i in ids if i in (crowd or {})}
+        stored = {crowd_doc_id(k): v for k, v in (crowd or {}).items()}  # R23: hashed doc ids
+        return {i: stored[i] for i in ids if i in stored}
 
     fs.get_many = AsyncMock(side_effect=get_many)
 
@@ -318,7 +320,7 @@ def test_recs_attach_crowd_and_reorder_crowd_pleasers(
     # one batch read for every song on the page
     calls = fs_out[0].get_many_calls
     assert len(calls) == 1 and calls[0][0] == "song_crowd_stats"
-    assert set(calls[0][1]) == {s["song_key"] for s in _songs(body)}
+    assert set(calls[0][1]) == {crowd_doc_id(s["song_key"]) for s in _songs(body)}
     # other sections keep their order
     others = [sec for sec in body["sections"] if sec["id"] != "crowd_pleasers"]
     base_body = make_client(user_doc=doc).get(URL).json()

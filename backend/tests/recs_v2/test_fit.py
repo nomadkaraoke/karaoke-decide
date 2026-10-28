@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_catalog_store_dep as get_store_dep
 from backend.api.deps import get_current_user, get_firestore, get_hidden_keys_provider
 from backend.main import app
+from backend.services.crowd_stats import crowd_doc_id
 from backend.services.recs_v2 import service as svc
 from backend.services.recs_v2 import weights as w
 from backend.services.recs_v2.candidates import Candidate
@@ -533,7 +534,8 @@ def _crowd_fs(rows: list[dict[str, Any]], crowd: dict[str, dict[str, Any]]) -> M
 
     async def get_many(collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
         assert collection == "song_crowd_stats"
-        return {i: crowd[i] for i in ids if i in crowd}
+        stored = {crowd_doc_id(k): v for k, v in crowd.items()}  # R23: hashed doc ids
+        return {i: stored[i] for i in ids if i in stored}
 
     fs.query_documents = AsyncMock(side_effect=query)
     fs.get_many = AsyncMock(side_effect=get_many)
@@ -577,3 +579,11 @@ async def test_own_key_hint_beats_crowd_hint(reader: CatalogReader) -> None:
                      "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "too_low"}]  # fmt: skip
     song = await _starlight_fit(rows, {STARLIGHT: _bucket_stats("baritone", right=0, too_high=5)}, reader)
     assert (song.fit.bucket, song.fit.transpose) == ("fitsIn", 2)
+
+
+async def test_own_right_answer_beats_crowd_hint(reader: CatalogReader) -> None:
+    """The user's latest key answer was "right": the crowd's "too high" never shifts it."""
+    rows: list[dict[str, Any]] = [*SONGS, {"user_id": "guest_fit", "artist": "Muse", "title": "Starlight", "source": "karaoke_log",
+                     "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "right"}]  # fmt: skip
+    song = await _starlight_fit(rows, {STARLIGHT: _bucket_stats("baritone", right=0, too_high=5)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fits", 0)

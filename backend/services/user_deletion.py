@@ -124,7 +124,7 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         VERSION_STATS_COLLECTION,
         # voice_personal_budget/{YYYY-MM}: the month's estimated personal-pool spend (totals only, no user).
         PERSONAL_BUDGET,
-        CROWD_COLLECTION,  # song_crowd_stats/{song_key}: aggregate counts; ≥5-singer threshold; no user ids
+        CROWD_COLLECTION,  # song_crowd_stats/{crowd_doc_id(song_key)}: aggregate counts; ≥5-singer threshold; no user ids
     }
 )
 

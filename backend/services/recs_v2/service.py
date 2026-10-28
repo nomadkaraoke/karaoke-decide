@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from backend.services.crowd_stats import (
     CROWD_COLLECTION,
     SongCrowd,
+    crowd_doc_id,
     crowd_figure,
     crowd_key_hint,
     voice_bucket,
@@ -287,20 +288,20 @@ class RecommendationServiceV2:
     async def _crowd_stats(self, user_id: str, keys: list[str]) -> dict[str, dict[str, Any]] | None:
         """The ``song_crowd_stats`` docs of ``keys`` in one batch read; None when the read fails.
 
-        Keys holding ``/`` can't be Firestore doc ids (and so have no stats); they are skipped."""
-        ids = list(dict.fromkeys(k for k in keys if k and "/" not in k))
-        if not ids:
+        Docs are keyed by ``crowd_doc_id(song_key)`` (R23); the result is keyed by song_key."""
+        by_id = {crowd_doc_id(k): k for k in dict.fromkeys(k for k in keys if k)}
+        if not by_id:
             return {}
         started = _now()
         try:
-            docs = await self._firestore.get_many(CROWD_COLLECTION, ids)
+            found = await self._firestore.get_many(CROWD_COLLECTION, list(by_id))
         except Exception:
             logger.warning("crowd stats read failed for %s; recommending without crowd", user_id, exc_info=True)
             return None
         ms = (_now() - started) * 1000
         if ms > CROWD_SLOW_MS:
-            logger.info("crowd stats read took %.0f ms for %d songs", ms, len(ids))
-        return docs
+            logger.info("crowd stats read took %.0f ms for %d songs", ms, len(by_id))
+        return {by_id[i]: doc for i, doc in found.items() if i in by_id}
 
     async def recommend(
         self,
@@ -336,7 +337,9 @@ class RecommendationServiceV2:
         stats = await self._crowd_stats(user.id, [s.c.song_key for sec in sections for s in sec.songs])
         bucket = voice_bucket({"voice_type": profile.voice_type}) if profile else None
         crowd = {k: crowd_figure(doc, bucket) for k, doc in (stats or {}).items()}
-        key_hints = {**_crowd_key_hints(stats or {}, bucket), **ctx.key_hints}  # the user's own hint wins
+        crowd_hints = _crowd_key_hints(stats or {}, bucket)
+        # the user's own latest key answer (a "right" too) always beats the crowd's
+        key_hints = {**{k: h for k, h in crowd_hints.items() if k not in ctx.own_key_answered}, **ctx.key_hints}
         _crowd_first(sections, crowd)
 
         return RecommendationsV2Response(

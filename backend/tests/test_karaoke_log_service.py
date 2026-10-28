@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from backend.services.catalog_lookup import CatalogLookup
+from backend.services.crowd_stats import crowd_doc_id
 from backend.services.karaoke_log_service import (
     LOG_COLLECTION,
     UNRESOLVED_COLLECTION,
@@ -790,7 +791,7 @@ def _row(fs: MemoryFirestore) -> dict[str, Any]:
 
 
 def _crowd(fs: MemoryFirestore) -> dict[str, Any] | None:
-    return fs.cols.get(CROWD, {}).get(HELLO_KEY)
+    return fs.cols.get(CROWD, {}).get(crowd_doc_id(HELLO_KEY))
 
 
 @pytest.mark.asyncio
@@ -1040,7 +1041,8 @@ async def test_retry_unresolved_lands_survey_and_vote(
     assert row["sung_surveys"][APP_ID]["key"] == "too_high"
     assert row["sung_surveys"][APP_ID]["at"]["key"] == T1
     assert row["crowd_bucket"] == "tenor"
-    stats = fs.cols[CROWD][late_key]
+    stats = fs.cols[CROWD][crowd_doc_id(late_key)]
+    assert stats["song_key"] == late_key  # R23: hashed doc id, key kept as a field
     assert stats["total"]["too_high"] == 1 and stats["by_bucket"]["tenor"]["too_high"] == 1
     assert not fs.cols.get(UNRESOLVED_COLLECTION)
 
@@ -1071,7 +1073,7 @@ async def test_song_a_to_song_b_moves_one_vote(svc: KaraokeLogService, fs: Memor
     await svc.upsert_user(USER, APP_ID, _app_entry(survey={"key": "too_low", "answered_at": T1}), email=EMAIL)
     await svc.upsert_user(USER, APP_ID, {"title": "Glass Meridian", "song_key": OTHER_KEY}, email=EMAIL)
     assert loved_doc_id(USER, HELLO_KEY) not in fs.user_songs()
-    a, b = fs.cols[CROWD][HELLO_KEY], fs.cols[CROWD][OTHER_KEY]
+    a, b = fs.cols[CROWD][crowd_doc_id(HELLO_KEY)], fs.cols[CROWD][crowd_doc_id(OTHER_KEY)]
     assert a["total"]["too_low"] == 0 and a["by_bucket"]["alto"]["too_low"] == 0
     assert b["total"]["too_low"] == 1 and b["by_bucket"]["alto"]["too_low"] == 1
     row_b = fs.user_songs()[loved_doc_id(USER, OTHER_KEY)]

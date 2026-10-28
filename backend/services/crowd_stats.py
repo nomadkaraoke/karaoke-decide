@@ -1,6 +1,7 @@
 """Crowd stats: how other singers found a song's key, one vote per singer per song (spec 6.7).
 
-``song_crowd_stats/{song_key}`` holds aggregate counts only, never user ids:
+``song_crowd_stats/{crowd_doc_id(song_key)}`` holds aggregate counts only, never user ids
+(ruling R23: the doc id is a hash, since a song_key may hold ``/``; ``song_key`` is a field):
 
 * ``total``: ``{too_low, right, too_high}``, each singer's latest key answer;
 * ``by_bucket.<bucket>``: the same, split by the singer's voice type (bass ... soprano); singers
@@ -16,6 +17,7 @@ Thresholds (``CROWD_MIN_SINGERS``, ``CROWD_MIN_BUCKET``) are applied by readers,
 
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -31,6 +33,13 @@ CROWD_KEY_HINT_SHARE = 0.6
 CROWD_KEY_HINT_SEMITONES = {"too_high": -2, "too_low": 2}
 
 Vote = tuple[str | None, str | None]  # (key_answer, bucket)
+
+
+def crowd_doc_id(song_key: str) -> str:
+    """The ``song_crowd_stats`` doc id of a song (R23): sha1 of the song_key, 32 hex chars.
+
+    Firestore ids can't hold ``/`` and song keys can; every reader and writer goes through this."""
+    return hashlib.sha1(song_key.encode("utf-8"), usedforsecurity=False).hexdigest()[:32]
 
 
 def voice_bucket(profile: dict[str, Any] | None) -> str | None:

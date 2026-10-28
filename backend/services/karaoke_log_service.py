@@ -52,7 +52,14 @@ from pydantic import ValidationError
 
 from backend.models.karaoke_log import KaraokeLogEntry, LogMedia, LogNight, Survey
 from backend.services.catalog_lookup import CatalogLookup, get_catalog_lookup
-from backend.services.crowd_stats import CROWD_COLLECTION, Vote, apply_pleaser, apply_vote, voice_bucket
+from backend.services.crowd_stats import (
+    CROWD_COLLECTION,
+    Vote,
+    apply_pleaser,
+    apply_vote,
+    crowd_doc_id,
+    voice_bucket,
+)
 from backend.services.song_feedback_service import (
     USER_SONGS_COLLECTION,
     choose_user_song_row,
@@ -671,7 +678,7 @@ class KaraokeLogService:
                 song_key = (after or before or {}).get("song_key")
                 if song_key and (moves[0] != moves[1] or moves[2] != moves[3]):
                     crowd.setdefault(str(song_key), []).append(moves)
-            stats = {k: await txn.get(CROWD_COLLECTION, k) for k in crowd}
+            stats = {k: await txn.get(CROWD_COLLECTION, crowd_doc_id(k)) for k in crowd}
             # all reads done; writes from here on
             for t, doc in final.items():
                 if doc is None:
@@ -683,7 +690,7 @@ class KaraokeLogService:
                 for old_vote, new_vote, old_pleaser, new_pleaser in changes:
                     s = apply_vote(s, old_vote, new_vote, now)
                     s = apply_pleaser(s, old_pleaser, new_pleaser, now)
-                txn.set(CROWD_COLLECTION, k, s)
+                txn.set(CROWD_COLLECTION, crowd_doc_id(k), s)
             if new_target:
                 new["counted"] = {"collection": new_target[0], "doc_id": new_target[1], "times": new_times}
             else:

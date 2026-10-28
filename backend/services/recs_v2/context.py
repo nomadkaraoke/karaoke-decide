@@ -63,6 +63,8 @@ class UserContextV2:
     go_tos: set[str] = field(default_factory=set)
     # song_key -> semitones to shift the key by, from the latest "key" survey answer.
     key_hints: dict[str, int] = field(default_factory=dict)
+    # Songs with any latest "key" answer (right included): a crowd key hint never overrides these.
+    own_key_answered: set[str] = field(default_factory=set)
     genres: set[str] = field(default_factory=set)
     decades: set[str] = field(default_factory=set)
     energy_pref: Literal["chill", "medium", "high"] | None = None
@@ -131,6 +133,7 @@ class _SongMap:
     survey_no: set[str]
     go_tos: set[str]  # before hidden songs are removed (build_context)
     key_hints: dict[str, int]
+    own_key_answered: set[str]
 
 
 def _is_go_to(d: dict[str, Any]) -> bool:
@@ -162,6 +165,7 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     survey_no: set[str] = set()
     go_tos: set[str] = set()
     key_hints: dict[str, int] = {}
+    own_key_answered: set[str] = set()
     for d in docs:
         artist, title = d.get("artist") or "", d.get("title") or ""
         kn_id = _kn_id(d.get("song_id"))
@@ -181,6 +185,8 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
             survey_no.add(key)
         elif _is_go_to(d):
             go_tos.add(key)
+        if d.get("sung_key_latest"):
+            own_key_answered.add(key)
         hint = KEY_HINT_SEMITONES.get(str(d.get("sung_key_latest")))
         if hint is not None:
             key_hints[key] = hint
@@ -198,7 +204,9 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
         no_karaoke.pop(key, None)
     go_tos -= survey_no
     counts = {k: n for k, v in artist_songs.items() if (n := len(v - survey_no))}
-    return _SongMap(known, list(no_karaoke.values()), counts, session_no, survey_no, go_tos, key_hints)
+    return _SongMap(
+        known, list(no_karaoke.values()), counts, session_no, survey_no, go_tos, key_hints, own_key_answered
+    )
 
 
 async def _hidden(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
@@ -225,6 +233,7 @@ async def build_context(
     ctx.known_songs, ctx.known_without_karaoke = songs.known, songs.no_karaoke
     ctx.session_no, ctx.survey_no, ctx.key_hints = songs.session_no, songs.survey_no, songs.key_hints
     ctx.go_tos = songs.go_tos - ctx.hidden
+    ctx.own_key_answered = songs.own_key_answered
     songs_per_artist = songs.songs_per_artist
 
     artists = ctx.artists

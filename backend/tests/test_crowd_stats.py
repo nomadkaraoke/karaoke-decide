@@ -12,6 +12,7 @@ from backend.services.crowd_stats import (
     SongCrowd,
     apply_pleaser,
     apply_vote,
+    crowd_doc_id,
     crowd_figure,
     crowd_key_hint,
     voice_bucket,
@@ -164,3 +165,13 @@ def test_crowd_key_hint() -> None:
     assert crowd_key_hint(few, "tenor") is None  # 4 in the bucket < CROWD_MIN_BUCKET
     assert crowd_key_hint(hi, None) is None
     assert crowd_key_hint(None, "tenor") is None
+
+
+def test_crowd_doc_id() -> None:
+    """R23: sha1(song_key) hex, 32 chars; no '/' whatever the key holds; stable."""
+    import hashlib
+
+    key = "ac/dc|back in black"
+    assert crowd_doc_id(key) == hashlib.sha1(key.encode()).hexdigest()[:32]
+    assert len(crowd_doc_id(key)) == 32 and "/" not in crowd_doc_id(key)
+    assert crowd_doc_id(key) == crowd_doc_id(key) != crowd_doc_id("ac dc|back in black")
