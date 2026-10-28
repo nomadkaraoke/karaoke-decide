@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Bạn đã từng hát bài này",
       "crowd_pleaser": "Khuấy động không khí",
       "decade_match": "Từ thập niên bạn thích",
       "genre_match": "Hợp thể loại nhạc bạn thích",
@@ -893,6 +894,10 @@
       "similar_artist": "Tương tự {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Bài tủ của bạn",
+        "reason": "Những bài hát bạn đã từng hát và yêu thích"
+      },
       "all": {
         "reason": "Tất cả bài hát phù hợp, theo thứ tự bạn đã chọn",
         "title": "Tất cả gợi ý"

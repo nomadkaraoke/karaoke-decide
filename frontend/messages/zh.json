@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "你唱过这首歌",
       "crowd_pleaser": "全场大合唱金曲",
       "decade_match": "来自你喜欢的年代",
       "genre_match": "符合你的曲风偏好",
@@ -893,6 +894,10 @@
       "similar_artist": "风格类似 {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "拿手曲目",
+        "reason": "你唱过且喜爱的拿手好歌"
+      },
       "all": {
         "reason": "所有匹配歌曲，按你选择的顺序排列",
         "title": "所有精选"

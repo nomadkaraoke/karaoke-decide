@@ -16,6 +16,7 @@ from backend.services.recs_v2.filters import Sort
 from backend.services.recs_v2.scoring import Scored
 
 SECTION_LIMITS: dict[str, int] = {
+    "go_tos": 10,
     "songs_you_know": 10,
     "artists_you_love": 15,
     "because": 10,
@@ -69,7 +70,12 @@ def because_seeds(remaining: list[Scored], ctx: UserContextV2) -> list[str]:
     counts: Counter[str] = Counter()
     for s in remaining:
         seed = s.c.similar_via
-        if not seed or not _discovery(s, ctx) or per_artist[(seed, s.c.artist_key)] >= PER_ARTIST:
+        if (
+            not seed
+            or not _discovery(s, ctx)
+            or s.c.song_key in ctx.survey_no
+            or per_artist[(seed, s.c.artist_key)] >= PER_ARTIST
+        ):
             continue
         per_artist[(seed, s.c.artist_key)] += 1
         counts[seed] += 1
@@ -88,7 +94,7 @@ def _discovery(s: Scored, ctx: UserContextV2) -> bool:
 
 
 def _similar_to(seed: str, ctx: UserContextV2) -> Callable[[Scored], bool]:
-    return lambda s: _discovery(s, ctx) and s.c.similar_via == seed
+    return lambda s: _discovery(s, ctx) and s.c.similar_via == seed and s.c.song_key not in ctx.survey_no
 
 
 def _fill(slots: list[_Slot], songs: list[Scored]) -> list[Scored]:
@@ -101,10 +107,12 @@ def _fill(slots: list[_Slot], songs: list[Scored]) -> list[Scored]:
 
 
 def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
-    """Greedy placement in score order. Known songs only go to ``songs_you_know`` (or ``make_it``
-    when there is no karaoke version); the other shelves are for discovery.
+    """Greedy placement in score order. Go-tos (karaoke songs in ``ctx.go_tos``) lead in their own
+    shelf, and those past its limit or per-artist cap fall through to ``songs_you_know`` (ruling R21;
+    ``_fill`` still places each song once); other known songs only go to ``songs_you_know`` (or
+    ``make_it`` when there is no karaoke version); the other shelves are for discovery. Survey-"bad" songs never fill a ``because_*`` shelf.
 
-    Two passes give the same result as one (a song's fate in the first two shelves never depends on
+    Two passes give the same result as one (a song's fate in the first three shelves never depends on
     later ones), and the second pass picks ``because_*`` seeds from what is actually left."""
     cold = ctx.is_cold
 
@@ -115,6 +123,11 @@ def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
 
     ordered = [s for s in sorted(scored, key=lambda s: (-s.score, s.c.song_key)) if s.c.song_key not in ctx.hidden]
     first = [
+        _Slot(
+            _section("go_tos"),
+            SECTION_LIMITS["go_tos"],
+            lambda s: s.c.has_karaoke and s.c.song_key in ctx.go_tos,
+        ),
         _Slot(
             _section("songs_you_know"),
             SECTION_LIMITS["songs_you_know"],

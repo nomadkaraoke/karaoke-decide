@@ -21,7 +21,9 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from backend.services.auth_service import AuthService
+from backend.services.crowd_stats import CROWD_COLLECTION
 from backend.services.firestore_service import FirestoreService
+from backend.services.get_made_service import DISMISSED_COLLECTION as MAKE_DISMISSED
 from backend.services.import_ingest_service import (
     EXPORT_ARTISTS_COLLECTION,
     IMPORTS_COLLECTION,
@@ -100,6 +102,7 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     UserDataStore(SyncService.SPOTIFY_PLAYLIST_IMPORTS_COLLECTION, "doc_id_user_id"),  # rate counter per user
     UserDataStore(SyncService.YOUTUBE_MUSIC_IMPORTS_COLLECTION, "doc_id_user_id"),  # rate counter per user
     UserDataStore(PlaylistService.PLAYLISTS_COLLECTION, "user_id_field"),  # the user's playlists, user_id field
+    UserDataStore(MAKE_DISMISSED, "user_id_field"),  # user_make_dismissed/{user_id}:{sha1(key)[:24]}, user_id field
     UserDataStore(SYNC_JOBS_COLLECTION, "user_id_field"),  # music-service sync jobs and their results, user_id field
     # Sign-in records keyed by email.
     UserDataStore(AuthService.MAGIC_LINKS_COLLECTION, "email_field", "email"),  # magic_links/{token}, email field
@@ -123,6 +126,7 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         VERSION_STATS_COLLECTION,
         # voice_personal_budget/{YYYY-MM}: the month's estimated personal-pool spend (totals only, no user).
         PERSONAL_BUDGET,
+        CROWD_COLLECTION,  # song_crowd_stats/{crowd_doc_id(song_key)}: aggregate counts; ≥5-singer threshold; no user ids
     }
 )
 

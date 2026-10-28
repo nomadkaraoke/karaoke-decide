@@ -20,6 +20,7 @@ from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.metabrainz_oauth import MetaBrainzInvalidGrantError, MetaBrainzOAuth
 from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError
+from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
 if TYPE_CHECKING:
     from backend.services.token_cipher import TokenCipher
@@ -277,6 +278,25 @@ class MusicServiceService:
         queries on ``user_artists`` / ``user_songs`` by each row's primary ``source``."""
         conns = await self.firestore.query_documents(self.SERVICES_COLLECTION, filters=[("user_id", "==", user_id)])
         return await self._summaries(user_id, conns)
+
+    async def count_known_songs(self, user_id: str) -> int:
+        """The user's distinct songs the recommender treats as known: rows deduped by ``song_key``
+        (a song can sit on both a ``sk:`` and a catalog-id row), counted when loved or when the best
+        of its sources has a positive weight. Voice-session-only unloved rows weigh 0."""
+        from backend.services.recs_v2.context import _base_weight
+        from backend.services.song_feedback_service import is_loved
+
+        docs = await self.firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
+        keys: set[str] = set()
+        empty = "u:" + make_song_key("", "")
+        for d in docs:
+            artist, title = d.get("artist") or "", d.get("title") or ""
+            if not d.get("song_key") and not (artist and title):
+                continue  # no identity: not a song
+            key = d.get("song_key") or ("u:" + make_song_key(artist, title))
+            if key != empty and (is_loved(d) or _base_weight(d) > 0):
+                keys.add(str(key))
+        return len(keys)
 
     async def get_services_with_summaries(self, user_id: str) -> tuple[list[MusicService], list[dict[str, Any]]]:
         """``get_user_services`` plus ``get_source_summaries`` from one ``music_services`` query."""

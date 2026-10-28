@@ -3,6 +3,7 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import asyncio
 import html
 import logging
 import re
@@ -37,7 +38,11 @@ from backend.services.catalog_lookup import CatalogLookup
 from backend.services.cloud_tasks_service import get_cloud_tasks_service
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import ImportSource
-from backend.services.music_service_service import ListenBrainzTokenUnavailableError, MusicServiceError
+from backend.services.music_service_service import (
+    ListenBrainzTokenUnavailableError,
+    MusicServiceError,
+    MusicServiceService,
+)
 from backend.services.screenshot_import_service import (
     MAX_CONFIRM_ITEMS,
     MAX_IMAGE_BYTES,
@@ -289,6 +294,7 @@ class SourceSummary(BaseModel):
 class SourcesSummaryResponse(BaseModel):
     sources: list[SourceSummary]
     capabilities: Capabilities
+    known_songs: int = 0  # distinct songs across all sources (deduped by song_key)
 
 
 class RemoveDataResponse(BaseModel):
@@ -303,6 +309,15 @@ def _capabilities(settings: BackendSettings) -> Capabilities:
     )
 
 
+async def _known_songs(music_service: MusicServiceService, user_id: str) -> int:
+    """``count_known_songs``, or 0 when it fails (the rest of the summary still answers)."""
+    try:
+        return await music_service.count_known_songs(user_id)
+    except Exception:
+        logger.warning("known_songs count failed for %s; summary reports 0", user_id, exc_info=True)
+        return 0
+
+
 @router.get("/summary", response_model=SourcesSummaryResponse)
 async def get_sources_summary(
     user: VerifiedUser,
@@ -310,8 +325,12 @@ async def get_sources_summary(
     settings: Settings,
 ) -> SourcesSummaryResponse:
     """Every connected or imported source with its counts and status, plus the capability flags."""
-    rows = await music_service.get_source_summaries(user.id)
-    return SourcesSummaryResponse(sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings))
+    rows, known = await asyncio.gather(
+        music_service.get_source_summaries(user.id), _known_songs(music_service, user.id)
+    )
+    return SourcesSummaryResponse(
+        sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings), known_songs=known
+    )
 
 
 @router.delete("/sources/{source}/data", response_model=RemoveDataResponse)

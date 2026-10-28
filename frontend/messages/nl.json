@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Dit heb je eerder gezongen",
       "crowd_pleaser": "Publieksfavoriet",
       "decade_match": "Uit een decennium dat je leuk vindt",
       "genre_match": "Past bij je genres",
@@ -893,6 +894,10 @@
       "similar_artist": "Vergelijkbaar met {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Je favorieten",
+        "reason": "Nummers die je eerder hebt gezongen en geweldig vond"
+      },
       "all": {
         "reason": "Alles wat overeenkomt, in de door jou gekozen volgorde",
         "title": "Alle suggesties"

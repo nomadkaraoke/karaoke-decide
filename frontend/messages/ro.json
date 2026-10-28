@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Ai mai cântat asta",
       "crowd_pleaser": "Pe placul tuturor",
       "decade_match": "Dintr-un deceniu care îți place",
       "genre_match": "Se potrivește cu genurile tale",
@@ -893,6 +894,10 @@
       "similar_artist": "În stilul {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Preferatele tale",
+        "reason": "Melodii pe care le-ai cântat și ți-a plăcut să le cânți"
+      },
       "all": {
         "reason": "Tot ce se potrivește, în ordinea aleasă de tine",
         "title": "Toate sugestiile"

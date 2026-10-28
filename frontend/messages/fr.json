@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Tu as déjà chanté ce titre",
       "crowd_pleaser": "Succès garanti",
       "decade_match": "D'une décennie que tu aimes",
       "genre_match": "Correspond à tes genres",
@@ -893,6 +894,10 @@
       "similar_artist": "Dans le style de {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Tes incontournables",
+        "reason": "Des chansons que tu as chantées et adoré chanter"
+      },
       "all": {
         "reason": "Tout ce qui correspond, dans l'ordre de ton choix",
         "title": "Toutes les suggestions"

@@ -22,6 +22,7 @@ from karaoke_decide.song_search.text_normalize import song_key
 
 logger = logging.getLogger(__name__)
 # Ranked top artists: synced services, plus the imports (import_ingest_service) ranked by plays.
+# Also the listening sources that make a ``user_songs`` row "imported" (Get this made).
 _TOP_SOURCES = {
     "spotify",
     "lastfm",
@@ -33,6 +34,9 @@ _TOP_SOURCES = {
     "spotify_playlist",
     "youtube_music",
 }
+
+
+LISTENING_SOURCES = frozenset(_TOP_SOURCES)
 
 
 class HiddenKeysProvider(Protocol):
@@ -57,6 +61,14 @@ class UserContextV2:
     hidden: set[str] = field(default_factory=set)
     # Songs the singer said they would not sing in a voice session: penalised, never "known".
     session_no: set[str] = field(default_factory=set)
+    # Songs whose latest post-song feel is "bad": penalised, never "known", no artist affinity.
+    survey_no: set[str] = field(default_factory=set)
+    # Go-tos (sung twice or rated great, latest feel not "bad", not hidden): their own first shelf.
+    go_tos: set[str] = field(default_factory=set)
+    # song_key -> semitones to shift the key by, from the latest "key" survey answer.
+    key_hints: dict[str, int] = field(default_factory=dict)
+    # Songs with any latest "key" answer (right included): a crowd key hint never overrides these.
+    own_key_answered: set[str] = field(default_factory=set)
     genres: set[str] = field(default_factory=set)
     decades: set[str] = field(default_factory=set)
     energy_pref: Literal["chill", "medium", "high"] | None = None
@@ -112,35 +124,105 @@ def _base_weight(d: dict[str, Any]) -> float:
     return max([w.song_weight(d), *(w.song_weight({**d, "source": s}) for s in _row_sources(d))])
 
 
-def _map_songs(
-    reader: CatalogReader, docs: list[dict[str, Any]]
-) -> tuple[dict[str, float], list[tuple[str, str, str]], dict[str, int], set[str]]:
-    """Return (song_key -> weight, songs with no karaoke version, song_key -> artist key per song,
-    voice-session "would not sing" keys).
+# The singer's latest key answer, as the shift to sing it in (semitones): "too high" means go down.
+KEY_HINT_SEMITONES: dict[str, int] = {"too_high": -2, "too_low": 2}
 
-    Voice-session labels come from the ``session_*`` fields whatever the row's ``source``: "yes" /
-    "yes in another key" and a "fine" feel raise the weight (max wins); "no" puts the song in
-    ``session_no`` and out of the known songs. A row whose only source is ``voice_session`` has no
-    base weight (known only through a label) and counts toward its artist only once loved ("Love it",
-    as a manual love does)."""
-    kn_keys = reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
+
+@dataclass
+class _SongMap:
+    known: dict[str, float]
+    no_karaoke: list[tuple[str, str, str]]
+    songs_per_artist: dict[str, int]
+    session_no: set[str]
+    survey_no: set[str]
+    go_tos: set[str]  # before hidden songs are removed (build_context)
+    key_hints: dict[str, int]
+    own_key_answered: set[str]
+
+
+def _is_go_to(d: dict[str, Any]) -> bool:
+    """The go-to rule (core ``isGoTo``), less the hidden check: latest feel isn't ``bad`` and either
+    it is ``great`` or the song was sung twice or more."""
+    feel = d.get("sung_feel_latest")
+    return feel != "bad" and (feel == "great" or (w.to_int(d.get("times_sung")) or 0) >= 2)
+
+
+def row_kn_keys(reader: CatalogReader, docs: list[dict[str, Any]]) -> dict[int, str]:
+    """catalog.db ``kn_song_map`` keys of the rows' numeric (KaraokeNerds) ``song_id``s, for ``row_key``."""
+    return reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
+
+
+def row_key(reader: CatalogReader, d: dict[str, Any], kn_keys: dict[int, str]) -> tuple[str, bool] | None:
+    """``(key, has_karaoke)`` of one ``user_songs`` row, or None when it has no key.
+
+    The key is the row's KaraokeNerds mapping (``kn_keys`` from ``row_kn_keys``; always a karaoke
+    song), else its stored ``song_key``, else ``song_key(artist, title)``; those have a karaoke
+    version when ``has_karaoke_key`` or ``match_kn`` finds one."""
+    artist, title = d.get("artist") or "", d.get("title") or ""
+    kn_id = _kn_id(d.get("song_id"))
+    key: str | None = kn_keys.get(kn_id) if kn_id is not None else None
+    if key is not None:
+        return key, True
+    stored = d.get("song_key")
+    key = str(stored) if isinstance(stored, str) and stored else None
+    if key is None and artist and title:
+        key = song_key(artist, title)
+    if key is None:
+        return None
+    return key, reader.has_karaoke_key(key) or reader.match_kn(artist, title) is not None
+
+
+def row_weight(d: dict[str, Any]) -> float:
+    """The row's recs weight: the max of its best source, its voice-session label and its karaoke history."""
+    return max(_base_weight(d), w.session_song_weight(d) or 0.0, w.sung_song_weight(d) or 0.0)
+
+
+def row_sources(d: dict[str, Any]) -> list[str]:
+    """The row's ``sources`` (``source`` alone on rows written before the field existed)."""
+    return _row_sources(d)
+
+
+def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
+    """Map the user's songs to catalog keys: weights, songs with no karaoke version, songs per
+    artist key, voice-session "would not sing" and survey "bad" keys, go-tos and key hints.
+
+    A row's key is its catalog.db KaraokeNerds mapping, else its stored ``song_key`` (the resolved
+    catalog key a karaoke-log or "Love it" row carries), else ``song_key(artist, title)``.
+
+    The weight is the max of the row's best source, its voice-session label and its karaoke history
+    (``times_sung`` / ``sung_feel_latest``). Voice-session labels come from the ``session_*`` fields
+    whatever the row's ``source``: "yes" / "yes in another key" and a "fine" feel raise the weight;
+    "no" puts the song in ``session_no`` and out of the known songs. A latest sung feel of "bad" puts
+    it in ``survey_no``, out of the known songs (loved or not) and out of its artist's count. A row
+    whose only source is ``voice_session`` has no base weight (known only through a label) and counts
+    toward its artist only once loved ("Love it", as a manual love does)."""
+    kn_keys = row_kn_keys(reader, docs)
     known: dict[str, float] = {}
     no_karaoke: dict[str, tuple[str, str, str]] = {}
     artist_songs: dict[str, set[str]] = {}
     session_no: set[str] = set()
+    survey_no: set[str] = set()
+    go_tos: set[str] = set()
+    key_hints: dict[str, int] = {}
+    own_key_answered: set[str] = set()
     for d in docs:
         artist, title = d.get("artist") or "", d.get("title") or ""
-        kn_id = _kn_id(d.get("song_id"))
-        key: str | None = kn_keys.get(kn_id) if kn_id is not None else None
-        has_karaoke = key is not None
-        if key is None:
-            if not artist or not title:
-                continue
-            key = song_key(artist, title)
-            has_karaoke = reader.match_kn(artist, title) is not None or reader.has_karaoke_key(key)
+        keyed = row_key(reader, d, kn_keys)
+        if keyed is None:
+            continue
+        key, has_karaoke = keyed
         if d.get("session_would_sing") == "no":
             session_no.add(key)
-        weight = max(_base_weight(d), w.session_song_weight(d) or 0.0)
+        if d.get("sung_feel_latest") == "bad":
+            survey_no.add(key)
+        elif _is_go_to(d):
+            go_tos.add(key)
+        if d.get("sung_key_latest"):
+            own_key_answered.add(key)
+        hint = KEY_HINT_SEMITONES.get(str(d.get("sung_key_latest")))
+        if hint is not None:
+            key_hints[key] = hint
+        weight = row_weight(d)
         if weight > 0:  # a voice_session-only row is known only through a session label
             known[key] = max(known.get(key, 0.0), weight)
             if not has_karaoke:
@@ -149,13 +231,18 @@ def _map_songs(
         session_only = _row_sources(d) == [w.SESSION_SOURCE] and d.get("loved") is not True
         if artist and d.get("source") != "quiz" and not session_only:
             artist_songs.setdefault(artist_key(artist), set()).add(key)
-    for key in session_no:
+    for key in session_no | survey_no:
         known.pop(key, None)
         no_karaoke.pop(key, None)
-    return known, list(no_karaoke.values()), {k: len(v) for k, v in artist_songs.items()}, session_no
+    go_tos -= survey_no
+    counts = {k: n for k, v in artist_songs.items() if (n := len(v - survey_no))}
+    return _SongMap(
+        known, list(no_karaoke.values()), counts, session_no, survey_no, go_tos, key_hints, own_key_answered
+    )
 
 
-async def _hidden(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
+async def hidden_keys_or_none(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
+    """The user's hidden keys; a failed read degrades to none hidden."""
     try:
         return set(await feedback.hidden_keys(user_id))
     except Exception:
@@ -170,14 +257,17 @@ async def build_context(
         _user_doc(firestore, user_id),
         _all_user_songs(firestore, user_id),
         firestore.query_documents("user_artists", filters=[("user_id", "==", user_id)]),
-        _hidden(feedback, user_id),
+        hidden_keys_or_none(feedback, user_id),
     )
     ctx = UserContextV2(user_id=user_id, hidden=set(hidden))
 
     # catalog.db reads are synchronous SQLite; keep them off the event loop.
-    ctx.known_songs, ctx.known_without_karaoke, songs_per_artist, ctx.session_no = await asyncio.to_thread(
-        _map_songs, reader, song_docs
-    )
+    songs = await asyncio.to_thread(_map_songs, reader, song_docs)
+    ctx.known_songs, ctx.known_without_karaoke = songs.known, songs.no_karaoke
+    ctx.session_no, ctx.survey_no, ctx.key_hints = songs.session_no, songs.survey_no, songs.key_hints
+    ctx.go_tos = songs.go_tos - ctx.hidden
+    ctx.own_key_answered = songs.own_key_answered
+    songs_per_artist = songs.songs_per_artist
 
     artists = ctx.artists
     names: dict[str, str] = {}

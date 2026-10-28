@@ -240,3 +240,44 @@ def test_guest_cannot_import_spotify_playlist(client: TestClient) -> None:
         json={"url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"},
     )
     assert resp.status_code == 403
+
+
+def test_summary_known_songs_deduped(client: TestClient, db: FakeDb) -> None:
+    def song(doc_id: str, **f: Any) -> None:
+        db.put("user_songs", doc_id, {"user_id": USER, **f})
+
+    song("a", song_key="k1", source="lastfm", sources=["lastfm"], playcount=20)
+    song("b", song_key="k1", source="spotify", sources=["spotify"])  # same song again: once
+    song("c", song_key="k2", source="voice_session", sources=["voice_session"])  # session-only: 0
+    song("d", song_key="k3", source="voice_session", sources=["voice_session"], loved=True)  # loved: counts
+    song("e", song_key="k4", source="screenshot", sources=["screenshot"])
+    db.put("user_songs", "z", {"user_id": "other", "song_key": "k9", "source": "lastfm"})
+    assert client.get("/api/services/summary").json()["known_songs"] == 3
+
+
+def test_summary_known_songs_keyless_rows_use_library_identity(client: TestClient, db: FakeDb) -> None:
+    for doc_id, source in (("a", "lastfm"), ("b", "screenshot")):
+        db.put("user_songs", doc_id, {"user_id": USER, "artist": "Some Band", "title": "Some Song", "source": source})
+    assert client.get("/api/services/summary").json()["known_songs"] == 1
+
+
+def test_summary_known_songs_skips_rows_without_identity(client: TestClient, db: FakeDb) -> None:
+    """No song_key and no artist/title: not a song (the empty key never counts, loved or not)."""
+    db.put("user_songs", "a", {"user_id": USER, "source": "lastfm", "playcount": 9})
+    db.put("user_songs", "b", {"user_id": USER, "artist": "", "title": "", "source": "manual", "loved": True})
+    db.put("user_songs", "c", {"user_id": USER, "artist": "Some Band", "title": "Some Song", "source": "lastfm"})
+    assert client.get("/api/services/summary").json()["known_songs"] == 1
+
+
+def test_summary_known_songs_failure_degrades_to_zero(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def boom(self: MusicServiceService, user_id: str) -> int:
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(MusicServiceService, "count_known_songs", boom)
+    with caplog.at_level("INFO"):
+        r = client.get("/api/services/summary")
+    assert r.status_code == 200
+    assert r.json()["known_songs"] == 0 and "sources" in r.json()
+    assert {rec.levelname for rec in caplog.records if "known_songs" in rec.getMessage()} == {"WARNING"}

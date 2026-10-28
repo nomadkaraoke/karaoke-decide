@@ -1029,8 +1029,10 @@ One row per (song, source) before merging. `song_key`, `source` (`gen_measured|p
 ### song_vocal_range
 Merged winner per `song_key` (source precedence gen_measured > pool_measured > nomad_measured > ultrastar > gemini):
 `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `tier` (`measured|notes|estimated`), `source`,
-`octave_confidence`, `is_duet`, `n_sources`, `confidence`, and Phase 4 placeholders
-`crowd_comfortable`, `crowd_too_low`, `crowd_too_high` (always NULL for now).
+`octave_confidence`, `is_duet`, `n_sources`, `confidence`, and the Phase 4 crowd counts
+`crowd_comfortable`, `crowd_too_low`, `crowd_too_high`: the Firestore `song_crowd_stats` key-answer totals
+(right / too low / too high) when at least 5 singers (`CROWD_MIN_SINGERS`) answered, else NULL (NULL for
+every song if that week's Firestore read failed; one WARNING).
 
 ### artist_vocal_range
 Per `artist_key`: `low_midi`, `high_midi`, `p10`, `p50`, `p90`, `basis`, `confidence`. Used as the

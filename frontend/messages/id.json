@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Pernah kamu nyanyikan",
       "crowd_pleaser": "Disukai banyak orang",
       "decade_match": "Dari dekade yang kamu suka",
       "genre_match": "Sesuai dengan genremu",
@@ -893,6 +894,10 @@
       "similar_artist": "Mirip {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Lagu andalanmu",
+        "reason": "Lagu yang pernah kamu nyanyikan dan suka kamu bawakan"
+      },
       "all": {
         "reason": "Semua yang cocok, sesuai urutan pilihanmu",
         "title": "Semua pilihan"

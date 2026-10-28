@@ -21,6 +21,17 @@ nothing a singer sang goes missing. The log doc remembers which counter doc it a
 (``counted``) and every change runs in one Firestore transaction, so a transition counts
 exactly once and retries, redo/undo and re-resolution never double-count.
 
+Survey state (Phase 4b). The same transaction keeps the resolved song's ``user_songs`` row's
+``sung_surveys`` map (``{entry_id: {feel, key, crowd_pleaser, at: {field: answered_at}, bucket}}``,
+one entry per counting record that answers any of them; an edit restamps only the fields whose
+value changed, and ``bucket`` is the voice bucket when that entry's key was set) and derives
+``sung_feel_counts``, ``sung_feel_latest`` / ``sung_key_latest`` (per field, latest by
+``answered_at``), ``sung_crowd_pleaser_count`` and ``crowd_bucket`` (the latest key entry's
+bucket) from it on every write. The singer's one crowd vote per song (latest key + bucket, and
+latest crowd-pleaser answer) moves in ``song_crowd_stats`` (``crowd_stats``) by its exact
+before/after. Unresolved songs carry neither; a backfill record counts toward the crowd only
+with a key answer.
+
 Resolution (artist + title to ``song_key``) runs inline with a 300 ms budget and never
 blocks the write; records left unresolved are retried by ``retry_unresolved(user_id)``.
 """
@@ -41,6 +52,14 @@ from pydantic import ValidationError
 
 from backend.models.karaoke_log import KaraokeLogEntry, LogMedia, LogNight, Survey
 from backend.services.catalog_lookup import CatalogLookup, get_catalog_lookup
+from backend.services.crowd_stats import (
+    CROWD_COLLECTION,
+    Vote,
+    apply_pleaser,
+    apply_vote,
+    crowd_doc_id,
+    voice_bucket,
+)
 from backend.services.song_feedback_service import (
     USER_SONGS_COLLECTION,
     choose_user_song_row,
@@ -48,6 +67,8 @@ from backend.services.song_feedback_service import (
     kn_id_for_song_key,
     resolve_song_keys,
 )
+from backend.services.voice_profile_service import FIELD as VOICE_PROFILE_FIELD
+from backend.services.voice_profile_service import USERS_COLLECTION, find_user_doc
 from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
 logger = logging.getLogger(__name__)
@@ -119,7 +140,7 @@ class LogFirestore(Protocol):
 
     async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None: ...
     async def query_documents(
-        self, collection: str, filters: list[tuple[str, str, Any]] | None = None
+        self, collection: str, filters: list[tuple[str, str, Any]] | None = None, *, limit: int | None = None
     ) -> list[dict[str, Any]]: ...
     async def run_transaction(self, fn: Callable[[Any], Awaitable[Any]]) -> Any: ...
 
@@ -166,8 +187,13 @@ def _parse_dt(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         dt = value
     elif isinstance(value, str):
+        text = value.strip()
+        if len(text) == 4 and text.isdigit():  # a backfill night's partial date: YYYY, YYYY-MM
+            text += "-01-01"
+        elif len(text) == 7 and text[4] == "-":
+            text += "-01"
         try:
-            dt = datetime.fromisoformat(value)
+            dt = datetime.fromisoformat(text)
         except ValueError as exc:
             raise KaraokeLogInvalidError(f"not an ISO timestamp: {value!r}") from exc
     else:
@@ -301,7 +327,17 @@ def _times(doc: dict[str, Any] | None) -> int:
 
 
 def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: str, times: int = 1) -> dict[str, Any]:
-    when = new.get("sung_at") or new.get("ended_at") or now
+    when = new.get("sung_at") or new.get("ended_at")
+    if not when and new.get("origin") == "backfill":
+        # An old remembered sing is dated by its night (or undated), never "now": `_later(old, None)`
+        # keeps the row's real last_sung_at.
+        when = (new.get("night") or {}).get("date") or None
+        try:
+            _parse_dt(when)
+        except KaraokeLogInvalidError:  # night.date is free text: unparseable means undated
+            when = None
+    elif not when:
+        when = now
     if doc is None:
         doc = {
             "user_id": new["user_id"],
@@ -344,6 +380,106 @@ def _dec(doc: dict[str, Any], target: Target, now: str, times: int = 1) -> dict[
     if left == 0:
         out["last_sung_at"] = None
     return out
+
+
+# ---------------------------------------------------------------- per-song survey state (user_songs rows)
+
+SURVEY_FIELDS = ("feel", "key", "crowd_pleaser")
+FEELS = ("great", "ok", "bad")
+Latest = tuple[str, str, Any]  # (answered_at, entry_id, value)
+
+
+def _key_is_new(doc: dict[str, Any], prev: dict[str, Any] | None) -> bool:
+    """True when the record's key answer is set and differs from its previous entry's (so the
+    singer's bucket is recorded now)."""
+    key = (doc.get("survey") or {}).get("key")
+    return key is not None and (prev or {}).get("key") != key
+
+
+def _survey_entry(doc: dict[str, Any], prev: dict[str, Any] | None, bucket: str | None) -> dict[str, Any] | None:
+    """The record's ``sung_surveys`` entry, or None when it answers none of feel/key/crowd_pleaser.
+
+    Per field (R3): a value unchanged from ``prev`` (the record's previous entry) keeps its old
+    ``at``; a changed or newly set one gets the survey's ``answered_at``. ``bucket`` (the voice
+    bucket when the key was set) likewise stays with an unchanged key and is ``bucket`` for a new one."""
+    survey = doc.get("survey") or {}
+    values: dict[str, Any] = {f: survey.get(f) for f in SURVEY_FIELDS}
+    if all(v is None for v in values.values()):
+        return None
+    prev = prev or {}
+    prev_at = prev.get("at") or {}
+    answered = survey.get("answered_at")
+    at = {
+        f: prev_at[f] if prev.get(f) == v and prev_at.get(f) else answered for f, v in values.items() if v is not None
+    }
+    entry: dict[str, Any] = {**values, "at": at}
+    if values["key"] is None:
+        entry["bucket"] = None
+    else:
+        entry["bucket"] = bucket if _key_is_new(doc, prev) else prev.get("bucket")
+    if doc.get("origin") == "backfill":
+        entry["backfill"] = True
+    return entry
+
+
+def _crowd_eligible(entry: dict[str, Any]) -> bool:
+    """A backfill record counts toward the crowd only when it carries a key answer."""
+    return not entry.get("backfill") or entry.get("key") is not None
+
+
+def _latest(
+    surveys: dict[str, Any], field: str, eligible: Callable[[dict[str, Any]], bool] | None = None
+) -> Latest | None:
+    """The newest answer to ``field`` by its ``answered_at`` (ties: larger entry id)."""
+    best: Latest | None = None
+    for eid, entry in surveys.items():
+        value = entry.get(field)
+        if value is None or (eligible is not None and not eligible(entry)):
+            continue
+        cand = (str((entry.get("at") or {}).get(field) or ""), str(eid), value)
+        if best is None or cand[:2] > best[:2]:
+            best = cand
+    return best
+
+
+def _surveys(row: dict[str, Any] | None) -> dict[str, Any]:
+    return dict((row or {}).get("sung_surveys") or {})
+
+
+def _derive_survey_fields(row: dict[str, Any]) -> None:
+    """Recompute the row's sung_* fields from its ``sung_surveys`` map (in place).
+
+    ``crowd_bucket`` is the bucket stored with the latest key answer's entry, so falling back to
+    an older answer uses that answer's bucket."""
+    surveys = _surveys(row)
+    counts = dict.fromkeys(FEELS, 0)
+    for entry in surveys.values():
+        if entry.get("feel") in counts:
+            counts[entry["feel"]] += 1
+    feel = _latest(surveys, "feel")
+    key = _latest(surveys, "key")
+    row["sung_surveys"] = surveys
+    row["sung_feel_counts"] = counts
+    row["sung_feel_latest"] = feel[2] if feel else None
+    row["sung_key_latest"] = key[2] if key else None
+    row["sung_crowd_pleaser_count"] = sum(1 for e in surveys.values() if e.get("crowd_pleaser") is True)
+    row["crowd_bucket"] = surveys[key[1]].get("bucket") if key else None
+
+
+def _needs_profile(pre: dict[str, Any] | None, patch_has_survey: bool) -> bool:
+    """Whether a write may set a key answer on a song row (only then is the bucket needed)."""
+    return patch_has_survey or ((pre or {}).get("survey") or {}).get("key") is not None
+
+
+def _crowd_vote(row: dict[str, Any] | None) -> Vote | None:
+    if row is None or row.get("sung_key_latest") is None:
+        return None
+    return row["sung_key_latest"], row.get("crowd_bucket")
+
+
+def _crowd_pleaser(row: dict[str, Any] | None) -> bool | None:
+    hit = _latest(_surveys(row), "crowd_pleaser", _crowd_eligible)
+    return bool(hit[2]) if hit else None
 
 
 def _encode_cursor(doc: dict[str, Any]) -> str:
@@ -438,10 +574,32 @@ class KaraokeLogService:
 
     # ------------------------------------------------------------ the transaction
 
-    async def _transact(self, doc_id: str, build: Callable[[dict[str, Any] | None], dict[str, Any] | None]) -> Any:
-        """Read the log doc, ``build`` its new contents (None = no change), move counters, write.
+    async def _users_doc_id(self, user_id: str) -> str | None:
+        """The singer's ``decide_users`` doc id, by ``voice_profile_service.find_user_doc`` (the
+        one rule). A query, so it runs before the transaction."""
+        _, doc_id = await find_user_doc(self.db, user_id)
+        return doc_id
 
-        ``build`` must be pure: Firestore may run this more than once."""
+    @staticmethod
+    async def _bucket(txn: Transaction, users_doc_id: str | None) -> str | None:
+        """The singer's crowd bucket from their current voice profile (a transactional read)."""
+        if not users_doc_id:
+            return None
+        user = await txn.get(USERS_COLLECTION, users_doc_id)
+        return voice_bucket((user or {}).get(VOICE_PROFILE_FIELD))
+
+    async def _transact(
+        self,
+        doc_id: str,
+        build: Callable[[dict[str, Any] | None], dict[str, Any] | None],
+        users_doc_id: str | None = None,
+    ) -> Any:
+        """Read the log doc, ``build`` its new contents (None = no change), move counters, keep the
+        song row's survey state and the crowd counters, write.
+
+        ``build`` must be pure: Firestore may run this more than once. ``users_doc_id`` is the
+        singer's ``decide_users`` doc (``_users_doc_id``), resolved before the transaction when
+        the write may set a key answer; without it a new key answer gets no bucket."""
         kn_cache: dict[str, int | None] = {}
 
         async def kn_for(key: str) -> int | None:
@@ -470,24 +628,69 @@ class KaraokeLogService:
             old_target: Target | None = (counted["collection"], counted["doc_id"]) if counted else None
             old_times = int(counted.get("times") or 1) if counted else 1  # pre-backfill docs: 1
             new_times = _times(new)
+            # 1. counters: the new contents of each counter row (None = delete it)
+            final: dict[Target, dict[str, Any] | None] = {}
             if (old_target, old_times) != (new_target, new_times):
                 for t in (old_target, new_target):
                     if t is not None and t not in reads:
                         reads[t] = await txn.get(*t)
-                # all reads done; writes from here on
                 old_doc = reads[old_target] if old_target is not None else None
                 dec = _dec(old_doc, old_target, now, old_times) if old_doc is not None and old_target else None
                 if old_target is not None and old_target == new_target:
                     # same row, new times: one write (a row the log created must not vanish between)
-                    txn.set(*old_target, _inc(dec, old_target, new, now, new_times))
+                    final[old_target] = _inc(dec, old_target, new, now, new_times)
                 else:
                     if old_target is not None and old_doc is not None:
-                        if dec is None:
-                            txn.delete(*old_target)
-                        else:
-                            txn.set(*old_target, dec)
+                        final[old_target] = dec
                     if new_target is not None:
-                        txn.set(*new_target, _inc(reads[new_target], new_target, new, now, new_times))
+                        final[new_target] = _inc(reads[new_target], new_target, new, now, new_times)
+            # 2. survey map on the user_songs rows (a survey-only edit still lands here)
+            song_rows = [t for t in dict.fromkeys((old_target, new_target)) if t and t[0] == USER_SONGS_COLLECTION]
+            prev = next((e for t in song_rows if (e := _surveys(reads.get(t)).get(new["id"])) is not None), None)
+            entry = None
+            if new_target and new_target[0] == USER_SONGS_COLLECTION:
+                bucket = await self._bucket(txn, users_doc_id) if _key_is_new(new, prev) else None
+                entry = _survey_entry(new, prev, bucket)
+            staged: dict[Target, dict[str, Any]] = {}
+            for t in song_rows:
+                base = final[t] if t in final else reads.get(t)
+                if base is None:  # row deleted by the counters, or never there
+                    continue
+                row = {**base, "sung_surveys": _surveys(base)}
+                if t == new_target and entry is not None:
+                    row["sung_surveys"][new["id"]] = entry
+                else:
+                    row["sung_surveys"].pop(new["id"], None)
+                staged[t] = row
+            for t, row in staged.items():
+                _derive_survey_fields(row)
+                if t in final or row != reads.get(t):
+                    if t not in final:
+                        row["updated_at"] = now
+                    final[t] = row
+            # 3. crowd: this singer's one vote per song, moved by its exact before/after
+            crowd: dict[str, list[tuple[Vote | None, Vote | None, bool | None, bool | None]]] = {}
+            for t in song_rows:
+                if t not in final:
+                    continue
+                before, after = reads.get(t), final[t]
+                moves = (_crowd_vote(before), _crowd_vote(after), _crowd_pleaser(before), _crowd_pleaser(after))
+                song_key = (after or before or {}).get("song_key")
+                if song_key and (moves[0] != moves[1] or moves[2] != moves[3]):
+                    crowd.setdefault(str(song_key), []).append(moves)
+            stats = {k: await txn.get(CROWD_COLLECTION, crowd_doc_id(k)) for k in crowd}
+            # all reads done; writes from here on
+            for t, doc in final.items():
+                if doc is None:
+                    txn.delete(*t)
+                else:
+                    txn.set(*t, doc)
+            for k, changes in crowd.items():
+                s: dict[str, Any] = {**(stats[k] or {}), "song_key": k}
+                for old_vote, new_vote, old_pleaser, new_pleaser in changes:
+                    s = apply_vote(s, old_vote, new_vote, now)
+                    s = apply_pleaser(s, old_pleaser, new_pleaser, now)
+                txn.set(CROWD_COLLECTION, crowd_doc_id(k), s)
             if new_target:
                 new["counted"] = {"collection": new_target[0], "doc_id": new_target[1], "times": new_times}
             else:
@@ -592,7 +795,8 @@ class KaraokeLogService:
                 cur["deleted"], cur["deleted_by"] = False, None
             return self._apply_facts(cur, {k: v for k, v in patch.items() if k != "deleted"}, resolution, now)
 
-        return self._entry(await self._transact(doc_id, build), entry_id)
+        users_doc = await self._users_doc_id(user_id) if _needs_profile(pre, "survey" in patch) else None
+        return self._entry(await self._transact(doc_id, build, users_doc), entry_id)
 
     async def delete(self, user_id: str, entry_id: str) -> KaraokeLogEntry:
         """Soft delete by the user (``DELETE /api/my/karaoke-log/{id}``); reverses its count."""
@@ -626,6 +830,7 @@ class KaraokeLogService:
         doc_id = log_doc_id(user_id, entry_id)
         pre = await self.db.get_document(LOG_COLLECTION, doc_id)
         resolution = await self._resolution(pre, facts, "partner")
+        users_doc = await self._users_doc_id(user_id) if _needs_profile(pre, False) else None
 
         def build(cur: dict[str, Any] | None) -> dict[str, Any]:
             now = _now()
@@ -647,7 +852,7 @@ class KaraokeLogService:
                 cur["deleted"], cur["deleted_by"] = False, None
             return self._apply_facts(cur, facts, resolution, now)
 
-        return self._entry(await self._transact(doc_id, build), entry_id)
+        return self._entry(await self._transact(doc_id, build, users_doc), entry_id)
 
     async def delete_partner(self, email: str, entry_id: str) -> KaraokeLogEntry | None:
         """kjbox un-done (``DELETE /api/partner/kjbox/karaoke-log/{id}``). Idempotent; None if unknown.
@@ -670,7 +875,7 @@ class KaraokeLogService:
                 return None
             return {**cur, "deleted": True, "deleted_by": "partner", "updated_at": _now()}
 
-        doc = await self._transact(log_doc_id(user_id, entry_id), build)
+        doc = await self._transact(log_doc_id(user_id, entry_id), build)  # removal only: no bucket needed
         return self._entry(doc, entry_id) if doc is not None else None
 
     # ------------------------------------------------------------ retry + listing
@@ -698,7 +903,8 @@ class KaraokeLogService:
                     return None
                 return {**cur, "song_key": k, "song_key_status": "resolved", "updated_at": _now()}
 
-            after = await self._transact(log_doc_id(user_id, doc["id"]), build)
+            users_doc = await self._users_doc_id(user_id) if _needs_profile(doc, False) else None
+            after = await self._transact(log_doc_id(user_id, doc["id"]), build, users_doc)
             if after is not None and after.get("song_key") == key:
                 resolved += 1
         return resolved

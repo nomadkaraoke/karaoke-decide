@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Você já cantou esta música",
       "crowd_pleaser": "Favorita do público",
       "decade_match": "De uma década que você curte",
       "genre_match": "Combina com seus gêneros",
@@ -893,6 +894,10 @@
       "similar_artist": "Parecido com {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Suas favoritas",
+        "reason": "Músicas que você já cantou e adorou cantar"
+      },
       "all": {
         "reason": "Tudo o que combina, na ordem que você escolheu",
         "title": "Todas as recomendações"

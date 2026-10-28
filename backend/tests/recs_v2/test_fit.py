@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from backend.api.deps import get_catalog_store_dep as get_store_dep
 from backend.api.deps import get_current_user, get_firestore, get_hidden_keys_provider
 from backend.main import app
+from backend.services.crowd_stats import crowd_doc_id
 from backend.services.recs_v2 import service as svc
 from backend.services.recs_v2 import weights as w
 from backend.services.recs_v2.candidates import Candidate
@@ -41,6 +42,7 @@ from karaoke_decide.vocal_range.fit import (
     fit_song,
     is_singable,
 )
+from karaoke_decide.vocal_range.tsv import SongRange
 
 URL = "/api/my/recommendations/v2"
 BARITONE = UserVoiceRange(low=45, high=69, comfort_low=50, comfort_high=64)
@@ -274,6 +276,7 @@ SONGS = [  # known songs make Muse and Adele known artists
 def _firestore(user_doc: dict[str, Any]) -> MagicMock:
     fs = MagicMock()
     fs.get_document = AsyncMock(return_value=user_doc)
+    fs.get_many = AsyncMock(return_value={})  # no crowd stats
 
     async def query(collection: str, **_: Any) -> list[dict[str, Any]]:
         if collection == "user_songs":
@@ -468,3 +471,119 @@ async def test_recommend_with_explicit_profile(reader: CatalogReader) -> None:
     assert res.voice.model_dump() == {"has_profile": True, "method": "session"}
     songs = [s for sec in res.sections for s in sec.songs]
     assert songs and all(s.fit is not None and s.fit.bucket in ("fits", "fitsIn") for s in songs)
+
+
+# ------------------------------------------------------------------ Phase 4b: per-song key hints
+
+
+def _ranged(key: str, bucket: str, transpose: int = 0, octave: int = 0) -> Scored:
+    c = cand(key, "Muse", vr=SongRange(50, 62, 51, 56, 61, "measured"))
+    c.fit = FitResult(bucket, transpose, octave, 0.0, 1.0)  # type: ignore[arg-type]
+    return Scored(c=c, score=1.0, reason_type="known_song", reason_artist=None)
+
+
+def _hinted(bucket: str, transpose: int, hint: int, octave: int = 0) -> tuple[str, int, int]:
+    fit = svc._rec_song(_ranged("m|s", bucket, transpose, octave), {"m|s": hint}).fit
+    assert fit is not None
+    return fit.bucket, fit.transpose, fit.octave
+
+
+def test_key_hint_sets_transpose() -> None:
+    """R20a: a hint shifts only an in-key fit (fits / fitsIn, octave 0); 0 after the shift is ``fits``."""
+    assert svc._rec_song(_ranged("m|high", "fits"), {"m|high": -2}).fit.model_dump() == {  # type: ignore[union-attr]
+        "bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "measured"
+    }  # fmt: skip
+    assert _hinted("fitsIn", -2, 2) == ("fits", 0, 0)
+    assert _hinted("fitsIn", -1, 2) == ("fitsIn", 1, 0)
+    assert _hinted("stretch", 1, -2) == ("stretch", 1, 0)
+    assert _hinted("outside", 0, -2) == ("outside", 0, 0)
+    assert _hinted("fitsIn", 1, -2, octave=-1) == ("fitsIn", 1, -1)  # octave fits stay untouched
+    plain = svc._rec_song(_ranged("m|none", "fits"), {"m|other": -2}).fit
+    assert plain is not None and (plain.bucket, plain.transpose) == ("fits", 0)
+    no_fit = cand("m|high")
+    assert (
+        svc._rec_song(Scored(c=no_fit, score=1.0, reason_type="known_song", reason_artist=None), {"m|high": -2}).fit
+        is None
+    )
+
+
+async def test_key_hint_through_recommend(reader: CatalogReader) -> None:
+    """End to end: Starlight fits the baritone, but the singer's last key answer was too high."""
+    rows: list[dict[str, Any]] = [*SONGS, {"user_id": "guest_fit", "artist": "Muse", "title": "Starlight", "source": "karaoke_log",
+                     "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "too_high"}]  # fmt: skip
+    fs = MagicMock()
+    fs.get_document = AsyncMock(return_value={"user_id": "guest_fit"})
+
+    async def query(collection: str, **_: Any) -> list[dict[str, Any]]:
+        return rows if collection == "user_songs" else []
+
+    fs.query_documents = AsyncMock(side_effect=query)
+    profile = VoiceProfileOut.model_validate(PROFILE)
+    service = svc.RecommendationServiceV2(fs, FakeStore(reader), FakeHidden(), voice=NoStoredProfile())
+    res = await service.recommend(User(id="guest_fit", is_guest=True), RecFilters(), "best", profile=profile)
+    fit = {s.song_key: s for sec in res.sections for s in sec.songs}[STARLIGHT].fit
+    assert fit is not None and (fit.bucket, fit.transpose) == ("fitsIn", -2)
+
+
+def _crowd_fs(rows: list[dict[str, Any]], crowd: dict[str, dict[str, Any]]) -> MagicMock:
+    fs = MagicMock()
+    fs.get_document = AsyncMock(return_value={"user_id": "guest_fit"})
+
+    async def query(collection: str, **_: Any) -> list[dict[str, Any]]:
+        return rows if collection == "user_songs" else []
+
+    async def get_many(collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+        assert collection == "song_crowd_stats"
+        stored = {crowd_doc_id(k): v for k, v in crowd.items()}  # R23: hashed doc ids
+        return {i: stored[i] for i in ids if i in stored}
+
+    fs.query_documents = AsyncMock(side_effect=query)
+    fs.get_many = AsyncMock(side_effect=get_many)
+    return fs
+
+
+def _bucket_stats(bucket: str, right: int, too_high: int = 0, too_low: int = 0) -> dict[str, Any]:
+    counts = {"right": right, "too_high": too_high, "too_low": too_low}
+    return {"total": dict(counts), "by_bucket": {bucket: dict(counts)}}
+
+
+async def _starlight_fit(rows: list[dict[str, Any]], crowd: dict[str, dict[str, Any]], reader: CatalogReader) -> Any:
+    profile = VoiceProfileOut.model_validate(PROFILE)  # baritone
+    service = svc.RecommendationServiceV2(
+        _crowd_fs(rows, crowd), FakeStore(reader), FakeHidden(), voice=NoStoredProfile()
+    )
+    res = await service.recommend(User(id="guest_fit", is_guest=True), RecFilters(), "best", profile=profile)
+    return {s.song_key: s for sec in res.sections for s in sec.songs}[STARLIGHT]
+
+
+async def test_crowd_key_hint_for_viewer_bucket(reader: CatalogReader) -> None:
+    """Baritones mostly found Starlight too high: the in-key fit shifts down 2, like the user's own hint."""
+    song = await _starlight_fit(SONGS, {STARLIGHT: _bucket_stats("baritone", right=2, too_high=3)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fitsIn", -2)
+    assert song.crowd is not None and song.crowd.bucket == "baritone"
+
+    song = await _starlight_fit(SONGS, {STARLIGHT: _bucket_stats("baritone", right=2, too_low=3)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fitsIn", 2)
+
+    # other buckets' votes don't move a baritone's key; nor do too few baritones
+    song = await _starlight_fit(SONGS, {STARLIGHT: _bucket_stats("tenor", right=0, too_high=9)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fits", 0)
+    few = _bucket_stats("baritone", right=0, too_high=4)
+    few["total"]["right"] = 6
+    song = await _starlight_fit(SONGS, {STARLIGHT: few}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fits", 0)
+
+
+async def test_own_key_hint_beats_crowd_hint(reader: CatalogReader) -> None:
+    rows: list[dict[str, Any]] = [*SONGS, {"user_id": "guest_fit", "artist": "Muse", "title": "Starlight", "source": "karaoke_log",
+                     "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "too_low"}]  # fmt: skip
+    song = await _starlight_fit(rows, {STARLIGHT: _bucket_stats("baritone", right=0, too_high=5)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fitsIn", 2)
+
+
+async def test_own_right_answer_beats_crowd_hint(reader: CatalogReader) -> None:
+    """The user's latest key answer was "right": the crowd's "too high" never shifts it."""
+    rows: list[dict[str, Any]] = [*SONGS, {"user_id": "guest_fit", "artist": "Muse", "title": "Starlight", "source": "karaoke_log",
+                     "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "right"}]  # fmt: skip
+    song = await _starlight_fit(rows, {STARLIGHT: _bucket_stats("baritone", right=0, too_high=5)}, reader)
+    assert (song.fit.bucket, song.fit.transpose) == ("fits", 0)

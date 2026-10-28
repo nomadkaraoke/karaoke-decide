@@ -22,6 +22,12 @@ Inputs (optional ones missing -> one INFO line each, never louder):
   from 3a's ``bq_source.ARTISTS_SQL`` (keyed by ``keys.artist_key``).
 * KaraokeNerds song keys (``karaokenerds_raw`` + ``karaokenerds_community``) for the
   match/unmatched counts and the UltraStar ``video_id`` join (spec §5.2).
+* Crowd key answers: Firestore ``song_crowd_stats`` (Phase 4b, ``backend.services.crowd_stats``),
+  read with the job's own credentials (``roles/datastore.viewer``). Each doc's ``song_key`` FIELD
+  names the song (the doc id is a hash, ruling R23). ``crowd_comfortable`` / ``crowd_too_low`` /
+  ``crowd_too_high`` get the doc's ``total`` counts when at least ``CROWD_MIN_SINGERS`` singers
+  answered, else NULL; a song with no ranges gets no row. A failed read is ONE WARNING and every
+  crowd column is NULL for the run (the step still publishes).
 
 Outputs, in this order (``latest.json`` LAST, so a failure leaves last week's pointer):
 
@@ -63,9 +69,11 @@ from typing import Any
 import httpx
 from google.cloud import bigquery
 
+from backend.services.crowd_stats import CROWD_COLLECTION, crowd_totals
 from karaoke_decide.catalog.bq_source import ARTISTS_SQL, _artist_rows
 from karaoke_decide.catalog.bq_source import P as PROD_DATASET
 from karaoke_decide.catalog.keys import artist_key, song_key
+from karaoke_decide.etl.musicbrainz_sql import PROJECT_ID
 from karaoke_decide.etl.musicbrainz_sql import S as STAGING_DATASET
 from karaoke_decide.etl.refresh_common import RefreshError, publish_tables, resumable_chunks
 from karaoke_decide.services.bq_limits import GIB, MAX_BYTES_CATALOG
@@ -161,7 +169,12 @@ SOURCES_SCHEMA = _schema(
     ("confidence", _FLOAT),
     ("loaded_at", "TIMESTAMP"),
 )
-CROWD_FIELDS = ("crowd_comfortable", "crowd_too_low", "crowd_too_high")  # Phase 4, always NULL for now
+# Filled from Firestore song_crowd_stats totals (>= CROWD_MIN_SINGERS singers), else NULL.
+CROWD_FIELDS = ("crowd_comfortable", "crowd_too_low", "crowd_too_high")
+# Firestore stream deadline (seconds): a stalled read becomes the one crowd WARNING, not a hung job.
+# ``retry`` is left at google-cloud-firestore's default.
+CROWD_READ_TIMEOUT_S = 120
+_CROWD_ANSWER = {"crowd_comfortable": "right", "crowd_too_low": "too_low", "crowd_too_high": "too_high"}
 SONGS_SCHEMA = _schema(
     ("song_key", "STRING"),
     *_RANGE,
@@ -411,6 +424,31 @@ def _gemini_rows(path: Path, kind: str) -> list[SourceRow]:
 # --------------------------------------------------------------------------
 
 
+def _firestore_client() -> Any:
+    """The job's Firestore client (its own service account; tests replace this)."""
+    from google.cloud import firestore
+
+    return firestore.Client(project=PROJECT_ID)
+
+
+def load_crowd(firestore: Any | None = None) -> dict[str, dict[str, int | None]]:
+    """``{song_key: {crowd_*: count}}`` for every ``song_crowd_stats`` doc with at least
+    ``CROWD_MIN_SINGERS`` key answers. Best effort: any failure is ONE WARNING and ``{}``."""
+    try:
+        db = firestore if firestore is not None else _firestore_client()
+        out: dict[str, dict[str, int | None]] = {}
+        for snap in db.collection(CROWD_COLLECTION).select(["song_key", "total"]).stream(timeout=CROWD_READ_TIMEOUT_S):
+            doc = snap.to_dict() or {}
+            key = doc.get("song_key")
+            totals = crowd_totals(doc)
+            if isinstance(key, str) and key and totals is not None:
+                out[key] = {field: totals[answer] for field, answer in _CROWD_ANSWER.items()}
+        return out
+    except Exception as e:  # noqa: BLE001 - best effort; crowd columns stay NULL this run
+        logger.warning(f"vocal_range: could not read Firestore song_crowd_stats ({e}); crowd_* left NULL this run")
+        return {}
+
+
 def band_predicate(bands: list[BandStats], kind: str) -> Callable[[SourceRow], bool]:
     """True iff the row's pop_rank falls in a calibrated band that was kept."""
     spec = SONG_BANDS if kind == "song" else ARTIST_BANDS
@@ -584,8 +622,17 @@ def _drop_staging(bq: Any) -> None:
             logger.warning(f"vocal_range: could not delete {table}: {e}")
 
 
-def publish(bq: Any, bucket: Any, result: Result, run: str, now: datetime) -> None:
+def publish(
+    bq: Any,
+    bucket: Any,
+    result: Result,
+    run: str,
+    now: datetime,
+    crowd: dict[str, dict[str, int | None]] | None = None,
+) -> None:
     """Staging loads -> TSVs + summary -> copy staging over prod -> latest.json -> drop staging.
+
+    ``crowd`` (``load_crowd``) fills ``song_vocal_range.crowd_*`` by song_key; other songs get NULL.
 
     A failed load leaves every prod table and the pointer as they were; the copy jobs are
     atomic per table and retried (refresh_common.publish_tables, same as the MB tables).
@@ -597,8 +644,10 @@ def publish(bq: Any, bucket: Any, result: Result, run: str, now: datetime) -> No
         [{**dataclasses.asdict(r), "loaded_at": loaded_at} for r in result.sources],
         SOURCES_SCHEMA,
     )
-    crowd = dict.fromkeys(CROWD_FIELDS)
-    _load(bq, STAGING_SONGS, [{**dataclasses.asdict(s), **crowd} for s in result.songs], SONGS_SCHEMA)
+    crowd = crowd or {}
+    none = dict.fromkeys(CROWD_FIELDS)
+    song_rows = [{**dataclasses.asdict(s), **crowd.get(s.song_key, none)} for s in result.songs]
+    _load(bq, STAGING_SONGS, song_rows, SONGS_SCHEMA)
     _load(bq, STAGING_ARTISTS, [dataclasses.asdict(a) for a in result.artists], ARTISTS_SCHEMA)
 
     song_tsv = tsv_gz(result.songs, [f.name for f in dataclasses.fields(MergedSong)])
@@ -650,9 +699,17 @@ def prune_runs(bucket: Any, keep: str) -> None:
 
 
 def run_step(
-    bq: Any, gcs: Any, http: httpx.Client, *, now: datetime | None = None, data_dir: Path = DATA_DIR
+    bq: Any,
+    gcs: Any,
+    http: httpx.Client,
+    *,
+    now: datetime | None = None,
+    data_dir: Path = DATA_DIR,
+    firestore: Any | None = None,
 ) -> dict[str, Any]:
-    """Build and publish the vocal-range tables; returns the summary. Raises on failure."""
+    """Build and publish the vocal-range tables; returns the summary. Raises on failure.
+
+    ``firestore`` is the crowd source (default: the job's own client); its failure never raises."""
     started = time.monotonic()
     now = now or datetime.now(UTC)
     run = now.strftime("%Y%m%d-%H%M%S")
@@ -676,8 +733,10 @@ def run_step(
         gender_of=gender_of,
         kn_keys=kn_keys,
     )
+    crowd = load_crowd(firestore)
     result.summary["run"] = run
-    publish(bq, bucket, result, run, now)
+    result.summary["crowd_songs"] = sum(1 for s in result.songs if s.song_key in crowd)
+    publish(bq, bucket, result, run, now, crowd)
     secs = time.monotonic() - started
     logger.info(f"vocal_range published run {run} in {secs:.0f}s: {json.dumps(result.summary, sort_keys=True)}")
     return result.summary

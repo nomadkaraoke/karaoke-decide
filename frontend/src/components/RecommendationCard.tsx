@@ -54,6 +54,7 @@ function getReasonBadgeVariant(
   reasonType: string
 ): "default" | "spotify" | "lastfm" | "quiz" | "success" | "warning" | "error" {
   switch (reasonType) {
+    case "sung_before":
     case "known_song":
     case "known_artist":
       return "spotify";

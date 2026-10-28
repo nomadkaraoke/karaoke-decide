@@ -105,3 +105,15 @@ def test_session_no_penalised() -> None:
     c = cand("a|nope")
     assert score(c, _ctx(session_no={"a|nope"})).score == pytest.approx(score(c, _ctx()).score - w.SESSION_NO_PENALTY)
     assert score(cand("a|other"), _ctx(session_no={"a|nope"})).score == score(cand("a|other"), _ctx()).score
+
+
+def test_survey_no_penalised_0_4() -> None:
+    c = cand("a|bad")
+    assert score(c, _ctx(survey_no={"a|bad"})).score == pytest.approx(score(c, _ctx()).score - w.SURVEY_NO_PENALTY)
+    assert score(cand("a|other"), _ctx(survey_no={"a|bad"})).score == score(cand("a|other"), _ctx()).score
+
+
+def test_reason_sung_before() -> None:
+    ctx = _ctx(known_songs={"a|fave": 1.0, "a|known": 1.0}, go_tos={"a|fave"})
+    assert score(cand("a|fave"), ctx).reason_type == "sung_before"  # takes precedence over known_song
+    assert score(cand("a|known"), ctx).reason_type == "known_song"

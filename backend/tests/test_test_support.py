@@ -638,3 +638,185 @@ def test_personal_seed_not_mounted_by_default(monkeypatch: pytest.MonkeyPatch) -
     for flag, env in ((False, "development"), (True, "production")):
         c = _app_with(monkeypatch, flag=flag, environment=env)
         assert c.post("/api/test/voice/personal-seed", json={"email": EMAIL}).status_code == 404
+
+
+def test_seed_get_made_lists_fixture_songs_and_reset_clears_dismissals(
+    client: TestClient,
+    fs: FakeFirestore,
+    reader: CatalogReader,  # noqa: F811
+) -> None:
+    class Store:
+        run = "fixture-run"
+
+        def require(self) -> CatalogReader:
+            return reader
+
+    songs = [
+        {"artist": "Fixture Artist 01", "title": "Fixture Song 01-01", "loved": True},
+        {"artist": "Fixture Artist 01", "title": "Fixture Song 01-02", "times_sung": 1},
+    ]
+    r = client.post("/api/test/get-made/seed", json={"email": EMAIL, "songs": songs})
+    assert r.status_code == 200, r.text
+    user_id, keys = r.json()["user_id"], r.json()["keys"]
+    assert keys == ["fixture artist 01|fixture song 01 01", "fixture artist 01|fixture song 01 02"]
+    assert not any(reader.has_karaoke_key(k) for k in keys)
+
+    app = client.app
+    app.dependency_overrides[get_current_user] = lambda: User(id=user_id)  # type: ignore[attr-defined]
+    app.dependency_overrides[get_catalog_store_dep] = lambda: Store()  # type: ignore[attr-defined]
+    got = client.get("/api/my/get-made").json()["items"]
+    assert [(i["key"], i["why"]) for i in got[:2]] == [(keys[0], "saved"), (keys[1], "sung")]
+
+    assert client.post(f"/api/my/get-made/{keys[0]}/dismiss").status_code == 204
+    assert fs.cols["user_make_dismissed"]
+    assert client.post("/api/test/profile/reset", json={"email": EMAIL}).status_code == 204
+    assert not fs.cols["user_make_dismissed"]
+
+
+CROWD_KEY = "fixture artist 02|fixture song 02/01"  # a '/' key: stored under its hashed doc id (R23)
+
+
+def _crowd_url(key: str) -> str:
+    from urllib.parse import quote
+
+    return f"/api/songs/{quote(key, safe='')}/crowd"
+
+
+def _baritone_viewer(client: TestClient) -> None:
+    user_id = client.post("/api/test/profile/seed", json={"email": EMAIL}).json()["user_id"]
+    profile = {
+        "low_midi": 43,
+        "high_midi": 67,
+        "comfort_low": 45,
+        "comfort_high": 64,
+        "voice_type": "baritone",
+        "register": None,
+        "confidence": "high",
+        "method": "mic",
+        "measured_at": "2026-10-01T00:00:00Z",
+    }
+    r = client.post("/api/test/voice/seed", json={"email": EMAIL, "profile": profile})
+    assert r.status_code == 204, r.text
+    client.app.dependency_overrides[get_current_user] = lambda: User(id=user_id)  # type: ignore[attr-defined]
+
+
+def test_crowd_seed_then_route_shows_figure(client: TestClient, fs: FakeFirestore) -> None:
+    from backend.services.crowd_stats import CROWD_COLLECTION, crowd_doc_id
+
+    _baritone_viewer(client)
+    body = {
+        "song_key": CROWD_KEY,
+        "total": {"right": 5, "too_high": 1},
+        "by_bucket": {"baritone": {"right": 5}},
+        "crowd_pleaser_yes": 4,
+    }
+    r = client.post("/api/test/crowd/seed", json=body)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"song_key": CROWD_KEY, "doc_id": crowd_doc_id(CROWD_KEY)}
+    doc = fs.cols[CROWD_COLLECTION][crowd_doc_id(CROWD_KEY)]
+    assert doc["song_key"] == CROWD_KEY
+    assert doc["total"] == {"too_low": 0, "right": 5, "too_high": 1}
+    assert doc["by_bucket"] == {"baritone": {"too_low": 0, "right": 5, "too_high": 0}}
+    assert (doc["crowd_pleaser_yes"], doc["crowd_pleaser_answered"]) == (4, 4)  # answered defaults to yes
+
+    got = client.get(_crowd_url(CROWD_KEY)).json()
+    assert got == {
+        "singers": 6,
+        "comfortable_share": 0.8333,
+        "too_high_share": 0.1667,
+        "too_low_share": 0.0,
+        "bucket": "baritone",
+        "bucket_singers": 5,
+        "bucket_comfortable_share": 1.0,
+        "crowd_pleaser_share": None,  # 4 answered < 5
+    }
+
+
+def test_crowd_seed_below_threshold_is_hidden_and_explicit_answered(client: TestClient) -> None:
+    _baritone_viewer(client)
+    body = {
+        "song_key": CROWD_KEY,
+        "total": {"right": 3, "too_low": 1},
+        "by_bucket": {"baritone": {"right": 3}},
+        "crowd_pleaser_yes": 3,
+        "crowd_pleaser_answered": 6,
+    }
+    assert client.post("/api/test/crowd/seed", json=body).status_code == 200
+    got = client.get(_crowd_url(CROWD_KEY)).json()
+    assert got == {**dict.fromkeys(got, None), "crowd_pleaser_share": 0.5}
+
+
+def test_crowd_reset_deletes_the_doc_and_seed_replaces(client: TestClient, fs: FakeFirestore) -> None:
+    from backend.services.crowd_stats import CROWD_COLLECTION, crowd_doc_id
+
+    _baritone_viewer(client)
+    other = "fixture artist 02|fixture song 02 02"
+    for key in (CROWD_KEY, other):
+        assert client.post("/api/test/crowd/seed", json={"song_key": key, "total": {"right": 9}}).status_code == 200
+    assert client.post("/api/test/crowd/seed", json={"song_key": CROWD_KEY, "total": {"right": 5}}).status_code == 200
+    assert fs.cols[CROWD_COLLECTION][crowd_doc_id(CROWD_KEY)]["total"]["right"] == 5  # a re-seed replaces
+    assert client.get(_crowd_url(CROWD_KEY)).json()["singers"] == 5
+
+    assert client.post("/api/test/crowd/reset", json={"song_key": CROWD_KEY}).status_code == 204
+    assert crowd_doc_id(CROWD_KEY) not in fs.cols[CROWD_COLLECTION]
+    assert crowd_doc_id(other) in fs.cols[CROWD_COLLECTION]  # only that one doc
+    assert set(client.get(_crowd_url(CROWD_KEY)).json().values()) == {None}
+    assert client.post("/api/test/crowd/reset", json={"song_key": CROWD_KEY}).status_code == 204  # idempotent
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"song_key": "", "total": {"right": 5}},
+        {"song_key": CROWD_KEY, "total": {"right": -1}},
+        {"song_key": CROWD_KEY, "total": {"rightish": 5}},
+        {"song_key": CROWD_KEY, "total": {"right": 5}, "by_bucket": {"countertenor": {"right": 5}}},
+        {"song_key": CROWD_KEY, "total": {"right": 5}, "crowd_pleaser_yes": 3, "crowd_pleaser_answered": 2},
+    ],
+)
+def test_crowd_seed_rejects_bad_bodies(client: TestClient, body: dict[str, Any]) -> None:
+    assert client.post("/api/test/crowd/seed", json=body).status_code == 422
+
+
+def test_crowd_test_api_not_mounted_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    for c in (
+        _app_with(monkeypatch, flag=True, environment="production"),
+        _app_with(monkeypatch, flag=False, environment="development"),
+    ):
+        assert c.post("/api/test/crowd/seed", json={"song_key": CROWD_KEY, "total": {"right": 5}}).status_code == 404
+        assert c.post("/api/test/crowd/reset", json={"song_key": CROWD_KEY}).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "total, by_bucket",
+    [
+        ({"right": 4}, {"baritone": {"right": 5}}),  # one bucket over total
+        ({"right": 5, "too_high": 1}, {"baritone": {"too_high": 2}}),  # over on another answer key
+        ({"right": 5}, {"baritone": {"right": 3}, "tenor": {"right": 3}}),  # each fits, the sum doesn't
+        ({}, {"alto": {"too_low": 1}}),  # buckets with no total at all
+    ],
+)
+def test_crowd_seed_rejects_buckets_above_total(
+    client: TestClient, total: dict[str, int], by_bucket: dict[str, dict[str, int]]
+) -> None:
+    r = client.post("/api/test/crowd/seed", json={"song_key": CROWD_KEY, "total": total, "by_bucket": by_bucket})
+    assert r.status_code == 422
+    assert "include bucket votes in total" in r.text
+
+
+def test_crowd_seed_accepts_buckets_equal_to_total(client: TestClient) -> None:
+    body = {
+        "song_key": CROWD_KEY,
+        "total": {"right": 6},
+        "by_bucket": {"baritone": {"right": 3}, "tenor": {"right": 3}},
+    }
+    assert client.post("/api/test/crowd/seed", json=body).status_code == 200
+
+
+def test_voice_bucket_literal_matches_crowd_stats() -> None:
+    from typing import get_args
+
+    from backend.api.routes.test_support import VoiceBucket
+    from backend.services.crowd_stats import VOICE_BUCKETS
+
+    assert set(get_args(VoiceBucket)) == set(VOICE_BUCKETS)

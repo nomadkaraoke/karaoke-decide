@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Ya has cantado esto",
       "crowd_pleaser": "Éxito asegurado",
       "decade_match": "De una década que te gusta",
       "genre_match": "Coincide con tus géneros",
@@ -893,6 +894,10 @@
       "similar_artist": "Parecido a {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Tus infalibles",
+        "reason": "Canciones que has cantado y te encantó cantar"
+      },
       "all": {
         "reason": "Todo lo que coincide, en el orden que elegiste",
         "title": "Todas las selecciones"

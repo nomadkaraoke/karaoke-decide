@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "過去に歌った曲",
       "crowd_pleaser": "みんなで盛り上がる曲",
       "decade_match": "お好みの年代の曲",
       "genre_match": "お好みのジャンルに一致",
@@ -893,6 +894,10 @@
       "similar_artist": "{artist} が好きな方へ"
     },
     "section": {
+      "go_tos": {
+        "title": "定番曲",
+        "reason": "歌ったことがあり、お気に入りの曲"
+      },
       "all": {
         "reason": "条件に一致するすべての曲（選択した並び順）",
         "title": "すべてのおすすめ"

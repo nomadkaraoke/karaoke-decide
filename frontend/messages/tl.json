@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Kinanta mo na ito",
       "crowd_pleaser": "Paborito ng marami",
       "decade_match": "Mula sa dekadang gusto mo",
       "genre_match": "Tugma sa iyong mga genre",
@@ -893,6 +894,10 @@
       "similar_artist": "Tulad ni {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Iyong mga paborito",
+        "reason": "Mga kantang kinanta mo na at nagustuhan mong kantahin"
+      },
       "all": {
         "reason": "Lahat ng tumutugma, ayon sa napili mong pagkakasunod-sunod",
         "title": "Lahat ng rekomendasyon"

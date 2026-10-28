@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "To już przez Ciebie śpiewane",
       "crowd_pleaser": "Hit imprezy",
       "decade_match": "Z dekady, którą lubisz",
       "genre_match": "Pasuje do Twoich gatunków",
@@ -893,6 +894,10 @@
       "similar_artist": "W stylu {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Twoje pewniaki",
+        "reason": "Piosenki, które masz już zaśpiewane i uwielbiasz do nich wracać"
+      },
       "all": {
         "reason": "Wszystko, co pasuje, w wybranej przez Ciebie kolejności",
         "title": "Wszystkie propozycje"

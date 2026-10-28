@@ -75,16 +75,46 @@ Useful for post-deploy verification and scheduled monitoring.
 Catalog-backed, explained recommendations (auth: decide JWT or gen session token). The web recommendations page uses this endpoint (all filters, sort and library). Query params (all optional):
 `genre` (multi), `mood` (multi), `energy` (low|mid|high), `decade` (multi), `popularity` (min 0-100), `popularity_max` (0-100), `lead_gender` (male|female|mixed), `duration` (short|medium|long), `classic` (bool), `explicit` (exclude|include), `has_karaoke` (yes|make|any), `library` (any|community|karafun), `singable` (bool), `sort` (best|popular|newest|oldest|shortest|az|fit), `cursor`.
 
-`sort=best` returns sections in order `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
+`sort=best` returns sections in order `go_tos`, `songs_you_know`, `artists_you_love`, `because_<artist_key>` (max 2), `crowd_pleasers`, `make_it` (empty sections omitted; at most 3 songs per artist per section; hidden songs never appear). Any other sort returns one flat section `all`, paged by `next_cursor`.
 
 ```json
-{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}, "fit": {"bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "notes"}}]}],
+{"sections": [{"id": "crowd_pleasers", "title_key": "...", "reason_key": "...", "title_params": {}, "songs": [{"song_key": "artist|title", "artist": "...", "title": "...", "reason": "...", "reason_type": "...", "reason_artist": null, "score": 0.8, "has_karaoke_version": true, "karaoke": {}, "facets": {"decade": "1990s", "genres": ["rock"], "mood": "happy", "energy": 0.7, "lead_gender": "male", "duration_ms": 215000, "popularity": 80, "is_classic": false, "explicit": false}, "fit": {"bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "notes"}, "crowd": null}]}],
  "filters_applied": {}, "next_cursor": null, "has_profile": true, "catalog_run": "20261021-120000", "voice": {"has_profile": true, "method": "mic"}}
 ```
 
 Vocal fit (needs a voice profile, `PUT /api/my/voice`): each song's `fit` is `{bucket: fits|fitsIn|stretch|outside, transpose, octave, tier}` (`fitsIn` = sing it `transpose` semitones / `octave` shifted), or `null` without a profile or without a song vocal range. `best` adds `0.15 x` fit affinity (fits 1.0, fitsIn 0.7, stretch 0.2, outside -0.5, unknown 0). `singable=true` keeps fits/fitsIn only (songs without a range drop out); without a profile it is ignored and not echoed in `filters_applied`. `sort=fit` is the flat `all` list ordered by fit bucket (fits, fitsIn, stretch, outside), then fit score, then popularity; songs without a range sort last. Once `catalog.db` has the `vr_*` columns the SQL prefilter keeps only songs with a range; before the catalog rebuild (schema 1) it returns songs with `fit: null` in popularity order. Without a profile it falls back to popularity order. `has_profile` is the taste profile; `voice.has_profile` is the voice profile.
 
 Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded. `GET /api/my/recommendations/categorized` (v1) is unchanged and keeps working.
+
+Sung history and surveys (Phase 4b): the karaoke log's per-song state on `user_songs` (`times_sung`, `sung_feel_latest`, `sung_key_latest`) feeds the weights. A sung song weighs 1.0 when its latest feel is `great` or it was sung 2+ times with a latest feel that isn't `bad`, 0.8 when sung once with no feel, 0.7 when the latest feel is `ok`; a song's weight is the max of its source, voice-session and sung weights. A latest feel of `bad` puts the song in `survey_no`: it scores -0.4, is never "known", never seeds a `because_*` shelf and doesn't count toward its artist. The user's own latest key answer is a key hint (`too_high` shifts the in-key fit -2, `too_low` +2).
+
+- **`go_tos`** (first, limit 10): the user's go-to karaoke songs, i.e. not hidden, latest feel not `bad`, and either latest feel `great` or `times_sung >= 2` (the same rule as the app's `isGoTo`). Go-tos past the shelf's limit or per-artist cap fall through to `songs_you_know`; a go-to never appears in both. Title/subtitle keys `recs.section.go_tos.title` / `.reason` (no params).
+- **`reason_type: "sung_before"`** ("You've sung this"): every go-to's reason; it takes precedence over `known_song`. Web key `recs.reason.sung_before`.
+
+Crowd: each song carries `crowd` (the `SongCrowd` figure below, from one batch read of `song_crowd_stats` for the page) or `null` when the song has no stats above the thresholds or the read failed (logged at WARNING; the page still returns). Within `crowd_pleasers` only, songs whose `crowd_pleaser_share >= 0.5` move to the front (stable). When at least 60% of 5+ singers in the viewer's voice bucket found a song too high (or too low), its in-key fit shifts -2 (or +2) like the user's own key hint; any key answer of the user's own ("right" included) always wins.
+
+`RecSong.crowd` is the same figure as the route below (same thresholds), attached per song.
+
+### GET /api/songs/{song_key}/crowd
+
+How other singers found a song's key (auth required; `song_key` percent-encoded). One vote per singer per song: the singer's latest key answer (`too_low|right|too_high`) across their karaoke-log records for it, counted in `total` and, when their voice profile has a voice type, in `by_bucket.<bass|baritone|tenor|alto|mezzo|soprano>` (a register-only or missing profile votes in `total` only); the crowd-pleaser figure likewise uses each singer's latest answer. Thresholds: `CROWD_MIN_SINGERS = 5` overall, `CROWD_MIN_BUCKET = 5` for the bucket figure. Returns `{singers, comfortable_share, too_high_share, too_low_share, bucket, bucket_singers, bucket_comfortable_share, crowd_pleaser_share}`. Thresholds are applied server-side: the overall fields are `null` below 5 key answers; the bucket fields are `null` unless the viewer's voice type (bass ... soprano) has 5+ answers; `crowd_pleaser_share` is `null` below 5 crowd-pleaser answers. An unknown song returns all `null`. Stats docs live at `song_crowd_stats/{crowd_doc_id(song_key)}` (sha1 hex, 32 chars) with the `song_key` as a field.
+
+### Get this made: /api/my/get-made
+
+The user's songs with no karaoke version yet (Me tab "Get this made"). Bearer gen session token.
+
+| Route | Purpose |
+|-------|---------|
+| `GET /api/my/get-made` | `{items: [{key, song_key, artist, title, why: saved\|sung\|imported\|voice\|recommended, weight}]}`, at most 30, **in server order**. |
+| `POST /api/my/get-made/{key}/dismiss` | 204. Hides `key` from this list only (never from recs). Idempotent. |
+| `DELETE /api/my/get-made/{key}/dismiss` | 204. Restores it. Idempotent. |
+
+- Candidates are the user's `user_songs` rows with no karaoke version that are saved (loved), sung, imported (a listening source) or voice-session "yes", plus uncatalogued songs they sang (`user_karaoke_unresolved`). The recs v2 `make_it` shelf tops the list up to 30 as `why: recommended`.
+- Excluded: dismissed keys, songs whose latest feel is `bad`, voice-session "no" songs and hidden songs.
+- `key` is the library identity: the catalog `song_key` when the song is in catalog.db (then `song_key == key`), else `"u:" + song_key(artist, title)` with `song_key: null`. Percent-encode it in the dismiss path (it holds `/`, `|`, `#`); keys over 512 characters are 400 `invalid`.
+- `why` is the strongest reason a row supports (saved > sung > voice > imported); `weight` is the recs weight of that reason. **`weight` is only comparable within one `why` group**: a `recommended` item's `weight` is its recs score, on a different scale from the user-song weights. Clients must keep the server's order and not re-sort by `weight`.
+- Dismissals live in `user_make_dismissed/{user_id}:{sha1(key)[:24]}` (per user, deleted with the account).
+- Errors: `401` without a token; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded.
 
 ### Song feedback: /api/my/songs
 
@@ -166,6 +196,9 @@ Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when
 | `GET /api/test/profile?email=` | Reads the profile back |
 | `POST /api/test/voice/seed-history` | `{email, sessions: [{state, result_summary?, attempts: [{song_key, artist, title, quiz, pitch?, note_labels?, recording, excluded?}]}]}` → `{user_id, sessions: [{session_id, attempt_ids, recording_ids}]}`. Replaces the user's voice history (oldest session first); `recording: true` stores a short synthetic WAV that `GET /api/voice/recordings/{id}/audio` plays (docs/TESTING.md § Voice session) |
 | `POST /api/test/karaoke-log/seed` | `{email, entries: [{id: "app_…", ...app patch}]}` → `{user_id, count}`. Writes app karaoke-log entries through `KaraokeLogService.upsert_user` (counts and survey placeholders as a real app write); creates the user if needed. Non-`app_` ids → 400 `invalid`. |
+| `POST /api/test/get-made/seed` | `{email, songs: [{artist, title, song_key?, loved?, times_sung?}]}` → `{user_id, keys}`. Writes `user_songs` rows (loved and / or sung, `source` `manual` when loved else `karaoke_log`) keyed like "Love it" rows (`loved_doc_id`), so a re-seed overwrites the same row. Use the fixture catalog's songs with no karaoke version ("Fixture Artist NN / Fixture Song NN-MM", `in_kn = 0`) so `GET /api/my/get-made` lists them. `song_key` defaults to `song_key(artist, title)`. Reset clears the user's `user_make_dismissed` docs. |
+| `POST /api/test/crowd/seed` | `{song_key, total: {too_low, right, too_high}, by_bucket: {<voice type>: {too_low, right, too_high}}, crowd_pleaser_yes, crowd_pleaser_answered?}` → `{song_key, doc_id}`. Replaces that song's `song_crowd_stats` doc in the live shape (thresholds still apply on read). **Bucket votes are not added into `total`**: a real vote counts in both, so include them in `total` yourself; per answer, the buckets' sum must fit inside `total` (else 422). `crowd_pleaser_answered` defaults to `crowd_pleaser_yes` and must be ≥ it (422). Unknown buckets or answer names are 422. Not per user: profile reset never clears it. |
+| `POST /api/test/crowd/reset` | `{song_key}` → 204. Deletes that song's `song_crowd_stats` doc (a missing doc is a no-op). Flows that seed a crowd reset it themselves. |
 | `GET /api/test/karaoke-log?email=` | `{user_id, entries, sung, unresolved}`: every karaoke-log record (deleted ones and placeholders too, newest first), `user_songs` rows with a sung count, and the unresolved counts. Reset also clears the karaoke log and the user's playlists. |
 | `POST /api/test/listenbrainz/poll` | Runs the daily `lb-poll` job's ListenBrainz poller once in-process (budget `lb_poll_budget_seconds`) → `{users_polled, listens_added, imports_checked, rate_limited, remaining}` |
 | `PUT /api/test/fake-externals` | `{knobs: {metabrainz?: "deny", metabrainz_user?, spotify_embed?: "changed", screenshot?: "fail"}}` → `{knobs}`; resets every `DECIDE_FAKE_EXTERNALS` fake to its defaults, then sets the knobs (422 unknown knob; 409 `fake_externals_disabled` when the fakes are off, as for the two below) |
@@ -737,7 +770,9 @@ No auth. Feature flags for the mobile Connect hub: `{"screenshot_import": bool, 
 
 Verified users. Every source the user has, for the app's "Connected sources" list: each `music_services` connection merged with its `user_imports` doc, plus import-only sources. `artists` / `songs` are Firestore aggregation counts of the rows whose primary `source` is that source (a row's `source` is the first source that wrote it; sources that only merged into someone else's row, listed in `sources`, are not counted).
 
-**Response:** `{"sources":[{"source":"lastfm","connected":true,"username":"x","artists":0,"songs":0,"last_import_at":null,"status":"ok","auth":"username"|"oauth"|null,"pending_listenbrainz_import":{"id":"...","status":"..."}|null}],"capabilities":{...same as /capabilities}}`. `status` (first match wins): `importing` (syncing, or import importing) > `needs_reconnect` (`error_code`) > `stale` (`lb_stale`) > `error` > `ok`.
+**Response:** `{"sources":[{"source":"lastfm","connected":true,"username":"x","artists":0,"songs":0,"last_import_at":null,"status":"ok","auth":"username"|"oauth"|null,"pending_listenbrainz_import":{"id":"...","status":"..."}|null}],"capabilities":{...same as /capabilities},"known_songs":42}`. `status` (first match wins): `importing` (syncing, or import importing) > `needs_reconnect` (`error_code`) > `stale` (`lb_stale`) > `error` > `ok`.
+
+`known_songs` (top level, an int) is the number of distinct songs the recommender treats as known, across all sources: `user_songs` rows deduped by `song_key` (else `"u:" + song_key(artist, title)`), counted when loved or when the best of its sources has a positive weight. Voice-session-only unloved rows don't count. It is 0 for a user with no rows.
 
 `GET /api/services` keeps its shape and gains `artists`, `songs`, `last_import_at`, `status`. If the per-source lookup fails it still answers `200` with those fields as `0`, `0`, `null`, `"ok"`.
 

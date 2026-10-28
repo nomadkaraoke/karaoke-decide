@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Toto si už spieval",
       "crowd_pleaser": "Hit pre každého",
       "decade_match": "Z dekády, ktorú máš rád",
       "genre_match": "Sedí k tvojim žánrom",
@@ -893,6 +894,10 @@
       "similar_artist": "Podobné ako {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Tvoje istoty",
+        "reason": "Skladby, ktoré si už spieval a rád si ich zaspievaš znova"
+      },
       "all": {
         "reason": "Všetko, čo vyhovuje, v tebou zvolenom poradí",
         "title": "Všetky tipy"
