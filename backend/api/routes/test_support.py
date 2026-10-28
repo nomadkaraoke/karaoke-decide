@@ -14,10 +14,10 @@ import struct
 import uuid
 import wave
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, get_args
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from backend.api.deps import (
     get_auth_service_dep,
@@ -35,6 +35,7 @@ from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
 from backend.models.voice_session import NoteLabelIn, PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
 from backend.services.auth_service import AuthService
+from backend.services.crowd_stats import CROWD_COLLECTION, KEY_ANSWERS, VOICE_BUCKETS, crowd_doc_id
 from backend.services.firestore_service import FirestoreService
 from backend.services.get_made_service import DISMISSED_COLLECTION as MAKE_DISMISSED
 from backend.services.import_ingest_service import ImportIngestService
@@ -584,6 +585,73 @@ async def seed_get_made(body: GetMadeSeedBody, fs: FirestoreDep, auth: AuthDep) 
             },
         )
     return {"user_id": user.id, "keys": keys}
+
+
+class CrowdCounts(BaseModel):
+    """Key-answer counts; omitted answers are 0."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    too_low: int = Field(default=0, ge=0)
+    right: int = Field(default=0, ge=0)
+    too_high: int = Field(default=0, ge=0)
+
+
+VoiceBucket = Literal["bass", "baritone", "tenor", "alto", "mezzo", "soprano"]
+assert set(get_args(VoiceBucket)) == set(VOICE_BUCKETS)  # kept in step with crowd_stats
+
+
+class CrowdSeedBody(BaseModel):
+    song_key: str = Field(min_length=1)
+    total: CrowdCounts = Field(default_factory=CrowdCounts)
+    by_bucket: dict[VoiceBucket, CrowdCounts] = Field(default_factory=dict)
+    crowd_pleaser_yes: int = Field(default=0, ge=0)
+    # Defaults to ``crowd_pleaser_yes`` (every answer was yes), so a share needs answered >= 5 (R17).
+    crowd_pleaser_answered: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _answered_covers_yes(self) -> CrowdSeedBody:
+        if self.crowd_pleaser_answered is not None and self.crowd_pleaser_answered < self.crowd_pleaser_yes:
+            raise ValueError("crowd_pleaser_answered must be >= crowd_pleaser_yes")
+        return self
+
+
+class CrowdKeyBody(BaseModel):
+    song_key: str = Field(min_length=1)
+
+
+def _crowd_counts(c: CrowdCounts) -> dict[str, int]:
+    return {k: getattr(c, k) for k in KEY_ANSWERS}
+
+
+@router.post("/crowd/seed")
+async def seed_crowd(body: CrowdSeedBody, fs: FirestoreDep) -> dict[str, str]:
+    """Replace one song's ``song_crowd_stats`` doc with these counts, in the shape ``apply_vote`` /
+    ``apply_pleaser`` write (doc id ``crowd_doc_id(song_key)``, R23), so ``GET /api/songs/{key}/crowd``
+    and the recs crowd attach read it unchanged; thresholds still apply on read. Bucket counts are
+    taken as given and not added to ``total`` (a real vote counts in both: include them in ``total``)."""
+    doc_id = crowd_doc_id(body.song_key)
+    yes = body.crowd_pleaser_yes
+    await fs.set_document(
+        CROWD_COLLECTION,
+        doc_id,
+        {
+            "song_key": body.song_key,
+            "total": _crowd_counts(body.total),
+            "by_bucket": {b: _crowd_counts(c) for b, c in body.by_bucket.items()},
+            "crowd_pleaser_yes": yes,
+            "crowd_pleaser_answered": yes if body.crowd_pleaser_answered is None else body.crowd_pleaser_answered,
+            "updated_at": datetime.now(UTC).isoformat(),
+        },
+    )
+    return {"song_key": body.song_key, "doc_id": doc_id}
+
+
+@router.post("/crowd/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_crowd(body: CrowdKeyBody, fs: FirestoreDep) -> Response:
+    """Delete that one song's ``song_crowd_stats`` doc. A missing doc is a no-op."""
+    await fs.delete_document(CROWD_COLLECTION, crowd_doc_id(body.song_key))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/karaoke-log")
