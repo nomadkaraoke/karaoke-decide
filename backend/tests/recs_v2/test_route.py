@@ -66,9 +66,10 @@ def make_client(reader: CatalogReader) -> Iterator[Callable[..., TestClient]]:
         hidden: set[str] | None = None,
         user_doc: dict[str, Any] | None = None,
         user_id: str = "guest_u1",
+        user_songs: list[dict[str, Any]] | None = None,
     ) -> TestClient:
         app.dependency_overrides[get_current_user] = lambda: User(id=user_id, is_guest=True)
-        app.dependency_overrides[get_firestore] = lambda: _firestore(user_doc)
+        app.dependency_overrides[get_firestore] = lambda: _firestore(user_doc, user_songs)
         app.dependency_overrides[get_store_dep] = lambda: store or FakeStore(reader)
         app.dependency_overrides[get_hidden_keys_provider] = lambda: FakeHidden(hidden)
         return TestClient(app)
@@ -223,3 +224,30 @@ def test_p50_under_500ms(make_client: Callable[..., TestClient]) -> None:
         assert client.get(URL).status_code == 200
         times.append(time.perf_counter() - t)
     assert statistics.median(times) < 0.5
+
+
+def test_go_tos_section_and_sung_before_reason(make_client: Callable[..., TestClient], reader: CatalogReader) -> None:
+    """Songs sung twice (or rated great) lead the page as go-tos; a latest-bad song isn't known."""
+    rows = (
+        reader.conn()
+        .execute("SELECT song_key, artist, title FROM songs WHERE in_kn = 1 ORDER BY song_key LIMIT 3")
+        .fetchall()
+    )
+    (fave, great, bad) = rows
+    log = {"user_id": "guest_u1", "source": "karaoke_log"}
+    songs = [
+        {**log, "song_id": fave[0], "song_key": fave[0], "artist": fave[1], "title": fave[2], "times_sung": 2},
+        {**log, "song_id": great[0], "song_key": great[0], "artist": great[1], "title": great[2], "times_sung": 1,
+         "sung_feel_latest": "great"},
+        {**log, "song_id": bad[0], "song_key": bad[0], "artist": bad[1], "title": bad[2], "times_sung": 3,
+         "sung_feel_latest": "bad", "loved": True},
+    ]  # fmt: skip
+    body = make_client(user_doc={"quiz_genres": ["rock"]}, user_songs=songs).get(URL).json()
+    first = body["sections"][0]
+    assert first["id"] == "go_tos"
+    assert (first["title_key"], first["reason_key"]) == ("recs.section.go_tos.title", "recs.section.go_tos.reason")
+    assert {s["song_key"] for s in first["songs"]} == {fave[0], great[0]}
+    assert {(s["reason_type"], s["reason"]) for s in first["songs"]} == {("sung_before", "You've sung this")}
+    rest = [s for sec in body["sections"][1:] for s in sec["songs"]]
+    assert not {s["song_key"] for s in rest} & {fave[0], great[0]}
+    assert all(s["reason_type"] != "known_song" for s in rest if s["song_key"] == bad[0])

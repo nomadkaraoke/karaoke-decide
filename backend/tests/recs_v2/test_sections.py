@@ -14,7 +14,7 @@ from backend.services.recs_v2.sections import SECTION_LIMITS, Section, build_sec
 from backend.tests.recs_v2.factories import cand
 from karaoke_decide.catalog.reader import CatalogReader
 
-ORDER = ["songs_you_know", "artists_you_love", "because", "crowd_pleasers", "make_it"]
+ORDER = ["go_tos", "songs_you_know", "artists_you_love", "because", "crowd_pleasers", "make_it"]
 
 
 def _rank(sid: str) -> int:
@@ -202,3 +202,53 @@ def test_because_counts_per_artist_cap() -> None:
     sections = build_sections(scored, ctx, "best")
     sec = next(s for s in sections if s.id == "because_loved2")  # 5 songs by one artist count as 3: eligible
     assert len(sec.songs) == 3
+
+
+def test_go_tos_section_first_and_deduped() -> None:
+    ctx = _ctx()
+    ctx.go_tos = {"loved1|k0", "other|k", "loved1|m0", "crowd0|s"}
+    ctx.known_songs |= {"loved1|m0": 1.0, "crowd0|s": 1.0}
+    sections = build_sections(_scored(ctx), ctx, "best")
+    go = sections[0]
+    assert (go.id, go.title_key, go.reason_key) == (
+        "go_tos",
+        "recs.section.go_tos.title",
+        "recs.section.go_tos.reason",
+    )
+    assert {s.c.song_key for s in go.songs} == {"loved1|k0", "other|k", "crowd0|s"}  # karaoke only
+    assert {s.reason_type for s in go.songs} == {"sung_before"}
+    know = next(s for s in sections if s.id == "songs_you_know")
+    assert not {s.c.song_key for s in know.songs} & ctx.go_tos
+    keys = _keys(sections)
+    assert len(keys) == len(set(keys))
+    assert SECTION_LIMITS["go_tos"] == 10
+    assert [s.id for s in sections] == sorted((s.id for s in sections), key=_rank)
+
+
+def test_go_tos_hidden_never_shown() -> None:
+    ctx = _ctx()
+    ctx.go_tos = {"loved1|k0"}
+    ctx.hidden = {"loved1|k0"}
+    assert "go_tos" not in [s.id for s in build_sections(_scored(ctx), ctx, "best")]
+
+
+def test_survey_no_not_a_because_seed() -> None:
+    ctx = _ctx()
+    ctx.survey_no = {"nearloved20|s", "nearloved21|s"}  # loved2: 4 similar, 2 said no -> 2 left
+    sections = build_sections(_scored(ctx), ctx, "best")
+    ids = [s.id for s in sections]
+    assert "because_loved2" not in ids
+    assert ids[2:4] == ["because_loved1", "because_loved3"]
+    for sec in sections:
+        if sec.id.startswith("because_"):
+            assert not {s.c.song_key for s in sec.songs} & ctx.survey_no
+
+
+def test_go_to_overflow_never_spills_into_songs_you_know() -> None:
+    """Past the go-tos per-artist cap a go-to is dropped, like any known-song overflow."""
+    ctx = _ctx()
+    ctx.go_tos = {f"loved1|k{i}" for i in range(6)}
+    sections = build_sections(_scored(ctx), ctx, "best")
+    assert sum(1 for s in sections[0].songs if s.c.artist_key == "loved1") == 3
+    know = next((s for s in sections if s.id == "songs_you_know"), None)
+    assert know is None or not {s.c.song_key for s in know.songs} & ctx.go_tos

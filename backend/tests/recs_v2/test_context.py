@@ -329,3 +329,91 @@ async def test_loved_session_only_row_counts_toward_its_artist(reader: CatalogRe
     assert from_session.artists[artist_key("Weezer")].weight == from_manual.artists[artist_key("Weezer")].weight
     unloved = FakeFirestore(user_songs=[_session("Loved Song", sources=["voice_session"], loved=False)])
     assert artist_key("Weezer") not in (await _ctx(reader, unloved)).artists
+
+
+# ------------------------------------------------------------------ Phase 4b: sung history + surveys
+
+
+def _sung(title: str, times: int, feel: str | None = None, source: str = "karaoke_log", **extra: Any) -> dict[str, Any]:
+    return _song(f"k:{title}", "Weezer", title, source=source, times_sung=times, sung_feel_latest=feel, **extra)
+
+
+def test_sung_weights() -> None:
+    assert (w.SONG_SUNG_GREAT, w.SONG_SUNG_ONCE, w.SONG_SUNG_OK, w.SURVEY_NO_PENALTY) == (1.0, 0.8, 0.7, 0.4)
+    assert w.sung_song_weight({"times_sung": 1, "sung_feel_latest": "great"}) == 1.0
+    assert w.sung_song_weight({"times_sung": 2, "sung_feel_latest": "ok"}) == 1.0
+    assert w.sung_song_weight({"times_sung": 2}) == 1.0
+    assert w.sung_song_weight({"times_sung": 1}) == 0.8
+    assert w.sung_song_weight({"times_sung": 1, "sung_feel_latest": "ok"}) == 0.7
+    assert w.sung_song_weight({"times_sung": 5, "sung_feel_latest": "bad"}) is None
+    assert w.sung_song_weight({"times_sung": 0, "sung_feel_latest": "great"}) is None
+    assert w.sung_song_weight({}) is None
+
+
+async def test_sung_great_is_known_at_full_weight(reader: CatalogReader) -> None:
+    ctx = await _ctx(reader, FakeFirestore(user_songs=[_sung("Great Song", 1, "great")]))
+    k = song_key("Weezer", "Great Song")
+    assert ctx.known_songs[k] == w.SONG_SUNG_GREAT
+    assert k in ctx.go_tos and k not in ctx.survey_no
+    assert artist_key("Weezer") in ctx.artists
+
+
+async def test_sung_once_no_survey_is_point_eight(reader: CatalogReader) -> None:
+    fs = FakeFirestore(user_songs=[_sung("Once", 1), _sung("Ok Once", 1, "ok"), _sung("Twice", 2)])
+    ctx = await _ctx(reader, fs)
+    once, ok, twice = (song_key("Weezer", t) for t in ("Once", "Ok Once", "Twice"))
+    assert ctx.known_songs[once] == w.SONG_SUNG_ONCE  # beats karaoke_log's default 0.6
+    assert ctx.known_songs[ok] == w.SONG_SUNG_OK
+    assert ctx.known_songs[twice] == w.SONG_SUNG_GREAT
+    assert ctx.go_tos == {twice}  # once (no feel / ok) is not a go-to
+
+
+async def test_sung_weight_is_maxed_with_base_and_session(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[
+            _sung("Loved Ok", 1, "ok", source="manual", loved=True),
+            _sung("Export Once", 1, source="spotify_export", playcount=1),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs[song_key("Weezer", "Loved Ok")] == w.SONG_MANUAL  # max(1.0, 0.7)
+    assert ctx.known_songs[song_key("Weezer", "Export Once")] == w.SONG_SUNG_ONCE  # max(0.4, 0.8)
+
+
+async def test_latest_bad_moves_to_survey_no_even_if_loved(reader: CatalogReader) -> None:
+    fs = FakeFirestore(user_songs=[_sung("Bad Song", 4, "bad", source="manual", loved=True)])
+    ctx = await _ctx(reader, fs)
+    k = song_key("Weezer", "Bad Song")
+    assert k in ctx.survey_no
+    assert k not in ctx.known_songs and k not in ctx.go_tos
+    assert ctx.known_without_karaoke == []
+    assert artist_key("Weezer") not in ctx.artists  # its only song doesn't count toward the artist
+    assert ctx.session_no == set()
+
+
+async def test_go_tos_exclude_hidden(reader: CatalogReader) -> None:
+    fs = FakeFirestore(user_songs=[_sung("Hidden Fave", 3, "great"), _sung("Fave", 3, "great")])
+    ctx = await _ctx(reader, fs, hidden={song_key("Weezer", "Hidden Fave")})
+    assert ctx.go_tos == {song_key("Weezer", "Fave")}
+
+
+async def test_key_hints_from_latest_key_answer(reader: CatalogReader) -> None:
+    fs = FakeFirestore(
+        user_songs=[
+            _sung("High", 1, sung_key_latest="too_high"),
+            _sung("Low", 1, sung_key_latest="too_low"),
+            _sung("Right", 1, sung_key_latest="right"),
+            _sung("None", 1),
+        ]
+    )
+    ctx = await _ctx(reader, fs)
+    assert ctx.key_hints == {song_key("Weezer", "High"): -2, song_key("Weezer", "Low"): 2}
+
+
+async def test_row_song_key_is_the_library_identity(reader: CatalogReader) -> None:
+    """A karaoke_log row stores the resolved catalog key; the sung spelling must not split the song."""
+    fs = FakeFirestore(user_songs=[_song("muse|starlight", "Muse", "Starlite (live)", source="karaoke_log",
+                                         song_key="muse|starlight", times_sung=2)])  # fmt: skip
+    ctx = await _ctx(reader, fs)
+    assert ctx.go_tos == {"muse|starlight"}
+    assert "muse|starlight" in ctx.known_songs and ctx.known_without_karaoke == []

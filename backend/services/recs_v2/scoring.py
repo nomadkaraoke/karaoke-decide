@@ -13,7 +13,14 @@ from backend.services.recs_v2.candidates import Candidate
 from backend.services.recs_v2.context import UserContextV2
 
 ReasonType = Literal[
-    "known_song", "known_artist", "similar_artist", "genre_match", "decade_match", "crowd_pleaser", "make_it"
+    "sung_before",
+    "known_song",
+    "known_artist",
+    "similar_artist",
+    "genre_match",
+    "decade_match",
+    "crowd_pleaser",
+    "make_it",
 ]
 
 
@@ -64,6 +71,8 @@ def score(c: Candidate, ctx: UserContextV2) -> Scored:
     )
     if c.song_key in ctx.session_no:
         total -= w.SESSION_NO_PENALTY
+    if c.song_key in ctx.survey_no:
+        total -= w.SURVEY_NO_PENALTY
     if ctx.crowd_pref == "hits":
         total += w.HITS_POPULARITY_BONUS * pop
     elif ctx.crowd_pref == "deep_cuts":
@@ -71,7 +80,9 @@ def score(c: Candidate, ctx: UserContextV2) -> Scored:
 
     reason: ReasonType
     reason_artist: str | None = None
-    if known > 0:
+    if c.song_key in ctx.go_tos:
+        reason = "sung_before"
+    elif known > 0:
         reason = "known_song"
     elif aff > 0:
         reason, reason_artist = "known_artist", c.artist

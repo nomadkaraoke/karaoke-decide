@@ -34,6 +34,7 @@ _CURSOR = re.compile(r"^o:(\d{1,9})$")
 
 # English fallbacks for clients without i18n; clients render from reason_type / reason_artist.
 REASON_TEXT: dict[str, str] = {
+    "sung_before": "You've sung this",
     "known_song": "You know this",
     "known_artist": "From an artist you love",
     "similar_artist": "Like {artist}",
@@ -144,7 +145,20 @@ def decode_cursor(cursor: str | None) -> int:
     return int(m.group(1))
 
 
-def _rec_song(s: Scored) -> RecSong:
+def _rec_fit(c: Candidate, hint: int | None) -> RecFit | None:
+    """The song's fit, shifted by the singer's key hint (their latest "too high" / "too low" answer):
+    the transpose moves by the hint and a song that ``fits`` as written now ``fitsIn`` that key."""
+    if c.fit is None or c.vr is None:
+        return None
+    bucket, transpose = c.fit.bucket, c.fit.transpose
+    if hint:
+        transpose += hint
+        if bucket == "fits":
+            bucket = "fitsIn"
+    return RecFit(bucket=bucket, transpose=transpose, octave=c.fit.octave, tier=c.vr.tier)  # type: ignore[arg-type]
+
+
+def _rec_song(s: Scored, key_hints: dict[str, int] | None = None) -> RecSong:
     c: Candidate = s.c
     reason = REASON_TEXT[s.reason_type].format(artist=s.reason_artist or c.artist)
     return RecSong(
@@ -170,11 +184,7 @@ def _rec_song(s: Scored) -> RecSong:
             is_classic=c.is_classic,
             explicit=c.explicit,
         ),
-        fit=(
-            RecFit(bucket=c.fit.bucket, transpose=c.fit.transpose, octave=c.fit.octave, tier=c.vr.tier)  # type: ignore[arg-type]
-            if c.fit is not None and c.vr is not None
-            else None
-        ),
+        fit=_rec_fit(c, (key_hints or {}).get(c.song_key)),
     )
 
 
@@ -276,7 +286,7 @@ class RecommendationServiceV2:
                     title_key=sec.title_key,
                     reason_key=sec.reason_key,
                     title_params=sec.title_params,
-                    songs=[_rec_song(s) for s in sec.songs],
+                    songs=[_rec_song(s, ctx.key_hints) for s in sec.songs],
                 )
                 for sec in sections
             ],

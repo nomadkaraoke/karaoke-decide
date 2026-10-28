@@ -34,6 +34,11 @@ SESSION_SOURCE = "voice_session"
 SONG_SESSION_YES = 1.0  # "would you sing it?" yes / yes in another key
 SONG_SESSION_FINE = 0.6  # felt fine
 SESSION_NO_PENALTY = 0.15  # "would you sing it?" no: subtracted from the score (scoring.score)
+# Karaoke log (Phase 4b: user_songs ``times_sung`` + the derived ``sung_feel_latest``; see sung_song_weight).
+SONG_SUNG_GREAT = 1.0  # latest feel "great", or sung 2+ times with a latest feel that isn't "bad"
+SONG_SUNG_ONCE = 0.8  # sung once, no feel answered
+SONG_SUNG_OK = 0.7  # sung once, latest feel "ok"
+SURVEY_NO_PENALTY = 0.4  # latest feel "bad": subtracted from the score (scoring.score), never "known"
 # Sources whose playcount is real listens (Last.fm, Spotify / Apple privacy exports): weighed alike.
 PLAY_COUNT_SOURCES = frozenset({"lastfm", "spotify_export", "apple_export"})
 
@@ -89,6 +94,21 @@ def session_song_weight(doc: dict[str, object]) -> float | None:
     if doc.get("session_feel") == "fine":
         return SONG_SESSION_FINE
     return None
+
+
+def sung_song_weight(doc: dict[str, object]) -> float | None:
+    """The weight the singer's karaoke history gives the song (max'd with the others), or None.
+
+    None when it was never sung or the latest feel is ``bad`` (that song goes to ``survey_no``)."""
+    feel = doc.get("sung_feel_latest")
+    times = to_int(doc.get("times_sung")) or 0
+    if feel == "bad" or times < 1:
+        return None
+    if feel == "great" or times >= 2:
+        return SONG_SUNG_GREAT
+    if feel == "ok":
+        return SONG_SUNG_OK
+    return SONG_SUNG_ONCE
 
 
 def to_int(v: object) -> int | None:

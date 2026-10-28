@@ -41,6 +41,7 @@ from karaoke_decide.vocal_range.fit import (
     fit_song,
     is_singable,
 )
+from karaoke_decide.vocal_range.tsv import SongRange
 
 URL = "/api/my/recommendations/v2"
 BARITONE = UserVoiceRange(low=45, high=69, comfort_low=50, comfort_high=64)
@@ -468,3 +469,46 @@ async def test_recommend_with_explicit_profile(reader: CatalogReader) -> None:
     assert res.voice.model_dump() == {"has_profile": True, "method": "session"}
     songs = [s for sec in res.sections for s in sec.songs]
     assert songs and all(s.fit is not None and s.fit.bucket in ("fits", "fitsIn") for s in songs)
+
+
+# ------------------------------------------------------------------ Phase 4b: per-song key hints
+
+
+def _ranged(key: str, bucket: str, transpose: int = 0) -> Scored:
+    c = cand(key, "Muse", vr=SongRange(50, 62, 51, 56, 61, "measured"))
+    c.fit = FitResult(bucket, transpose, 0, 0.0, 1.0)  # type: ignore[arg-type]
+    return Scored(c=c, score=1.0, reason_type="known_song", reason_artist=None)
+
+
+def test_key_hint_sets_transpose() -> None:
+    """A song the singer said was too high and that fits now comes as fitsIn, two semitones down."""
+    hints = {"m|high": -2, "m|low": 2, "m|stretch": -2}
+    assert svc._rec_song(_ranged("m|high", "fits"), hints).fit.model_dump() == {  # type: ignore[union-attr]
+        "bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "measured"
+    }  # fmt: skip
+    low = svc._rec_song(_ranged("m|low", "fitsIn", -1), hints).fit
+    assert low is not None and (low.bucket, low.transpose) == ("fitsIn", 1)
+    stretch = svc._rec_song(_ranged("m|stretch", "stretch", 1), hints).fit
+    assert stretch is not None and (stretch.bucket, stretch.transpose) == ("stretch", -1)
+    plain = svc._rec_song(_ranged("m|none", "fits"), hints).fit
+    assert plain is not None and (plain.bucket, plain.transpose) == ("fits", 0)
+    no_fit = cand("m|high")
+    assert svc._rec_song(Scored(c=no_fit, score=1.0, reason_type="known_song", reason_artist=None), hints).fit is None
+
+
+async def test_key_hint_through_recommend(reader: CatalogReader) -> None:
+    """End to end: Starlight fits the baritone, but the singer's last key answer was too high."""
+    rows: list[dict[str, Any]] = [*SONGS, {"user_id": "guest_fit", "artist": "Muse", "title": "Starlight", "source": "karaoke_log",
+                     "song_key": STARLIGHT, "times_sung": 1, "sung_key_latest": "too_high"}]  # fmt: skip
+    fs = MagicMock()
+    fs.get_document = AsyncMock(return_value={"user_id": "guest_fit"})
+
+    async def query(collection: str, **_: Any) -> list[dict[str, Any]]:
+        return rows if collection == "user_songs" else []
+
+    fs.query_documents = AsyncMock(side_effect=query)
+    profile = VoiceProfileOut.model_validate(PROFILE)
+    service = svc.RecommendationServiceV2(fs, FakeStore(reader), FakeHidden(), voice=NoStoredProfile())
+    res = await service.recommend(User(id="guest_fit", is_guest=True), RecFilters(), "best", profile=profile)
+    fit = {s.song_key: s for sec in res.sections for s in sec.songs}[STARLIGHT].fit
+    assert fit is not None and (fit.bucket, fit.transpose) == ("fitsIn", -2)
