@@ -180,8 +180,13 @@ def _parse_dt(value: Any) -> datetime | None:
     if isinstance(value, datetime):
         dt = value
     elif isinstance(value, str):
+        text = value.strip()
+        if len(text) == 4 and text.isdigit():  # a backfill night's partial date: YYYY, YYYY-MM
+            text += "-01-01"
+        elif len(text) == 7 and text[4] == "-":
+            text += "-01"
         try:
-            dt = datetime.fromisoformat(value)
+            dt = datetime.fromisoformat(text)
         except ValueError as exc:
             raise KaraokeLogInvalidError(f"not an ISO timestamp: {value!r}") from exc
     else:
@@ -315,7 +320,13 @@ def _times(doc: dict[str, Any] | None) -> int:
 
 
 def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: str, times: int = 1) -> dict[str, Any]:
-    when = new.get("sung_at") or new.get("ended_at") or now
+    when = new.get("sung_at") or new.get("ended_at")
+    if not when and new.get("origin") == "backfill":
+        # An old remembered sing is dated by its night (or undated), never "now": `_later(old, None)`
+        # keeps the row's real last_sung_at.
+        when = (new.get("night") or {}).get("date") or None
+    elif not when:
+        when = now
     if doc is None:
         doc = {
             "user_id": new["user_id"],

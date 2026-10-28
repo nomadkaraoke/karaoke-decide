@@ -688,13 +688,13 @@ async def test_unknown_vibe_rejected(svc: KaraokeLogService) -> None:
 
 
 def _backfill(**over: Any) -> dict[str, Any]:
-    return _app_entry(
-        sung_at=None,
-        origin="backfill",
-        times=5,
-        night={"kind": "other", "date": "2024", "date_precision": "year"},
-        **over,
-    )
+    kw: dict[str, Any] = {
+        "sung_at": None,
+        "origin": "backfill",
+        "times": 5,
+        "night": {"kind": "other", "date": "2024", "date_precision": "year"},
+    }
+    return _app_entry(**{**kw, **over})
 
 
 @pytest.mark.asyncio
@@ -1119,3 +1119,30 @@ async def test_profile_lookup_skipped_without_survey(svc: KaraokeLogService, fs:
     assert "decide_users" not in calls
     await svc.upsert_user(USER, APP_ID2, _app_entry(survey={"key": "right"}), email=EMAIL)
     assert calls.count("decide_users") == 1
+
+
+@pytest.mark.asyncio
+async def test_backfill_undated_keeps_last_sung_at(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, "app_real", _app_entry(sung_at="2026-10-01T20:00:00+00:00"))
+    await svc.upsert_user(USER, APP_ID, _backfill(night={"kind": "other"}))
+    assert fs.user_songs()[row_id]["last_sung_at"] == "2026-10-01T20:00:00+00:00"
+    assert fs.user_songs()[row_id]["times_sung"] == 6
+
+
+@pytest.mark.asyncio
+async def test_backfill_undated_alone_has_no_last_sung_at(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    await svc.upsert_user(USER, APP_ID, _backfill(night={"kind": "other"}))
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["last_sung_at"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("date", "expected"),
+    [("2024", "2024-01-01"), ("2024-03", "2024-03-01"), ("2024-03-09", "2024-03-09")],
+)
+async def test_backfill_partial_date_sets_last_sung_at_from_night_date(
+    svc: KaraokeLogService, fs: MemoryFirestore, date: str, expected: str
+) -> None:
+    await svc.upsert_user(USER, APP_ID, _backfill(night={"kind": "other", "date": date}))
+    assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["last_sung_at"].startswith(expected)

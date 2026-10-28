@@ -3,6 +3,7 @@
 Handles OAuth flows, service connections, and sync operations.
 """
 
+import asyncio
 import html
 import logging
 import re
@@ -289,6 +290,7 @@ class SourceSummary(BaseModel):
 class SourcesSummaryResponse(BaseModel):
     sources: list[SourceSummary]
     capabilities: Capabilities
+    known_songs: int = 0  # distinct songs across all sources (deduped by song_key)
 
 
 class RemoveDataResponse(BaseModel):
@@ -310,8 +312,12 @@ async def get_sources_summary(
     settings: Settings,
 ) -> SourcesSummaryResponse:
     """Every connected or imported source with its counts and status, plus the capability flags."""
-    rows = await music_service.get_source_summaries(user.id)
-    return SourcesSummaryResponse(sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings))
+    rows, known = await asyncio.gather(
+        music_service.get_source_summaries(user.id), music_service.count_known_songs(user.id)
+    )
+    return SourcesSummaryResponse(
+        sources=[SourceSummary(**r) for r in rows], capabilities=_capabilities(settings), known_songs=known
+    )
 
 
 @router.delete("/sources/{source}/data", response_model=RemoveDataResponse)

@@ -240,3 +240,16 @@ def test_guest_cannot_import_spotify_playlist(client: TestClient) -> None:
         json={"url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M"},
     )
     assert resp.status_code == 403
+
+
+def test_summary_known_songs_deduped(client: TestClient, db: FakeDb) -> None:
+    def song(doc_id: str, **f: Any) -> None:
+        db.put("user_songs", doc_id, {"user_id": USER, **f})
+
+    song("a", song_key="k1", source="lastfm", sources=["lastfm"], playcount=20)
+    song("b", song_key="k1", source="spotify", sources=["spotify"])  # same song again: once
+    song("c", song_key="k2", source="voice_session", sources=["voice_session"])  # session-only: 0
+    song("d", song_key="k3", source="voice_session", sources=["voice_session"], loved=True)  # loved: counts
+    song("e", song_key="k4", source="screenshot", sources=["screenshot"])
+    db.put("user_songs", "z", {"user_id": "other", "song_key": "k9", "source": "lastfm"})
+    assert client.get("/api/services/summary").json()["known_songs"] == 3
