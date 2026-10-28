@@ -14,7 +14,7 @@ import struct
 import uuid
 import wave
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any, Literal, get_args
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -35,7 +35,7 @@ from backend.fakes.state import KNOWN_KNOBS, STATE, FakeLastFmUser, FakeListen
 from backend.models.karaoke_log import KaraokeLogEntry
 from backend.models.voice_session import NoteLabelIn, PitchSummaryIn, QuizIn, SessionResultSummaryOut, SessionStateName
 from backend.services.auth_service import AuthService
-from backend.services.crowd_stats import CROWD_COLLECTION, KEY_ANSWERS, VOICE_BUCKETS, crowd_doc_id
+from backend.services.crowd_stats import CROWD_COLLECTION, KEY_ANSWERS, crowd_doc_id
 from backend.services.firestore_service import FirestoreService
 from backend.services.get_made_service import DISMISSED_COLLECTION as MAKE_DISMISSED
 from backend.services.import_ingest_service import ImportIngestService
@@ -598,7 +598,7 @@ class CrowdCounts(BaseModel):
 
 
 VoiceBucket = Literal["bass", "baritone", "tenor", "alto", "mezzo", "soprano"]
-assert set(get_args(VoiceBucket)) == set(VOICE_BUCKETS)  # kept in step with crowd_stats
+# Same values as crowd_stats.VOICE_BUCKETS (test_voice_bucket_literal_matches_crowd_stats).
 
 
 class CrowdSeedBody(BaseModel):
@@ -613,6 +613,18 @@ class CrowdSeedBody(BaseModel):
     def _answered_covers_yes(self) -> CrowdSeedBody:
         if self.crowd_pleaser_answered is not None and self.crowd_pleaser_answered < self.crowd_pleaser_yes:
             raise ValueError("crowd_pleaser_answered must be >= crowd_pleaser_yes")
+        return self
+
+    @model_validator(mode="after")
+    def _buckets_within_total(self) -> CrowdSeedBody:
+        """A real vote counts in its bucket and in ``total``, so per answer the buckets' sum can't exceed it."""
+        for key in KEY_ANSWERS:
+            in_buckets = sum(getattr(c, key) for c in self.by_bucket.values())
+            if in_buckets > getattr(self.total, key):
+                raise ValueError(
+                    f"by_bucket {key} votes ({in_buckets}) exceed total {key} ({getattr(self.total, key)}): "
+                    "include bucket votes in total"
+                )
         return self
 
 

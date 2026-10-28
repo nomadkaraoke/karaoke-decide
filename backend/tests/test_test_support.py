@@ -785,3 +785,38 @@ def test_crowd_test_api_not_mounted_in_production(monkeypatch: pytest.MonkeyPatc
     ):
         assert c.post("/api/test/crowd/seed", json={"song_key": CROWD_KEY, "total": {"right": 5}}).status_code == 404
         assert c.post("/api/test/crowd/reset", json={"song_key": CROWD_KEY}).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "total, by_bucket",
+    [
+        ({"right": 4}, {"baritone": {"right": 5}}),  # one bucket over total
+        ({"right": 5, "too_high": 1}, {"baritone": {"too_high": 2}}),  # over on another answer key
+        ({"right": 5}, {"baritone": {"right": 3}, "tenor": {"right": 3}}),  # each fits, the sum doesn't
+        ({}, {"alto": {"too_low": 1}}),  # buckets with no total at all
+    ],
+)
+def test_crowd_seed_rejects_buckets_above_total(
+    client: TestClient, total: dict[str, int], by_bucket: dict[str, dict[str, int]]
+) -> None:
+    r = client.post("/api/test/crowd/seed", json={"song_key": CROWD_KEY, "total": total, "by_bucket": by_bucket})
+    assert r.status_code == 422
+    assert "include bucket votes in total" in r.text
+
+
+def test_crowd_seed_accepts_buckets_equal_to_total(client: TestClient) -> None:
+    body = {
+        "song_key": CROWD_KEY,
+        "total": {"right": 6},
+        "by_bucket": {"baritone": {"right": 3}, "tenor": {"right": 3}},
+    }
+    assert client.post("/api/test/crowd/seed", json=body).status_code == 200
+
+
+def test_voice_bucket_literal_matches_crowd_stats() -> None:
+    from typing import get_args
+
+    from backend.api.routes.test_support import VoiceBucket
+    from backend.services.crowd_stats import VOICE_BUCKETS
+
+    assert set(get_args(VoiceBucket)) == set(VOICE_BUCKETS)
