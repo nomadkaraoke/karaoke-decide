@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Bunu söylemiştin",
       "crowd_pleaser": "Herkesi coşturan şarkı",
       "decade_match": "Sevdiğin bir dönemden",
       "genre_match": "Müzik zevkine uygun",
@@ -893,6 +894,10 @@
       "similar_artist": "{artist} gibi"
     },
     "section": {
+      "go_tos": {
+        "title": "Gözdelerin",
+        "reason": "Söylediğin ve söylemeyi sevdiğin şarkılar"
+      },
       "all": {
         "reason": "Eşleşen tüm şarkılar, seçtiğin sırada",
         "title": "Tüm öneriler"

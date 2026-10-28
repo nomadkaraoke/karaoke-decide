@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Ezt már énekelted",
       "crowd_pleaser": "Közönségkedvenc",
       "decade_match": "Egy olyan évtizedből, amit kedvelsz",
       "genre_match": "Illik a stílusaidhoz",
@@ -893,6 +894,10 @@
       "similar_artist": "Hasonló, mint {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "A tuti befutóid",
+        "reason": "Dalok, amiket már énekeltél és szerettél énekelni"
+      },
       "all": {
         "reason": "Minden találat a kiválasztott sorrendben",
         "title": "Összes ajánlat"

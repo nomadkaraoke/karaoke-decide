@@ -884,6 +884,10 @@
   },
   "recs": {
     "section": {
+      "go_tos": {
+        "title": "Your go-tos",
+        "reason": "Songs you've sung and loved singing"
+      },
       "songs_you_know": {
         "title": "Songs you know",
         "reason": "Karaoke versions of songs from your library"
@@ -910,6 +914,7 @@
       }
     },
     "reason": {
+      "sung_before": "You've sung this",
       "known_song": "You know this",
       "known_artist": "From an artist you love",
       "similar_artist": "Like {artist}",

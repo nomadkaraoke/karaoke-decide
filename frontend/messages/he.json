@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "כבר שרת את זה",
       "crowd_pleaser": "להיט בטוח",
       "decade_match": "מעשור שאהבת",
       "genre_match": "מתאים לסגנונות שלך",
@@ -893,6 +894,10 @@
       "similar_artist": "בסגנון {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "הקבועים שלך",
+        "reason": "שירים ששרת ואהבת לשיר"
+      },
       "all": {
         "reason": "כל מה שמתאים, לפי סדר המיון שבחרת",
         "title": "כל ההמלצות"

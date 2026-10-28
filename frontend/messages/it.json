@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "L'hai già cantata",
       "crowd_pleaser": "Successo assicurato",
       "decade_match": "Da un decennio che ti piace",
       "genre_match": "In linea con i tuoi generi",
@@ -893,6 +894,10 @@
       "similar_artist": "Simile a {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "I tuoi cavalli di battaglia",
+        "reason": "Canzoni che hai cantato e che ami cantare"
+      },
       "all": {
         "reason": "Tutti i brani corrispondenti, nell'ordine che hai scelto",
         "title": "Tutti i brani scelti"

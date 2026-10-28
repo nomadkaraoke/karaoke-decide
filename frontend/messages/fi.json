@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Olet laulanut tämän",
       "crowd_pleaser": "Yleisön suosikki",
       "decade_match": "Mieluisalta vuosikymmeneltä",
       "genre_match": "Sopii musiikkimakuusi",
@@ -893,6 +894,10 @@
       "similar_artist": "Kuten {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Luottobiisisi",
+        "reason": "Biisit, joita olet laulanut ja rakastanut laulaa"
+      },
       "all": {
         "reason": "Kaikki osumat valitsemassasi järjestyksessä",
         "title": "Kaikki suositukset"

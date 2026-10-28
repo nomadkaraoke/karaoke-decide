@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Du har sunget denne",
       "crowd_pleaser": "Publikumsfavoritt",
       "decade_match": "Fra et tiår du liker",
       "genre_match": "Matcher sjangrene dine",
@@ -893,6 +894,10 @@
       "similar_artist": "Ligner på {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Dine faste favoritter",
+        "reason": "Sanger du har sunget og elsket å synge"
+      },
       "all": {
         "reason": "Alt som matcher, i den rekkefølgen du har valgt",
         "title": "Alle anbefalinger"

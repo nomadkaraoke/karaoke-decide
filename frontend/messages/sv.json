@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Du har sjungit den här",
       "crowd_pleaser": "Publikfavorit",
       "decade_match": "Från ett årtionde du gillar",
       "genre_match": "Matchar dina genrer",
@@ -893,6 +894,10 @@
       "similar_artist": "Liknar {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Dina favoriter",
+        "reason": "Låtar du har sjungit och älskat att sjunga"
+      },
       "all": {
         "reason": "Allt som matchar, i den ordning du valt",
         "title": "Alla förslag"

@@ -884,6 +884,7 @@
   },
   "recs": {
     "reason": {
+      "sung_before": "Ja l'has cantada",
       "crowd_pleaser": "Èxit assegurat",
       "decade_match": "D'una dècada que t'agrada",
       "genre_match": "Coincideix amb els teus gèneres",
@@ -893,6 +894,10 @@
       "similar_artist": "A l'estil de {artist}"
     },
     "section": {
+      "go_tos": {
+        "title": "Els teus clàssics",
+        "reason": "Cançons que has cantat i t'ha encantat cantar"
+      },
       "all": {
         "reason": "Tot el que coincideix, en l'ordre que has triat",
         "title": "Tots els suggeriments"
