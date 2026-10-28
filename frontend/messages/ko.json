@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "불러 본 노래",
+      "sung_before": "전에 부른 노래예요",
       "crowd_pleaser": "분위기 띄우기 좋은 곡",
       "decade_match": "선호하는 시대의 곡",
       "genre_match": "취향에 맞는 장르",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "나의 애창곡",
-        "reason": "불러 봤고 즐겨 부르는 노래"
+        "reason": "직접 불러보고 마음에 들었던 노래예요"
       },
       "all": {
         "reason": "선택한 정렬 순서대로 보여주는 모든 곡",

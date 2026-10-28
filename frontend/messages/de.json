@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Hast du schon gesungen",
+      "sung_before": "Schon mal gesungen",
       "crowd_pleaser": "Publikumsliebling",
       "decade_match": "Aus einem Jahrzehnt, das du magst",
       "genre_match": "Passt zu deinen Genres",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Deine Favoriten",
-        "reason": "Songs, die du gesungen hast und gern singst"
+        "reason": "Songs, die du schon gesungen hast und liebst"
       },
       "all": {
         "reason": "Alles, was passt, in der von dir gewählten Reihenfolge",

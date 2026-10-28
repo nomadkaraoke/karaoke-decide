@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Kamu pernah menyanyikan ini",
+      "sung_before": "Pernah kamu nyanyikan",
       "crowd_pleaser": "Disukai banyak orang",
       "decade_match": "Dari dekade yang kamu suka",
       "genre_match": "Sesuai dengan genremu",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Lagu andalanmu",
-        "reason": "Lagu yang pernah kamu nyanyikan dan kamu suka"
+        "reason": "Lagu yang pernah kamu nyanyikan dan suka kamu bawakan"
       },
       "all": {
         "reason": "Semua yang cocok, sesuai urutan pilihanmu",

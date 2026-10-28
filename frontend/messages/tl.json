@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Nakanta mo na ito",
+      "sung_before": "Kinanta mo na ito",
       "crowd_pleaser": "Paborito ng marami",
       "decade_match": "Mula sa dekadang gusto mo",
       "genre_match": "Tugma sa iyong mga genre",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Iyong mga paborito",
-        "reason": "Mga kantang nakanta mo na at gustong-gusto mong kantahin"
+        "reason": "Mga kantang kinanta mo na at nagustuhan mong kantahin"
       },
       "all": {
         "reason": "Lahat ng tumutugma, ayon sa napili mong pagkakasunod-sunod",

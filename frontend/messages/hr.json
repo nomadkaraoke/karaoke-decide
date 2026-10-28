@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Ovo si već pjevao",
+      "sung_before": "Ovo si već pjevao/la",
       "crowd_pleaser": "Hit za publiku",
       "decade_match": "Iz desetljeća koje voliš",
       "genre_match": "Odgovara tvojim žanrovima",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Tvoji favoriti",
-        "reason": "Pjesme koje si pjevao i volio pjevati"
+        "reason": "Pjesme koje si pjevao/la i rado ih pjevaš"
       },
       "all": {
         "reason": "Sve što odgovara, redoslijedom koji odabereš",

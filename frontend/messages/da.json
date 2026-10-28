@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Du har sunget denne",
+      "sung_before": "Du har sunget denne før",
       "crowd_pleaser": "Publikumsfavorit",
       "decade_match": "Fra et årti, du kan lide",
       "genre_match": "Matcher dine genrer",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Dine favoritter",
-        "reason": "Sange du har sunget og elsket at synge"
+        "reason": "Sange, du har sunget og elsker at synge"
       },
       "all": {
         "reason": "Alt, der matcher, i din valgte rækkefølge",

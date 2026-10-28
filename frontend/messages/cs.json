@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Tohle už jsi zpíval",
+      "sung_before": "Tohle už jsi zpíval(a)",
       "crowd_pleaser": "Hit pro všechny",
       "decade_match": "Z tvé oblíbené dekády",
       "genre_match": "Odpovídá tvým žánrům",
@@ -896,7 +896,7 @@
     "section": {
       "go_tos": {
         "title": "Tvoje jistoty",
-        "reason": "Písničky, které jsi zpíval a zpívání tě bavilo"
+        "reason": "Písničky, které už jsi zpíval(a) a bavilo tě to"
       },
       "all": {
         "reason": "Všechno, co odpovídá, ve tvém zvoleném pořadí",

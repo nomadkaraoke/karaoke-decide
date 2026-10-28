@@ -884,7 +884,7 @@
   },
   "recs": {
     "reason": {
-      "sung_before": "Tu l'as déjà chantée",
+      "sung_before": "Tu as déjà chanté ce titre",
       "crowd_pleaser": "Succès garanti",
       "decade_match": "D'une décennie que tu aimes",
       "genre_match": "Correspond à tes genres",
