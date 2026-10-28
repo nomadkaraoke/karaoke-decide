@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any, Literal, Self
+from typing import Any, Literal, Protocol, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -83,17 +83,34 @@ class VoiceProfileUserNotFoundError(Exception):
     """The user has no decide_users doc to hold a profile."""
 
 
+class UserDocReader(Protocol):
+    """The slice of ``FirestoreService`` ``find_user_doc`` needs."""
+
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None: ...
+    async def query_documents(
+        self, collection: str, filters: list[tuple[str, str, Any]] | None = None, *, limit: int | None = None
+    ) -> list[dict[str, Any]]: ...
+
+
+async def find_user_doc(firestore: UserDocReader, user_id: str) -> tuple[dict[str, Any] | None, str | None]:
+    """``(doc, doc_id)`` of the user's decide_users doc (where the voice profile lives), or
+    ``(None, None)``. The one resolution rule, shared with the karaoke log's crowd bucket:
+    guests by their user_id doc, everyone else by the doc whose ``user_id`` field matches
+    (verified users' docs are keyed by an email hash, which callers must not guess)."""
+    if user_id.startswith("guest_"):
+        doc = await firestore.get_document(USERS_COLLECTION, user_id)
+        return (doc, user_id) if doc else (None, None)
+    docs = await firestore.query_documents(USERS_COLLECTION, filters=[("user_id", "==", user_id)], limit=1)
+    return (docs[0], str(docs[0]["id"])) if docs else (None, None)
+
+
 class VoiceProfileService:
     def __init__(self, firestore: FirestoreService) -> None:
         self.firestore = firestore
 
     async def _doc(self, user_id: str) -> tuple[dict[str, Any] | None, str | None]:
-        """The decide_users doc for a user: guests are keyed by user_id, verified users by email hash."""
-        if user_id.startswith("guest_"):
-            doc = await self.firestore.get_document(USERS_COLLECTION, user_id)
-            return (doc, user_id) if doc else (None, None)
-        docs = await self.firestore.query_documents(USERS_COLLECTION, filters=[("user_id", "==", user_id)], limit=1)
-        return (docs[0], docs[0]["id"]) if docs else (None, None)
+        """The decide_users doc for a user (see ``find_user_doc``)."""
+        return await find_user_doc(self.firestore, user_id)
 
     async def _read(self, user_id: str, field: str) -> VoiceProfileOut | None:
         doc, _ = await self._doc(user_id)

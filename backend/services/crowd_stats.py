@@ -5,7 +5,8 @@
 * ``total``: ``{too_low, right, too_high}``, each singer's latest key answer;
 * ``by_bucket.<bucket>``: the same, split by the singer's voice type (bass ... soprano); singers
   with a register-only or missing profile count in ``total`` alone;
-* ``crowd_pleaser_yes``: singers whose latest crowd-pleaser answer is yes.
+* ``crowd_pleaser_yes``: singers whose latest crowd-pleaser answer is yes, and
+  ``crowd_pleaser_answered``: singers whose latest record answered it (yes or no), the base for a share.
 
 The karaoke-log transaction keeps each singer's exact contribution on their ``user_songs`` row
 (``sung_key_latest`` + ``crowd_bucket``) and moves it here with ``apply_vote`` / ``apply_pleaser``
@@ -75,9 +76,12 @@ def apply_vote(
 def apply_pleaser(
     stats: dict[str, Any] | None, old: bool | None, new: bool | None, now: str | None = None
 ) -> dict[str, Any]:
-    """``crowd_pleaser_yes`` moved from ``old`` to ``new`` (one per singer, never below 0)."""
+    """``crowd_pleaser_yes`` (latest answer yes) and ``crowd_pleaser_answered`` (latest answer
+    yes or no) moved from ``old`` to ``new``: one per singer, never below 0 (R17)."""
     out = _copy(stats)
-    yes = int(out.get("crowd_pleaser_yes") or 0) - (1 if old is True else 0) + (1 if new is True else 0)
+    yes = int(out.get("crowd_pleaser_yes") or 0) - (old is True) + (new is True)
+    answered = int(out.get("crowd_pleaser_answered") or 0) - (old is not None) + (new is not None)
     out["crowd_pleaser_yes"] = max(0, yes)
+    out["crowd_pleaser_answered"] = max(0, answered)
     out["updated_at"] = now or datetime.now(UTC).isoformat()
     return out

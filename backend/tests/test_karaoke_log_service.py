@@ -821,7 +821,9 @@ async def test_survey_only_edit_writes_row(svc: KaraokeLogService, fs: MemoryFir
     assert row["sung_feel_latest"] == "great" and row["sung_key_latest"] == "right"
     assert row["times_sung"] == 1  # counting untouched
     await svc.upsert_user(USER, KJ_ID, {"survey": {"feel": "ok", "answered_at": T2}})
-    assert _row(fs)["sung_feel_latest"] == "ok"
+    row = _row(fs)
+    assert row["sung_feel_latest"] == "ok"
+    assert row["sung_surveys"][KJ_ID]["at"] == {"feel": T2, "key": T1}  # the key's at is untouched
 
 
 @pytest.mark.asyncio
@@ -866,14 +868,34 @@ async def test_crowd_bucket_from_voice_profile(svc: KaraokeLogService, fs: Memor
     stats = _crowd(fs)
     assert stats is not None and stats["by_bucket"]["baritone"]["right"] == 1
     assert _row(fs)["crowd_bucket"] == "baritone"
+    assert _row(fs)["sung_surveys"][APP_ID]["bucket"] == "baritone"
     _profile(fs, "tenor")
-    await svc.upsert_user(USER, APP_ID, {"survey": {"key": "right", "answered_at": T2}}, email=EMAIL)
+    # sings it again and re-answers: the stored baritone vote comes out exactly
+    await svc.upsert_user(USER, APP_ID2, _app_entry(survey={"key": "right", "answered_at": T2}), email=EMAIL)
     stats = _crowd(fs)
     assert stats is not None
     assert stats["by_bucket"]["baritone"]["right"] == 0
     assert stats["by_bucket"]["tenor"]["right"] == 1
     assert stats["total"]["right"] == 1
     assert _row(fs)["crowd_bucket"] == "tenor"
+    # falling back to the older answer uses that answer's own bucket
+    await svc.delete(USER, APP_ID2)
+    stats = _crowd(fs)
+    assert stats is not None
+    assert stats["by_bucket"]["baritone"]["right"] == 1 and stats["by_bucket"]["tenor"]["right"] == 0
+    assert _row(fs)["crowd_bucket"] == "baritone"
+
+
+@pytest.mark.asyncio
+async def test_changed_key_takes_current_bucket(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    _profile(fs, "baritone")
+    await svc.upsert_user(USER, APP_ID, _app_entry(survey={"key": "right", "answered_at": T1}), email=EMAIL)
+    _profile(fs, "tenor")
+    await svc.upsert_user(USER, APP_ID, {"survey": {"key": "too_high", "answered_at": T2}}, email=EMAIL)
+    stats = _crowd(fs)
+    assert stats is not None
+    assert stats["by_bucket"]["baritone"] == {"too_low": 0, "right": 0, "too_high": 0}
+    assert stats["by_bucket"]["tenor"]["too_high"] == 1
 
 
 @pytest.mark.asyncio
@@ -952,3 +974,148 @@ async def test_notes_only_edit_leaves_crowd_alone(svc: KaraokeLogService, fs: Me
     before = copy.deepcopy(_crowd(fs))
     await svc.upsert_user(USER, APP_ID, {"survey": {"notes": "fun night"}}, email=EMAIL)
     assert _crowd(fs) == before
+
+
+@pytest.mark.asyncio
+async def test_one_field_edit_keeps_other_fields_at(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    """R3: a feel-only edit of the older record (newer answered_at) must not restamp its key."""
+    _profile(fs, "baritone")
+    await svc.upsert_user(USER, APP_ID, _app_entry(survey={"key": "too_low", "answered_at": T1}), email=EMAIL)
+    await svc.upsert_user(USER, APP_ID2, _app_entry(survey={"key": "right", "answered_at": T2}), email=EMAIL)
+    _profile(fs, "tenor")
+    before_row = copy.deepcopy(_row(fs))
+    before_stats = copy.deepcopy(_crowd(fs))
+    await svc.upsert_user(USER, APP_ID, {"survey": {"feel": "great", "answered_at": T3}}, email=EMAIL)
+    row = _row(fs)
+    assert row["sung_key_latest"] == "right" == before_row["sung_key_latest"]
+    assert row["crowd_bucket"] == "baritone" == before_row["crowd_bucket"]
+    assert row["sung_surveys"][APP_ID]["at"] == {"key": T1, "feel": T3}
+    assert row["sung_surveys"][APP_ID]["bucket"] == "baritone"
+    assert row["sung_feel_latest"] == "great"
+    stats = _crowd(fs)
+    assert stats is not None and before_stats is not None
+    assert {k: stats[k] for k in ("total", "by_bucket", "crowd_pleaser_yes")} == {
+        k: before_stats[k] for k in ("total", "by_bucket", "crowd_pleaser_yes")
+    }
+
+
+@pytest.mark.asyncio
+async def test_crowd_pleaser_answered(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    await svc.upsert_user(USER, APP_ID, _app_entry(survey={"crowd_pleaser": False, "answered_at": T1}), email=EMAIL)
+    stats = _crowd(fs)
+    assert stats is not None and (stats["crowd_pleaser_yes"], stats["crowd_pleaser_answered"]) == (0, 1)
+    await svc.upsert_user(USER, APP_ID2, _app_entry(survey={"crowd_pleaser": True, "answered_at": T2}), email=EMAIL)
+    stats = _crowd(fs)
+    assert stats is not None and (stats["crowd_pleaser_yes"], stats["crowd_pleaser_answered"]) == (1, 1)
+    await svc.delete(USER, APP_ID2)
+    await svc.delete(USER, APP_ID)
+    stats = _crowd(fs)
+    assert stats is not None and (stats["crowd_pleaser_yes"], stats["crowd_pleaser_answered"]) == (0, 0)
+
+
+# ---------------------------------------------------------------- target moves
+
+OTHER_KEY = "the lanterns|glass meridian"
+OTHER_KN = 4343
+
+
+@pytest.mark.asyncio
+async def test_retry_unresolved_lands_survey_and_vote(
+    svc: KaraokeLogService, fs: MemoryFirestore, reader: FakeReader
+) -> None:
+    _profile(fs, "tenor")
+    await svc.upsert_user(
+        USER,
+        APP_ID,
+        _app_entry(
+            artist="Nobody Known", title="Unlisted Tune", song_key=None, survey={"key": "too_high", "answered_at": T1}
+        ),
+        email=EMAIL,
+    )
+    assert not fs.cols.get(CROWD) and fs.user_songs() == {}
+    late_key = "nobody known|unlisted tune"
+    reader.add_kn(9999, "Nobody Known", "Unlisted Tune", late_key)
+    assert await svc.retry_unresolved(USER) == 1
+    row = fs.user_songs()[loved_doc_id(USER, late_key)]
+    assert row["sung_surveys"][APP_ID]["key"] == "too_high"
+    assert row["sung_surveys"][APP_ID]["at"]["key"] == T1
+    assert row["crowd_bucket"] == "tenor"
+    stats = fs.cols[CROWD][late_key]
+    assert stats["total"]["too_high"] == 1 and stats["by_bucket"]["tenor"]["too_high"] == 1
+    assert not fs.cols.get(UNRESOLVED_COLLECTION)
+
+
+@pytest.mark.asyncio
+async def test_resolved_to_unresolved_pops_entry_and_vote(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    _profile(fs, "tenor")
+    await svc.upsert_user(
+        USER, APP_ID, _app_entry(survey={"key": "right", "crowd_pleaser": True, "answered_at": T1}), email=EMAIL
+    )
+    await svc.upsert_user(
+        USER, APP_ID, {"artist": "Nobody Known", "title": "Unlisted Tune", "song_key": None}, email=EMAIL
+    )
+    assert fs.log(APP_ID)["song_key_status"] == "unresolved"
+    assert loved_doc_id(USER, HELLO_KEY) not in fs.user_songs()  # log-created row at 0: removed
+    stats = _crowd(fs)
+    assert stats is not None
+    assert stats["total"]["right"] == 0 and stats["by_bucket"]["tenor"]["right"] == 0
+    assert (stats["crowd_pleaser_yes"], stats["crowd_pleaser_answered"]) == (0, 0)
+    (unres,) = fs.cols[UNRESOLVED_COLLECTION].values()
+    assert "sung_surveys" not in unres
+
+
+@pytest.mark.asyncio
+async def test_song_a_to_song_b_moves_one_vote(svc: KaraokeLogService, fs: MemoryFirestore, reader: FakeReader) -> None:
+    _profile(fs, "alto")
+    reader.add_kn(OTHER_KN, "The Lanterns", "Glass Meridian", OTHER_KEY)
+    await svc.upsert_user(USER, APP_ID, _app_entry(survey={"key": "too_low", "answered_at": T1}), email=EMAIL)
+    await svc.upsert_user(USER, APP_ID, {"title": "Glass Meridian", "song_key": OTHER_KEY}, email=EMAIL)
+    assert loved_doc_id(USER, HELLO_KEY) not in fs.user_songs()
+    a, b = fs.cols[CROWD][HELLO_KEY], fs.cols[CROWD][OTHER_KEY]
+    assert a["total"]["too_low"] == 0 and a["by_bucket"]["alto"]["too_low"] == 0
+    assert b["total"]["too_low"] == 1 and b["by_bucket"]["alto"]["too_low"] == 1
+    row_b = fs.user_songs()[loved_doc_id(USER, OTHER_KEY)]
+    assert row_b["sung_surveys"][APP_ID]["at"] == {"key": T1}  # same answer, same at
+    assert row_b["crowd_bucket"] == "alto" and row_b["times_sung"] == 1
+
+
+@pytest.mark.asyncio
+async def test_times_change_keeps_survey_map(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    await svc.upsert_user(
+        USER, APP_ID, _backfill(survey={"feel": "great", "key": "right", "answered_at": T1}), email=EMAIL
+    )
+    before = copy.deepcopy(_row(fs)["sung_surveys"])
+    await svc.upsert_user(USER, APP_ID, {"times": 2}, email=EMAIL)
+    row = _row(fs)
+    assert row["times_sung"] == 2
+    assert row["sung_surveys"] == before
+    assert row["sung_feel_latest"] == "great" and row["sung_key_latest"] == "right"
+
+
+@pytest.mark.asyncio
+async def test_bucket_uses_user_id_lookup_not_email_hash(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    """A kjbox record's email_hash need not be the decide_users id: the user_id lookup is the authority."""
+    _profile(fs, "mezzo", doc_id="decide_doc_not_the_email_hash")
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    await svc.upsert_user(USER, KJ_ID, {"survey": {"key": "right", "answered_at": T1}})
+    stats = _crowd(fs)
+    assert stats is not None and stats["by_bucket"]["mezzo"]["right"] == 1
+
+
+@pytest.mark.asyncio
+async def test_profile_lookup_skipped_without_survey(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    calls: list[str] = []
+    real = fs.query_documents
+
+    async def spy(collection: str, filters: Any = None, **kw: Any) -> list[dict[str, Any]]:
+        calls.append(collection)
+        return await real(collection, filters, **kw)
+
+    fs.query_documents = spy  # type: ignore[method-assign]
+    await svc.upsert_user(USER, APP_ID, _app_entry(), email=EMAIL)
+    await svc.upsert_user(USER, APP_ID, {"times": 2}, email=EMAIL)
+    await svc.delete(USER, APP_ID)
+    await svc.upsert_partner(EMAIL, KJ_ID, _kj_facts())
+    assert "decide_users" not in calls
+    await svc.upsert_user(USER, APP_ID2, _app_entry(survey={"key": "right"}), email=EMAIL)
+    assert calls.count("decide_users") == 1

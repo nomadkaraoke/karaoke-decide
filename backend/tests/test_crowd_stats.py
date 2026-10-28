@@ -66,3 +66,14 @@ def test_apply_pleaser() -> None:
     assert s["crowd_pleaser_yes"] == 0
     s = apply_pleaser(s, False, True)
     assert s["crowd_pleaser_yes"] == 1
+
+
+def test_apply_pleaser_answered() -> None:
+    s = apply_pleaser(None, None, False)
+    assert (s["crowd_pleaser_yes"], s["crowd_pleaser_answered"]) == (0, 1)
+    s = apply_pleaser(s, False, True)
+    assert (s["crowd_pleaser_yes"], s["crowd_pleaser_answered"]) == (1, 1)
+    s = apply_pleaser(s, True, None)
+    assert (s["crowd_pleaser_yes"], s["crowd_pleaser_answered"]) == (0, 0)
+    s = apply_pleaser(s, False, None)  # never below 0
+    assert s["crowd_pleaser_answered"] == 0
