@@ -330,3 +330,62 @@ def test_registry_guard_passes() -> None:
     assert stores[DISMISSED_COLLECTION].field == "user_id"
     assert DISMISSED_COLLECTION in guard._all_collections()
     guard.test_guard_every_collection_classified()
+
+
+def test_get_made_yes_other_key_counts_as_voice_yes(client: TestClient, fs: MemoryFirestore) -> None:
+    key = put_fixture(fs, 16, 1, source="voice_session", sources=["voice_session"], session_would_sing="yes_other_key")
+    assert [(i["key"], i["why"], i["weight"]) for i in items(client)] == [(key, "voice", 1.0)]
+
+
+def test_get_made_voice_no_excludes_uncatalogued_unresolved_sings(client: TestClient, fs: MemoryFirestore) -> None:
+    fs.col("user_songs")[f"{USER}:no"] = {
+        "user_id": USER,
+        "artist": "Invented Duo",
+        "title": "Made Up",
+        "source": "manual",
+        "loved": True,
+        "session_would_sing": "no",
+    }
+    fs.col("user_karaoke_unresolved")[f"{USER}:u"] = {
+        "user_id": USER,
+        "artist": "Invented Duo",
+        "title": "Made Up",
+        "norm_key": song_key("Invented Duo", "Made Up"),
+        "times_sung": 2,
+    }
+    assert items(client) == []
+
+
+def test_get_made_uncatalogued_key_from_artist_title_not_stale_stored_key(
+    client: TestClient, fs: MemoryFirestore
+) -> None:
+    fs.col("user_songs")[f"{USER}:stale"] = {
+        "user_id": USER,
+        "artist": "Invented Duo",
+        "title": "Made Up",
+        "song_key": "invented duo|made up (old spelling)",
+        "source": "manual",
+        "loved": True,
+    }
+    expected = "u:" + song_key("Invented Duo", "Made Up")
+    assert [(i["key"], i["song_key"]) for i in items(client)] == [(expected, None)]
+    assert client.post(dismiss_url(expected)).status_code == 204
+    assert items(client) == []
+
+
+def test_get_made_top_up_skips_voice_no_and_hidden(client: TestClient, fs: MemoryFirestore, recs: FakeRecs) -> None:
+    no_key = put_fixture(fs, 17, 1, source="quiz", sources=["quiz"], session_would_sing="no")
+    hidden_key = fixture_key(17, 2)
+    fs.col("user_hidden_songs")[f"{USER}:h"] = {"user_id": USER, "song_key": hidden_key}
+    keep = fixture_key(17, 3)
+    recs.sections = [
+        section(
+            "make_it",
+            [
+                rec_song(no_key, *fixture_names(17, 1), 0.7),
+                rec_song(hidden_key, *fixture_names(17, 2), 0.6),
+                rec_song(keep, *fixture_names(17, 3), 0.5),
+            ],
+        )
+    ]
+    assert [(i["key"], i["why"]) for i in items(client)] == [(keep, "recommended")]

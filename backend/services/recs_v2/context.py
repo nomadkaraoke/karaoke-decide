@@ -241,7 +241,8 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     )
 
 
-async def _hidden(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
+async def hidden_keys_or_none(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
+    """The user's hidden keys; a failed read degrades to none hidden."""
     try:
         return set(await feedback.hidden_keys(user_id))
     except Exception:
@@ -256,7 +257,7 @@ async def build_context(
         _user_doc(firestore, user_id),
         _all_user_songs(firestore, user_id),
         firestore.query_documents("user_artists", filters=[("user_id", "==", user_id)]),
-        _hidden(feedback, user_id),
+        hidden_keys_or_none(feedback, user_id),
     )
     ctx = UserContextV2(user_id=user_id, hidden=set(hidden))
 

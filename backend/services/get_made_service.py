@@ -32,6 +32,7 @@ from backend.services.recs_v2 import weights as w
 from backend.services.recs_v2.context import (
     LISTENING_SOURCES,
     HiddenKeysProvider,
+    hidden_keys_or_none,
     row_key,
     row_kn_keys,
     row_sources,
@@ -128,12 +129,15 @@ def _own_songs(
         if keyed is None:
             continue
         key, has_karaoke = keyed
+        artist, title = d.get("artist") or "", d.get("title") or ""
         if d.get("sung_feel_latest") == "bad" or d.get("session_would_sing") == "no":
             excluded.add(key)
+            if artist and title:  # the song's uncatalogued identity (its unresolved sings)
+                excluded.add("u:" + make_song_key(artist, title))
         why = _row_why(d)
         if has_karaoke or why is None:
             continue
-        add(key, d.get("artist") or "", d.get("title") or "", why, row_weight(d))
+        add(key, artist, title, why, row_weight(d))
 
     for d in unresolved:
         times = w.to_int(d.get("times_sung")) or 0
@@ -158,7 +162,10 @@ def _own_songs(
             artist, title = catalogued[key]
         if not (artist and title):  # never show a key as a name (R4)
             continue
-        out_key = key if in_catalog or key.startswith("u:") else "u:" + key
+        # the library identity: "u:" + song_key(artist, title), whatever key the row stored
+        out_key = key if in_catalog or key.startswith("u:") else "u:" + make_song_key(artist, title)
+        if out_key in excluded:
+            continue
         cur = final.get(out_key)
         if cur is None:
             final[out_key] = (key if in_catalog else None, _Cand(out_key, artist, title, c.why, c.weight))
@@ -228,13 +235,7 @@ class GetMadeService:
         ]
 
     async def _hidden_keys(self, user_id: str) -> set[str]:
-        if self._hidden is None:
-            return set()
-        try:
-            return set(await self._hidden.hidden_keys(user_id))
-        except Exception:
-            logger.warning("get-made: hidden_keys failed for %s; continuing with none hidden", user_id, exc_info=True)
-            return set()
+        return set() if self._hidden is None else await hidden_keys_or_none(self._hidden, user_id)
 
     async def dismissed_keys(self, user_id: str) -> set[str]:
         docs = await self._fs.query_documents(DISMISSED_COLLECTION, filters=[("user_id", "==", user_id)])
