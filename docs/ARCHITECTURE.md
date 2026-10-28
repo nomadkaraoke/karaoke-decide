@@ -353,6 +353,19 @@ session's consent (`setup.record = true` at upload time), kept private, and neve
   holds only the month's totals (`NOT_USER_DATA`). The songs a batch queues go into the global
   `voice_pool_fetch` queue (and from there voice.db / BigQuery) with `source = personal` and the random batch id,
   never the user id; they stay in the shared pool after the user is deleted.
+- **Karaoke-log survey state and the crowd (Phase 4b)**:
+  - `sung_surveys` lives on the user's `user_songs` rows (no new collection): one entry per counting
+    karaoke-log record that answered feel / key / crowd-pleaser (`{feel, key, crowd_pleaser, at, bucket,
+    backfill?}`), plus the fields derived from it on every write (`sung_feel_counts`, `sung_feel_latest`,
+    `sung_key_latest`, `sung_crowd_pleaser_count`, `crowd_bucket`). They go with the rows on account deletion.
+  - `user_make_dismissed/{user_id}:{sha1(key)[:24]}` ("Get this made" dismissals, `user_id` field) is
+    per-user data, registered in `USER_DATA_STORES` and deleted with the account (and by `profile/reset`).
+  - `song_crowd_stats/{crowd_doc_id(song_key)}` is an anonymous aggregate in `NOT_USER_DATA`: per-song counts
+    of key answers (total and by voice type) and crowd-pleaser answers, with no user ids, read only through
+    the 5-singer thresholds (`CROWD_MIN_SINGERS`, `CROWD_MIN_BUCKET`). By design it is **kept** after an account
+    deletion: the singer's past votes stay in the counts, which can't be traced back to them.
+  - The one-off `scripts/rebuild_survey_state.py` (ruling R18) rebuilds both from `karaoke_log`; it is
+    idempotent, dry-run by default (see its docstring).
 - **Account deletion contract (Phase 6)**: `DELETE /api/users/me` MUST, before removing the user, and failing
   the request (so it can be retried) if any step raises:
   1. call `VoiceRecordingService.delete_all_for_user(user.id)` (objects, `voice_recordings` docs, attempt links);
