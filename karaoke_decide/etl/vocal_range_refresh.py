@@ -171,6 +171,9 @@ SOURCES_SCHEMA = _schema(
 )
 # Filled from Firestore song_crowd_stats totals (>= CROWD_MIN_SINGERS singers), else NULL.
 CROWD_FIELDS = ("crowd_comfortable", "crowd_too_low", "crowd_too_high")
+# Firestore stream deadline (seconds): a stalled read becomes the one crowd WARNING, not a hung job.
+# ``retry`` is left at google-cloud-firestore's default.
+CROWD_READ_TIMEOUT_S = 120
 _CROWD_ANSWER = {"crowd_comfortable": "right", "crowd_too_low": "too_low", "crowd_too_high": "too_high"}
 SONGS_SCHEMA = _schema(
     ("song_key", "STRING"),
@@ -434,7 +437,7 @@ def load_crowd(firestore: Any | None = None) -> dict[str, dict[str, int | None]]
     try:
         db = firestore if firestore is not None else _firestore_client()
         out: dict[str, dict[str, int | None]] = {}
-        for snap in db.collection(CROWD_COLLECTION).select(["song_key", "total"]).stream():
+        for snap in db.collection(CROWD_COLLECTION).select(["song_key", "total"]).stream(timeout=CROWD_READ_TIMEOUT_S):
             doc = snap.to_dict() or {}
             key = doc.get("song_key")
             totals = crowd_totals(doc)

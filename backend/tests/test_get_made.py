@@ -155,7 +155,8 @@ def client(fs: MemoryFirestore, recs: FakeRecs, reader: CatalogReader) -> Iterat
 def items(client: TestClient) -> list[dict[str, Any]]:
     r = client.get("/api/my/get-made")
     assert r.status_code == 200, r.text
-    return r.json()["items"]
+    out: list[dict[str, Any]] = r.json()["items"]
+    return out
 
 
 def dismiss_url(key: str) -> str:

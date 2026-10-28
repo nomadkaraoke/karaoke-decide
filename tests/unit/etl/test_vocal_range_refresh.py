@@ -162,6 +162,7 @@ class FakeFirestore:
         self.error = error
         self.collections: list[str] = []
         self.selected: list[list[str]] = []
+        self.stream_kwargs: list[dict[str, Any]] = []
 
     def collection(self, name: str) -> FakeFirestore:
         self.collections.append(name)
@@ -171,7 +172,8 @@ class FakeFirestore:
         self.selected.append(list(field_paths))
         return self
 
-    def stream(self) -> Iterator[FakeSnap]:
+    def stream(self, **kwargs: Any) -> Iterator[FakeSnap]:
+        self.stream_kwargs.append(kwargs)
         if self.error:
             raise self.error
         yield from (FakeSnap(d) for d in self.docs.values())
@@ -620,9 +622,11 @@ def test_publish_fills_crowd_when_threshold_met(tmp_path: Path, monkeypatch: pyt
     assert songs[LALAS_KEY]["crowd_too_high"] == 1
     assert "nobody|nothing" not in songs  # crowd never adds rows, it only fills existing ones
     others = [r for k, r in songs.items() if k != LALAS_KEY]
-    assert others and all(r["crowd_comfortable"] is None for r in others)
+    assert others and all(r[f] is None for r in others for f in vr.CROWD_FIELDS)
     assert fs.collections == [CROWD_COLLECTION]
     assert fs.selected and {"song_key", "total"} <= set(fs.selected[0])
+    # A stalled stream ends in one WARNING, not a hung job; retry stays the library default.
+    assert fs.stream_kwargs == [{"timeout": vr.CROWD_READ_TIMEOUT_S}] and vr.CROWD_READ_TIMEOUT_S == 120
 
     # 4 singers: below CROWD_MIN_SINGERS, so all three stay NULL (raw counts never leave).
     fs4 = FakeFirestore(dict([_crowd_doc(LALAS_KEY, right=2, too_low=1, too_high=1)]))
