@@ -3,8 +3,8 @@
 Candidates are the user's ``user_songs`` rows with no karaoke version (the test recs v2 uses,
 ``context.row_key``) that are saved (loved), sung (``times_sung > 0``), imported (a listening
 source in ``sources``) or voice-session "yes", plus the uncatalogued songs they sang
-(``user_karaoke_unresolved``, key ``"u:" + norm_key``). Rows sharing a key merge (max weight,
-the strongest ``why``). They rank by recs weight (``context.row_weight``), descending, then by
+(``user_karaoke_unresolved``, key ``"u:" + song_key(artist, title)``, else the stored ``norm_key``).
+Rows sharing a key merge (max weight, the strongest ``why``). They rank by recs weight (``context.row_weight``), descending, then by
 key; the recs v2 ``make_it`` shelf tops the list up to ``MAX_ITEMS``.
 
 Excluded: dismissed keys (``user_make_dismissed/{user_id}:{sha1(key)[:24]}``), survey-"bad"
@@ -142,7 +142,7 @@ def _own_songs(
     for d in unresolved:
         times = w.to_int(d.get("times_sung")) or 0
         artist, title = d.get("artist") or "", d.get("title") or ""
-        norm = d.get("norm_key") or (make_song_key(artist, title) if artist and title else "")
+        norm = (make_song_key(artist, title) if artist and title else "") or d.get("norm_key") or ""
         if times < 1 or not norm:
             continue
         if reader.has_karaoke_key(norm) or reader.match_kn(artist, title) is not None:

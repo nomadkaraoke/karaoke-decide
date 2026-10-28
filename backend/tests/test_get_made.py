@@ -390,3 +390,15 @@ def test_get_made_top_up_skips_voice_no_and_hidden(client: TestClient, fs: Memor
         )
     ]
     assert [(i["key"], i["why"]) for i in items(client)] == [(keep, "recommended")]
+
+
+def test_get_made_unresolved_key_from_artist_title_not_stale_norm_key(client: TestClient, fs: MemoryFirestore) -> None:
+    """A stored norm_key from an older normaliser must not split the song from its library key."""
+    fs.col("user_karaoke_unresolved")[f"{USER}:old"] = {
+        "user_id": USER,
+        "artist": "Nobody Band",
+        "title": "Unknown Tune",
+        "norm_key": "stale|key",
+        "times_sung": 1,
+    }
+    assert [i["key"] for i in items(client)] == ["u:" + song_key("Nobody Band", "Unknown Tune")]

@@ -329,6 +329,15 @@ def test_recs_attach_crowd_and_reorder_crowd_pleasers(
     ]
 
 
+def test_recs_crowd_below_thresholds_is_null(make_client: Callable[..., TestClient]) -> None:
+    """A stats doc under every threshold must not show: an all-null figure would reveal it exists."""
+    doc = {"quiz_genres": ["rock"], "quiz_decades": ["1990s"]}
+    key = _crowd_section(make_client(user_doc=doc).get(URL).json())[0]["song_key"]
+    body = make_client(user_doc=doc, crowd={key: _stats(right=3, too_high=1, yes=4, answered=4)}).get(URL).json()
+    song = next(s for s in _songs(body) if s["song_key"] == key)
+    assert song["crowd"] is None
+
+
 def test_recs_crowd_read_failure_degrades(
     make_client: Callable[..., TestClient], caplog: pytest.LogCaptureFixture
 ) -> None:

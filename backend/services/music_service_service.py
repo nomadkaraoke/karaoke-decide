@@ -288,9 +288,13 @@ class MusicServiceService:
 
         docs = await self.firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
         keys: set[str] = set()
+        empty = "u:" + make_song_key("", "")
         for d in docs:
-            key = d.get("song_key") or ("u:" + make_song_key(d.get("artist") or "", d.get("title") or ""))
-            if key != "u:" and (is_loved(d) or _base_weight(d) > 0):
+            artist, title = d.get("artist") or "", d.get("title") or ""
+            if not d.get("song_key") and not (artist and title):
+                continue  # no identity: not a song
+            key = d.get("song_key") or ("u:" + make_song_key(artist, title))
+            if key != empty and (is_loved(d) or _base_weight(d) > 0):
                 keys.add(str(key))
         return len(keys)
 

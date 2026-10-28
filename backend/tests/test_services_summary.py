@@ -259,3 +259,25 @@ def test_summary_known_songs_keyless_rows_use_library_identity(client: TestClien
     for doc_id, source in (("a", "lastfm"), ("b", "screenshot")):
         db.put("user_songs", doc_id, {"user_id": USER, "artist": "Some Band", "title": "Some Song", "source": source})
     assert client.get("/api/services/summary").json()["known_songs"] == 1
+
+
+def test_summary_known_songs_skips_rows_without_identity(client: TestClient, db: FakeDb) -> None:
+    """No song_key and no artist/title: not a song (the empty key never counts, loved or not)."""
+    db.put("user_songs", "a", {"user_id": USER, "source": "lastfm", "playcount": 9})
+    db.put("user_songs", "b", {"user_id": USER, "artist": "", "title": "", "source": "manual", "loved": True})
+    db.put("user_songs", "c", {"user_id": USER, "artist": "Some Band", "title": "Some Song", "source": "lastfm"})
+    assert client.get("/api/services/summary").json()["known_songs"] == 1
+
+
+def test_summary_known_songs_failure_degrades_to_zero(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def boom(self: MusicServiceService, user_id: str) -> int:
+        raise RuntimeError("firestore down")
+
+    monkeypatch.setattr(MusicServiceService, "count_known_songs", boom)
+    with caplog.at_level("INFO"):
+        r = client.get("/api/services/summary")
+    assert r.status_code == 200
+    assert r.json()["known_songs"] == 0 and "sources" in r.json()
+    assert {rec.levelname for rec in caplog.records if "known_songs" in rec.getMessage()} == {"WARNING"}

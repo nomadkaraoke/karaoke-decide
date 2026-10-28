@@ -336,7 +336,9 @@ class RecommendationServiceV2:
 
         stats = await self._crowd_stats(user.id, [s.c.song_key for sec in sections for s in sec.songs])
         bucket = voice_bucket({"voice_type": profile.voice_type}) if profile else None
-        crowd = {k: crowd_figure(doc, bucket) for k, doc in (stats or {}).items()}
+        # Only a figure that carries something: an all-null one would reveal a below-threshold doc exists.
+        figures = {k: crowd_figure(doc, bucket) for k, doc in (stats or {}).items()}
+        crowd = {k: c for k, c in figures.items() if c.singers is not None or c.crowd_pleaser_share is not None}
         crowd_hints = _crowd_key_hints(stats or {}, bucket)
         # the user's own latest key answer (a "right" too) always beats the crowd's
         key_hints = {**{k: h for k, h in crowd_hints.items() if k not in ctx.own_key_answered}, **ctx.key_hints}
