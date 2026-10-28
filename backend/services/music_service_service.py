@@ -20,6 +20,7 @@ from karaoke_decide.services.lastfm import LastFmClient
 from karaoke_decide.services.listenbrainz import ListenBrainzClient
 from karaoke_decide.services.metabrainz_oauth import MetaBrainzInvalidGrantError, MetaBrainzOAuth
 from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError
+from karaoke_decide.song_search.text_normalize import song_key as make_song_key
 
 if TYPE_CHECKING:
     from backend.services.token_cipher import TokenCipher
@@ -288,8 +289,8 @@ class MusicServiceService:
         docs = await self.firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
         keys: set[str] = set()
         for d in docs:
-            key = d.get("song_key") or d.get("id")
-            if key and (is_loved(d) or _base_weight(d) > 0):
+            key = d.get("song_key") or ("u:" + make_song_key(d.get("artist") or "", d.get("title") or ""))
+            if key != "u:" and (is_loved(d) or _base_weight(d) > 0):
                 keys.add(str(key))
         return len(keys)
 

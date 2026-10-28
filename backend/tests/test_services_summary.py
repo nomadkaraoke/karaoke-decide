@@ -253,3 +253,9 @@ def test_summary_known_songs_deduped(client: TestClient, db: FakeDb) -> None:
     song("e", song_key="k4", source="screenshot", sources=["screenshot"])
     db.put("user_songs", "z", {"user_id": "other", "song_key": "k9", "source": "lastfm"})
     assert client.get("/api/services/summary").json()["known_songs"] == 3
+
+
+def test_summary_known_songs_keyless_rows_use_library_identity(client: TestClient, db: FakeDb) -> None:
+    for doc_id, source in (("a", "lastfm"), ("b", "screenshot")):
+        db.put("user_songs", doc_id, {"user_id": USER, "artist": "Some Band", "title": "Some Song", "source": source})
+    assert client.get("/api/services/summary").json()["known_songs"] == 1

@@ -325,6 +325,10 @@ def _inc(doc: dict[str, Any] | None, target: Target, new: dict[str, Any], now: s
         # An old remembered sing is dated by its night (or undated), never "now": `_later(old, None)`
         # keeps the row's real last_sung_at.
         when = (new.get("night") or {}).get("date") or None
+        try:
+            _parse_dt(when)
+        except KaraokeLogInvalidError:  # night.date is free text: unparseable means undated
+            when = None
     elif not when:
         when = now
     if doc is None:

@@ -1146,3 +1146,11 @@ async def test_backfill_partial_date_sets_last_sung_at_from_night_date(
 ) -> None:
     await svc.upsert_user(USER, APP_ID, _backfill(night={"kind": "other", "date": date}))
     assert fs.user_songs()[loved_doc_id(USER, HELLO_KEY)]["last_sung_at"].startswith(expected)
+
+
+@pytest.mark.asyncio
+async def test_backfill_unparseable_night_date_is_undated(svc: KaraokeLogService, fs: MemoryFirestore) -> None:
+    row_id = loved_doc_id(USER, HELLO_KEY)
+    await svc.upsert_user(USER, "app_real", _app_entry(sung_at="2026-10-01T20:00:00+00:00"))
+    await svc.upsert_user(USER, APP_ID, _backfill(night={"kind": "other", "date": "last summer"}))
+    assert fs.user_songs()[row_id]["last_sung_at"] == "2026-10-01T20:00:00+00:00"
