@@ -19,11 +19,16 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from pydantic import BaseModel
+
 CROWD_COLLECTION = "song_crowd_stats"
 CROWD_MIN_SINGERS = 5
 CROWD_MIN_BUCKET = 5
 VOICE_BUCKETS = ("bass", "baritone", "tenor", "alto", "mezzo", "soprano")
 KEY_ANSWERS = ("too_low", "right", "too_high")
+# A viewer-bucket share at or above this suggests a key shift (recs v2), unless the user has their own hint.
+CROWD_KEY_HINT_SHARE = 0.6
+CROWD_KEY_HINT_SEMITONES = {"too_high": -2, "too_low": 2}
 
 Vote = tuple[str | None, str | None]  # (key_answer, bucket)
 
@@ -85,3 +90,82 @@ def apply_pleaser(
     out["crowd_pleaser_answered"] = max(0, answered)
     out["updated_at"] = now or datetime.now(UTC).isoformat()
     return out
+
+
+# --------------------------------------------------------------------------- readers (thresholded)
+
+
+class SongCrowd(BaseModel):
+    """How the crowd found a song, thresholded server-side: raw counts below the minimums never leave.
+
+    The overall fields are null below ``CROWD_MIN_SINGERS`` key answers; the bucket fields are null
+    unless the viewer has a bucket with at least ``CROWD_MIN_BUCKET`` answers;
+    ``crowd_pleaser_share`` is null below ``CROWD_MIN_SINGERS`` crowd-pleaser answers (R17)."""
+
+    singers: int | None = None
+    comfortable_share: float | None = None
+    too_high_share: float | None = None
+    too_low_share: float | None = None
+    bucket: str | None = None
+    bucket_singers: int | None = None
+    bucket_comfortable_share: float | None = None
+    crowd_pleaser_share: float | None = None
+
+
+def _int(v: Any) -> int:
+    return v if isinstance(v, int) and not isinstance(v, bool) and v > 0 else 0
+
+
+def _counts(raw: Any) -> dict[str, int]:
+    raw = raw if isinstance(raw, dict) else {}
+    return {k: _int(raw.get(k)) for k in KEY_ANSWERS}
+
+
+def _bucket_counts(stats: dict[str, Any], bucket: str | None) -> dict[str, int] | None:
+    if bucket not in VOICE_BUCKETS:
+        return None
+    by_bucket = stats.get("by_bucket")
+    return _counts(by_bucket.get(bucket)) if isinstance(by_bucket, dict) else _counts(None)
+
+
+def _share(n: int, of: int) -> float:
+    return round(n / of, 4)
+
+
+def crowd_figure(stats: dict[str, Any] | None, viewer_bucket: str | None) -> SongCrowd:
+    """The thresholded crowd figure of one ``song_crowd_stats`` doc for a viewer in ``viewer_bucket``."""
+    stats = stats if isinstance(stats, dict) else {}
+    out = SongCrowd()
+    answered = _int(stats.get("crowd_pleaser_answered"))
+    if answered >= CROWD_MIN_SINGERS:
+        out.crowd_pleaser_share = _share(min(_int(stats.get("crowd_pleaser_yes")), answered), answered)
+    total = _counts(stats.get("total"))
+    n = sum(total.values())
+    if n < CROWD_MIN_SINGERS:
+        return out
+    out.singers = n
+    out.comfortable_share = _share(total["right"], n)
+    out.too_high_share = _share(total["too_high"], n)
+    out.too_low_share = _share(total["too_low"], n)
+    b = _bucket_counts(stats, viewer_bucket)
+    bn = sum(b.values()) if b else 0
+    if b is not None and bn >= CROWD_MIN_BUCKET:
+        out.bucket = viewer_bucket
+        out.bucket_singers = bn
+        out.bucket_comfortable_share = _share(b["right"], bn)
+    return out
+
+
+def crowd_key_hint(stats: dict[str, Any] | None, viewer_bucket: str | None) -> int | None:
+    """Semitones to shift the key by when the viewer's bucket mostly found it too high (-2) or too
+    low (+2): a share of at least ``CROWD_KEY_HINT_SHARE`` over at least ``CROWD_MIN_BUCKET`` answers."""
+    if not isinstance(stats, dict):
+        return None
+    b = _bucket_counts(stats, viewer_bucket)
+    bn = sum(b.values()) if b else 0
+    if b is None or bn < CROWD_MIN_BUCKET:
+        return None
+    for answer, semitones in CROWD_KEY_HINT_SEMITONES.items():
+        if b[answer] / bn >= CROWD_KEY_HINT_SHARE:
+            return semitones
+    return None

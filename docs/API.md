@@ -86,6 +86,12 @@ Vocal fit (needs a voice profile, `PUT /api/my/voice`): each song's `fit` is `{b
 
 Errors: `400 bad_cursor`; `503 warming_up` (with `Retry-After: 30`) until `catalog.db` has loaded. `GET /api/my/recommendations/categorized` (v1) is unchanged and keeps working.
 
+Crowd: each song carries `crowd` (the `SongCrowd` figure below, from one batch read of `song_crowd_stats` for the page) or `null` when the song has no stats or the read failed (logged at WARNING; the page still returns). Within `crowd_pleasers` only, songs whose `crowd_pleaser_share >= 0.5` move to the front (stable). When at least 60% of 5+ singers in the viewer's voice bucket found a song too high (or too low), its in-key fit shifts -2 (or +2) like the user's own key hint; the user's own hint always wins.
+
+### GET /api/songs/{song_key}/crowd
+
+How other singers found a song's key (auth required; `song_key` percent-encoded). Returns `{singers, comfortable_share, too_high_share, too_low_share, bucket, bucket_singers, bucket_comfortable_share, crowd_pleaser_share}`. Thresholds are applied server-side: the overall fields are `null` below 5 key answers; the bucket fields are `null` unless the viewer's voice type (bass ... soprano) has 5+ answers; `crowd_pleaser_share` is `null` below 5 crowd-pleaser answers. An unknown song returns all `null`.
+
 ### Song feedback: /api/my/songs
 
 `GET /api/my/songs/hidden`, `GET /api/my/songs/loved` list `{songs: [...]}`. `POST` / `DELETE /api/my/songs/{song_key}/hide` and `/love` (204) hide or love a song; hidden songs never appear in v2.

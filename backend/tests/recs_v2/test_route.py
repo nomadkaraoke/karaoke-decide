@@ -43,9 +43,22 @@ class FakeHidden:
         return set(self.keys)
 
 
-def _firestore(user_doc: dict[str, Any] | None = None, user_songs: list[dict[str, Any]] | None = None) -> MagicMock:
+def _firestore(
+    user_doc: dict[str, Any] | None = None,
+    user_songs: list[dict[str, Any]] | None = None,
+    crowd: dict[str, dict[str, Any]] | Exception | None = None,
+) -> MagicMock:
     fs = MagicMock()
     fs.get_document = AsyncMock(return_value=user_doc or {})
+    fs.get_many_calls = []
+
+    async def get_many(collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
+        fs.get_many_calls.append((collection, list(ids)))
+        if isinstance(crowd, Exception):
+            raise crowd
+        return {i: (crowd or {})[i] for i in ids if i in (crowd or {})}
+
+    fs.get_many = AsyncMock(side_effect=get_many)
 
     async def query(collection: str, **_: Any) -> list[dict[str, Any]]:
         if collection == "decide_users":
@@ -67,9 +80,14 @@ def make_client(reader: CatalogReader) -> Iterator[Callable[..., TestClient]]:
         user_doc: dict[str, Any] | None = None,
         user_id: str = "guest_u1",
         user_songs: list[dict[str, Any]] | None = None,
+        crowd: dict[str, dict[str, Any]] | Exception | None = None,
+        fs_out: list[MagicMock] | None = None,
     ) -> TestClient:
+        fs = _firestore(user_doc, user_songs, crowd)
+        if fs_out is not None:
+            fs_out.append(fs)
         app.dependency_overrides[get_current_user] = lambda: User(id=user_id, is_guest=True)
-        app.dependency_overrides[get_firestore] = lambda: _firestore(user_doc, user_songs)
+        app.dependency_overrides[get_firestore] = lambda: fs
         app.dependency_overrides[get_store_dep] = lambda: store or FakeStore(reader)
         app.dependency_overrides[get_hidden_keys_provider] = lambda: FakeHidden(hidden)
         return TestClient(app)
@@ -107,8 +125,10 @@ def test_v2_shape(make_client: Callable[..., TestClient]) -> None:
         "karaoke",
         "facets",
         "fit",
+        "crowd",
     }
     assert song["fit"] is None  # no voice profile
+    assert song["crowd"] is None  # no crowd stats for the song
     assert set(song["karaoke"]) == {"community", "commercial", "karafun", "brand_count"}
     assert set(song["facets"]) == {
         "decade",
@@ -256,3 +276,77 @@ def test_go_tos_section_and_sung_before_reason(make_client: Callable[..., TestCl
     elsewhere = [s for s in rest if s["song_key"] == bad[0]]
     assert len(elsewhere) <= 1
     assert all(s["reason_type"] not in ("known_song", "sung_before") for s in elsewhere)
+
+
+def _stats(right: int, too_high: int = 0, yes: int = 0, answered: int = 0) -> dict[str, Any]:
+    return {
+        "total": {"right": right, "too_low": 0, "too_high": too_high},
+        "by_bucket": {},
+        "crowd_pleaser_yes": yes,
+        "crowd_pleaser_answered": answered,
+    }
+
+
+def _crowd_section(body: dict[str, Any]) -> list[dict[str, Any]]:
+    return next(sec["songs"] for sec in body["sections"] if sec["id"] == "crowd_pleasers")
+
+
+def test_recs_attach_crowd_and_reorder_crowd_pleasers(
+    make_client: Callable[..., TestClient], caplog: pytest.LogCaptureFixture
+) -> None:
+    doc = {"quiz_genres": ["rock"], "quiz_decades": ["1990s"]}
+    base = _crowd_section(make_client(user_doc=doc).get(URL).json())
+    assert len(base) >= 4
+    keys = [s["song_key"] for s in base]
+    crowd = {
+        keys[-1]: _stats(right=5, yes=4, answered=5),  # 0.8: up front
+        keys[-2]: _stats(right=5, yes=3, answered=6),  # 0.5: up front, after keys[-1]'s original slot order
+        keys[0]: _stats(right=5, yes=1, answered=5),  # 0.2: stays put
+        keys[1]: _stats(right=5, yes=4, answered=4),  # 4 answers: below threshold, stays put
+    }
+    fs_out: list[MagicMock] = []
+    with caplog.at_level("INFO", logger="backend.services.recs_v2.service"):
+        body = make_client(user_doc=doc, crowd=crowd, fs_out=fs_out).get(URL).json()
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
+    got = _crowd_section(body)
+    assert [s["song_key"] for s in got] == [keys[-2], keys[-1], *keys[:-2]]  # stable among the leaders
+    by_key = {s["song_key"]: s for s in got}
+    assert by_key[keys[-1]]["crowd"]["crowd_pleaser_share"] == 0.8
+    assert by_key[keys[-1]]["crowd"]["singers"] == 5
+    assert by_key[keys[1]]["crowd"]["crowd_pleaser_share"] is None
+    assert all(s["crowd"] is None for s in _songs(body) if s["song_key"] not in crowd)
+    # one batch read for every song on the page
+    calls = fs_out[0].get_many_calls
+    assert len(calls) == 1 and calls[0][0] == "song_crowd_stats"
+    assert set(calls[0][1]) == {s["song_key"] for s in _songs(body)}
+    # other sections keep their order
+    others = [sec for sec in body["sections"] if sec["id"] != "crowd_pleasers"]
+    base_body = make_client(user_doc=doc).get(URL).json()
+    assert [[s["song_key"] for s in sec["songs"]] for sec in others] == [
+        [s["song_key"] for s in sec["songs"]] for sec in base_body["sections"] if sec["id"] != "crowd_pleasers"
+    ]
+
+
+def test_recs_crowd_read_failure_degrades(
+    make_client: Callable[..., TestClient], caplog: pytest.LogCaptureFixture
+) -> None:
+    doc = {"quiz_genres": ["rock"]}
+    with caplog.at_level("INFO"):
+        r = make_client(user_doc=doc, crowd=RuntimeError("firestore down")).get(URL)
+    assert r.status_code == 200
+    assert all(s["crowd"] is None for s in _songs(r.json()))
+    levels = {rec.levelname for rec in caplog.records if "crowd" in rec.getMessage()}
+    assert levels == {"WARNING"}
+
+
+def test_recs_slow_crowd_read_logs_info(
+    make_client: Callable[..., TestClient], caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.services.recs_v2 import service as svc
+
+    ticks = iter([0.0, 0.2])
+    monkeypatch.setattr(svc, "_now", lambda: next(ticks))
+    with caplog.at_level("INFO", logger="backend.services.recs_v2.service"):
+        assert make_client(user_doc={"quiz_genres": ["rock"]}).get(URL).status_code == 200
+    slow = [rec for rec in caplog.records if "crowd" in rec.getMessage()]
+    assert [rec.levelname for rec in slow] == ["INFO"]

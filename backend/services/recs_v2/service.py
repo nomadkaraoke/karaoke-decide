@@ -12,10 +12,18 @@ import base64
 import binascii
 import logging
 import re
+import time
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
+from backend.services.crowd_stats import (
+    CROWD_COLLECTION,
+    SongCrowd,
+    crowd_figure,
+    crowd_key_hint,
+    voice_bucket,
+)
 from backend.services.firestore_service import FirestoreService
 from backend.services.recs_v2.candidates import Candidate, gather_candidates
 from backend.services.recs_v2.context import HiddenKeysProvider, UserContextV2, build_context
@@ -30,6 +38,9 @@ from karaoke_decide.vocal_range.fit import UserVoiceRange, fit_song, is_singable
 logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 30
+CROWD_SLOW_MS = 50
+CROWD_PLEASER_LEAD_SHARE = 0.5
+_now = time.perf_counter  # patched in tests
 _CURSOR = re.compile(r"^o:(\d{1,9})$")
 
 # English fallbacks for clients without i18n; clients render from reason_type / reason_artist.
@@ -109,6 +120,7 @@ class RecSong(BaseModel):
     karaoke: RecKaraoke
     facets: RecFacets
     fit: RecFit | None = None  # null without a voice profile or without a song vocal range
+    crowd: SongCrowd | None = None  # null when the song has no crowd stats doc or the read failed
 
 
 class RecSection(BaseModel):
@@ -160,7 +172,7 @@ def _rec_fit(c: Candidate, hint: int | None) -> RecFit | None:
     return RecFit(bucket=bucket, transpose=transpose, octave=c.fit.octave, tier=c.vr.tier)  # type: ignore[arg-type]
 
 
-def _rec_song(s: Scored, key_hints: dict[str, int] | None = None) -> RecSong:
+def _rec_song(s: Scored, key_hints: dict[str, int] | None = None, crowd: dict[str, SongCrowd] | None = None) -> RecSong:
     c: Candidate = s.c
     reason = REASON_TEXT[s.reason_type].format(artist=s.reason_artist or c.artist)
     return RecSong(
@@ -187,7 +199,22 @@ def _rec_song(s: Scored, key_hints: dict[str, int] | None = None) -> RecSong:
             explicit=c.explicit,
         ),
         fit=_rec_fit(c, (key_hints or {}).get(c.song_key)),
+        crowd=(crowd or {}).get(c.song_key),
     )
+
+
+def _leads_crowd(fig: SongCrowd | None) -> bool:
+    """A crowd pleaser by the crowd's own answers (``crowd_pleaser_share`` is already thresholded)."""
+    return (
+        fig is not None and fig.crowd_pleaser_share is not None and fig.crowd_pleaser_share >= CROWD_PLEASER_LEAD_SHARE
+    )
+
+
+def _crowd_first(sections: list[Section], crowd: dict[str, SongCrowd]) -> None:
+    """Within ``crowd_pleasers`` only: a stable reorder putting the crowd's own pleasers first."""
+    for sec in sections:
+        if sec.id == "crowd_pleasers":
+            sec.songs = sorted(sec.songs, key=lambda s: not _leads_crowd(crowd.get(s.c.song_key)))
 
 
 def voice_range(p: VoiceProfileOut | None) -> UserVoiceRange | None:
@@ -224,6 +251,13 @@ def _rank(
     return build_sections(scored, ctx, sort)
 
 
+def _crowd_key_hints(stats: dict[str, dict[str, Any]], bucket: str | None) -> dict[str, int]:
+    """song_key -> semitones from the viewer's bucket (mostly too high: -2, too low: +2)."""
+    if bucket is None:
+        return {}
+    return {k: h for k, doc in stats.items() if (h := crowd_key_hint(doc, bucket)) is not None}
+
+
 class RecommendationServiceV2:
     def __init__(
         self,
@@ -249,6 +283,24 @@ class RecommendationServiceV2:
         except Exception:
             logger.warning("voice profile read failed for %s; recommending without fit", user_id, exc_info=True)
             return None
+
+    async def _crowd_stats(self, user_id: str, keys: list[str]) -> dict[str, dict[str, Any]] | None:
+        """The ``song_crowd_stats`` docs of ``keys`` in one batch read; None when the read fails.
+
+        Keys holding ``/`` can't be Firestore doc ids (and so have no stats); they are skipped."""
+        ids = list(dict.fromkeys(k for k in keys if k and "/" not in k))
+        if not ids:
+            return {}
+        started = _now()
+        try:
+            docs = await self._firestore.get_many(CROWD_COLLECTION, ids)
+        except Exception:
+            logger.warning("crowd stats read failed for %s; recommending without crowd", user_id, exc_info=True)
+            return None
+        ms = (_now() - started) * 1000
+        if ms > CROWD_SLOW_MS:
+            logger.info("crowd stats read took %.0f ms for %d songs", ms, len(ids))
+        return docs
 
     async def recommend(
         self,
@@ -281,6 +333,12 @@ class RecommendationServiceV2:
                     next_cursor = encode_cursor(offset + PAGE_SIZE)
             sections = [sec for sec in sections if sec.songs]
 
+        stats = await self._crowd_stats(user.id, [s.c.song_key for sec in sections for s in sec.songs])
+        bucket = voice_bucket({"voice_type": profile.voice_type}) if profile else None
+        crowd = {k: crowd_figure(doc, bucket) for k, doc in (stats or {}).items()}
+        key_hints = {**_crowd_key_hints(stats or {}, bucket), **ctx.key_hints}  # the user's own hint wins
+        _crowd_first(sections, crowd)
+
         return RecommendationsV2Response(
             sections=[
                 RecSection(
@@ -288,7 +346,7 @@ class RecommendationServiceV2:
                     title_key=sec.title_key,
                     reason_key=sec.reason_key,
                     title_params=sec.title_params,
-                    songs=[_rec_song(s, ctx.key_hints) for s in sec.songs],
+                    songs=[_rec_song(s, key_hints, crowd) for s in sec.songs],
                 )
                 for sec in sections
             ],

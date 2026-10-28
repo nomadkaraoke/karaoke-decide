@@ -19,6 +19,7 @@ from backend.api.routes.playlists import router as playlists_router
 from backend.api.routes.quiz import router as quiz_router
 from backend.api.routes.recommendations import router as recommendations_router
 from backend.api.routes.services import router as services_router
+from backend.api.routes.songs import router as songs_router
 from backend.api.routes.voice import router as voice_router
 from backend.api.routes.voice_session import router as voice_session_router
 
@@ -31,6 +32,7 @@ router.include_router(catalog_router, prefix="/catalog", tags=["catalog"])
 router.include_router(services_router, prefix="/services", tags=["services"])
 router.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 router.include_router(my_songs_router, prefix="/my/songs", tags=["my-songs"])
+router.include_router(songs_router, prefix="/songs", tags=["songs"])
 router.include_router(recommendations_router, prefix="/my", tags=["my"])
 router.include_router(my_data_router, prefix="/my/data", tags=["my-data"])
 router.include_router(playlists_router, prefix="/playlists", tags=["playlists"])
