@@ -165,6 +165,16 @@ def crowd_figure(stats: dict[str, Any] | None, viewer_bucket: str | None) -> Son
     return out
 
 
+def crowd_totals(stats: dict[str, Any] | None) -> dict[str, int] | None:
+    """The ``total`` key-answer counts ``{too_low, right, too_high}`` of one ``song_crowd_stats`` doc,
+    or None below ``CROWD_MIN_SINGERS`` answers (the threshold applies here, so raw counts under it
+    never leave decide; used by the mb-refresh ``song_vocal_range.crowd_*`` fill)."""
+    if not isinstance(stats, dict):
+        return None
+    total = _counts(stats.get("total"))
+    return total if sum(total.values()) >= CROWD_MIN_SINGERS else None
+
+
 def crowd_key_hint(stats: dict[str, Any] | None, viewer_bucket: str | None) -> int | None:
     """Semitones to shift the key by when the viewer's bucket mostly found it too high (-2) or too
     low (+2): a share of at least ``CROWD_KEY_HINT_SHARE`` over at least ``CROWD_MIN_BUCKET`` answers."""

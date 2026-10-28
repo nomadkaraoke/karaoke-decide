@@ -653,6 +653,14 @@ gcp.storage.BucketIAMMember(
     role="roles/storage.objectAdmin",
     member=mb_refresh_member,
 )
+# Firestore read of song_crowd_stats (vocal_range step fills song_vocal_range.crowd_*), via the
+# project-level Datastore role.
+gcp.projects.IAMMember(
+    "mb-refresh-datastore-viewer",
+    project=project,
+    role="roles/datastore.viewer",
+    member=mb_refresh_member,
+)
 
 mb_refresh_job = gcp.cloudrunv2.Job(
     "mb-refresh-job",

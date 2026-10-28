@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import zipfile
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from typing import Any
 import httpx
 import pytest
 
+from backend.services.crowd_stats import CROWD_COLLECTION, crowd_doc_id
 from karaoke_decide.etl import vocal_range_refresh as vr
 from karaoke_decide.vocal_range.merge import SourceRow
 from tests.unit.fake_gcs import FakeBucket
@@ -142,6 +144,48 @@ class Origin:
 def _zip_checksum(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(vr, "USDB_ZIP_SHA1", hashlib.sha1(ZIP).hexdigest())  # noqa: S324 - archive.org publishes sha1
     monkeypatch.setattr(vr, "USDB_ZIP_BYTES", len(ZIP))
+
+
+class FakeSnap:
+    def __init__(self, data: dict[str, Any]) -> None:
+        self._data = data
+
+    def to_dict(self) -> dict[str, Any]:
+        return dict(self._data)
+
+
+class FakeFirestore:
+    """Just enough of ``google.cloud.firestore.Client`` for the crowd read: collection().select().stream()."""
+
+    def __init__(self, docs: dict[str, dict[str, Any]] | None = None, error: Exception | None = None) -> None:
+        self.docs = docs or {}
+        self.error = error
+        self.collections: list[str] = []
+        self.selected: list[list[str]] = []
+
+    def collection(self, name: str) -> FakeFirestore:
+        self.collections.append(name)
+        return self
+
+    def select(self, field_paths: list[str]) -> FakeFirestore:
+        self.selected.append(list(field_paths))
+        return self
+
+    def stream(self) -> Iterator[FakeSnap]:
+        if self.error:
+            raise self.error
+        yield from (FakeSnap(d) for d in self.docs.values())
+
+
+def _crowd_doc(song_key: str, right: int, too_low: int = 0, too_high: int = 0) -> tuple[str, dict[str, Any]]:
+    total = {"right": right, "too_low": too_low, "too_high": too_high}
+    return crowd_doc_id(song_key), {"song_key": song_key, "total": total, "by_bucket": {"tenor": total}}
+
+
+@pytest.fixture(autouse=True)
+def _no_real_firestore(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test may reach real Firestore: the default crowd source is an empty fake."""
+    monkeypatch.setattr(vr, "_firestore_client", lambda: FakeFirestore())
 
 
 def _write_gz_csv(path: Path, header: str, rows: list[str]) -> None:
@@ -556,3 +600,77 @@ def test_float_rejects_non_finite() -> None:
     assert vr._float("-Infinity") is None
     assert vr._float("") is None and vr._float(None) is None
     assert vr._float("60.5") == 60.5
+
+
+# -------------------------------------------------------------------------- crowd fill (Phase 4b C6)
+
+
+def _songs_loaded(bq: FakeBQ) -> dict[str, dict[str, Any]]:
+    rows = next(rows for d, rows, _ in bq.loads if d == vr.STAGING_SONGS)
+    return {r["song_key"]: r for r in rows}
+
+
+def test_publish_fills_crowd_when_threshold_met(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 5 singers on The Lalas: counts filled from song_crowd_stats totals (song_key read from the field).
+    fs = FakeFirestore(dict([_crowd_doc(LALAS_KEY, right=3, too_low=1, too_high=1), _crowd_doc("nobody|nothing", 9)]))
+    monkeypatch.setattr(vr, "_firestore_client", lambda: fs)
+    _, bq, _, _ = _step(tmp_path / "five")
+    songs = _songs_loaded(bq)
+    assert (songs[LALAS_KEY]["crowd_comfortable"], songs[LALAS_KEY]["crowd_too_low"]) == (3, 1)
+    assert songs[LALAS_KEY]["crowd_too_high"] == 1
+    assert "nobody|nothing" not in songs  # crowd never adds rows, it only fills existing ones
+    others = [r for k, r in songs.items() if k != LALAS_KEY]
+    assert others and all(r["crowd_comfortable"] is None for r in others)
+    assert fs.collections == [CROWD_COLLECTION]
+    assert fs.selected and {"song_key", "total"} <= set(fs.selected[0])
+
+    # 4 singers: below CROWD_MIN_SINGERS, so all three stay NULL (raw counts never leave).
+    fs4 = FakeFirestore(dict([_crowd_doc(LALAS_KEY, right=2, too_low=1, too_high=1)]))
+    monkeypatch.setattr(vr, "_firestore_client", lambda: fs4)
+    _, bq4, _, _ = _step(tmp_path / "four")
+    lalas = _songs_loaded(bq4)[LALAS_KEY]
+    assert (lalas["crowd_comfortable"], lalas["crowd_too_low"], lalas["crowd_too_high"]) == (None, None, None)
+
+
+def test_crowd_doc_without_song_key_field_is_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    doc_id, doc = _crowd_doc(LALAS_KEY, right=5)
+    del doc["song_key"]  # never parse the doc id (R23)
+    monkeypatch.setattr(vr, "_firestore_client", lambda: FakeFirestore({doc_id: doc}))
+    _, bq, _, _ = _step(tmp_path)
+    assert _songs_loaded(bq)[LALAS_KEY]["crowd_comfortable"] is None
+
+
+@pytest.mark.parametrize("where", ["client", "stream"])
+def test_crowd_read_failure_is_one_warning_and_publishes_null(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, where: str
+) -> None:
+    def broken_client() -> FakeFirestore:
+        raise RuntimeError("no credentials")
+
+    if where == "client":
+        monkeypatch.setattr(vr, "_firestore_client", broken_client)
+    else:
+        monkeypatch.setattr(vr, "_firestore_client", lambda: FakeFirestore(error=RuntimeError("permission denied")))
+    caplog.set_level(logging.DEBUG)
+    summary, bq, gcs, _ = _step(tmp_path)
+    assert gcs.bucket_obj.writes[-1] == vr.POINTER_BLOB  # the step still publishes
+    assert all(r["crowd_comfortable"] is None for r in _songs_loaded(bq).values())
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1 and "song_crowd_stats" in warnings[0].getMessage()
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert summary["crowd_songs"] == 0
+
+
+def test_summary_counts_crowd_filled_songs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(vr, "_firestore_client", lambda: FakeFirestore(dict([_crowd_doc(LALAS_KEY, right=5)])))
+    summary, *_ = _step(tmp_path)
+    assert summary["crowd_songs"] == 1
+
+
+def test_injected_firestore_is_used_instead_of_the_default(tmp_path: Path) -> None:
+    fs = FakeFirestore(dict([_crowd_doc(LALAS_KEY, right=4, too_high=2)]))
+    with httpx.Client(transport=httpx.MockTransport(Origin())) as http:
+        bq = FakeBQ()
+        vr.run_step(bq, FakeGCS(), http, now=NOW, data_dir=_data_dir(tmp_path), firestore=fs)
+    lalas = _songs_loaded(bq)[LALAS_KEY]
+    assert (lalas["crowd_comfortable"], lalas["crowd_too_low"], lalas["crowd_too_high"]) == (4, 0, 2)

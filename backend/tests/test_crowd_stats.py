@@ -15,6 +15,7 @@ from backend.services.crowd_stats import (
     crowd_doc_id,
     crowd_figure,
     crowd_key_hint,
+    crowd_totals,
     voice_bucket,
 )
 
@@ -175,3 +176,18 @@ def test_crowd_doc_id() -> None:
     assert crowd_doc_id(key) == hashlib.sha1(key.encode()).hexdigest()[:32]
     assert len(crowd_doc_id(key)) == 32 and "/" not in crowd_doc_id(key)
     assert crowd_doc_id(key) == crowd_doc_id(key) != crowd_doc_id("ac dc|back in black")
+
+
+def test_crowd_totals_thresholded() -> None:
+    assert crowd_totals({"total": {"right": 3, "too_low": 1, "too_high": 1}}) == {
+        "right": 3,
+        "too_low": 1,
+        "too_high": 1,
+    }
+    assert crowd_totals({"total": {"right": 2, "too_low": 1, "too_high": 1}}) is None  # 4 < CROWD_MIN_SINGERS
+    assert crowd_totals({"total": {"right": 5, "too_low": -3, "too_high": True}}) == {
+        "right": 5,
+        "too_low": 0,
+        "too_high": 0,
+    }
+    assert crowd_totals(None) is None and crowd_totals({"total": "junk"}) is None
