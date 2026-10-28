@@ -244,11 +244,14 @@ def test_survey_no_not_a_because_seed() -> None:
             assert not {s.c.song_key for s in sec.songs} & ctx.survey_no
 
 
-def test_go_to_overflow_never_spills_into_songs_you_know() -> None:
-    """Past the go-tos per-artist cap a go-to is dropped, like any known-song overflow."""
+def test_go_to_overflow_falls_through_to_songs_you_know() -> None:
+    """R21: go-tos past the go_tos per-artist cap land in songs_you_know (each song still placed once)."""
     ctx = _ctx()
     ctx.go_tos = {f"loved1|k{i}" for i in range(6)}
     sections = build_sections(_scored(ctx), ctx, "best")
-    assert sum(1 for s in sections[0].songs if s.c.artist_key == "loved1") == 3
-    know = next((s for s in sections if s.id == "songs_you_know"), None)
-    assert know is None or not {s.c.song_key for s in know.songs} & ctx.go_tos
+    go = {s.c.song_key for s in sections[0].songs}
+    assert sections[0].id == "go_tos" and len(go) == 3
+    know = next(s for s in sections if s.id == "songs_you_know")
+    spilled = {s.c.song_key for s in know.songs} & ctx.go_tos
+    assert len(spilled) == 3 and not spilled & go
+    assert {s.reason_type for s in know.songs if s.c.song_key in spilled} == {"sung_before"}

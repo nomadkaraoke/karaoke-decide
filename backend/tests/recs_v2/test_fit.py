@@ -474,26 +474,35 @@ async def test_recommend_with_explicit_profile(reader: CatalogReader) -> None:
 # ------------------------------------------------------------------ Phase 4b: per-song key hints
 
 
-def _ranged(key: str, bucket: str, transpose: int = 0) -> Scored:
+def _ranged(key: str, bucket: str, transpose: int = 0, octave: int = 0) -> Scored:
     c = cand(key, "Muse", vr=SongRange(50, 62, 51, 56, 61, "measured"))
-    c.fit = FitResult(bucket, transpose, 0, 0.0, 1.0)  # type: ignore[arg-type]
+    c.fit = FitResult(bucket, transpose, octave, 0.0, 1.0)  # type: ignore[arg-type]
     return Scored(c=c, score=1.0, reason_type="known_song", reason_artist=None)
 
 
+def _hinted(bucket: str, transpose: int, hint: int, octave: int = 0) -> tuple[str, int, int]:
+    fit = svc._rec_song(_ranged("m|s", bucket, transpose, octave), {"m|s": hint}).fit
+    assert fit is not None
+    return fit.bucket, fit.transpose, fit.octave
+
+
 def test_key_hint_sets_transpose() -> None:
-    """A song the singer said was too high and that fits now comes as fitsIn, two semitones down."""
-    hints = {"m|high": -2, "m|low": 2, "m|stretch": -2}
-    assert svc._rec_song(_ranged("m|high", "fits"), hints).fit.model_dump() == {  # type: ignore[union-attr]
+    """R20a: a hint shifts only an in-key fit (fits / fitsIn, octave 0); 0 after the shift is ``fits``."""
+    assert svc._rec_song(_ranged("m|high", "fits"), {"m|high": -2}).fit.model_dump() == {  # type: ignore[union-attr]
         "bucket": "fitsIn", "transpose": -2, "octave": 0, "tier": "measured"
     }  # fmt: skip
-    low = svc._rec_song(_ranged("m|low", "fitsIn", -1), hints).fit
-    assert low is not None and (low.bucket, low.transpose) == ("fitsIn", 1)
-    stretch = svc._rec_song(_ranged("m|stretch", "stretch", 1), hints).fit
-    assert stretch is not None and (stretch.bucket, stretch.transpose) == ("stretch", -1)
-    plain = svc._rec_song(_ranged("m|none", "fits"), hints).fit
+    assert _hinted("fitsIn", -2, 2) == ("fits", 0, 0)
+    assert _hinted("fitsIn", -1, 2) == ("fitsIn", 1, 0)
+    assert _hinted("stretch", 1, -2) == ("stretch", 1, 0)
+    assert _hinted("outside", 0, -2) == ("outside", 0, 0)
+    assert _hinted("fitsIn", 1, -2, octave=-1) == ("fitsIn", 1, -1)  # octave fits stay untouched
+    plain = svc._rec_song(_ranged("m|none", "fits"), {"m|other": -2}).fit
     assert plain is not None and (plain.bucket, plain.transpose) == ("fits", 0)
     no_fit = cand("m|high")
-    assert svc._rec_song(Scored(c=no_fit, score=1.0, reason_type="known_song", reason_artist=None), hints).fit is None
+    assert (
+        svc._rec_song(Scored(c=no_fit, score=1.0, reason_type="known_song", reason_artist=None), {"m|high": -2}).fit
+        is None
+    )
 
 
 async def test_key_hint_through_recommend(reader: CatalogReader) -> None:

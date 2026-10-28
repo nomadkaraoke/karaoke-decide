@@ -108,9 +108,9 @@ def _fill(slots: list[_Slot], songs: list[Scored]) -> list[Scored]:
 
 def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
     """Greedy placement in score order. Go-tos (karaoke songs in ``ctx.go_tos``) lead in their own
-    shelf (overflow is dropped, never moved to ``songs_you_know``); other known songs only go to
-    ``songs_you_know`` (or ``make_it`` when there is no karaoke version); the other shelves are for
-    discovery. Survey-"bad" songs never fill a ``because_*`` shelf.
+    shelf, and those past its limit or per-artist cap fall through to ``songs_you_know`` (ruling R21;
+    ``_fill`` still places each song once); other known songs only go to ``songs_you_know`` (or
+    ``make_it`` when there is no karaoke version); the other shelves are for discovery. Survey-"bad" songs never fill a ``because_*`` shelf.
 
     Two passes give the same result as one (a song's fate in the first three shelves never depends on
     later ones), and the second pass picks ``because_*`` seeds from what is actually left."""
@@ -131,7 +131,7 @@ def _best(scored: list[Scored], ctx: UserContextV2) -> list[Section]:
         _Slot(
             _section("songs_you_know"),
             SECTION_LIMITS["songs_you_know"],
-            lambda s: s.c.has_karaoke and _known(s, ctx) and s.c.song_key not in ctx.go_tos,
+            lambda s: s.c.has_karaoke and _known(s, ctx),
         ),
         _Slot(
             _section("artists_you_love"),

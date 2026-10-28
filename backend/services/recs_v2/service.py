@@ -146,15 +146,17 @@ def decode_cursor(cursor: str | None) -> int:
 
 
 def _rec_fit(c: Candidate, hint: int | None) -> RecFit | None:
-    """The song's fit, shifted by the singer's key hint (their latest "too high" / "too low" answer):
-    the transpose moves by the hint and a song that ``fits`` as written now ``fitsIn`` that key."""
+    """The song's fit, shifted by the singer's key hint (their latest "too high" / "too low" answer).
+
+    Only an in-key fit moves (``fits`` / ``fitsIn`` at octave 0): the transpose shifts by the hint and
+    the bucket is ``fits`` when that lands on 0, else ``fitsIn``. Stretch, outside and octave fits
+    stay as they are (ruling R20a)."""
     if c.fit is None or c.vr is None:
         return None
     bucket, transpose = c.fit.bucket, c.fit.transpose
-    if hint:
+    if hint and bucket in ("fits", "fitsIn") and c.fit.octave == 0:
         transpose += hint
-        if bucket == "fits":
-            bucket = "fitsIn"
+        bucket = "fits" if transpose == 0 else "fitsIn"
     return RecFit(bucket=bucket, transpose=transpose, octave=c.fit.octave, tier=c.vr.tier)  # type: ignore[arg-type]
 
 

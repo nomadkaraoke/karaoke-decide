@@ -417,3 +417,24 @@ async def test_row_song_key_is_the_library_identity(reader: CatalogReader) -> No
     ctx = await _ctx(reader, fs)
     assert ctx.go_tos == {"muse|starlight"}
     assert "muse|starlight" in ctx.known_songs and ctx.known_without_karaoke == []
+
+
+async def test_imported_row_keyed_by_its_resolved_song_key(reader: CatalogReader) -> None:
+    """A 3b import row (non-KN song_id, resolved song_key) is keyed by its song_key, not its spelling."""
+    fs = FakeFirestore(user_songs=[_song("spotify:abc123", "Muse", "Starlite - Remastered", source="spotify_export",
+                                         song_key="muse|starlight", playcount=12)])  # fmt: skip
+    ctx = await _ctx(reader, fs)
+    assert ctx.known_songs == {"muse|starlight": w.SONG_LASTFM_HIGH}
+    assert ctx.known_without_karaoke == []
+
+
+async def test_latest_bad_then_later_great_is_a_go_to_again(reader: CatalogReader) -> None:
+    """Latest is per answered_at (C1 derives sung_feel_latest): a later great reverses an earlier bad."""
+    row = _sung("Comeback", 2, "bad")
+    first = await _ctx(reader, FakeFirestore(user_songs=[row]))
+    k = song_key("Weezer", "Comeback")
+    assert k in first.survey_no and k not in first.go_tos
+    again = await _ctx(reader, FakeFirestore(user_songs=[{**row, "times_sung": 3, "sung_feel_latest": "great"}]))
+    assert k in again.go_tos and k not in again.survey_no
+    assert again.known_songs[k] == w.SONG_SUNG_GREAT
+    assert artist_key("Weezer") in again.artists

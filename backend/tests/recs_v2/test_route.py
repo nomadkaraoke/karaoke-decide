@@ -250,4 +250,9 @@ def test_go_tos_section_and_sung_before_reason(make_client: Callable[..., TestCl
     assert {(s["reason_type"], s["reason"]) for s in first["songs"]} == {("sung_before", "You've sung this")}
     rest = [s for sec in body["sections"][1:] for s in sec["songs"]]
     assert not {s["song_key"] for s in rest} & {fave[0], great[0]}
-    assert all(s["reason_type"] != "known_song" for s in rest if s["song_key"] == bad[0])
+    known_shelves = [sec for sec in body["sections"] if sec["id"] in ("go_tos", "songs_you_know")]
+    assert bad[0] not in {s["song_key"] for sec in known_shelves for s in sec["songs"]}
+    # A latest-bad song is no longer known: it is either a penalised discovery pick or not shown at all.
+    elsewhere = [s for s in rest if s["song_key"] == bad[0]]
+    assert len(elsewhere) <= 1
+    assert all(s["reason_type"] not in ("known_song", "sung_before") for s in elsewhere)
