@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from backend.services.auth_service import AuthService
+from backend.services.crowd_stats import CROWD_COLLECTION
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import (
     EXPORT_ARTISTS_COLLECTION,
@@ -123,6 +124,7 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         VERSION_STATS_COLLECTION,
         # voice_personal_budget/{YYYY-MM}: the month's estimated personal-pool spend (totals only, no user).
         PERSONAL_BUDGET,
+        CROWD_COLLECTION,  # song_crowd_stats/{song_key}: aggregate counts; ≥5-singer threshold; no user ids
     }
 )
 
