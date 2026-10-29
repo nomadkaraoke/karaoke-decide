@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "यह कनेक्शन लिंक एक्सपायर हो चुका है। कृपया फिर से शुरू करो।",
     "spotifyErrorMissingParams": "Spotify से कनेक्शन रिस्पॉन्स अधूरा था। कृपया फिर से कोशिश करो।",
     "spotifyErrorSpotify": "कनेक्ट करते समय Spotify की तरफ से कोई समस्या आई। कृपया फिर से कोशिश करो।",
-    "spotifyErrorUnknown": "कोई अज्ञात गड़बड़ी हुई"
+    "spotifyErrorUnknown": "कोई अज्ञात गड़बड़ी हुई",
+    "spotifyErrorNotAllowlisted": "Spotify अभी हमें केवल कुछ ही टेस्ट अकाउंट्स कनेक्ट करने की अनुमति देता है। इसके बजाय Last.fm या Apple Music कनेक्ट करो, या खुद अपने हाथ से आर्टिस्ट जोड़ो।",
+    "spotifyErrorOtherServices": "कोई दूसरी सर्विस कनेक्ट करो"
   },
   "admin": {
     "backToApp": "ऐप पर वापस जाओ",

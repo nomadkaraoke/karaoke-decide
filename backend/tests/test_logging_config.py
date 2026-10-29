@@ -6,7 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from backend.logging_config import configure_job_logging
+from backend.logging_config import configure_job_logging, configure_logging
 
 
 @pytest.fixture
@@ -50,3 +50,39 @@ def test_job_logging_is_plain_text_locally(
     out = capsys.readouterr().out
     assert "WARNING lb_poll hello" in out
     assert logging.getLogger("httpx").level == logging.WARNING
+
+
+def test_service_logging_keeps_traceback_inside_one_warning_record_on_cloud_run(
+    bare_root: logging.Logger, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A WARNING with exc_info is ONE JSON line at WARNING, so Cloud Logging never splits the
+    traceback into separate entries that the error monitor reads as ERRORs."""
+    monkeypatch.setenv("K_SERVICE", "karaoke-decide")
+    bare_root.handlers = []
+    configure_logging()
+
+    try:
+        raise RuntimeError("boom")
+    except RuntimeError:
+        logging.getLogger("backend.api.routes.services").warning("callback failed", exc_info=True)
+
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 1
+    entry = json.loads(lines[0])
+    assert entry["severity"] == "WARNING"
+    assert entry["logger"] == "backend.api.routes.services"
+    assert entry["message"].startswith("callback failed\nTraceback")
+    assert "RuntimeError: boom" in entry["message"]
+
+
+def test_service_logging_is_plain_text_locally(
+    bare_root: logging.Logger, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("K_SERVICE", raising=False)
+    bare_root.handlers = []
+    configure_logging()
+
+    logging.getLogger("backend.main").info("hello")
+
+    assert "INFO:backend.main:hello" in capsys.readouterr().out
+    assert logging.getLogger("httpcore").level == logging.WARNING

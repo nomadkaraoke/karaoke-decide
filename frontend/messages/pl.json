@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Ten link autoryzacyjny wygasł. Spróbuj od początku.",
     "spotifyErrorMissingParams": "Odpowiedź ze Spotify była niekompletna. Spróbuj ponownie.",
     "spotifyErrorSpotify": "Spotify zgłosiło problem podczas łączenia. Spróbuj ponownie.",
-    "spotifyErrorUnknown": "Wystąpił nieznany błąd"
+    "spotifyErrorUnknown": "Wystąpił nieznany błąd",
+    "spotifyErrorNotAllowlisted": "Spotify pozwala nam obecnie połączyć tylko garstkę kont testowych. Zamiast tego połącz Last.fm lub Apple Music albo dodaj wykonawców ręcznie.",
+    "spotifyErrorOtherServices": "Połącz inną usługę"
   },
   "admin": {
     "backToApp": "Powrót do aplikacji",

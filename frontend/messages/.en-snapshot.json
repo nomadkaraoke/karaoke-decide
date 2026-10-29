@@ -478,6 +478,8 @@
     "spotifyErrorMissingParams": "The connection response from Spotify was incomplete. Please try again.",
     "spotifyErrorInvalidState": "This connection link has expired. Please start again.",
     "spotifyErrorExchangeFailed": "We couldn't finish connecting to Spotify. Please try again.",
+    "spotifyErrorNotAllowlisted": "Spotify only lets us connect a handful of test accounts right now. Connect Last.fm or Apple Music instead, or add artists by hand.",
+    "spotifyErrorOtherServices": "Connect another service",
     "spotifyErrorUnknown": "An unknown error occurred"
   },
   "admin": {

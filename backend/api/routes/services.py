@@ -63,6 +63,7 @@ from karaoke_decide.services.listenbrainz import (
     ListenBrainzRateLimitedError,
 )
 from karaoke_decide.services.metabrainz_oauth import new_pkce_pair
+from karaoke_decide.services.spotify import SpotifyUserNotAllowedError
 from karaoke_decide.services.spotify_embed import (
     InvalidSpotifyPlaylistUrlError,
     SpotifyEmbedFetchError,
@@ -487,6 +488,14 @@ async def spotify_callback(
 
         return RedirectResponse(
             url=f"{frontend_url}{locale_prefix}/services/spotify/success",
+            status_code=status.HTTP_302_FOUND,
+        )
+
+    except SpotifyUserNotAllowedError:
+        # Expected while our Spotify app is in Development Mode: one line, no traceback.
+        logger.warning("Spotify callback: user %s is not on the Spotify app allowlist", user_id)
+        return RedirectResponse(
+            url=f"{frontend_url}{locale_prefix}/services/spotify/error?message=not_allowlisted",
             status_code=status.HTTP_302_FOUND,
         )
 

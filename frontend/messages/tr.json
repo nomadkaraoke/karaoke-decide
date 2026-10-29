@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Bu bağlantı linkinin süresi doldu. Lütfen işlemi baştan başlat.",
     "spotifyErrorMissingParams": "Spotify'dan gelen bağlantı yanıtı eksikti. Lütfen tekrar dene.",
     "spotifyErrorSpotify": "Spotify bağlanırken bir sorun bildirdi. Lütfen tekrar dene.",
-    "spotifyErrorUnknown": "Bilinmeyen bir hata oluştu."
+    "spotifyErrorUnknown": "Bilinmeyen bir hata oluştu.",
+    "spotifyErrorNotAllowlisted": "Spotify şu anda sadece az sayıda test hesabını bağlamamıza izin veriyor. Bunun yerine Last.fm veya Apple Music'i bağlayabilir ya da sanatçıları elle ekleyebilirsin.",
+    "spotifyErrorOtherServices": "Başka bir servis bağla"
   },
   "admin": {
     "backToApp": "Uygulamaya Dön",

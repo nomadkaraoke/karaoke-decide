@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Liên kết kết nối đã hết hạn. Vui lòng thử lại từ đầu.",
     "spotifyErrorMissingParams": "Phản hồi kết nối từ Spotify không đầy đủ thông tin. Vui lòng thử lại.",
     "spotifyErrorSpotify": "Spotify gặp sự cố trong quá trình kết nối. Vui lòng thử lại.",
-    "spotifyErrorUnknown": "Đã xảy ra lỗi không xác định"
+    "spotifyErrorUnknown": "Đã xảy ra lỗi không xác định",
+    "spotifyErrorNotAllowlisted": "Hiện tại Spotify chỉ cho phép chúng tôi kết nối với một vài tài khoản thử nghiệm. Bạn hãy kết nối Last.fm hoặc Apple Music để thay thế, hoặc tự thêm nghệ sĩ bằng tay.",
+    "spotifyErrorOtherServices": "Kết nối dịch vụ khác"
   },
   "admin": {
     "backToApp": "Quay lại ứng dụng",

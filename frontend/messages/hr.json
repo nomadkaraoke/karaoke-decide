@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Poveznica za povezivanje je istekla. Pokreni postupak ispočetka.",
     "spotifyErrorMissingParams": "Odgovor na povezivanje sa Spotifyja nije bio potpun. Pokušaj ponovno.",
     "spotifyErrorSpotify": "Spotify je prijavio problem prilikom povezivanja. Pokušaj ponovno.",
-    "spotifyErrorUnknown": "Došlo je do nepoznate pogreške"
+    "spotifyErrorUnknown": "Došlo je do nepoznate pogreške",
+    "spotifyErrorNotAllowlisted": "Spotify nam trenutačno dopušta povezivanje samo malog broja testnih računa. Umjesto toga poveži Last.fm ili Apple Music, ili ručno dodaj izvođače.",
+    "spotifyErrorOtherServices": "Poveži drugu uslugu"
   },
   "admin": {
     "backToApp": "Natrag u aplikaciju",

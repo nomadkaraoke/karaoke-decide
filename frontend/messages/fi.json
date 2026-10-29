@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Tämä yhteyslinkki on vanhentunut. Aloita alusta.",
     "spotifyErrorMissingParams": "Spotifyn yhteysvastaus oli puutteellinen. Yritä uudelleen.",
     "spotifyErrorSpotify": "Spotify ilmoitti ongelmasta yhdistämisen aikana. Yritä uudelleen.",
-    "spotifyErrorUnknown": "Tapahtui tuntematon virhe."
+    "spotifyErrorUnknown": "Tapahtui tuntematon virhe.",
+    "spotifyErrorNotAllowlisted": "Spotify antaa meidän yhdistää tällä hetkellä vain kourallisen testitilejä. Yhdistä sen sijaan Last.fm tai Apple Music tai lisää artisteja käsin.",
+    "spotifyErrorOtherServices": "Yhdistä toinen palvelu"
   },
   "admin": {
     "backToApp": "Takaisin sovellukseen",

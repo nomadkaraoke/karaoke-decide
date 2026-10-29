@@ -716,6 +716,7 @@ Redirects to frontend success/error page.
 | `spotify_error` | Spotify returned any other `error` |
 | `missing_params` | No `code` or `state` |
 | `invalid_state` | The state is malformed, unknown or expired |
+| `not_allowlisted` | Spotify refused the user with 403 "not registered for this application". Our Spotify app is in Development Mode, which only allows allowlisted users, so retrying never helps. The page links to `/services` instead of "Try again" |
 | `exchange_failed` | The token exchange or profile fetch failed (details are logged at WARNING) |
 
 A reconnect clears a `needs_reconnect` flag (`error_code`) and an `error` sync status. Those are left when a refresh token is revoked (Spotify `invalid_grant`).

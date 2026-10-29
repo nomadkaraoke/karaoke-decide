@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "انتهت صلاحية رابط الاتصال هذا. يُرجى البدء من جديد.",
     "spotifyErrorMissingParams": "استجابة الاتصال الواردة من Spotify غير مكتملة. يُرجى المحاولة مرة أخرى.",
     "spotifyErrorSpotify": "أبلغ Spotify عن مشكلة أثناء الاتصال. يُرجى المحاولة مرة أخرى.",
-    "spotifyErrorUnknown": "حدث خطأ غير معروف"
+    "spotifyErrorUnknown": "حدث خطأ غير معروف",
+    "spotifyErrorNotAllowlisted": "تسمح Spotify حاليًا بربط عدد محدود فقط من الحسابات التجريبية. يمكنك ربط Last.fm أو Apple Music بدلاً من ذلك، أو إضافة الفنانين يدويًا.",
+    "spotifyErrorOtherServices": "ربط خدمة أخرى"
   },
   "admin": {
     "backToApp": "العودة للتطبيق",

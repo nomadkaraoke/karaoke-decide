@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Deze verbindingslink is verlopen. Probeer het opnieuw vanaf het begin.",
     "spotifyErrorMissingParams": "Het antwoord van Spotify was onvolledig. Probeer het opnieuw.",
     "spotifyErrorSpotify": "Spotify meldde een probleem tijdens het verbinden. Probeer het opnieuw.",
-    "spotifyErrorUnknown": "Er is een onbekende fout opgetreden."
+    "spotifyErrorUnknown": "Er is een onbekende fout opgetreden.",
+    "spotifyErrorNotAllowlisted": "Spotify staat ons op dit moment slechts toe om een handjevol testaccounts te koppelen. Koppel in plaats daarvan Last.fm of Apple Music, of voeg artiesten handmatig toe.",
+    "spotifyErrorOtherServices": "Koppel een andere dienst"
   },
   "admin": {
     "backToApp": "Terug naar app",

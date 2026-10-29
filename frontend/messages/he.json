@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "פג תוקפו של קישור החיבור הזה. יש להתחיל מחדש.",
     "spotifyErrorMissingParams": "תגובת החיבור שהתקבלה מ-Spotify לא הייתה מלאה. יש לנסות שוב.",
     "spotifyErrorSpotify": "התקבלה שגיאה מ-Spotify במהלך החיבור. יש לנסות שוב.",
-    "spotifyErrorUnknown": "אירעה שגיאה לא ידועה"
+    "spotifyErrorUnknown": "אירעה שגיאה לא ידועה",
+    "spotifyErrorNotAllowlisted": "Spotify מאפשרת לנו כרגע לחבר רק מספר מצומצם של חשבונות בדיקה. אפשר לחבר במקום זאת את Last.fm או Apple Music, או להוסיף אמנים באופן ידני.",
+    "spotifyErrorOtherServices": "חיבור שירות אחר"
   },
   "admin": {
     "backToApp": "חזרה לאפליקציה",

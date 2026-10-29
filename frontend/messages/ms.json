@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Pautan sambungan ini telah tamat tempoh. Sila cuba semula dari awal.",
     "spotifyErrorMissingParams": "Maklum balas sambungan daripada Spotify tidak lengkap. Sila cuba lagi.",
     "spotifyErrorSpotify": "Spotify melaporkan masalah semasa menyambung. Sila cuba lagi.",
-    "spotifyErrorUnknown": "Ralat yang tidak diketahui telah berlaku"
+    "spotifyErrorUnknown": "Ralat yang tidak diketahui telah berlaku",
+    "spotifyErrorNotAllowlisted": "Spotify hanya membenarkan kami menyambungkan beberapa akaun ujian buat masa ini. Sambungkan Last.fm atau Apple Music sebagai ganti, atau tambah artis secara manual.",
+    "spotifyErrorOtherServices": "Sambungkan perkhidmatan lain"
   },
   "admin": {
     "backToApp": "Kembali ke Apl",

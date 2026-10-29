@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Ez a kapcsolódási link lejárt. Kérjük, kezdd újra a folyamatot.",
     "spotifyErrorMissingParams": "A Spotifytól érkező kapcsolódási válasz hiányos volt. Kérjük, próbáld újra.",
     "spotifyErrorSpotify": "A Spotify hibát jelzett a kapcsolódás során. Kérjük, próbáld újra.",
-    "spotifyErrorUnknown": "Ismeretlen hiba történt."
+    "spotifyErrorUnknown": "Ismeretlen hiba történt.",
+    "spotifyErrorNotAllowlisted": "A Spotify jelenleg csak néhány tesztfiók összekapcsolását engedélyezi számunkra. Kapcsold össze inkább a Last.fm-et vagy az Apple Musicot, vagy add hozzá az előadókat kézzel.",
+    "spotifyErrorOtherServices": "Másik szolgáltatás összekapcsolása"
   },
   "admin": {
     "backToApp": "Vissza az alkalmazásba",

@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Aquest enllaç de connexió ha caducat. Torna a començar.",
     "spotifyErrorMissingParams": "La resposta de connexió de Spotify era incompleta. Torna-ho a provar.",
     "spotifyErrorSpotify": "Spotify ha informat d'un problema en connectar. Torna-ho a provar.",
-    "spotifyErrorUnknown": "S'ha produït un error desconegut"
+    "spotifyErrorUnknown": "S'ha produït un error desconegut",
+    "spotifyErrorNotAllowlisted": "Ara mateix, Spotify només ens permet connectar uns quants comptes de prova. Connecta Last.fm o Apple Music en comptes d'això, o afegeix artistes manualment.",
+    "spotifyErrorOtherServices": "Connecta un altre servei"
   },
   "admin": {
     "backToApp": "Torna a l'aplicació",

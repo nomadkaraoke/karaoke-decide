@@ -13,13 +13,18 @@ const ERROR_KEYS: Record<string, string> = {
   missing_params: "spotifyErrorMissingParams",
   invalid_state: "spotifyErrorInvalidState",
   exchange_failed: "spotifyErrorExchangeFailed",
+  not_allowlisted: "spotifyErrorNotAllowlisted",
 };
+
+// Codes where retrying Spotify can never work, so the page points at other ways to add music.
+const NO_RETRY_CODES = new Set(["not_allowlisted"]);
 
 function ErrorContent() {
   const searchParams = useSearchParams();
   const t = useTranslations('services');
   const code = searchParams.get("message") ?? "";
   const message = t(ERROR_KEYS[code] ?? "spotifyErrorUnknown");
+  const canRetry = !NO_RETRY_CODES.has(code);
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
@@ -42,7 +47,7 @@ function ErrorContent() {
         <div className="space-y-3">
           <Link href="/services">
             <Button variant="primary" className="w-full">
-              {t("tryAgain")}
+              {canRetry ? t("tryAgain") : t("spotifyErrorOtherServices")}
             </Button>
           </Link>
           <Link href="/">

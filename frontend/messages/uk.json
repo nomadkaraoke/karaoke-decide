@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Термін дії цього посилання для підключення минув. Спробуй з початку.",
     "spotifyErrorMissingParams": "Відповідь на запит підключення від Spotify була неповною. Спробуй ще раз.",
     "spotifyErrorSpotify": "Spotify повідомив про помилку під час підключення. Спробуй ще раз.",
-    "spotifyErrorUnknown": "Сталася невідома помилка"
+    "spotifyErrorUnknown": "Сталася невідома помилка",
+    "spotifyErrorNotAllowlisted": "Зараз Spotify дозволяє нам підключати лише обмежену кількість тестових акаунтів. Підключи натомість Last.fm чи Apple Music або додай виконавців вручну.",
+    "spotifyErrorOtherServices": "Підключити інший сервіс"
   },
   "admin": {
     "backToApp": "Назад до застосунку",

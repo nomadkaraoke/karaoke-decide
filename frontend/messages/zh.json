@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "连接已过期，请重新开始。",
     "spotifyErrorMissingParams": "来自 Spotify 的连接响应不完整，请重试。",
     "spotifyErrorSpotify": "连接时 Spotify 反馈出现问题，请重试。",
-    "spotifyErrorUnknown": "发生未知错误"
+    "spotifyErrorUnknown": "发生未知错误",
+    "spotifyErrorNotAllowlisted": "Spotify 目前仅允许我们连接少数测试账号。您可以改用 Last.fm 或 Apple Music，也可以手动添加歌手。",
+    "spotifyErrorOtherServices": "连接其他服务"
   },
   "admin": {
     "backToApp": "返回应用",
