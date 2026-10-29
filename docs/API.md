@@ -687,6 +687,8 @@ List connected music services.
 
 Start Spotify OAuth flow. Returns an authorization URL to redirect the user.
 
+> **No client starts this flow any more (2026-10-29).** Our Spotify app is in Development Mode, capped at a 5-account allowlist (extended quota needs 250k+ MAU), so the web UI shows the Spotify card only for already-connected accounts (sync + disconnect). Users are steered to ListenBrainz (mobile), Last.fm and Apple Music. The endpoint stays for the existing allowlisted connections.
+
 **Requires:** Bearer token
 
 **Response:**

@@ -173,17 +173,6 @@ export function ConnectedServicesSection({
   const getService = (serviceType: string) =>
     services.find((s) => s.service_type === serviceType);
 
-  const handleConnectSpotify = async () => {
-    try {
-      const response = await api.services.connectSpotify();
-      window.location.href = response.auth_url;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t('failedToConnectSpotify')
-      );
-    }
-  };
-
   const handleConnectLastfm = async (e: FormEvent) => {
     e.preventDefault();
     if (!lastfmUsername.trim()) return;
@@ -330,28 +319,23 @@ export function ConnectedServicesSection({
             <LoadingPulse count={2} />
           ) : (
             <>
-              {/* Spotify */}
-              <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
-                    <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-medium text-[var(--text)]">{t('spotify')}</h3>
-                    {isConnected("spotify") ? (
+              {/* Spotify: connect is gone (our Spotify app is capped at a 5-account
+                  allowlist, 2026-10-29); existing connections keep sync + disconnect. */}
+              {isConnected("spotify") && (
+                <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-[#1DB954]/20 flex items-center justify-center">
+                      <SpotifyIcon className="w-4 h-4 text-[#1DB954]" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-[var(--text)]">{t('spotify')}</h3>
                       <p className="text-xs text-[var(--text-muted)]">
                         {getService("spotify")?.service_username}
                       </p>
-                    ) : null}
-                  </div>
-                  {isConnected("spotify") ? (
+                    </div>
                     <Badge variant="success">{t('connected')}</Badge>
-                  ) : (
-                    <Badge variant="default">{t('notConnected')}</Badge>
-                  )}
-                </div>
+                  </div>
 
-                {isConnected("spotify") ? (
                   <div className="space-y-2">
                     <div className="flex items-center gap-4 text-xs text-[var(--text-subtle)]">
                       <span>
@@ -375,17 +359,8 @@ export function ConnectedServicesSection({
                       {t('disconnect')}
                     </Button>
                   </div>
-                ) : (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleConnectSpotify}
-                    leftIcon={<SpotifyIcon className="w-4 h-4" />}
-                  >
-                    {t('connectSpotify')}
-                  </Button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Last.fm */}
               <div className="p-4 rounded-xl bg-[var(--secondary)] border border-[var(--card-border)]">
