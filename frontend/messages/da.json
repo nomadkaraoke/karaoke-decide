@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Dette forbindelseslink er udløbet. Start venligst forfra.",
     "spotifyErrorMissingParams": "Forbindelsessvaret fra Spotify var ufuldstændigt. Prøv venligst igen.",
     "spotifyErrorSpotify": "Spotify meldte om et problem under oprettelse af forbindelsen. Prøv venligst igen.",
-    "spotifyErrorUnknown": "Der opstod en ukendt fejl"
+    "spotifyErrorUnknown": "Der opstod en ukendt fejl",
+    "spotifyErrorNotAllowlisted": "Spotify giver os kun lov til at tilknytte en håndfuld testkonti lige nu. Tilknyt Last.fm eller Apple Music i stedet, eller tilføj kunstnere manuelt.",
+    "spotifyErrorOtherServices": "Tilknyt en anden tjeneste"
   },
   "admin": {
     "backToApp": "Tilbage til app",

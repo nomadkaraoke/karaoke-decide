@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Nag-expire na ang link ng koneksyong ito. Pakisubukang magsimula muli.",
     "spotifyErrorMissingParams": "Hindi kumpleto ang tugon sa koneksyon mula sa Spotify. Pakisubukan muli.",
     "spotifyErrorSpotify": "Nagkaproblema ang Spotify habang kumokonekta. Pakisubukan muli.",
-    "spotifyErrorUnknown": "May naganap na hindi malamang error"
+    "spotifyErrorUnknown": "May naganap na hindi malamang error",
+    "spotifyErrorNotAllowlisted": "Ilang test account pa lang ang pinapayagan ng Spotify na ikonekta sa ngayon. Ikonekta na lang ang Last.fm o Apple Music, o manu-manong magdagdag ng mga artist.",
+    "spotifyErrorOtherServices": "Magkonekta ng ibang serbisyo"
   },
   "admin": {
     "backToApp": "Bumalik sa App",

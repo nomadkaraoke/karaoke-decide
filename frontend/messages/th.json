@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "ลิงก์การเชื่อมต่อนี้หมดอายุแล้ว โปรดเริ่มใหม่อีกครั้ง",
     "spotifyErrorMissingParams": "ข้อมูลการตอบกลับจาก Spotify ไม่ครบถ้วน โปรดลองอีกครั้ง",
     "spotifyErrorSpotify": "Spotify แจ้งปัญหาขณะเชื่อมต่อ โปรดลองอีกครั้ง",
-    "spotifyErrorUnknown": "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ"
+    "spotifyErrorUnknown": "เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ",
+    "spotifyErrorNotAllowlisted": "ขณะนี้ Spotify อนุญาตให้เราเชื่อมต่อบัญชีทดสอบได้เพียงไม่กี่บัญชีเท่านั้น โปรดเชื่อมต่อ Last.fm หรือ Apple Music แทน หรือเพิ่มศิลปินด้วยตัวเอง",
+    "spotifyErrorOtherServices": "เชื่อมต่อบริการอื่น"
   },
   "admin": {
     "backToApp": "กลับไปที่แอป",

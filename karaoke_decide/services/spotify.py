@@ -8,12 +8,26 @@ import httpx
 from karaoke_decide.core.config import Settings
 from karaoke_decide.core.exceptions import ExternalServiceError, RateLimitError
 
+# Spotify's 403 body for a user who is not on a Development Mode app's allowlist.
+_NOT_REGISTERED_MARKER = "not registered for this application"
+
 
 class SpotifyInvalidGrantError(ExternalServiceError):
     """The refresh token is no longer usable (revoked or expired): the user must reconnect."""
 
     def __init__(self) -> None:
         super().__init__("Spotify", "invalid_grant")
+
+
+class SpotifyUserNotAllowedError(ExternalServiceError):
+    """Spotify refused the user: our app is in Development Mode and they are not on its allowlist.
+
+    Development Mode allows a handful of hand-added users. Anyone else gets a 403 "The user is
+    not registered for this application" from the Web API. Retrying never helps.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("Spotify", "user not registered for this application")
 
 
 class SpotifyClient:
@@ -178,6 +192,9 @@ class SpotifyClient:
             if response.status_code == 429:
                 retry_after = response.headers.get("Retry-After", "60")
                 raise RateLimitError("Spotify", f"Rate limited. Retry after {retry_after}s")
+
+            if response.status_code == 403 and _NOT_REGISTERED_MARKER in response.text.lower():
+                raise SpotifyUserNotAllowedError()
 
             if response.status_code != 200:
                 raise ExternalServiceError("Spotify", f"API error: {response.text}")

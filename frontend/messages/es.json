@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Este enlace de conexión ha caducado. Por favor, empieza de nuevo.",
     "spotifyErrorMissingParams": "La respuesta de conexión de Spotify estaba incompleta. Por favor, inténtalo de nuevo.",
     "spotifyErrorSpotify": "Spotify informó de un problema al conectar. Por favor, inténtalo de nuevo.",
-    "spotifyErrorUnknown": "Ocurrió un error desconocido"
+    "spotifyErrorUnknown": "Ocurrió un error desconocido",
+    "spotifyErrorNotAllowlisted": "Actualmente, Spotify solo nos permite conectar unas pocas cuentas de prueba. Conecta Last.fm o Apple Music en su lugar, o añade artistas a mano.",
+    "spotifyErrorOtherServices": "Conectar otro servicio"
   },
   "admin": {
     "backToApp": "Volver a la aplicación",

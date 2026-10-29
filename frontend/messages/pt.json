@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Este link de conexão expirou. Tente começar novamente.",
     "spotifyErrorMissingParams": "A resposta de conexão do Spotify estava incompleta. Tente novamente.",
     "spotifyErrorSpotify": "O Spotify relatou um problema ao conectar. Tente novamente.",
-    "spotifyErrorUnknown": "Ocorreu um erro desconhecido"
+    "spotifyErrorUnknown": "Ocorreu um erro desconhecido",
+    "spotifyErrorNotAllowlisted": "O Spotify só nos permite conectar um número limitado de contas de teste no momento. Conecte o Last.fm ou o Apple Music em vez disso, ou adicione artistas manualmente.",
+    "spotifyErrorOtherServices": "Conectar outro serviço"
   },
   "admin": {
     "backToApp": "Voltar para o App",

@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "接続リンクの有効期限が切れています。最初からやり直してください。",
     "spotifyErrorMissingParams": "Spotifyからの接続レスポンスが不完全でした。もう一度お試しください。",
     "spotifyErrorSpotify": "接続中にSpotifyで問題が発生しました。もう一度お試しください。",
-    "spotifyErrorUnknown": "不明なエラーが発生しました"
+    "spotifyErrorUnknown": "不明なエラーが発生しました",
+    "spotifyErrorNotAllowlisted": "現在、Spotifyで連携できるのは一部のテストアカウントのみとなっています。代わりにLast.fmやApple Musicを連携するか、手動でアーティストを追加してください。",
+    "spotifyErrorOtherServices": "他のサービスを連携する"
   },
   "admin": {
     "backToApp": "アプリに戻る",

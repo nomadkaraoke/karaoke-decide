@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Dieser Verbindungslink ist abgelaufen. Bitte versuche es von vorn.",
     "spotifyErrorMissingParams": "Die Antwort zur Verbindung von Spotify war unvollständig. Bitte versuche es erneut.",
     "spotifyErrorSpotify": "Spotify hat beim Verbinden ein Problem gemeldet. Bitte versuche es erneut.",
-    "spotifyErrorUnknown": "Ein unbekannter Fehler ist aufgetreten"
+    "spotifyErrorUnknown": "Ein unbekannter Fehler ist aufgetreten",
+    "spotifyErrorNotAllowlisted": "Spotify lässt uns derzeit nur eine Handvoll Test-Accounts verbinden. Verbinde stattdessen Last.fm oder Apple Music oder füge Künstler manuell hinzu.",
+    "spotifyErrorOtherServices": "Anderen Dienst verbinden"
   },
   "admin": {
     "backToApp": "Zurück zur App",

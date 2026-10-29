@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Αυτός ο σύνδεσμος σύνδεσης έχει λήξει. Δοκίμασε από την αρχή.",
     "spotifyErrorMissingParams": "Η απάντηση σύνδεσης από το Spotify ήταν ελλιπής. Δοκίμασε ξανά.",
     "spotifyErrorSpotify": "Το Spotify ανέφερε ένα πρόβλημα κατά τη σύνδεση. Δοκίμασε ξανά.",
-    "spotifyErrorUnknown": "Παρουσιάστηκε άγνωστο σφάλμα"
+    "spotifyErrorUnknown": "Παρουσιάστηκε άγνωστο σφάλμα",
+    "spotifyErrorNotAllowlisted": "Το Spotify μας επιτρέπει να συνδέσουμε μόνο έναν περιορισμένο αριθμό δοκιμαστικών λογαριασμών αυτή τη στιγμή. Σύνδεσε το Last.fm ή το Apple Music αντ' αυτού ή πρόσθεσε καλλιτέχνες χειροκίνητα.",
+    "spotifyErrorOtherServices": "Σύνδεση άλλης υπηρεσίας"
   },
   "admin": {
     "backToApp": "Πίσω στην Εφαρμογή",

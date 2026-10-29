@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Acest link de conectare a expirat. Te rugăm să iei procesul de la capăt.",
     "spotifyErrorMissingParams": "Răspunsul de conectare de la Spotify a fost incomplet. Te rugăm să încerci din nou.",
     "spotifyErrorSpotify": "Spotify a raportat o problemă la conectare. Te rugăm să încerci din nou.",
-    "spotifyErrorUnknown": "A apărut o eroare necunoscută"
+    "spotifyErrorUnknown": "A apărut o eroare necunoscută",
+    "spotifyErrorNotAllowlisted": "Spotify ne permite în acest moment să conectăm doar câteva conturi de test. Conectează în schimb Last.fm sau Apple Music ori adaugă artiști manual.",
+    "spotifyErrorOtherServices": "Conectează alt serviciu"
   },
   "admin": {
     "backToApp": "Înapoi la aplicație",

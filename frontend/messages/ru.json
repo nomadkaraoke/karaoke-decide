@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Срок действия ссылки для подключения истёк. Пожалуйста, начни сначала.",
     "spotifyErrorMissingParams": "Ответ от Spotify при подключении был неполным. Пожалуйста, попробуй ещё раз.",
     "spotifyErrorSpotify": "Spotify сообщил об ошибке при подключении. Пожалуйста, попробуй ещё раз.",
-    "spotifyErrorUnknown": "Произошла неизвестная ошибка."
+    "spotifyErrorUnknown": "Произошла неизвестная ошибка.",
+    "spotifyErrorNotAllowlisted": "Сейчас Spotify позволяет нам подключить лишь несколько тестовых аккаунтов. Подключи вместо этого Last.fm или Apple Music либо добавь исполнителей вручную.",
+    "spotifyErrorOtherServices": "Подключить другой сервис"
   },
   "admin": {
     "backToApp": "Вернуться в приложение",

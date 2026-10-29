@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Den här anslutningslänken har upphört att gälla. Börja om på nytt.",
     "spotifyErrorMissingParams": "Anslutningssvaret från Spotify var ofullständigt. Försök igen.",
     "spotifyErrorSpotify": "Spotify rapporterade ett problem vid anslutningen. Försök igen.",
-    "spotifyErrorUnknown": "Ett okänt fel inträffade"
+    "spotifyErrorUnknown": "Ett okänt fel inträffade",
+    "spotifyErrorNotAllowlisted": "Spotify låter oss bara ansluta ett fåtal testkonton just nu. Anslut Last.fm eller Apple Music i stället, eller lägg till artister manuellt.",
+    "spotifyErrorOtherServices": "Anslut en annan tjänst"
   },
   "admin": {
     "backToApp": "Tillbaka till appen",

@@ -1,5 +1,6 @@
 """Tests for services API routes."""
 
+import logging
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,6 +12,7 @@ from backend.config import BackendSettings
 from backend.services.sync_service import SyncResult
 from karaoke_decide.core.exceptions import NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService, User
+from karaoke_decide.services.spotify import SpotifyUserNotAllowedError
 
 
 @pytest.fixture
@@ -340,6 +342,32 @@ class TestSpotifyCallback:
         assert response.status_code == 302
         assert response.headers["location"].endswith("spotify/error?message=exchange_failed")
         assert "secret" not in response.headers["location"]
+
+    def test_callback_not_allowlisted_redirects_with_own_code(
+        self,
+        auth_client: TestClient,
+        mock_music_service_service: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A user outside the Spotify Development Mode allowlist gets not_allowlisted, logged as
+        one WARNING line with no traceback (a traceback is what paged #alerts)."""
+        mock_music_service_service.spotify.get_current_user = AsyncMock(side_effect=SpotifyUserNotAllowedError())
+
+        with caplog.at_level(logging.WARNING, logger="backend.api.routes.services"):
+            response = auth_client.get(
+                "/api/services/spotify/callback",
+                params={"code": "auth-code", "state": "test-state-0123456789"},
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 302
+        assert response.headers["location"].endswith("spotify/error?message=not_allowlisted")
+        mock_music_service_service.create_or_update_spotify_service.assert_not_called()
+        records = [r for r in caplog.records if r.name == "backend.api.routes.services"]
+        assert len(records) == 1
+        assert records[0].levelno == logging.WARNING
+        assert records[0].exc_info is None
+        assert "allowlist" in records[0].getMessage()
 
     def test_callback_missing_params_redirects(
         self,

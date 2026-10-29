@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Tautan koneksi ini telah kedaluwarsa. Silakan mulai lagi dari awal.",
     "spotifyErrorMissingParams": "Respons koneksi dari Spotify tidak lengkap. Silakan coba lagi.",
     "spotifyErrorSpotify": "Spotify mengalami masalah saat menghubungkan. Silakan coba lagi.",
-    "spotifyErrorUnknown": "Terjadi kesalahan yang tidak diketahui"
+    "spotifyErrorUnknown": "Terjadi kesalahan yang tidak diketahui",
+    "spotifyErrorNotAllowlisted": "Saat ini Spotify hanya mengizinkan kami menghubungkan beberapa akun uji coba saja. Hubungkan Last.fm atau Apple Music sebagai gantinya, atau tambahkan artis secara manual.",
+    "spotifyErrorOtherServices": "Hubungkan layanan lain"
   },
   "admin": {
     "backToApp": "Kembali ke Aplikasi",

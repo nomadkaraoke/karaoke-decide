@@ -478,7 +478,9 @@
     "spotifyErrorInvalidState": "Platnosť tohto odkazu na prepojenie vypršala. Začni, prosím, odznova.",
     "spotifyErrorMissingParams": "Odpoveď o prepojení zo služby Spotify bola neúplná. Skús to znova, prosím.",
     "spotifyErrorSpotify": "Služba Spotify nahlásila pri pripájaní problém. Skús to znova, prosím.",
-    "spotifyErrorUnknown": "Vyskytla sa neznáma chyba"
+    "spotifyErrorUnknown": "Vyskytla sa neznáma chyba",
+    "spotifyErrorNotAllowlisted": "Spotify nám momentálne umožňuje pripojiť len niekoľko testovacích účtov. Namiesto toho pripoj Last.fm alebo Apple Music, prípadne pridaj interpretov ručne.",
+    "spotifyErrorOtherServices": "Pripojiť inú službu"
   },
   "admin": {
     "backToApp": "Späť do aplikácie",

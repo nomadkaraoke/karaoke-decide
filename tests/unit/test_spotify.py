@@ -6,7 +6,7 @@ import pytest
 
 from karaoke_decide.core.config import Settings
 from karaoke_decide.core.exceptions import ExternalServiceError, RateLimitError
-from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError
+from karaoke_decide.services.spotify import SpotifyClient, SpotifyInvalidGrantError, SpotifyUserNotAllowedError
 
 
 @pytest.fixture
@@ -230,6 +230,36 @@ class TestApiRequest:
 
             with pytest.raises(ExternalServiceError):
                 await spotify_client._api_request("GET", "/me", "token")
+
+    @pytest.mark.asyncio
+    async def test_api_request_not_registered_raises_not_allowed(self, spotify_client: SpotifyClient) -> None:
+        """Development Mode 403 for a user outside the allowlist gets its own exception."""
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.text = '{"error": {"status": 403, "message": "The user is not registered for this application"}}'
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.request = AsyncMock(return_value=mock_response)
+
+            with pytest.raises(SpotifyUserNotAllowedError) as exc_info:
+                await spotify_client._api_request("GET", "/me", "token")
+
+        assert isinstance(exc_info.value, ExternalServiceError)
+
+    @pytest.mark.asyncio
+    async def test_api_request_other_403_is_plain_external_error(self, spotify_client: SpotifyClient) -> None:
+        """Any other 403 (e.g. missing scope) stays a plain ExternalServiceError."""
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.text = '{"error": {"status": 403, "message": "Insufficient client scope"}}'
+
+        with patch("httpx.AsyncClient") as mock_client:
+            mock_client.return_value.__aenter__.return_value.request = AsyncMock(return_value=mock_response)
+
+            with pytest.raises(ExternalServiceError) as exc_info:
+                await spotify_client._api_request("GET", "/me", "token")
+
+        assert not isinstance(exc_info.value, SpotifyUserNotAllowedError)
 
 
 class TestSpotifyApiMethods:
