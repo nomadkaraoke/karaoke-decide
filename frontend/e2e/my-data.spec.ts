@@ -124,10 +124,44 @@ test.describe("My Data Page", () => {
     await page.goto("/my-data");
     await page.waitForLoadState("networkidle");
 
-    // Services section should be expanded by default
-    await expect(page.getByText("Spotify")).toBeVisible({ timeout: 10000 });
+    // Services section is collapsed by default (bottom of the page)
+    await page.getByRole("button", { name: /connected services/i }).click();
+    await expect(page.getByRole("heading", { name: "Spotify", exact: true })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("testuser")).toBeVisible();
-    await expect(page.getByText(/100 tracks/)).toBeVisible();
+    await expect(page.getByText(/100 songs/)).toBeVisible();
+  });
+
+  test("no Spotify connect option when Spotify isn't connected", async ({ page }) => {
+    // Our Spotify app is capped at a 5-account allowlist, so connect is removed
+    // (2026-10-29); only an existing connection still shows its card.
+    await page.route("**/api/my/data/summary", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          services: {},
+          artists: { total: 0, by_source: {} },
+          songs: { total: 0, with_karaoke: 0 },
+          preferences: { completed: false },
+        }),
+      });
+    });
+    await page.route("**/api/services/sync/status", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ services: [], active_job: null }),
+      });
+    });
+
+    await page.goto("/my-data");
+    await page.waitForLoadState("networkidle");
+
+    await page.getByRole("button", { name: /connected services/i }).click();
+    await expect(page.getByRole("button", { name: /connect last\.fm/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Apple Music", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /connect spotify/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Spotify", exact: true })).toHaveCount(0);
   });
 
   test("artists section shows artists grouped by source", async ({ page }) => {

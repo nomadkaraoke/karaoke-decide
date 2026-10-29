@@ -45,7 +45,7 @@ export function UpgradePrompt({
         <ul className="space-y-2 text-sm text-[var(--text-muted)]">
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />
-            {t('connectSpotifyLastfm')}
+            {t('connectMusicServices')}
           </li>
           <li className="flex items-center gap-2">
             <CheckIcon className="w-4 h-4 text-[var(--brand-pink)]" />

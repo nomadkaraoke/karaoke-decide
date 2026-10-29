@@ -777,9 +777,6 @@ export const api = {
         }>
       >("/api/services"),
 
-    connectSpotify: () =>
-      api.post<{ auth_url: string }>("/api/services/spotify/connect"),
-
     importYouTubeMusicPlaylist: (playlistUrl: string) =>
       api.post<{
         playlist_title: string;
