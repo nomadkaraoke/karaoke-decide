@@ -48,6 +48,12 @@ MAX_BYTES_TABLE = 80 * GIB
 # alert every week forever.
 MIN_ROW_RATIO = 0.9
 MIN_ROW_DROP = 50
+# Passing the two checks above isn't enough to block a small table: one upstream
+# bulk edit or revert can move a small relation table by hundreds of rows
+# (2026-11-01: l_recording_release 1,366 -> 1,073, l_release_group_work 405 -> 212).
+# So the drop must also be big in absolute terms or leave almost nothing behind.
+SEVERE_ROW_DROP = 1000
+SEVERE_ROW_RATIO = 0.25
 # Bounds on the run summary so one ERROR stays readable.
 SUMMARY_MAX_TABLES = 25
 SUMMARY_MAX_ERROR_CHARS = 300
@@ -146,8 +152,11 @@ def check_rows(new: int | None, old: int | None) -> str | None:
     """Row-count sanity vs the published copy; None = OK."""
     if new is None:
         return "staging table missing"
-    if old and new < old * MIN_ROW_RATIO and old - new >= MIN_ROW_DROP:
-        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%}, -{old - new:,})"
+    if not old:
+        return None
+    drop = old - new
+    if new < old * MIN_ROW_RATIO and drop >= MIN_ROW_DROP and (drop >= SEVERE_ROW_DROP or new < old * SEVERE_ROW_RATIO):
+        return f"{new:,} rows vs published {old:,} (< {MIN_ROW_RATIO:.0%}, -{drop:,})"
     return None
 
 

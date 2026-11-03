@@ -147,7 +147,6 @@ class TestCheckRows:
             (0, None, True),
             (95_000, 100_000, True),
             (89_000, 100_000, False),
-            (899, 1000, False),
             (None, 100, False),
             (0, 0, True),
             # Tiny tables churn by a few rows a week (2026-10-18: l_artist_genre 6 -> 3,
@@ -162,6 +161,19 @@ class TestCheckRows:
             (0, 999, False),
             (1, 500, False),
             (450, 500, True),
+            # Small relation tables swing by hundreds when a single upstream bulk edit lands
+            # or is reverted (2026-11-01: both were rejected, and would have been every week).
+            (1_073, 1_366, True),
+            (212, 405, True),
+            (899, 1000, True),
+            # A small table is still blocked once nearly all of it has gone: under 25% remains.
+            (249, 1000, False),
+            (250, 1000, True),
+            # 1,000+ rows lost and below 90% is a broken load, however big the table.
+            (4_000, 5_000, False),
+            (4_001, 5_000, True),
+            (8_999, 10_000, False),
+            (9_000, 10_000, True),
         ],
     )
     def test_bounds(self, new, old, ok):
@@ -251,6 +263,18 @@ class TestBuildAndPublish:
         assert result.skipped == {}
         dests = {c.args[1] for c in bq.copy_table.call_args_list}
         assert f"{mirror.MIRROR_DATASET}.l_artist_genre" in dests
+
+    def test_small_table_bulk_edit_revert_is_published_without_error(self, caplog):
+        # 2026-11-01: a reverted upstream bulk edit shrank these, the guard kept the stale
+        # copies, and the same stale baseline would have re-alerted every Sunday.
+        bq = _mirror_bq(rows={"l_recording_release": (1_073, 1_366), "l_release_group_work": (212, 405)})
+        with caplog.at_level(logging.WARNING, logger="mb_refresh"):
+            result = mirror.build_and_publish(bq, "20261031-002147", "31")
+        assert result.skipped == {}
+        dests = {c.args[1] for c in bq.copy_table.call_args_list}
+        assert f"{mirror.MIRROR_DATASET}.l_recording_release" in dests
+        assert f"{mirror.MIRROR_DATASET}.l_release_group_work" in dests
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
     def test_load_failures_are_reported_with_their_cause(self, caplog):
         bq = _mirror_bq()
