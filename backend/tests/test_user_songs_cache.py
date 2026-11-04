@@ -611,15 +611,15 @@ async def test_a_bad_cursor_is_rejected_before_any_flight() -> None:
 
 @pytest.mark.parametrize(
     ("kwargs", "fresh"),
-    [({}, False), ({"shared": False}, True), ({"shared": True}, False)],
+    [({}, True), ({"shared": False}, True), ({"shared": True}, False)],
 )
 async def test_build_context_reads_fresh_unless_asked_to_share(
     monkeypatch: pytest.MonkeyPatch, kwargs: dict[str, bool], fresh: bool
 ) -> None:
     seen: list[bool] = []
 
-    async def read(_fs: Any, _user: str, *, fresh: bool = False) -> list[dict[str, Any]]:
-        seen.append(fresh)
+    async def read(_fs: Any, _user: str, **read_kwargs: bool) -> list[dict[str, Any]]:
+        seen.append(read_kwargs["fresh"])
         return []
 
     monkeypatch.setattr(ctx_mod, "read_user_songs", read)
@@ -630,7 +630,7 @@ async def test_build_context_reads_fresh_unless_asked_to_share(
     feedback.hidden_keys = AsyncMock(return_value=set())
     await ctx_mod.build_context(fs, _reader(), feedback, "guest_1", **kwargs)
     # Default stays fresh for voice sessions and the voice pool; only recs asks to share.
-    assert seen == [kwargs.get("shared") is not True]
+    assert seen == [fresh]
 
 
 async def test_get_made_reads_through_the_shared_reader(monkeypatch: pytest.MonkeyPatch) -> None:
