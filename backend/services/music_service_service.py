@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import IMPORTS_COLLECTION
+from backend.services.user_songs_cache import read_user_songs
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
@@ -286,17 +287,20 @@ class MusicServiceService:
         from backend.services.recs_v2.context import _base_weight
         from backend.services.song_feedback_service import is_loved
 
-        docs = await self.firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
-        keys: set[str] = set()
-        empty = "u:" + make_song_key("", "")
-        for d in docs:
-            artist, title = d.get("artist") or "", d.get("title") or ""
-            if not d.get("song_key") and not (artist and title):
-                continue  # no identity: not a song
-            key = d.get("song_key") or ("u:" + make_song_key(artist, title))
-            if key != empty and (is_loved(d) or _base_weight(d) > 0):
-                keys.add(str(key))
-        return len(keys)
+        def count(docs: list[dict[str, Any]]) -> int:
+            keys: set[str] = set()
+            empty = "u:" + make_song_key("", "")
+            for d in docs:
+                artist, title = d.get("artist") or "", d.get("title") or ""
+                if not d.get("song_key") and not (artist and title):
+                    continue  # no identity: not a song
+                key = d.get("song_key") or ("u:" + make_song_key(artist, title))
+                if key != empty and (is_loved(d) or _base_weight(d) > 0):
+                    keys.add(str(key))
+            return len(keys)
+
+        # Every row, normalised: tens of thousands for a heavy user, so off the event loop.
+        return await asyncio.to_thread(count, await read_user_songs(self.firestore, user_id))
 
     async def get_services_with_summaries(self, user_id: str) -> tuple[list[MusicService], list[dict[str, Any]]]:
         """``get_user_services`` plus ``get_source_summaries`` from one ``music_services`` query."""

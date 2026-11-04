@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from backend.config import BackendSettings
@@ -18,6 +18,19 @@ else:  # imported on first use (cold start: grpc + protobuf + firestore are ~1/4
 
 _T = TypeVar("_T")
 
+WriteListener = Callable[[str, Sequence[str]], None]
+_write_listeners: list[WriteListener] = []
+
+
+def add_write_listener(listener: WriteListener) -> None:
+    """``listener(collection, doc_ids)`` runs after each committed write through ``FirestoreService``."""
+    _write_listeners.append(listener)
+
+
+def _notify_write(collection: str, doc_ids: Sequence[str]) -> None:
+    for listener in _write_listeners:
+        listener(collection, doc_ids)
+
 
 class TransactionView:
     """Document reads and writes inside one Firestore transaction.
@@ -25,9 +38,15 @@ class TransactionView:
     Firestore requires every read to happen before the first write.
     """
 
-    def __init__(self, service: FirestoreService, transaction: firestore.AsyncTransaction) -> None:
+    def __init__(
+        self,
+        service: FirestoreService,
+        transaction: firestore.AsyncTransaction,
+        written: list[tuple[str, str]] | None = None,
+    ) -> None:
         self._service = service
         self._transaction = transaction
+        self._written = written if written is not None else []
 
     async def get(self, collection: str, doc_id: str) -> dict[str, Any] | None:
         snap = await self._service.collection(collection).document(doc_id).get(transaction=self._transaction)
@@ -35,9 +54,11 @@ class TransactionView:
 
     def set(self, collection: str, doc_id: str, data: dict[str, Any]) -> None:
         self._transaction.set(self._service.collection(collection).document(doc_id), data)
+        self._written.append((collection, doc_id))
 
     def delete(self, collection: str, doc_id: str) -> None:
         self._transaction.delete(self._service.collection(collection).document(doc_id))
+        self._written.append((collection, doc_id))
 
 
 class FirestoreService:
@@ -80,6 +101,7 @@ class FirestoreService:
         """Set a document (create or overwrite)."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.set(data, merge=merge)
+        _notify_write(collection, [doc_id])
 
     async def create_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> bool:
         """Create a document only if absent. Returns False if it already exists."""
@@ -88,6 +110,7 @@ class FirestoreService:
             await doc_ref.create(data)
         except api_exceptions.AlreadyExists:
             return False
+        _notify_write(collection, [doc_id])
         return True
 
     async def batch_set(
@@ -100,17 +123,21 @@ class FirestoreService:
         items = list(docs.items())
         for i in range(0, len(items), 400):
             batch = self.client.batch()
-            for doc_id, data in items[i : i + 400]:
+            chunk = items[i : i + 400]
+            for doc_id, data in chunk:
                 batch.set(self.collection(collection).document(doc_id), data, merge=merge)
             await batch.commit()
+            _notify_write(collection, [doc_id for doc_id, _ in chunk])
 
     async def batch_delete(self, collection: str, doc_ids: list[str]) -> None:
         """Delete many documents, committing in batches of at most 400."""
         for i in range(0, len(doc_ids), 400):
             batch = self.client.batch()
-            for doc_id in doc_ids[i : i + 400]:
+            chunk = doc_ids[i : i + 400]
+            for doc_id in chunk:
                 batch.delete(self.collection(collection).document(doc_id))
             await batch.commit()
+            _notify_write(collection, chunk)
 
     async def get_many(self, collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
         """Fetch many documents, one ``get_all`` round trip per 300 ids. Missing ids are omitted."""
@@ -126,11 +153,13 @@ class FirestoreService:
         """Update specific fields in a document."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.update(data)
+        _notify_write(collection, [doc_id])
 
     async def delete_document(self, collection: str, doc_id: str) -> None:
         """Delete a document."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.delete()
+        _notify_write(collection, [doc_id])
 
     async def query_documents(
         self,
@@ -140,6 +169,7 @@ class FirestoreService:
         order_direction: str = "ASCENDING",
         limit: int | None = None,
         offset: int | None = None,
+        select: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Query documents with filters.
 
@@ -150,6 +180,7 @@ class FirestoreService:
             order_direction: ASCENDING or DESCENDING
             limit: Max documents to return
             offset: Number of documents to skip
+            select: Only these fields (a smaller response and fewer objects for a big read)
 
         Returns:
             List of document dictionaries with IDs
@@ -169,6 +200,9 @@ class FirestoreService:
 
         if limit:
             query = query.limit(limit)
+
+        if select:
+            query = query.select(select)
 
         docs = []
         async for doc in query.stream():
@@ -225,6 +259,7 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await delete_in_transaction(transaction)
+        _notify_write(collection, [doc_id])
         return result
 
     async def transform_document_atomically(
@@ -260,6 +295,7 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await transform_in_transaction(transaction)
+        _notify_write(collection, [doc_id])
         return result
 
     async def run_transaction(self, fn: Callable[[TransactionView], Awaitable[_T]]) -> _T:
@@ -269,9 +305,14 @@ class FirestoreService:
         effects: Firestore retries the whole transaction (calling ``fn`` again) on contention.
         """
 
+        written: list[tuple[str, str]] = []
+
         @firestore.async_transactional
         async def in_transaction(transaction: firestore.AsyncTransaction) -> _T:
-            return await fn(TransactionView(self, transaction))
+            return await fn(TransactionView(self, transaction, written))
 
         result: _T = await in_transaction(self.client.transaction())
+        # After the commit: reported any earlier, a re-read could cache the rows from before this write.
+        for collection, doc_id in written:
+            _notify_write(collection, [doc_id])
         return result
