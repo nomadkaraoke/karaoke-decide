@@ -16,6 +16,7 @@ from typing import Any, Literal, Protocol
 
 from backend.services.firestore_service import FirestoreService
 from backend.services.recs_v2 import weights as w
+from backend.services.user_songs_cache import read_user_songs
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
@@ -98,11 +99,6 @@ async def _user_doc(firestore: FirestoreService, user_id: str) -> dict[str, Any]
         return await firestore.get_document("decide_users", user_id) or {}
     docs = await firestore.query_documents("decide_users", filters=[("user_id", "==", user_id)], limit=1)
     return docs[0] if docs else {}
-
-
-async def _all_user_songs(firestore: FirestoreService, user_id: str) -> list[dict[str, Any]]:
-    """One unbounded query: the client streams it in batches, and no skipped docs are re-billed."""
-    return await firestore.query_documents("user_songs", filters=[("user_id", "==", user_id)])
 
 
 def _kn_id(song_id: object) -> int | None:
@@ -241,6 +237,15 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
     )
 
 
+def _artist_names(docs: list[dict[str, Any]]) -> dict[str, str]:
+    """``artist_key -> artist`` as first spelled in the rows. Runs over every row: keep it off the event loop."""
+    names: dict[str, str] = {}
+    for d in docs:
+        if d.get("artist"):
+            names.setdefault(artist_key(d["artist"]), d["artist"])
+    return names
+
+
 async def hidden_keys_or_none(feedback: HiddenKeysProvider, user_id: str) -> set[str]:
     """The user's hidden keys; a failed read degrades to none hidden."""
     try:
@@ -251,11 +256,18 @@ async def hidden_keys_or_none(feedback: HiddenKeysProvider, user_id: str) -> set
 
 
 async def build_context(
-    firestore: FirestoreService, reader: CatalogReader, feedback: HiddenKeysProvider, user_id: str
+    firestore: FirestoreService,
+    reader: CatalogReader,
+    feedback: HiddenKeysProvider,
+    user_id: str,
+    *,
+    shared: bool = False,
 ) -> UserContextV2:
+    """``shared`` accepts the instance's shared ``user_songs`` read, up to its TTL old when another
+    instance wrote; the default reads the rows afresh, as a flow reading back its own writes must."""
     user, song_docs, artist_docs, hidden = await asyncio.gather(
         _user_doc(firestore, user_id),
-        _all_user_songs(firestore, user_id),
+        read_user_songs(firestore, user_id, fresh=not shared),
         firestore.query_documents("user_artists", filters=[("user_id", "==", user_id)]),
         hidden_keys_or_none(feedback, user_id),
     )
@@ -270,10 +282,7 @@ async def build_context(
     songs_per_artist = songs.songs_per_artist
 
     artists = ctx.artists
-    names: dict[str, str] = {}
-    for d in song_docs:
-        if d.get("artist"):
-            names.setdefault(artist_key(d["artist"]), d["artist"])
+    names = await asyncio.to_thread(_artist_names, song_docs)
     for key, n in songs_per_artist.items():  # quiz-seeded songs are excluded from the count
         if key:
             _add_artist(artists, names.get(key, key), w.artist_from_songs(n), "songs")

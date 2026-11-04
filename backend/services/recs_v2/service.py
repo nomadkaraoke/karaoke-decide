@@ -31,6 +31,7 @@ from backend.services.recs_v2.context import HiddenKeysProvider, UserContextV2, 
 from backend.services.recs_v2.filters import RecFilters, Sort, filters_applied
 from backend.services.recs_v2.scoring import Scored, score
 from backend.services.recs_v2.sections import Section, build_sections
+from backend.services.user_songs_cache import USER_SONGS, SingleFlight
 from backend.services.voice_profile_service import VoiceProfileOut
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
@@ -259,6 +260,10 @@ def _crowd_key_hints(stats: dict[str, dict[str, Any]], bucket: str | None) -> di
     return {k: h for k, doc in stats.items() if (h := crowd_key_hint(doc, bucket)) is not None}
 
 
+# Services are built per request; the requests they could share a computation with aren't.
+_FLIGHTS: SingleFlight[RecommendationsV2Response] = SingleFlight()
+
+
 class RecommendationServiceV2:
     def __init__(
         self,
@@ -312,11 +317,23 @@ class RecommendationServiceV2:
         *,
         profile: VoiceProfileOut | None = None,
     ) -> RecommendationsV2Response:
-        """``profile`` overrides the stored voice profile (a voice session's result before it is saved)."""
+        """``profile`` overrides the stored voice profile (a voice session's result before it is saved).
+
+        Identical concurrent requests share one computation (the app's launch asks for the same
+        unfiltered recs from several places, and get-made asks too). Only while it runs: the response
+        isn't kept, so a song just hidden is gone from the next one."""
         offset = decode_cursor(cursor)  # cheap; reject before any work
+        if profile is not None:
+            return await self._recommend(user, f, sort, offset, profile)
+        key = (user.id, USER_SONGS.generation(user.id), f.model_dump_json(), sort, offset)
+        return await _FLIGHTS.run(key, lambda: self._recommend(user, f, sort, offset, None))
+
+    async def _recommend(
+        self, user: User, f: RecFilters, sort: Sort, offset: int, profile: VoiceProfileOut | None
+    ) -> RecommendationsV2Response:
         reader = await asyncio.to_thread(self._store.require)  # CatalogUnavailable -> route 503
         ctx, stored = await asyncio.gather(
-            build_context(self._firestore, reader, self._feedback, user.id),
+            build_context(self._firestore, reader, self._feedback, user.id, shared=profile is None),
             self._stored_profile(user.id, override=profile is not None),
         )
         profile = profile or stored

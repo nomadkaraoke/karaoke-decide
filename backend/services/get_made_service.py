@@ -40,7 +40,8 @@ from backend.services.recs_v2.context import (
 )
 from backend.services.recs_v2.filters import RecFilters
 from backend.services.recs_v2.service import RecommendationsV2Response
-from backend.services.song_feedback_service import USER_SONGS_COLLECTION, is_loved
+from backend.services.song_feedback_service import is_loved
+from backend.services.user_songs_cache import read_user_songs
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.core.models import User
 from karaoke_decide.song_search.text_normalize import song_key as make_song_key
@@ -194,7 +195,7 @@ class GetMadeService:
     async def list(self, user_id: str) -> GetMadeResponse:
         reader = await asyncio.to_thread(self._store.require)  # CatalogUnavailable -> route 503
         rows, unresolved, dismissed, hidden, recs = await asyncio.gather(
-            self._fs.query_documents(USER_SONGS_COLLECTION, filters=[("user_id", "==", user_id)]),
+            read_user_songs(self._fs, user_id),
             self._fs.query_documents(UNRESOLVED_COLLECTION, filters=[("user_id", "==", user_id)]),
             self.dismissed_keys(user_id),
             self._hidden_keys(user_id),
