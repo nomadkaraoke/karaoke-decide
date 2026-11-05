@@ -22,7 +22,7 @@ from typing import Any, Literal
 
 from backend.services.auth_service import AuthService
 from backend.services.crowd_stats import CROWD_COLLECTION
-from backend.services.firestore_service import FirestoreService
+from backend.services.firestore_service import USER_SONGS_SNAPSHOT_META, FirestoreService
 from backend.services.get_made_service import DISMISSED_COLLECTION as MAKE_DISMISSED
 from backend.services.import_ingest_service import (
     EXPORT_ARTISTS_COLLECTION,
@@ -37,6 +37,7 @@ from backend.services.quiz_service import QuizService
 from backend.services.screenshot_import_service import RATE_COLLECTION as SCREENSHOT_IMPORTS
 from backend.services.song_feedback_service import HIDDEN_COLLECTION, USER_SONGS_COLLECTION
 from backend.services.sync_service import SyncService
+from backend.services.user_songs_snapshot import SHARDS as SNAPSHOT_SHARDS
 from backend.services.voice_pool_service import BATCHES_COLLECTION as PERSONAL_BATCHES
 from backend.services.voice_pool_service import BUDGET_COLLECTION as PERSONAL_BUDGET
 from backend.services.voice_pool_service import LAST_BATCH_COLLECTION as PERSONAL_LAST_BATCH
@@ -90,6 +91,8 @@ USER_DATA_STORES: tuple[UserDataStore, ...] = (
     UserDataStore(PERSONAL_LAST_BATCH, "doc_id_user_id"),  # voice_personal_users/{user_id}: last batch pointer
     # Listening and taste data.
     UserDataStore(USER_SONGS_COLLECTION, "user_id_field"),  # user_songs/{user_id}:{song_id}, user_id field
+    UserDataStore(USER_SONGS_SNAPSHOT_META, "doc_id_user_id"),  # user_songs_snapshots/{user_id}: a heavy user's meta
+    UserDataStore(SNAPSHOT_SHARDS, "user_id_field"),  # {user_id}:{snapshot}:{i}: their user_songs, gzip JSON
     UserDataStore(USER_ARTISTS_COLLECTION, "user_id_field"),  # user_artists/{user_id}:{artist}, user_id field
     UserDataStore(HIDDEN_COLLECTION, "user_id_field"),  # user_hidden_songs/{user_id}:{digest}, user_id field
     UserDataStore(IMPORTS_COLLECTION, "user_id_field"),  # user_imports/{user_id}:{source} status docs, user_id field

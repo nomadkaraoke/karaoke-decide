@@ -25,7 +25,9 @@ from backend.models.sync_job import (
     SyncJobResult,
     SyncJobStatus,
 )
+from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
 from backend.services.firestore_service import FirestoreService, TransactionView
+from backend.services.user_songs_snapshot import SNAPSHOTS
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,30 @@ class SyncProcessResponse(BaseModel):
     job_id: str
     status: str
     message: str
+
+
+class SnapshotRefreshRequest(BaseModel):
+    user_id: str
+
+
+class SnapshotRefreshResponse(BaseModel):
+    user_id: str
+    result: str
+
+
+@router.post("/user-songs-snapshot/refresh", response_model=SnapshotRefreshResponse, dependencies=[InternalCaller])
+async def refresh_user_songs_snapshot(
+    body: SnapshotRefreshRequest, firestore: FirestoreServiceDep
+) -> SnapshotRefreshResponse:
+    """Refresh a heavy user's ``user_songs`` snapshot, as a request so it has CPU. Idempotent."""
+    store = get_catalog_store()
+    try:
+        reader = await asyncio.to_thread(store.require)
+    except CatalogUnavailable as exc:  # Cloud Tasks retries
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="catalog warming up") from exc
+    result = await SNAPSHOTS.refresh(firestore, reader, store.run, body.user_id)
+    logger.info("user_songs snapshot refresh for %s: %s", body.user_id, result)
+    return SnapshotRefreshResponse(user_id=body.user_id, result=result)
 
 
 @router.post("/sync/process", response_model=SyncProcessResponse, dependencies=[InternalCaller])

@@ -14,6 +14,7 @@ from backend.config import BackendSettings
 from backend.services.firestore_service import FirestoreService
 from backend.services.import_ingest_service import IMPORTS_COLLECTION
 from backend.services.user_songs_cache import read_user_songs
+from backend.services.user_songs_snapshot import SNAPSHOTS
 from karaoke_decide.core.exceptions import ExternalServiceError, NotFoundError, ValidationError
 from karaoke_decide.core.models import MusicService
 from karaoke_decide.services.apple_music import AppleMusicClient, DeveloperTokenSigner
@@ -49,6 +50,25 @@ class ListenBrainzTokenUnavailableError(MusicServiceError):
 # Strong references to in-flight shielded token refreshes, so a cancelled caller can't let the
 # task be garbage-collected mid-refresh (asyncio keeps only weak references to tasks).
 _background_refreshes: set[asyncio.Task[str]] = set()
+
+
+def known_song_count(docs: list[dict[str, Any]]) -> int:
+    """The user's distinct songs the recommender treats as known: rows deduped by ``song_key``
+    (a song can sit on both a ``sk:`` and a catalog-id row), counted when loved or when the best
+    of its sources has a positive weight. Voice-session-only unloved rows weigh 0."""
+    from backend.services.recs_v2.context import _base_weight, row_song_key
+    from backend.services.song_feedback_service import is_loved
+
+    keys: set[str] = set()
+    empty = "u:" + make_song_key("", "")
+    for d in docs:
+        artist, title = d.get("artist") or "", d.get("title") or ""
+        if not d.get("song_key") and not (artist and title):
+            continue  # no identity: not a song
+        key = d.get("song_key") or ("u:" + row_song_key(d))
+        if key != empty and (is_loved(d) or _base_weight(d) > 0):
+            keys.add(str(key))
+    return len(keys)
 
 
 def _forget_refresh(task: asyncio.Task[str]) -> None:
@@ -281,26 +301,23 @@ class MusicServiceService:
         return await self._summaries(user_id, conns)
 
     async def count_known_songs(self, user_id: str) -> int:
-        """The user's distinct songs the recommender treats as known: rows deduped by ``song_key``
-        (a song can sit on both a ``sk:`` and a catalog-id row), counted when loved or when the best
-        of its sources has a positive weight. Voice-session-only unloved rows weigh 0."""
-        from backend.services.recs_v2.context import _base_weight
-        from backend.services.song_feedback_service import is_loved
-
-        def count(docs: list[dict[str, Any]]) -> int:
-            keys: set[str] = set()
-            empty = "u:" + make_song_key("", "")
-            for d in docs:
-                artist, title = d.get("artist") or "", d.get("title") or ""
-                if not d.get("song_key") and not (artist and title):
-                    continue  # no identity: not a song
-                key = d.get("song_key") or ("u:" + make_song_key(artist, title))
-                if key != empty and (is_loved(d) or _base_weight(d) > 0):
-                    keys.add(str(key))
-            return len(keys)
-
+        """The user's distinct songs the recommender treats as known (``known_song_count``)."""
+        view = await self._snapshot_view(user_id)
+        if view is not None:
+            return int(view.known_songs)
         # Every row, normalised: tens of thousands for a heavy user, so off the event loop.
-        return await asyncio.to_thread(count, await read_user_songs(self.firestore, user_id))
+        return await asyncio.to_thread(known_song_count, await read_user_songs(self.firestore, user_id))
+
+    async def _snapshot_view(self, user_id: str) -> Any:
+        """A heavy user's snapshot view; None for everyone else or while the catalog isn't loaded."""
+        from backend.services.catalog_store import CatalogUnavailable, get_catalog_store
+
+        store = get_catalog_store()
+        try:
+            reader = await asyncio.to_thread(store.require)
+        except CatalogUnavailable:
+            return None
+        return await SNAPSHOTS.view(self.firestore, reader, store.run, user_id)
 
     async def get_services_with_summaries(self, user_id: str) -> tuple[list[MusicService], list[dict[str, Any]]]:
         """``get_user_services`` plus ``get_source_summaries`` from one ``music_services`` query."""
@@ -312,8 +329,11 @@ class MusicServiceService:
         conn_by = {str(c["service_type"]): c for c in conns if c.get("service_type")}
         imp_by = {str(i["source"]): i for i in imports if i.get("source")}
         sources = list(conn_by) + [s for s in imp_by if s not in conn_by]
+        view = await self._snapshot_view(user_id) if sources else None
 
         async def count(collection: str, source: str) -> int:
+            if view is not None and collection == "user_songs":
+                return int(view.source_counts[source])
             return await self.firestore.count_documents(
                 collection, filters=[("user_id", "==", user_id), ("source", "==", source)]
             )

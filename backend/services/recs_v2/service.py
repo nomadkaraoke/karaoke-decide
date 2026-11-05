@@ -234,7 +234,7 @@ def fitted_candidates(
     ``fit_song`` only runs on rows that can fit; candidate counts stay within the source caps."""
     prefilter = voice is not None and (f.singable or sort == "fit")
     span = voice.comfort_high - voice.comfort_low if voice is not None and prefilter else None
-    cands = gather_candidates(reader, ctx, f, voice_span=span)
+    cands = gather_candidates(reader, ctx, f, voice_span=span, sort=sort)
     if voice is None:
         return cands
     for c in cands:
@@ -333,7 +333,9 @@ class RecommendationServiceV2:
     ) -> RecommendationsV2Response:
         reader = await asyncio.to_thread(self._store.require)  # CatalogUnavailable -> route 503
         ctx, stored = await asyncio.gather(
-            build_context(self._firestore, reader, self._feedback, user.id, shared=profile is None),
+            build_context(
+                self._firestore, reader, self._feedback, user.id, shared=profile is None, catalog_run=self._store.run
+            ),
             self._stored_profile(user.id, override=profile is not None),
         )
         profile = profile or stored

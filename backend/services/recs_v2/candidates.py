@@ -13,8 +13,9 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from backend.services.catalog_facets import availability_flags
+from backend.services.recs_v2 import weights as w
 from backend.services.recs_v2.context import UserContextV2
-from backend.services.recs_v2.filters import HAS_KARAOKE_SQL, RecFilters, where_sql
+from backend.services.recs_v2.filters import HAS_KARAOKE_SQL, RecFilters, Sort, where_sql
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.moods import ENERGY_BANDS
 from karaoke_decide.catalog.reader import CatalogReader, song_range_from_row
@@ -32,6 +33,11 @@ CROWD_SONGS = 300
 CROWD_MIN_POPULARITY = 70
 MAKE_IT_SONGS = 10
 KNOWN_SONGS = 300  # the user's own known songs, so "Songs you know" never depends on artist rank
+# sort=best only: outside-catalog songs can only land in the make_it shelf (10 songs, 3 per artist).
+# Each shelf artist capped by songs from the catalog holds 3 of the 10 places, so at most 3 artists
+# are capped and at most 9 of the outside songs kept are passed over: 10 + 9 always suffice.
+OUTSIDE_FOR_BEST = 19
+OUTSIDE_PER_ARTIST = 3
 
 ENERGY_PREF_BAND = {"chill": "low", "medium": "mid", "high": "high"}
 
@@ -219,13 +225,13 @@ def _candidate(r: sqlite3.Row, avail: dict[str, tuple[bool, bool, bool]]) -> Can
     )
 
 
-def _outside_catalog(key: str, artist: str, title: str) -> Candidate:
+def _outside_catalog(key: str, artist: str, title: str, akey: str) -> Candidate:
     """A known song with no karaoke version that catalog.db doesn't carry (no facets)."""
     return Candidate(
         song_key=key,
         artist=artist,
         title=title,
-        artist_key=artist_key(artist),
+        artist_key=akey,
         has_karaoke=False,
         community=False,
         commercial=False,
@@ -244,8 +250,33 @@ def _outside_catalog(key: str, artist: str, title: str) -> Candidate:
     )
 
 
+def _outside_for_best(ctx: UserContextV2, outside: list[tuple[str, str, str, str]]) -> list[tuple[str, str, str, str]]:
+    """The outside-catalog songs that can reach the make_it shelf, by what ``scoring.score`` gives a
+    song with no facets. A heavy user has tens of thousands; building a candidate for each costs seconds."""
+
+    def value(item: tuple[str, str, str, str]) -> tuple[float, str]:
+        key, akey = item[0], item[3]
+        signal = ctx.artists.get(akey)
+        return (
+            -(w.SCORE_AFFINITY * (signal.weight if signal else 0.0) + w.SCORE_KNOWN * ctx.known_songs.get(key, 0.0)),
+            key,
+        )
+
+    per_artist: dict[str, int] = {}
+    kept: list[tuple[str, str, str, str]] = []
+    for item in sorted(outside, key=value):
+        n = per_artist.get(item[3], 0)
+        if n >= OUTSIDE_PER_ARTIST:
+            continue
+        per_artist[item[3]] = n + 1
+        kept.append(item)
+        if len(kept) >= OUTSIDE_FOR_BEST:
+            break
+    return kept
+
+
 def gather_candidates(
-    reader: CatalogReader, ctx: UserContextV2, f: RecFilters, voice_span: int | None = None
+    reader: CatalogReader, ctx: UserContextV2, f: RecFilters, voice_span: int | None = None, sort: Sort = "best"
 ) -> list[Candidate]:
     """``voice_span`` (the user's comfort span) adds the vocal-range SQL prefilter to every source."""
     g = _Gatherer(reader, f, voice_span)
@@ -275,7 +306,16 @@ def gather_candidates(
     # Known songs with no karaoke version that catalog.db doesn't carry have no facets to
     # filter on, so they only join an unfiltered request.
     if g.where == "1":
+        akeys: dict[str, str] = {}  # far fewer artists than songs
+        outside: list[tuple[str, str, str, str]] = []
         for key, artist, title in ctx.known_without_karaoke:
             if key not in out and key not in ctx.hidden:
-                out[key] = _outside_catalog(key, artist, title)
+                akey = akeys.get(artist)
+                if akey is None:
+                    akey = akeys[artist] = artist_key(artist)
+                outside.append((key, artist, title, akey))
+        if sort == "best":
+            outside = _outside_for_best(ctx, outside)
+        for key, artist, title, akey in outside:
+            out[key] = _outside_catalog(key, artist, title, akey)
     return list(out.values())

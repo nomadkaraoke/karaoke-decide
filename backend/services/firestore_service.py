@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -16,10 +18,18 @@ else:  # imported on first use (cold start: grpc + protobuf + firestore are ~1/4
     firestore = lazy_module("google.cloud.firestore")
 
 
+logger = logging.getLogger(__name__)
+
 _T = TypeVar("_T")
 
 WriteListener = Callable[[str, Sequence[str]], None]
 _write_listeners: list[WriteListener] = []
+
+USER_SONGS = "user_songs"
+# A heavy user's snapshot meta doc (backend/services/user_songs_snapshot.py), keyed by user id.
+USER_SONGS_SNAPSHOT_META = "user_songs_snapshots"
+# A write of more ids than this marks the snapshot stale, rather than listing them.
+SNAPSHOT_BULK_WRITE_IDS = 50
 
 
 def add_write_listener(listener: WriteListener) -> None:
@@ -82,6 +92,39 @@ class FirestoreService:
         """Get a collection reference."""
         return self.client.collection(name)
 
+    async def _committed(self, collection: str, doc_ids: Sequence[str]) -> None:
+        """After every commit. Awaited, so a reader on any instance sees a writer's own write."""
+        _notify_write(collection, doc_ids)
+        if collection == USER_SONGS:
+            await self._mark_user_songs_snapshot(doc_ids)
+
+    async def _mark_user_songs_snapshot(self, doc_ids: Sequence[str]) -> None:
+        """Report written rows to their users' snapshot meta docs. Doc ids are ``{user_id}:...``.
+
+        Users without a snapshot (nearly all) have no meta doc, and the update is a no-op. A failure
+        never fails the write that already committed; the snapshot's age limit bounds what it misses."""
+        by_user: dict[str, list[str]] = {}
+        for doc_id in doc_ids:
+            by_user.setdefault(doc_id.split(":", 1)[0], []).append(doc_id)
+
+        async def mark(user_id: str, ids: list[str]) -> None:
+            ref = self.collection(USER_SONGS_SNAPSHOT_META).document(user_id)
+            bulk = {"rev": firestore.Increment(1), "stale": True, "dirty_ids": []}
+            try:
+                if len(ids) > SNAPSHOT_BULK_WRITE_IDS:
+                    await ref.update(bulk)
+                    return
+                try:
+                    await ref.update({"rev": firestore.Increment(1), "dirty_ids": firestore.ArrayUnion(ids)})
+                except api_exceptions.InvalidArgument:  # the list reached the document size limit
+                    await ref.update(bulk)
+            except api_exceptions.NotFound:
+                pass
+            except Exception:
+                logger.warning("user_songs snapshot marker failed for %s", user_id, exc_info=True)
+
+        await asyncio.gather(*(mark(u, ids) for u, ids in by_user.items()))
+
     async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
         """Get a document by ID."""
         doc_ref = self.collection(collection).document(doc_id)
@@ -101,7 +144,7 @@ class FirestoreService:
         """Set a document (create or overwrite)."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.set(data, merge=merge)
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
 
     async def create_document(self, collection: str, doc_id: str, data: dict[str, Any]) -> bool:
         """Create a document only if absent. Returns False if it already exists."""
@@ -110,7 +153,7 @@ class FirestoreService:
             await doc_ref.create(data)
         except api_exceptions.AlreadyExists:
             return False
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
         return True
 
     async def batch_set(
@@ -127,7 +170,7 @@ class FirestoreService:
             for doc_id, data in chunk:
                 batch.set(self.collection(collection).document(doc_id), data, merge=merge)
             await batch.commit()
-            _notify_write(collection, [doc_id for doc_id, _ in chunk])
+            await self._committed(collection, [doc_id for doc_id, _ in chunk])
 
     async def batch_delete(self, collection: str, doc_ids: list[str]) -> None:
         """Delete many documents, committing in batches of at most 400."""
@@ -137,7 +180,7 @@ class FirestoreService:
             for doc_id in chunk:
                 batch.delete(self.collection(collection).document(doc_id))
             await batch.commit()
-            _notify_write(collection, chunk)
+            await self._committed(collection, chunk)
 
     async def get_many(self, collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
         """Fetch many documents, one ``get_all`` round trip per 300 ids. Missing ids are omitted."""
@@ -153,13 +196,13 @@ class FirestoreService:
         """Update specific fields in a document."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.update(data)
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
 
     async def delete_document(self, collection: str, doc_id: str) -> None:
         """Delete a document."""
         doc_ref = self.collection(collection).document(doc_id)
         await doc_ref.delete()
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
 
     async def query_documents(
         self,
@@ -259,7 +302,7 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await delete_in_transaction(transaction)
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
         return result
 
     async def transform_document_atomically(
@@ -295,7 +338,7 @@ class FirestoreService:
 
         transaction = self.client.transaction()
         result: dict[str, Any] | None = await transform_in_transaction(transaction)
-        _notify_write(collection, [doc_id])
+        await self._committed(collection, [doc_id])
         return result
 
     async def run_transaction(self, fn: Callable[[TransactionView], Awaitable[_T]]) -> _T:
@@ -315,4 +358,7 @@ class FirestoreService:
         # After the commit: reported any earlier, a re-read could cache the rows from before this write.
         for collection, doc_id in written:
             _notify_write(collection, [doc_id])
+        songs = [doc_id for collection, doc_id in written if collection == USER_SONGS]
+        if songs:
+            await self._mark_user_songs_snapshot(songs)
         return result
