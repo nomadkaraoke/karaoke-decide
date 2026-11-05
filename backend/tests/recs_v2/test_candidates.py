@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import random
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from backend.services.recs_v2 import candidates as cmod
-from backend.services.recs_v2.candidates import gather_candidates
+from backend.services.recs_v2.candidates import Candidate, gather_candidates
 from backend.services.recs_v2.context import ArtistSignal, UserContextV2
 from backend.services.recs_v2.filters import RecFilters
+from backend.services.recs_v2.scoring import score
+from backend.services.recs_v2.sections import build_sections
 from karaoke_decide.catalog.build import CatalogRows, SongRow, build_catalog_db
+from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.reader import CatalogReader
 
 
@@ -123,3 +127,37 @@ def test_quiz_strict_slice_comes_first(quiz_reader: CatalogReader, monkeypatch: 
     keys = {c.song_key for c in gather_candidates(quiz_reader, QUIZ_CTX, RecFilters())}
     # both exact matches despite low popularity, then the most popular of the rest
     assert keys == {"a|exact low pop", "b|exact", "c|wrong decade"}
+
+
+@pytest.mark.parametrize("seed", range(8))
+def test_bounding_outside_catalog_songs_never_changes_the_best_shelves(reader: CatalogReader, seed: int) -> None:
+    """sort=best keeps only the outside-catalog songs that can reach make_it; every shelf stays the same."""
+    rng = random.Random(seed)
+    artists = [f"Unlisted Act {i}" for i in range(rng.choice([2, 5, 40]))]
+    outside = [
+        (f"nowhere|song {i}", rng.choice(artists), f"Unlisted Song {i}") for i in range(rng.choice([25, 200, 2000]))
+    ]
+    ctx = _warm(reader)  # brings catalog songs with no karaoke version, which compete for make_it
+    ctx.known_songs.update({key: rng.choice([0.2, 0.5, 0.5, 1.0]) for key, _, _ in outside})
+    ctx.known_without_karaoke = outside
+    ctx.hidden = {outside[0][0]}
+    for name in rng.sample(artists, k=len(artists) // 2):
+        ctx.artists[artist_key(name)] = ArtistSignal(weight=rng.choice([0.1, 0.4, 0.95]), source="songs", name=name)
+    ctx.crowd_pref = rng.choice([None, "hits", "deep_cuts"])
+
+    def shelves(cands: list[Candidate]) -> list[tuple[str, list[str]]]:
+        sections = build_sections([score(c, ctx) for c in cands], ctx, "best")
+        return [(s.id, [x.c.song_key for x in s.songs]) for s in sections]
+
+    bounded = gather_candidates(reader, ctx, RecFilters(), sort="best")
+    everything = gather_candidates(reader, ctx, RecFilters(), sort="az")
+    assert len(bounded) < len(everything)
+    assert any(sid == "make_it" for sid, _ in shelves(everything))
+    assert shelves(bounded) == shelves(everything)
+
+
+def test_flat_sorts_still_list_every_outside_catalog_song(reader: CatalogReader) -> None:
+    outside = [(f"nowhere|song {i}", "Unlisted Act", f"Unlisted Song {i}") for i in range(100)]
+    ctx = UserContextV2(user_id="u", known_songs={k: 0.5 for k, _, _ in outside}, known_without_karaoke=outside)
+    keys = {c.song_key for c in gather_candidates(reader, ctx, RecFilters(), sort="az")}
+    assert {k for k, _, _ in outside} <= keys

@@ -76,10 +76,19 @@ class CloudTasksService:
             Task name.
         """
         payload = {"job_id": job_id, "user_id": user_id}
+        if self.settings.inline_tasks and delay_seconds > 0:
+            logger.info(f"Inline task inline:{job_id}: delay_seconds={delay_seconds} ignored locally")
+        return self._create_http_task("/internal/sync/process", payload, f"inline:{job_id}", delay_seconds)
+
+    def create_snapshot_refresh_task(self, user_id: str) -> str:
+        """Create a Cloud Task that refreshes a heavy user's ``user_songs`` snapshot."""
+        return self._create_http_task(
+            "/internal/user-songs-snapshot/refresh", {"user_id": user_id}, f"inline:snapshot:{user_id}"
+        )
+
+    def _create_http_task(self, path: str, payload: dict[str, Any], inline_name: str, delay_seconds: int = 0) -> str:
         if self.settings.inline_tasks:
-            if delay_seconds > 0:
-                logger.info(f"Inline task inline:{job_id}: delay_seconds={delay_seconds} ignored locally")
-            return self._run_inline("/internal/sync/process", payload, name=f"inline:{job_id}")
+            return self._run_inline(path, payload, name=inline_name)
 
         # Build the Cloud Run URL for the internal endpoint
         cloud_run_url = self.settings.cloud_run_url
@@ -87,7 +96,7 @@ class CloudTasksService:
             # Fallback for development
             cloud_run_url = f"http://localhost:{self.settings.api_port}"
 
-        url = f"{cloud_run_url}/internal/sync/process"
+        url = f"{cloud_run_url}{path}"
 
         # Create task request
         task: dict[str, Any] = {
@@ -123,7 +132,7 @@ class CloudTasksService:
         )
 
         response = self.client.create_task(request=request)
-        logger.info(f"Created sync task: {response.name}")
+        logger.info(f"Created task {path}: {response.name}")
         return response.name
 
     def _run_inline(self, path: str, payload: dict[str, Any], name: str) -> str:

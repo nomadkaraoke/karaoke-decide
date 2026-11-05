@@ -255,6 +255,15 @@ The voice session (`/api/voice/*`, Phase 3d) runs on a **fixture `voice.db`**: `
   curl -XPOST 127.0.0.1:8030/api/test/voice/reset -H 'content-type: application/json' -d '{"email":"me@example.com"}'
   ```
 
+### Heavy-user benchmark
+
+`scripts/bench_heavy_user.py` seeds a synthetic 50k-song user on the Firestore emulator and times the app's launch calls (recs v2, get-made, known songs); it exits non-zero when the warm launch's p95 is over 2 s. Baseline before the snapshot: 15.75 s. With it: 0.45 s, or 1.28 s with `--new-instance`, which is what a new instance or the first read after a write pays (same Mac; a 1 vCPU Cloud Run instance is about 3x slower). `backend/tests/test_user_songs_snapshot_emulator.py` covers the write marker on real Firestore semantics and is skipped without `FIRESTORE_EMULATOR_HOST`.
+
+```bash
+FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 GOOGLE_CLOUD_PROJECT=bench-heavy PYTHONPATH=. \
+  python scripts/bench_heavy_user.py --rows 50000 --catalog-dir .local-stack/catalog --index-dir .local-stack/song-index
+```
+
 ## Search local stack
 
 `scripts/search-local-stack.sh` is a thin wrapper for `scripts/local-stack.sh <cmd> --search-only`: just the search service on :8020 (no Firestore, no catalog, gen not required except for `/resolve`). Everything below applies to it and to the full stack's search half.

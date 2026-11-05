@@ -17,6 +17,7 @@ from typing import Any, Literal, Protocol
 from backend.services.firestore_service import FirestoreService
 from backend.services.recs_v2 import weights as w
 from backend.services.user_songs_cache import read_user_songs
+from backend.services.user_songs_snapshot import SNAPSHOTS
 from karaoke_decide.catalog.keys import artist_key
 from karaoke_decide.catalog.reader import CatalogReader
 from karaoke_decide.song_search.text_normalize import song_key
@@ -145,7 +146,8 @@ def _is_go_to(d: dict[str, Any]) -> bool:
 
 def row_kn_keys(reader: CatalogReader, docs: list[dict[str, Any]]) -> dict[int, str]:
     """catalog.db ``kn_song_map`` keys of the rows' numeric (KaraokeNerds) ``song_id``s, for ``row_key``."""
-    return reader.kn_song_keys([i for i in (_kn_id(d.get("song_id")) for d in docs) if i is not None])
+    ids = (_kn_id(d.get("song_id")) for d in docs if "_k" not in d)
+    return reader.kn_song_keys([i for i in ids if i is not None])
 
 
 def row_key(reader: CatalogReader, d: dict[str, Any], kn_keys: dict[int, str]) -> tuple[str, bool] | None:
@@ -153,7 +155,10 @@ def row_key(reader: CatalogReader, d: dict[str, Any], kn_keys: dict[int, str]) -
 
     The key is the row's KaraokeNerds mapping (``kn_keys`` from ``row_kn_keys``; always a karaoke
     song), else its stored ``song_key``, else ``song_key(artist, title)``; those have a karaoke
-    version when ``has_karaoke_key`` or ``match_kn`` finds one."""
+    version when ``has_karaoke_key`` or ``match_kn`` finds one. A snapshot row carries the answer
+    (``user_songs_snapshot.derive_rows``)."""
+    if "_k" in d:
+        return (d["_k"], bool(d["_hk"])) if d["_k"] is not None else None
     artist, title = d.get("artist") or "", d.get("title") or ""
     kn_id = _kn_id(d.get("song_id"))
     key: str | None = kn_keys.get(kn_id) if kn_id is not None else None
@@ -166,6 +171,21 @@ def row_key(reader: CatalogReader, d: dict[str, Any], kn_keys: dict[int, str]) -
     if key is None:
         return None
     return key, reader.has_karaoke_key(key) or reader.match_kn(artist, title) is not None
+
+
+def row_artist_key(d: dict[str, Any]) -> str:
+    """``artist_key`` of the row's artist (a snapshot row carries it: 50k normalisations add up)."""
+    return d["_a"] if "_a" in d else artist_key(d.get("artist") or "")
+
+
+def row_song_key(d: dict[str, Any]) -> str:
+    """``song_key(artist, title)`` of the row (a snapshot row carries it)."""
+    return d["_n"] if "_n" in d else song_key(d.get("artist") or "", d.get("title") or "")
+
+
+def row_carried_song_key(d: dict[str, Any]) -> str | None:
+    """``song_key(artist, title)`` if the row already carries it, without computing it."""
+    return d["_n"] if "_n" in d else None
 
 
 def row_weight(d: dict[str, Any]) -> float:
@@ -226,7 +246,7 @@ def _map_songs(reader: CatalogReader, docs: list[dict[str, Any]]) -> _SongMap:
         # quiz seeds 5 songs per liked artist (affinity already covers it); voice-session pool songs probe range
         session_only = _row_sources(d) == [w.SESSION_SOURCE] and d.get("loved") is not True
         if artist and d.get("source") != "quiz" and not session_only:
-            artist_songs.setdefault(artist_key(artist), set()).add(key)
+            artist_songs.setdefault(row_artist_key(d), set()).add(key)
     for key in session_no | survey_no:
         known.pop(key, None)
         no_karaoke.pop(key, None)
@@ -242,7 +262,7 @@ def _artist_names(docs: list[dict[str, Any]]) -> dict[str, str]:
     names: dict[str, str] = {}
     for d in docs:
         if d.get("artist"):
-            names.setdefault(artist_key(d["artist"]), d["artist"])
+            names.setdefault(row_artist_key(d), d["artist"])
     return names
 
 
@@ -262,19 +282,28 @@ async def build_context(
     user_id: str,
     *,
     shared: bool = False,
+    catalog_run: str | None = None,
 ) -> UserContextV2:
-    """``shared`` accepts the instance's shared ``user_songs`` read, up to its TTL old when another
-    instance wrote; the default reads the rows afresh, as a flow reading back its own writes must."""
-    user, song_docs, artist_docs, hidden = await asyncio.gather(
+    """``shared`` accepts a heavy user's snapshot (current on every instance) or else the instance's
+    shared ``user_songs`` read, up to its TTL old when another instance wrote; the default reads the
+    rows afresh, as a flow reading back its own writes must."""
+
+    async def songs_and_names() -> tuple[_SongMap, dict[str, str]]:
+        view = await SNAPSHOTS.view(firestore, reader, catalog_run, user_id) if shared else None
+        if view is not None:
+            return view.song_map, view.names
+        rows = await read_user_songs(firestore, user_id, fresh=not shared)
+        # catalog.db reads are synchronous SQLite; keep them off the event loop.
+        return await asyncio.to_thread(_map_songs, reader, rows), await asyncio.to_thread(_artist_names, rows)
+
+    user, (songs, names), artist_docs, hidden = await asyncio.gather(
         _user_doc(firestore, user_id),
-        read_user_songs(firestore, user_id, fresh=not shared),
+        songs_and_names(),
         firestore.query_documents("user_artists", filters=[("user_id", "==", user_id)]),
         hidden_keys_or_none(feedback, user_id),
     )
     ctx = UserContextV2(user_id=user_id, hidden=set(hidden))
 
-    # catalog.db reads are synchronous SQLite; keep them off the event loop.
-    songs = await asyncio.to_thread(_map_songs, reader, song_docs)
     ctx.known_songs, ctx.known_without_karaoke = songs.known, songs.no_karaoke
     ctx.session_no, ctx.survey_no, ctx.key_hints = songs.session_no, songs.survey_no, songs.key_hints
     ctx.go_tos = songs.go_tos - ctx.hidden
@@ -282,7 +311,6 @@ async def build_context(
     songs_per_artist = songs.songs_per_artist
 
     artists = ctx.artists
-    names = await asyncio.to_thread(_artist_names, song_docs)
     for key, n in songs_per_artist.items():  # quiz-seeded songs are excluded from the count
         if key:
             _add_artist(artists, names.get(key, key), w.artist_from_songs(n), "songs")

@@ -1399,3 +1399,7 @@ return await firestore.query_documents(collection, filters=[], limit=MAX_USERS_F
 **Recommendation:**
 - Commit `poetry.lock`, and lock every package shared with karaoke-gen to gen's exact version (see [DEVELOPMENT.md](DEVELOPMENT.md#shared-dependency-versions-keep-in-lockstep-with-karaoke-gen)). Check alignment with `python scripts/check-shared-deps.py`.
 - Poetry 2 `poetry lock` keeps existing locked versions. Only `--regenerate` or `poetry update` floats them.
+
+## Heavy users: a TTL cache doesn't fix a read that costs 16 s (2026-11-04)
+
+The 60 s row cache from #204 stopped the OOMs, but every cache miss still read 50k documents. What fixed it was shrinking the read itself (gzip of the projected rows: 2-3 documents) and keeping it exact with a write marker, rather than tuning the TTL. Profile on real data first: the suspected BigQuery calls and O(n²) joins weren't in the path. Also measure the path a new instance pays, not just the in-memory hit; a review caught our benchmark only timing the latter.
