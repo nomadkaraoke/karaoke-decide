@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import sqlite3
 import time
 from collections.abc import Awaitable, Callable
@@ -11,9 +12,15 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
+from backend.api.deps import get_firestore, get_settings
+from backend.api.routes.internal import router as internal_router
 from backend.config import BackendSettings
 from backend.services import user_songs_snapshot as uss
+from backend.services.catalog_store import CatalogUnavailable
+from backend.services.cloud_tasks_service import CloudTasksService
 from backend.services.firestore_service import USER_SONGS_SNAPSHOT_META as META
 from backend.services.firestore_service import FirestoreService
 from backend.services.get_made_service import _own_songs, own_items
@@ -618,3 +625,65 @@ async def test_only_user_songs_writes_are_reported() -> None:
     assert not seen
     await fs._committed("user_songs", ["a:1"])
     assert seen == [["a:1"]]
+
+
+# ------------------------------------------------------------------ the Cloud Task
+
+
+def _route_client(fs: MemoryFs) -> TestClient:
+    app = FastAPI()
+    app.include_router(internal_router, prefix="/internal")
+    app.dependency_overrides[get_firestore] = lambda: fs
+    app.dependency_overrides[get_settings] = lambda: BackendSettings(environment="development")
+    return TestClient(app)
+
+
+def test_the_refresh_route_refreshes_and_says_what_it_did(fs: MemoryFs, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[Any, ...]] = []
+
+    async def refresh(firestore: Any, reader: Any, run: str | None, user_id: str) -> str:
+        calls.append((firestore, reader, run, user_id))
+        return "compacted"
+
+    monkeypatch.setattr(uss.SNAPSHOTS, "refresh", refresh)
+    reader = Reader()
+    catalog = MagicMock(run="r9", require=lambda: reader)
+    monkeypatch.setattr("backend.api.routes.internal.get_catalog_store", lambda: catalog)
+    r = _route_client(fs).post("/internal/user-songs-snapshot/refresh", json={"user_id": USER})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"user_id": USER, "result": "compacted"}
+    assert calls == [(fs, reader, "r9", USER)]
+
+
+def test_the_refresh_route_answers_503_so_cloud_tasks_retries_while_the_catalog_loads(
+    fs: MemoryFs, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def warming() -> None:
+        raise CatalogUnavailable("warming_up")
+
+    catalog = MagicMock(run=None, require=warming)
+    monkeypatch.setattr("backend.api.routes.internal.get_catalog_store", lambda: catalog)
+    r = _route_client(fs).post("/internal/user-songs-snapshot/refresh", json={"user_id": USER})
+    assert r.status_code == 503
+
+
+def test_the_refresh_route_rejects_a_caller_without_a_valid_token_in_production(fs: MemoryFs) -> None:
+    client = _route_client(fs)
+    assert client.app is not None
+    client.app.dependency_overrides[get_settings] = lambda: BackendSettings(  # type: ignore[attr-defined]
+        environment="production", cloud_run_url="https://example.run.app"
+    )
+    r = client.post("/internal/user-songs-snapshot/refresh", json={"user_id": USER})
+    assert r.status_code in (401, 403)
+
+
+def test_the_task_posts_to_the_route_the_api_serves(monkeypatch: pytest.MonkeyPatch) -> None:
+    tasks = MagicMock()
+    monkeypatch.setattr("backend.services.cloud_tasks_service.tasks_v2", tasks)
+    service = CloudTasksService(BackendSettings(environment="development", cloud_run_url="https://x.run.app"))
+    service._client = MagicMock()
+    service.create_snapshot_refresh_task(USER)
+    http = tasks.CreateTaskRequest.call_args.kwargs["task"]["http_request"]
+    assert http["url"] == "https://x.run.app/internal/user-songs-snapshot/refresh"
+    assert json.loads(http["body"]) == {"user_id": USER}
+    assert "/user-songs-snapshot/refresh" in {getattr(r, "path", "") for r in internal_router.routes}
