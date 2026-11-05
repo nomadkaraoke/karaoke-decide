@@ -64,14 +64,14 @@ class MemoryFs(FirestoreService):
     async def batch_set(self, collection: str, docs: dict[str, dict[str, Any]], merge: bool = False) -> None:
         self._c(collection).update({k: dict(v) for k, v in docs.items()})
         items = list(docs)
-        for i in range(0, len(items), 400):
-            await self._committed(collection, items[i : i + 400])
+        for start in range(0, len(items), 400):
+            await self._committed(collection, items[start : start + 400])
 
     async def batch_delete(self, collection: str, doc_ids: list[str]) -> None:
-        for i in doc_ids:
-            self._c(collection).pop(i, None)
-        for i in range(0, len(doc_ids), 400):
-            await self._committed(collection, doc_ids[i : i + 400])
+        for doc_id in doc_ids:
+            self._c(collection).pop(doc_id, None)
+        for start in range(0, len(doc_ids), 400):
+            await self._committed(collection, doc_ids[start : start + 400])
 
     async def get_many(self, collection: str, ids: list[str]) -> dict[str, dict[str, Any]]:
         if collection == SHARDS:
@@ -87,7 +87,9 @@ class MemoryFs(FirestoreService):
             out = [d for d in out if d.get(field) == value]
         return out
 
-    async def query_documents(self, collection: str, filters: Any = None, select: Any = None, **_: Any) -> list[Any]:
+    async def query_documents(  # type: ignore[override]
+        self, collection: str, filters: Any = None, select: Any = None, **_: Any
+    ) -> list[Any]:
         if collection == "user_songs":
             self.full_reads += 1
         rows = self._rows(collection, filters)
@@ -126,7 +128,7 @@ class Reader(MagicMock):
 
     def __init__(self, *a: Any, **k: Any) -> None:
         super().__init__(*a, spec=CatalogReader, **k)
-        self.kn_song_keys = lambda ids: {}
+        self.kn_song_keys: Callable[[Any], dict[int, str]] = lambda ids: {}
         self.has_karaoke_key = lambda key: key.endswith(("0", "2", "4", "6", "8"))
         self.match_kn = lambda artist, title: None
         db = sqlite3.connect(":memory:", check_same_thread=False)
@@ -253,7 +255,12 @@ async def test_a_snapshot_row_never_needs_the_catalog_again(fs: MemoryFs) -> Non
 
     reader.has_karaoke_key = reader.match_kn = fail
     asked: list[Any] = []
-    reader.kn_song_keys = lambda ids: asked.extend(ids) or {}
+
+    def kn_song_keys(ids: Any) -> dict[int, str]:
+        asked.extend(ids)
+        return {}
+
+    reader.kn_song_keys = kn_song_keys
     assert ctx_mod.row_key(reader, rows[1], {}) == (rows[1]["_k"], True)
     assert ctx_mod.row_key(reader, rows[2], {}) is None
     ctx_mod.row_kn_keys(reader, [{**rows[0], "song_id": "123"}])
@@ -606,7 +613,7 @@ async def test_only_user_songs_writes_are_reported() -> None:
     async def mark(ids: Any) -> None:
         seen.append(ids)
 
-    fs._mark_user_songs_snapshot = mark  # type: ignore[method-assign]
+    fs._mark_user_songs_snapshot = mark  # type: ignore[method-assign,assignment]
     await fs._committed("user_artists", ["a:1"])
     assert not seen
     await fs._committed("user_songs", ["a:1"])

@@ -197,11 +197,11 @@ def _final_cands(
         out_key = key if in_catalog or key.startswith("u:") else "u:" + (norm or make_song_key(artist, title))
         if out_key in own.excluded:
             continue
-        cur = final.get(out_key)
-        if cur is None:
+        seen = final.get(out_key)
+        if seen is None:
             final[out_key] = (key if in_catalog else None, _Cand(out_key, artist, title, c.why, c.weight))
         else:
-            cur[1].merge(artist, title, c.why, c.weight)
+            seen[1].merge(artist, title, c.why, c.weight)
     return final
 
 

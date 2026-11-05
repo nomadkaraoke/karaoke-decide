@@ -614,7 +614,7 @@ async def test_a_bad_cursor_is_rejected_before_any_flight() -> None:
     [({}, True), ({"shared": False}, True), ({"shared": True}, False)],
 )
 async def test_build_context_reads_fresh_unless_asked_to_share(
-    monkeypatch: pytest.MonkeyPatch, kwargs: dict[str, bool], fresh: bool
+    monkeypatch: pytest.MonkeyPatch, kwargs: dict[str, Any], fresh: bool
 ) -> None:
     seen: list[bool] = []
 
