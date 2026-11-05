@@ -5,6 +5,8 @@
       PYTHONPATH=. python scripts/bench_heavy_user.py --rows 50000 --catalog-dir .local-stack/catalog \\
       --index-dir .local-stack/song-index
 
+Pass --new-instance for what a new instance, or the first read after a write, pays.
+
 Seeds one synthetic user, then runs the app's launch calls (recs v2, get-made, the sources summary's
 known-songs count) in separate "warm" rounds, with the 60 s row cache emptied between rounds as a new
 minute or another instance would see it. Refuses to run without the emulator: it writes.
@@ -63,6 +65,7 @@ async def main() -> int:
     parser.add_argument("--rounds", type=int, default=5)
     parser.add_argument("--catalog-dir", required=True)
     parser.add_argument("--index-dir", required=True)
+    parser.add_argument("--new-instance", action="store_true", help="measure each round as a fresh instance would")
     args = parser.parse_args()
     if not os.environ.get("FIRESTORE_EMULATOR_HOST"):
         print("FIRESTORE_EMULATOR_HOST is not set: refusing to seed anything but the emulator", file=sys.stderr)
@@ -75,6 +78,7 @@ async def main() -> int:
     from backend.services.recs_v2.filters import RecFilters
     from backend.services.recs_v2.service import RecommendationServiceV2
     from backend.services.user_songs_cache import USER_SONGS
+    from backend.services.user_songs_snapshot import SNAPSHOTS
     from karaoke_decide.catalog.reader import CatalogReader
     from karaoke_decide.core.models import User
 
@@ -110,6 +114,8 @@ async def main() -> int:
     results: dict[str, list[float]] = {"recs": [], "get_made": [], "known_songs": [], "launch": []}
     for n in range(args.rounds):
         USER_SONGS._entries.pop(USER_ID, None)  # as a new minute, or another instance, would find it
+        if args.new_instance:
+            SNAPSHOTS._views.clear()  # holds no summary: reads the shards, decodes and summarises
         started = time.perf_counter()
         r, g, k = await asyncio.gather(
             timed(recs.recommend(user, RecFilters(), "best")),
