@@ -177,6 +177,14 @@ decide's usual shape: `{"detail": "<code>"}` (FastAPI's own 422 body for schema 
 
 Server to server from gen's account deletion. Body `{"email": str}`, header `X-Partner-Secret` = `DECIDE_GEN_PARTNER_SECRET` (`hmac.compare_digest`): missing or wrong → 401 `partner_auth`; unset on the server → 503 `partner_disabled`. Runs `delete_all_user_data` (every per-user store, voice recordings included) and returns `200 {"deleted": {collection: count}}`; an unknown or already-deleted email returns `{"deleted": {}}` (idempotent, so gen can retry).
 
+### Partner: live Spotify search (`GET /api/partner/gen/spotify-search?q=&limit=`)
+
+Server to server, for gen's match judge and free-text resolver. They use it to confirm a typed song exists when the BigQuery catalogue (July 2025 Spotify snapshot + MusicBrainz) doesn't know it, e.g. a 2025 release. Same `X-Partner-Secret` auth as above (401 / 503). `q` is 2–300 chars, `limit` 1–10 (Spotify's cap since Feb 2026). Returns `200 {"tracks": [{track_id, track_name, artist_name, artist_names, album_name, release_year, duration_ms, isrc}], "available": bool}`. There is no `popularity`: Spotify removed it in Feb 2026.
+
+- **Client-credentials token** on decide's Spotify app (`SPOTIFY_CLIENT_ID` / `_SECRET`). It is app-level, so it never touches the Premium account flacfetch downloads with.
+- **Quota.** Development Mode quotas are counted per developer account, possibly shared with flacfetch's Spotify searches. Results are cached in memory for 6 h per normalised query. Any Spotify 429 pauses Spotify calls for `max(Retry-After, 10 min)`.
+- **`available: false`** means "no evidence": not configured, breaker open, or Spotify failed. It is never an HTTP error, so gen degrades instead of retrying.
+
 ### GET /api/quiz/progress
 
 Returns the progress saved by `PUT /api/quiz/progress` (same shape), or 204 when there is none.
