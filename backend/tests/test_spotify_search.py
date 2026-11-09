@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -10,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import main
-from backend.api.deps import get_settings
+from backend.api.deps import get_firestore, get_settings
 from backend.config import BackendSettings
 from backend.services import spotify_search as mod
 from backend.services.spotify_search import MIN_COOLDOWN_S, SpotifySearchService
@@ -208,6 +210,7 @@ def _client(monkeypatch: pytest.MonkeyPatch, secret: str) -> TestClient:
     monkeypatch.setattr(main, "get_backend_settings", lambda: settings)
     c = TestClient(main.create_app())
     c.app.dependency_overrides[get_settings] = lambda: settings  # type: ignore[attr-defined]
+    c.app.dependency_overrides[get_firestore] = lambda: object()  # type: ignore[attr-defined]
     return c
 
 
@@ -215,7 +218,7 @@ def _client(monkeypatch: pytest.MonkeyPatch, secret: str) -> TestClient:
 def route_fake(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeSpotify]:
     fake = FakeSpotify()
     service = SpotifySearchService("cid", "cs", transport=httpx.MockTransport(fake))
-    monkeypatch.setattr("backend.api.routes.partner_gen.get_spotify_search_service", lambda cid, cs: service)
+    monkeypatch.setattr("backend.api.routes.partner_gen.get_spotify_search_service", lambda cid, cs, store: service)
     yield fake
 
 
@@ -239,7 +242,7 @@ def test_route_returns_tracks(monkeypatch: pytest.MonkeyPatch, route_fake: FakeS
     assert body["available"] is True
     assert body["tracks"][0]["artist_name"] == "Cole Phillips"
     assert body["tracks"][0]["track_name"] == "Roll of Dice"
-    assert route_fake.search_calls[0]["limit"] == "5"
+    assert route_fake.search_calls[0]["limit"] == "10"  # always fetch (and keep) Spotify's max
 
 
 def test_route_validates_query(monkeypatch: pytest.MonkeyPatch, route_fake: FakeSpotify) -> None:
@@ -254,3 +257,146 @@ def test_get_spotify_search_service_is_shared(monkeypatch: pytest.MonkeyPatch) -
     a = mod.get_spotify_search_service("cid", "cs")
     assert mod.get_spotify_search_service("cid", "cs") is a
     assert mod.get_spotify_search_service("other", "cs") is not a
+
+
+# --- permanent store (2026-11-08: indefinite cache, nothing deleted) ---------------------
+
+from backend.services.spotify_store import (  # noqa: E402
+    BQ_TABLE,
+    CACHE_COLLECTION,
+    EMPTY_RECHECK_S,
+    SpotifyStore,
+    bq_rows,
+    query_key,
+)
+
+
+class FakeFs:
+    def __init__(self) -> None:
+        self.docs: dict[tuple[str, str], dict[str, Any]] = {}
+        self.fail = False
+
+    async def get_document(self, collection: str, doc_id: str) -> dict[str, Any] | None:
+        if self.fail:
+            raise RuntimeError("firestore down")
+        d = self.docs.get((collection, doc_id))
+        return {"id": doc_id, **d} if d else None
+
+    async def set_document(self, collection: str, doc_id: str, data: dict[str, Any], merge: bool = False) -> None:
+        if self.fail:
+            raise RuntimeError("firestore down")
+        cur = dict(self.docs.get((collection, doc_id), {})) if merge else {}
+        for k, v in data.items():
+            if type(v).__name__ == "Increment":
+                cur[k] = cur.get(k, 0) + 1
+            else:
+                cur[k] = v
+        self.docs[(collection, doc_id)] = cur
+
+
+class FakeBq:
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+        self.created: list[str] = []
+        self.fail = False
+
+    def create_table(self, table: Any, exists_ok: bool = False) -> None:
+        self.created.append(table.table_id)
+
+    def insert_rows_json(self, table_id: str, rows: list[dict[str, Any]]) -> list[Any]:
+        if self.fail:
+            raise RuntimeError("bq down")
+        self.rows.extend(rows)
+        return []
+
+
+def _stored(fake: FakeSpotify, clock: Clock, fs: FakeFs, bq: FakeBq) -> SpotifySearchService:
+    store = SpotifyStore(fs, "proj", bq_client=bq, clock=clock)
+    return SpotifySearchService("cid", "cs", transport=httpx.MockTransport(fake), clock=clock, store=store)
+
+
+async def _drain(svc: SpotifySearchService) -> None:
+    await asyncio.gather(*list(svc.store._tasks))  # type: ignore[union-attr]
+
+
+async def test_fetch_is_kept_forever_with_raw_items(fake: FakeSpotify, clock: Clock) -> None:
+    fs, bq = FakeFs(), FakeBq()
+    svc = _stored(fake, clock, fs, bq)
+    await svc.search_tracks("Roll of dice Cole Phillips", limit=3)
+    await _drain(svc)
+    doc = fs.docs[(CACHE_COLLECTION, query_key("roll of dice cole phillips"))]
+    assert doc["query"] == "roll of dice cole phillips"
+    assert doc["tracks"][0]["track_name"] == "Roll of Dice"
+    assert doc["raw_items"] == fake.search_body["tracks"]["items"]  # verbatim, nothing dropped
+    assert doc["fetch_count"] == 1
+    assert bq.rows[0]["track_id"] == "id-Roll of Dice" and bq.rows[0]["isrc"] == "USQX92500001"
+    assert bq.created == ["spotify_live_tracks"]
+
+
+async def test_seen_query_never_calls_spotify_again(fake: FakeSpotify, clock: Clock) -> None:
+    fs, bq = FakeFs(), FakeBq()
+    first = _stored(fake, clock, fs, bq)
+    await first.search_tracks("roll of dice cole phillips")
+    await _drain(first)
+    # A new instance (other Cloud Run instance / after a restart), a year later.
+    clock.t += 365 * 24 * 3600
+    fake.search_status = 500
+    later = _stored(fake, clock, fs, bq)
+    res = await later.search_tracks("Roll of Dice  Cole Phillips", limit=1)
+    assert res.available is True and [t["track_name"] for t in res.tracks] == ["Roll of Dice"]
+    assert len(fake.search_calls) == 1 and fake.token_calls == 1
+
+
+async def test_store_hit_works_even_when_spotify_unconfigured_or_breaker_open(fake: FakeSpotify, clock: Clock) -> None:
+    fs = FakeFs()
+    fs.docs[(CACHE_COLLECTION, query_key("some song"))] = {"tracks": [{"track_name": "S", "artist_name": "A"}]}
+    store = SpotifyStore(fs, "proj", bq_client=FakeBq(), clock=clock)
+    svc = SpotifySearchService("", "", transport=httpx.MockTransport(fake), clock=clock, store=store)
+    assert (await svc.search_tracks("some song")).tracks == [{"track_name": "S", "artist_name": "A"}]
+
+
+async def test_empty_result_is_kept_but_rechecked_after_a_day(fake: FakeSpotify, clock: Clock) -> None:
+    fs, bq = FakeFs(), FakeBq()
+    fake.search_body = {"tracks": {"items": []}}
+    svc = _stored(fake, clock, fs, bq)
+    await svc.search_tracks("not out yet")
+    await _drain(svc)
+    clock.t += 3600
+    svc2 = _stored(fake, clock, fs, bq)
+    assert (await svc2.search_tracks("not out yet")).tracks == []
+    assert len(fake.search_calls) == 1
+    clock.t += EMPTY_RECHECK_S
+    fake.search_body = {"tracks": {"items": [_track("Not Out Yet", "New Artist")]}}
+    svc3 = _stored(fake, clock, fs, bq)
+    res = await svc3.search_tracks("not out yet")
+    await _drain(svc3)
+    assert [t["track_name"] for t in res.tracks] == ["Not Out Yet"]
+    doc = fs.docs[(CACHE_COLLECTION, query_key("not out yet"))]
+    assert doc["fetch_count"] == 2 and doc["tracks"][0]["track_name"] == "Not Out Yet"
+
+
+async def test_store_failures_never_fail_the_search(fake: FakeSpotify, clock: Clock) -> None:
+    fs, bq = FakeFs(), FakeBq()
+    fs.fail = bq.fail = True
+    svc = _stored(fake, clock, fs, bq)
+    res = await svc.search_tracks("roll of dice")
+    await _drain(svc)
+    assert res.available is True and res.tracks
+
+
+def test_bq_rows_keep_every_field_and_the_raw_item() -> None:
+    from datetime import UTC, datetime
+
+    item = _track("Roll of Dice", "Cole Phillips")
+    item["artists"].append({"name": "Guest", "id": "g1"})
+    item["artists"][0]["id"] = "c1"
+    item["explicit"] = False
+    item["album"]["id"] = "al1"
+    item["album"]["album_type"] = "single"
+    rows = bq_rows("q", [item, {"name": "no id"}, "junk"], datetime(2026, 11, 8, tzinfo=UTC))  # type: ignore[list-item]
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["artist_names"] == ["Cole Phillips", "Guest"] and r["artist_ids"] == ["c1", "g1"]
+    assert (r["album_id"], r["album_type"], r["release_year"], r["explicit"]) == ("al1", "single", 2025, False)
+    assert json.loads(r["raw"]) == item
+    assert BQ_TABLE == "spotify_live_tracks"

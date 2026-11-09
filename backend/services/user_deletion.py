@@ -124,6 +124,7 @@ NOT_USER_DATA: frozenset[str] = frozenset(
         QuizService.LASTFM_USERS_COLLECTION,  # lastfm_users: imported public Last.fm dataset, no decide user link
         "jobs",  # gen's jobs, read by the vocal range ETL
         "voice_pool_fetch",  # global voice-pool fetch queue (songs, no user)
+        "spotify_search_cache",  # global: live Spotify search results keyed by query, no user link
         # Global per-version stats keyed by video id. Its ``not_embeddable_by`` / ``not_embeddable_by_guests`` list
         # user ids: erase_voice_data removes the user from them (the doc and any global ``embeddable`` verdict stay).
         VERSION_STATS_COLLECTION,

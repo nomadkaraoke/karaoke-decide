@@ -13,6 +13,9 @@ Why it's careful:
   circuit breaker: no Spotify call until the cooldown ends. Callers treat "unavailable" as "no
   evidence", never as an error.
 - Feb 2026 API: ``limit`` is at most 10 and tracks no longer carry ``popularity``.
+- **Kept forever** (2026-11-08): every fetch is stored by ``spotify_store.SpotifyStore``,
+  including the raw items. A query seen before is answered from the store and never asks Spotify
+  again. Lookup order: in-memory cache → permanent store → Spotify.
 """
 
 from __future__ import annotations
@@ -22,9 +25,12 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
+
+if TYPE_CHECKING:
+    from backend.services.spotify_store import SearchStore
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +83,7 @@ class SpotifySearchService:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
         clock: Any = time.monotonic,
+        store: SearchStore | None = None,
     ) -> None:
         self._client_id = client_id
         self._client_secret = client_secret
@@ -87,6 +94,7 @@ class SpotifySearchService:
         self._cooldown_until = 0.0
         self._cache: OrderedDict[str, tuple[float, list[dict[str, Any]]]] = OrderedDict()
         self._token_lock = asyncio.Lock()
+        self.store = store
 
     @property
     def configured(self) -> bool:
@@ -151,13 +159,17 @@ class SpotifySearchService:
     async def search_tracks(self, q: str, limit: int = MAX_LIMIT) -> SpotifySearchResult:
         query = _norm_query(q)
         limit = max(1, min(int(limit), MAX_LIMIT))
-        if not query or not self.configured:
+        if not query:
             return SpotifySearchResult([], available=False)
-        key = f"{limit}:{query}"
-        cached = self._cache_get(key)
+        # Always fetch Spotify's maximum and keep it all; callers get the first `limit`.
+        cached = self._cache_get(query)
+        if cached is None and self.store is not None:
+            cached = await self.store.get(query)
+            if cached is not None:
+                self._cache_set(query, cached)
         if cached is not None:
-            return SpotifySearchResult(cached, available=True)
-        if self._clock() < self._cooldown_until:
+            return SpotifySearchResult(cached[:limit], available=True)
+        if not self.configured or self._clock() < self._cooldown_until:
             return SpotifySearchResult([], available=False)
         try:
             async with self._client() as client:
@@ -166,7 +178,7 @@ class SpotifySearchService:
                     return SpotifySearchResult([], available=False)
                 resp = await client.get(
                     SEARCH_URL,
-                    params={"q": query, "type": "track", "limit": limit},
+                    params={"q": query, "type": "track", "limit": MAX_LIMIT},
                     headers={"Authorization": f"Bearer {token}"},
                 )
                 if resp.status_code == 401:
@@ -182,17 +194,25 @@ class SpotifySearchService:
         except httpx.HTTPError as exc:
             logger.warning("spotify-search: request error: %s", exc)
             return SpotifySearchResult([], available=False)
-        tracks = [v for v in (_track_view(t) for t in items if isinstance(t, dict)) if v]
-        self._cache_set(key, tracks)
-        return SpotifySearchResult(tracks, available=True)
+        raw = [t for t in items if isinstance(t, dict)]
+        tracks = [v for v in (_track_view(t) for t in raw) if v]
+        self._cache_set(query, tracks)
+        if self.store is not None:
+            await self.store.save(query, tracks, raw)  # never raises
+        return SpotifySearchResult(tracks[:limit], available=True)
 
 
 _service: SpotifySearchService | None = None
 
 
-def get_spotify_search_service(client_id: str, client_secret: str) -> SpotifySearchService:
-    """Process-wide instance (one token, one cache, one breaker per Cloud Run instance)."""
+def get_spotify_search_service(
+    client_id: str, client_secret: str, store: SearchStore | None = None
+) -> SpotifySearchService:
+    """Process-wide instance (one token, one cache, one breaker per Cloud Run instance).
+    The first ``store`` passed is kept."""
     global _service
     if _service is None or (_service._client_id, _service._client_secret) != (client_id, client_secret):
-        _service = SpotifySearchService(client_id, client_secret)
+        _service = SpotifySearchService(client_id, client_secret, store=store)
+    elif _service.store is None and store is not None:
+        _service.store = store
     return _service

@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from backend.api.deps import FirestoreServiceDep, Settings
 from backend.api.routes.admin_voice import get_recordings_bucket
 from backend.services.spotify_search import get_spotify_search_service
+from backend.services.spotify_store import SpotifyStore
 from backend.services.user_deletion import delete_all_user_data
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ async def require_gen_partner(settings: Settings, x_partner_secret: Annotated[st
 @router.get("/spotify-search", dependencies=[Depends(require_gen_partner)])
 async def spotify_search(
     settings: Settings,
+    fs: FirestoreServiceDep,
     q: Annotated[str, Query(min_length=2, max_length=300)],
     limit: Annotated[int, Query(ge=1, le=10)] = 10,
 ) -> dict[str, Any]:
@@ -54,7 +56,8 @@ async def spotify_search(
     ``available: false`` means "no evidence" (not configured, rate-limit breaker open, or Spotify
     failed). It is never an HTTP error, so gen degrades instead of retrying.
     """
-    svc = get_spotify_search_service(settings.spotify_client_id, settings.spotify_client_secret)
+    store = SpotifyStore(fs, settings.google_cloud_project or "nomadkaraoke")
+    svc = get_spotify_search_service(settings.spotify_client_id, settings.spotify_client_secret, store)
     result = await svc.search_tracks(q, limit)
     return {"tracks": result.tracks, "available": result.available}
 

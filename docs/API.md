@@ -182,7 +182,11 @@ Server to server from gen's account deletion. Body `{"email": str}`, header `X-P
 Server to server, for gen's match judge and free-text resolver. They use it to confirm a typed song exists when the BigQuery catalogue (July 2025 Spotify snapshot + MusicBrainz) doesn't know it, e.g. a 2025 release. Same `X-Partner-Secret` auth as above (401 / 503). `q` is 2–300 chars, `limit` 1–10 (Spotify's cap since Feb 2026). Returns `200 {"tracks": [{track_id, track_name, artist_name, artist_names, album_name, release_year, duration_ms, isrc}], "available": bool}`. There is no `popularity`: Spotify removed it in Feb 2026.
 
 - **Client-credentials token** on decide's Spotify app (`SPOTIFY_CLIENT_ID` / `_SECRET`). It is app-level, so it never touches the Premium account flacfetch downloads with.
-- **Quota.** Development Mode quotas are counted per developer account, possibly shared with flacfetch's Spotify searches. Results are cached in memory for 6 h per normalised query. Any Spotify 429 pauses Spotify calls for `max(Retry-After, 10 min)`.
+- **Quota.** Development Mode quotas are counted per developer account, possibly shared with flacfetch's Spotify searches. Any Spotify 429 pauses Spotify calls for `max(Retry-After, 10 min)`.
+- **Kept forever (v0.38.0, `services/spotify_store.py`), nothing deleted.** Every fetch asks Spotify for the maximum (10) and stores all of it:
+  - **Firestore `spotify_search_cache/{sha256(normalised query)}`:** `query`, `tracks` (the views), `raw_items` (Spotify's items verbatim), `fetched_at`, `fetch_count`. A query seen before is answered from here (after a 6 h in-memory layer) and never calls Spotify again, even with the breaker open. A query that found nothing is fetched again after 24 h; its doc is updated in place.
+  - **BigQuery `karaoke_decide.spotify_live_tracks`** (created on first write, partitioned by `seen_at`): append-only, one row per track per fetch, with artist and album ids, ISRC, release date and the raw item JSON. gen's kn-data-sync adds these songs to the kjbox song-identification index.
+  - The Firestore write happens before the response; the BigQuery insert runs in the background. A store failure never fails the search.
 - **`available: false`** means "no evidence": not configured, breaker open, or Spotify failed. It is never an HTTP error, so gen degrades instead of retrying.
 
 ### GET /api/quiz/progress
